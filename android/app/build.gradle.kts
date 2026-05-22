@@ -7,7 +7,6 @@ plugins {
 android {
     namespace = "com.example.registro_catechismo"
     
-    // CHANGED: Overrode flutter.compileSdkVersion to force SDK 36
     compileSdk = 36 
     ndkVersion = flutter.ndkVersion
 
@@ -17,10 +16,8 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.delelimed.registro_catechismo"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        
         minSdk = flutter.minSdkVersion
         targetSdk = 36
         versionCode = flutter.versionCode
@@ -29,9 +26,22 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // TODO: Aggiungi qui la tua configurazione di firma (Keystore) per la produzione.
             signingConfig = signingConfigs.getByName("debug")
+            
+            // --- ATTIVAZIONE SICUREZZA E OTTIMIZZAZIONE (Kotlin DSL) ---
+            
+            // Attiva l'ottimizzazione e l'offuscamento del codice nativo/Java/Kotlin tramite R8
+            isMinifyEnabled = true
+            
+            // Rimuove automaticamente le risorse (immagini, layout) non utilizzate dai pacchetti
+            isShrinkResources = true
+            
+            // Specifica le regole di ProGuard da applicare
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 }
@@ -45,4 +55,3 @@ kotlin {
 flutter {
     source = "../.."
 }
-

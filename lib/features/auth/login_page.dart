@@ -2,10 +2,12 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'bible_quote.dart';
 import '../../core/auth/auth_provider.dart';
+import '../../core/auth/auth_service.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -19,27 +21,37 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   final _pinController = TextEditingController();
   final _confirmPinController = TextEditingController();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _groupController = TextEditingController();
 
   bool _isConfirmingStage = false;
   bool _isFirstSetup = false;
+  bool _biometricAvailable = false;
 
   String _firstPin = '';
   String? _errorMessage;
+
+  final _localAuth = LocalAuthentication();
 
   @override
   void initState() {
     super.initState();
     randomQuote = bibleQuotes[Random().nextInt(bibleQuotes.length)];
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final auth = ref.read(authStateProvider);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final authService = ref.read(authServiceProvider);
+      final isConfigured = authService.isPinConfigured;
+      final canBiometric =
+          await _localAuth.isDeviceSupported() ||
+          await _localAuth.canCheckBiometrics;
 
-      setState(() {
-  _isFirstSetup = auth.maybeWhen(
-    data: (user) => user == null,
-    orElse: () => false,
-  );
-});
+      if (mounted) {
+        setState(() {
+          _isFirstSetup = !isConfigured;
+          _biometricAvailable = canBiometric && isConfigured;
+        });
+      }
     });
   }
 
@@ -54,9 +66,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     HapticFeedback.mediumImpact();
     setState(() => _errorMessage = null);
 
-    final controller =
-        _isConfirmingStage ? _confirmPinController : _pinController;
-
+    final controller = _isConfirmingStage
+        ? _confirmPinController
+        : _pinController;
     final pin = controller.text.trim();
 
     if (pin.length < 4) {
@@ -66,9 +78,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
     final auth = ref.read(authStateProvider.notifier);
 
-    // 🟢 FIRST SETUP FLOW
     if (_isFirstSetup) {
       if (!_isConfirmingStage) {
+        final firstName = _firstNameController.text.trim();
+        final lastName = _lastNameController.text.trim();
+        final groupName = _groupController.text.trim();
+
+        if (firstName.isEmpty || lastName.isEmpty || groupName.isEmpty) {
+          setState(
+            () => _errorMessage = "Nome, cognome e gruppo sono obbligatori.",
+          );
+          return;
+        }
+
         _firstPin = pin;
         _pinController.clear();
 
@@ -82,21 +104,31 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
         setState(() {
           _isConfirmingStage = false;
-          _errorMessage = "I PIN non corrispondono";
+          _errorMessage = "I PIN non corrispondono.";
         });
         return;
       }
 
-      final ok = await ref.read(authStateProvider.notifier).setupAndUnlock(pin);
+      final firstName = _firstNameController.text.trim();
+      final lastName = _lastNameController.text.trim();
+      final groupName = _groupController.text.trim();
+
+      final ok = await auth.setupAndUnlock(
+        pin,
+        firstName: firstName,
+        lastName: lastName,
+        groupName: groupName,
+      );
 
       if (!ok && mounted) {
-        setState(() => _errorMessage = "Errore durante la creazione PIN");
+        setState(
+          () => _errorMessage = "Errore durante la creazione del profilo.",
+        );
       }
 
       return;
     }
 
-    // 🟢 NORMAL LOGIN FLOW
     final ok = await auth.unlock(pin);
 
     if (!ok && mounted) {
@@ -104,6 +136,21 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         _errorMessage = "PIN errato";
         _pinController.clear();
       });
+    }
+  }
+
+  Future<void> _authenticateWithBiometrics() async {
+    HapticFeedback.mediumImpact();
+    setState(() => _errorMessage = null);
+
+    final auth = ref.read(authStateProvider.notifier);
+    final ok = await auth.unlockWithBiometrics();
+
+    if (!ok && mounted) {
+      setState(
+        () => _errorMessage =
+            "Autenticazione biometrica non riuscita. Usa il PIN.",
+      );
     }
   }
 
@@ -116,11 +163,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Color(0xFFEAF4FF),
-              Color(0xFFD5E8FF),
-              Color(0xFFB9D7FF),
-            ],
+            colors: [Color(0xFFEAF4FF), Color(0xFFD5E8FF), Color(0xFFB9D7FF)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -165,9 +208,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         Text(
                           '"${randomQuote.text}"',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontStyle: FontStyle.italic,
-                          ),
+                          style: const TextStyle(fontStyle: FontStyle.italic),
                         ),
 
                         const SizedBox(height: 28),
@@ -178,15 +219,43 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           Text(
                             _isFirstSetup
                                 ? (_isConfirmingStage
-                                    ? "Conferma PIN"
-                                    : "Crea PIN")
+                                      ? "Conferma PIN"
+                                      : "Crea il tuo account")
                                 : "Inserisci PIN",
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
 
                           const SizedBox(height: 12),
+
+                          if (_isFirstSetup && !_isConfirmingStage) ...[
+                            TextField(
+                              controller: _firstNameController,
+                              textCapitalization: TextCapitalization.words,
+                              decoration: const InputDecoration(
+                                labelText: 'Nome',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _lastNameController,
+                              textCapitalization: TextCapitalization.words,
+                              decoration: const InputDecoration(
+                                labelText: 'Cognome',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _groupController,
+                              textCapitalization: TextCapitalization.words,
+                              decoration: const InputDecoration(
+                                labelText: 'Gruppo',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                          ],
 
                           TextField(
                             controller: _isConfirmingStage
@@ -224,12 +293,25 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               child: Text(
                                 _isFirstSetup
                                     ? (_isConfirmingStage
-                                        ? "Conferma"
-                                        : "Continua")
+                                          ? "Conferma"
+                                          : "Continua")
                                     : "Sblocca",
                               ),
                             ),
                           ),
+
+                          if (!_isFirstSetup && _biometricAvailable) ...[
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: OutlinedButton.icon(
+                                icon: const Icon(Icons.fingerprint),
+                                label: const Text('Usa impronta digitale'),
+                                onPressed: _authenticateWithBiometrics,
+                              ),
+                            ),
+                          ],
                         ],
 
                         const SizedBox(height: 20),
@@ -240,8 +322,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               "https://www.diocesisabina.it/sussidiocatechesi/",
                             );
                             if (await canLaunchUrl(uri)) {
-                              await launchUrl(uri,
-                                  mode: LaunchMode.externalApplication);
+                              await launchUrl(
+                                uri,
+                                mode: LaunchMode.externalApplication,
+                              );
                             }
                           },
                           icon: const Icon(Icons.open_in_new),

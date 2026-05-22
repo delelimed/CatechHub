@@ -15,14 +15,21 @@ import '../students/students_repository.dart';
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
 
-  double _calculatePresenceRate(String classId) {
-    int totalPresences = 0;
-    int totalAbsences = 0;
+  List<Map<String, dynamic>> _attendanceForClass(
+    List<Map<String, dynamic>> attendance,
+    String classId,
+  ) {
+    return attendance.where((record) => record['classId'] == classId).toList();
+  }
 
-    for (final record in AttendanceRepository()
-        .getAttendanceSync()
-        .where((record) => record['classId'] == classId)) {
-      final presence = Map<String, dynamic>.from(record['presence'] as Map? ?? {});
+  double _calculatePresenceRate(List<Map<String, dynamic>> attendanceRecords) {
+    var totalPresences = 0;
+    var totalAbsences = 0;
+
+    for (final record in attendanceRecords) {
+      final presence = Map<String, dynamic>.from(
+        record['presence'] as Map? ?? {},
+      );
       for (final value in presence.values) {
         if (value == 'Presente') totalPresences++;
         if (value == 'Assente') totalAbsences++;
@@ -34,13 +41,16 @@ class DashboardPage extends ConsumerWidget {
     return totalPresences / total * 100;
   }
 
-  List<_HighAbsenceStudent> _fetchHighAbsenceStudents(String classId) {
+  List<_HighAbsenceStudent> _fetchHighAbsenceStudents(
+    List<Map<String, dynamic>> attendanceRecords,
+    Map<String, String> studentNames,
+  ) {
     final absenceCounts = <String, int>{};
 
-    for (final record in AttendanceRepository()
-        .getAttendanceSync()
-        .where((record) => record['classId'] == classId)) {
-      final presence = Map<String, dynamic>.from(record['presence'] as Map? ?? {});
+    for (final record in attendanceRecords) {
+      final presence = Map<String, dynamic>.from(
+        record['presence'] as Map? ?? {},
+      );
       presence.forEach((studentId, status) {
         if (status == 'Assente') {
           absenceCounts[studentId] = (absenceCounts[studentId] ?? 0) + 1;
@@ -48,46 +58,46 @@ class DashboardPage extends ConsumerWidget {
       });
     }
 
-    final students = StudentsRepository().getAllStudentsSync();
-    final result = absenceCounts.entries
-        .where((entry) => entry.value >= 6)
-        .map((entry) {
-          final matches = students.where((student) => student.id == entry.key);
-          if (matches.isEmpty) return null;
-          final student = matches.first;
-          return _HighAbsenceStudent(
-            name: '${student.name} ${student.surname}'.trim(),
-            absences: entry.value,
-          );
-        })
-        .whereType<_HighAbsenceStudent>()
-        .toList()
-      ..sort((a, b) => b.absences.compareTo(a.absences));
+    final result =
+        absenceCounts.entries
+            .where((entry) => entry.value >= 6)
+            .map((entry) {
+              final name = studentNames[entry.key];
+              if (name == null || name.isEmpty) return null;
+              return _HighAbsenceStudent(name: name, absences: entry.value);
+            })
+            .whereType<_HighAbsenceStudent>()
+            .toList()
+          ..sort((a, b) => b.absences.compareTo(a.absences));
 
     return result;
   }
 
-  List<_PendingDocument> _fetchPendingDocuments(List<String> groupStudentIds) {
-    final documentsRepo = DocumentsRepository();
-    final studentsById = {
-      for (final student in StudentsRepository().getAllStudentsSync())
-        student.id: '${student.name} ${student.surname}'.trim(),
-    };
-
+  List<_PendingDocument> _fetchPendingDocuments(
+    List<String> groupStudentIds,
+    List<Map<String, dynamic>> documents,
+    DocumentsRepository documentsRepo,
+    Map<String, String> studentsById,
+  ) {
     final result = <_PendingDocument>[];
 
-    for (final document in documentsRepo.getDocumentsSync()) {
-      final deliveries = documentsRepo.getDeliveriesSync(document['id'].toString());
-      final pendingStudents = groupStudentIds
-          .where((studentId) {
-            final delivery =
-                Map<String, dynamic>.from(deliveries[studentId] as Map? ?? {});
-            return delivery['givenOutAt'] != null && delivery['receivedAt'] == null;
-          })
-          .map((studentId) => studentsById[studentId] ?? '')
-          .where((name) => name.isNotEmpty)
-          .toList()
-        ..sort();
+    for (final document in documents) {
+      final deliveries = documentsRepo.getDeliveriesSync(
+        document['id'].toString(),
+      );
+      final pendingStudents =
+          groupStudentIds
+              .where((studentId) {
+                final delivery = Map<String, dynamic>.from(
+                  deliveries[studentId] as Map? ?? {},
+                );
+                return delivery['givenOutAt'] != null &&
+                    delivery['receivedAt'] == null;
+              })
+              .map((studentId) => studentsById[studentId] ?? '')
+              .where((name) => name.isNotEmpty)
+              .toList()
+            ..sort();
 
       if (pendingStudents.isNotEmpty) {
         result.add(
@@ -106,6 +116,9 @@ class DashboardPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final classesAsync = ref.watch(classesStreamProvider);
     final planningRepo = ref.watch(planningRepoProvider);
+    final attendanceRepo = AttendanceRepository();
+    final studentsRepo = StudentsRepository();
+    final documentsRepo = DocumentsRepository();
 
     return AppScaffold(
       title: 'Dashboard',
@@ -131,9 +144,27 @@ class DashboardPage extends ConsumerWidget {
           }
 
           final currentClass = myClassList.first;
-          final presenceRate = _calculatePresenceRate(currentClass.id);
-          final highAbsences = _fetchHighAbsenceStudents(currentClass.id);
-          final pendingDocuments = _fetchPendingDocuments(currentClass.studentIds);
+          final allAttendance = attendanceRepo.getAttendanceSync();
+          final classAttendance = _attendanceForClass(
+            allAttendance,
+            currentClass.id,
+          );
+          final allStudents = studentsRepo.getAllStudentsSync();
+          final studentNames = {
+            for (final student in allStudents)
+              student.id: '${student.name} ${student.surname}'.trim(),
+          };
+          final presenceRate = _calculatePresenceRate(classAttendance);
+          final highAbsences = _fetchHighAbsenceStudents(
+            classAttendance,
+            studentNames,
+          );
+          final pendingDocuments = _fetchPendingDocuments(
+            currentClass.studentIds,
+            documentsRepo.getDocumentsSync(),
+            documentsRepo,
+            studentNames,
+          );
 
           return StreamBuilder<List<PlanningMeeting>>(
             stream: planningRepo.getMeetings(),
@@ -143,7 +174,9 @@ class DashboardPage extends ConsumerWidget {
               }
 
               final nextMeeting = _nextMeeting(
-                snapshot.data!.where((m) => m.classId == currentClass.id).toList(),
+                snapshot.data!
+                    .where((m) => m.classId == currentClass.id)
+                    .toList(),
               );
 
               return LayoutBuilder(
@@ -161,7 +194,10 @@ class DashboardPage extends ConsumerWidget {
                         children: [
                           _SectionTitle('Il tuo prossimo impegno'),
                           const SizedBox(height: 10),
-                          _NextMeetingCard(meeting: nextMeeting, compact: !isWide),
+                          _NextMeetingCard(
+                            meeting: nextMeeting,
+                            compact: !isWide,
+                          ),
                           const SizedBox(height: 24),
                           _SectionTitle('Andamento del gruppo'),
                           const SizedBox(height: 10),
@@ -194,10 +230,17 @@ class DashboardPage extends ConsumerWidget {
   PlanningMeeting? _nextMeeting(List<PlanningMeeting> meetings) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final futureMeetings = meetings
-        .where((m) => !DateTime(m.date.year, m.date.month, m.date.day).isBefore(today))
-        .toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
+    final futureMeetings =
+        meetings
+            .where(
+              (m) => !DateTime(
+                m.date.year,
+                m.date.month,
+                m.date.day,
+              ).isBefore(today),
+            )
+            .toList()
+          ..sort((a, b) => a.date.compareTo(b.date));
 
     return futureMeetings.isEmpty ? null : futureMeetings.first;
   }
@@ -207,20 +250,14 @@ class _HighAbsenceStudent {
   final String name;
   final int absences;
 
-  const _HighAbsenceStudent({
-    required this.name,
-    required this.absences,
-  });
+  const _HighAbsenceStudent({required this.name, required this.absences});
 }
 
 class _PendingDocument {
   final String title;
   final List<String> students;
 
-  const _PendingDocument({
-    required this.title,
-    required this.students,
-  });
+  const _PendingDocument({required this.title, required this.students});
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -233,9 +270,9 @@ class _SectionTitle extends StatelessWidget {
     return Text(
       title,
       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: const Color(0xFF174A7E),
-          ),
+        fontWeight: FontWeight.bold,
+        color: const Color(0xFF174A7E),
+      ),
     );
   }
 }
@@ -244,10 +281,7 @@ class _NextMeetingCard extends StatelessWidget {
   final PlanningMeeting? meeting;
   final bool compact;
 
-  const _NextMeetingCard({
-    required this.meeting,
-    required this.compact,
-  });
+  const _NextMeetingCard({required this.meeting, required this.compact});
 
   @override
   Widget build(BuildContext context) {
@@ -282,7 +316,10 @@ class _NextMeetingCard extends StatelessWidget {
           ),
           Text(
             DateFormat('MMM', 'it_IT').format(meeting!.date).toUpperCase(),
-            style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              color: Colors.white70,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -308,7 +345,10 @@ class _NextMeetingCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   meeting!.title,
-                  style: const TextStyle(fontWeight: FontWeight.w600, height: 1.35),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
                 ),
                 if (meeting!.activity.trim().isNotEmpty) ...[
                   const SizedBox(height: 8),
@@ -444,7 +484,10 @@ class _HighAbsencePanel extends StatelessWidget {
                   color: Colors.red.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(Icons.warning_amber_rounded, color: Colors.red.shade700),
+                child: Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.red.shade700,
+                ),
               ),
               const SizedBox(width: 14),
               const Expanded(
@@ -473,10 +516,7 @@ class _HighAbsencePanel extends StatelessWidget {
                         style: const TextStyle(fontWeight: FontWeight.w500),
                       ),
                     ),
-                    _CountBadge(
-                      text: '${student.absences}',
-                      color: Colors.red,
-                    ),
+                    _CountBadge(text: '${student.absences}', color: Colors.red),
                   ],
                 ),
               ),
@@ -507,7 +547,10 @@ class _PendingDocumentsCard extends StatelessWidget {
                   color: Colors.orange.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(Icons.description_outlined, color: Colors.orange.shade800),
+                child: Icon(
+                  Icons.description_outlined,
+                  color: Colors.orange.shade800,
+                ),
               ),
               const SizedBox(width: 14),
               const Expanded(
@@ -583,7 +626,11 @@ class _QuickActionsGrid extends StatelessWidget {
         icon: Icons.check_circle_outline,
         path: '/attendance-meetings',
       ),
-      _ActionItem(title: 'Documenti', icon: Icons.description_outlined, path: '/documents'),
+      _ActionItem(
+        title: 'Documenti',
+        icon: Icons.description_outlined,
+        path: '/documents',
+      ),
     ];
 
     return LayoutBuilder(
@@ -634,10 +681,7 @@ class _CountBadge extends StatelessWidget {
   final String text;
   final MaterialColor color;
 
-  const _CountBadge({
-    required this.text,
-    required this.color,
-  });
+  const _CountBadge({required this.text, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -664,10 +708,7 @@ class _Panel extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
 
-  const _Panel({
-    required this.child,
-    this.padding = const EdgeInsets.all(18),
-  });
+  const _Panel({required this.child, this.padding = const EdgeInsets.all(18)});
 
   @override
   Widget build(BuildContext context) {
@@ -695,9 +736,5 @@ class _ActionItem {
   final IconData icon;
   final String path;
 
-  _ActionItem({
-    required this.title,
-    required this.icon,
-    required this.path,
-  });
+  _ActionItem({required this.title, required this.icon, required this.path});
 }

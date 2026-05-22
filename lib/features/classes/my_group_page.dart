@@ -27,71 +27,77 @@ class _StudentWithStats {
   });
 }
 
-final _groupStudentsStatsProvider =
-    StreamProvider.autoDispose.family<List<_StudentWithStats>, List<String>>(
-        (ref, studentIds) {
-  final studentsRepo = ref.read(studentsRepoProvider);
-  final attendanceRepo = AttendanceRepository();
+final _groupStudentsStatsProvider = StreamProvider.autoDispose
+    .family<List<_StudentWithStats>, List<String>>((ref, studentIds) {
+      final studentsRepo = ref.read(studentsRepoProvider);
+      final attendanceRepo = AttendanceRepository();
 
-  final studentsStream = studentsRepo.getAllStudents();
+      final studentsStream = studentsRepo.getAllStudents();
 
-  return studentsStream.asyncMap((allStudents) async {
-    final attendance = attendanceRepo.getAttendanceSync()
-      ..sort((a, b) {
-        final aDate = DateTime.tryParse(a['date']?.toString() ?? '') ??
-            DateTime.fromMillisecondsSinceEpoch(0);
-        final bDate = DateTime.tryParse(b['date']?.toString() ?? '') ??
-            DateTime.fromMillisecondsSinceEpoch(0);
-        return bDate.compareTo(aDate);
-      });
-    final classStudents =
-        allStudents.where((s) => studentIds.contains(s.id)).toList();
+      return studentsStream.asyncMap((allStudents) async {
+        final attendance = attendanceRepo.getAttendanceSync()
+          ..sort((a, b) {
+            final aDate =
+                DateTime.tryParse(a['date']?.toString() ?? '') ??
+                DateTime.fromMillisecondsSinceEpoch(0);
+            final bDate =
+                DateTime.tryParse(b['date']?.toString() ?? '') ??
+                DateTime.fromMillisecondsSinceEpoch(0);
+            return bDate.compareTo(aDate);
+          });
 
-    Map<String, int> totalPresenceMap = {};
-    Map<String, int> totalAbsenceMap = {};
-    Map<String, int> consecutiveAbsencesMap = {};
-    Map<String, bool> breakConsecutiveMap = {};
+        final studentIdsSet = studentIds.toSet();
+        final classStudents = allStudents
+            .where((s) => studentIdsSet.contains(s.id))
+            .toList();
 
-    for (final s in classStudents) {
-      totalPresenceMap[s.id] = 0;
-      totalAbsenceMap[s.id] = 0;
-      consecutiveAbsencesMap[s.id] = 0;
-      breakConsecutiveMap[s.id] = false;
-    }
+        final totalPresenceMap = <String, int>{};
+        final totalAbsenceMap = <String, int>{};
+        final consecutiveAbsencesMap = <String, int>{};
+        final breakConsecutiveMap = <String, bool>{};
 
-    for (final data in attendance) {
-      final presence = Map<String, dynamic>.from(data['presence'] as Map? ?? {});
+        for (final s in classStudents) {
+          totalPresenceMap[s.id] = 0;
+          totalAbsenceMap[s.id] = 0;
+          consecutiveAbsencesMap[s.id] = 0;
+          breakConsecutiveMap[s.id] = false;
+        }
 
-      for (final studentId in studentIds) {
-        final status = presence[studentId]?.toString();
+        for (final data in attendance) {
+          final presence = Map<String, dynamic>.from(
+            data['presence'] as Map? ?? {},
+          );
 
-        if (status == 'Presente') {
-          totalPresenceMap[studentId] =
-              (totalPresenceMap[studentId] ?? 0) + 1;
+          for (final entry in presence.entries) {
+            final studentId = entry.key.toString();
+            if (!studentIdsSet.contains(studentId)) continue;
 
-          breakConsecutiveMap[studentId] = true;
-        } else if (status == 'Assente') {
-          totalAbsenceMap[studentId] =
-              (totalAbsenceMap[studentId] ?? 0) + 1;
-
-          if (breakConsecutiveMap[studentId] == false) {
-            consecutiveAbsencesMap[studentId] =
-                (consecutiveAbsencesMap[studentId] ?? 0) + 1;
+            final status = entry.value?.toString();
+            if (status == 'Presente') {
+              totalPresenceMap[studentId] =
+                  (totalPresenceMap[studentId] ?? 0) + 1;
+              breakConsecutiveMap[studentId] = true;
+            } else if (status == 'Assente') {
+              totalAbsenceMap[studentId] =
+                  (totalAbsenceMap[studentId] ?? 0) + 1;
+              if (breakConsecutiveMap[studentId] == false) {
+                consecutiveAbsencesMap[studentId] =
+                    (consecutiveAbsencesMap[studentId] ?? 0) + 1;
+              }
+            }
           }
         }
-      }
-    }
 
-    return classStudents.map((s) {
-      return _StudentWithStats(
-        student: s,
-        totalPresence: totalPresenceMap[s.id] ?? 0,
-        totalAbsence: totalAbsenceMap[s.id] ?? 0,
-        consecutiveAbsences: consecutiveAbsencesMap[s.id] ?? 0,
-      );
-    }).toList();
-  });
-});
+        return classStudents.map((s) {
+          return _StudentWithStats(
+            student: s,
+            totalPresence: totalPresenceMap[s.id] ?? 0,
+            totalAbsence: totalAbsenceMap[s.id] ?? 0,
+            consecutiveAbsences: consecutiveAbsencesMap[s.id] ?? 0,
+          );
+        }).toList();
+      });
+    });
 
 class MyGroupPage extends ConsumerWidget {
   const MyGroupPage({super.key});
@@ -111,22 +117,17 @@ class MyGroupPage extends ConsumerWidget {
         data: (classes) {
           final myClass = classes.firstWhere(
             (c) => c.catechistIds.contains(uid),
-            orElse: () => SchoolClass(
-              id: '',
-              name: '',
-              studentIds: [],
-              catechistIds: [],
-            ),
+            orElse: () =>
+                SchoolClass(id: '', name: '', studentIds: [], catechistIds: []),
           );
 
           if (myClass.id.isEmpty) {
-            return const Center(
-              child: Text('Nessun gruppo assegnato'),
-            );
+            return const Center(child: Text('Nessun gruppo assegnato'));
           }
 
-          final studentsStatsAsync =
-              ref.watch(_groupStudentsStatsProvider(myClass.studentIds));
+          final studentsStatsAsync = ref.watch(
+            _groupStudentsStatsProvider(myClass.studentIds),
+          );
 
           return studentsStatsAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
@@ -163,9 +164,7 @@ class MyGroupPage extends ConsumerWidget {
 
                   Expanded(
                     child: studentsWithStats.isEmpty
-                        ? const Center(
-                            child: Text('Nessun ragazzo presente'),
-                          )
+                        ? const Center(child: Text('Nessun ragazzo presente'))
                         : ListView.separated(
                             padding: const EdgeInsets.all(12),
                             itemCount: studentsWithStats.length,
@@ -179,8 +178,7 @@ class MyGroupPage extends ConsumerWidget {
                                 compact: !isDesktop,
                                 present: item.totalPresence,
                                 absent: item.totalAbsence,
-                                consecutiveAbsences:
-                                    item.consecutiveAbsences,
+                                consecutiveAbsences: item.consecutiveAbsences,
                               );
                             },
                           ),
@@ -237,8 +235,7 @@ class _MobileActions extends StatelessWidget {
                     className: className,
                     students: students.map((s) {
                       return PrintStudentData(
-                        fullName:
-                            '${s.student.name} ${s.student.surname}',
+                        fullName: '${s.student.name} ${s.student.surname}',
                         present: s.totalPresence,
                         absent: s.totalAbsence,
                         consecutiveAbsences: s.consecutiveAbsences,
@@ -293,8 +290,7 @@ class _DesktopActions extends StatelessWidget {
                 className: className,
                 students: students.map((s) {
                   return PrintStudentData(
-                    fullName:
-                        '${s.student.name} ${s.student.surname}',
+                    fullName: '${s.student.name} ${s.student.surname}',
                     present: s.totalPresence,
                     absent: s.totalAbsence,
                     consecutiveAbsences: s.consecutiveAbsences,
@@ -388,18 +384,12 @@ class _ClassHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.groups_rounded,
-            color: Color(0xFF174A7E),
-          ),
+          const Icon(Icons.groups_rounded, color: Color(0xFF174A7E)),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               name,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -443,20 +433,19 @@ class _StudentCard extends StatelessWidget {
             color: Colors.black.withOpacity(0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: compact ? 16 : 20,
-            backgroundColor:
-                hasWarning ? Colors.red.shade100 : Colors.blue.shade50,
+            backgroundColor: hasWarning
+                ? Colors.red.shade100
+                : Colors.blue.shade50,
             child: Icon(
               Icons.person,
-              color: hasWarning
-                  ? Colors.red.shade900
-                  : const Color(0xFF174A7E),
+              color: hasWarning ? Colors.red.shade900 : const Color(0xFF174A7E),
             ),
           ),
 
@@ -472,9 +461,7 @@ class _StudentCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: compact ? 13 : 15,
                     fontWeight: FontWeight.w600,
-                    color: hasWarning
-                        ? Colors.red.shade900
-                        : Colors.black87,
+                    color: hasWarning ? Colors.red.shade900 : Colors.black87,
                   ),
                 ),
                 if (hasWarning)

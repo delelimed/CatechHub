@@ -19,6 +19,7 @@ dependencies:
   # Database Locale e Crittografia (Nuovi)
   hive_flutter: ^1.1.0
   flutter_secure_storage: ^10.2.0 # Serve per salvare la chiave di cifratura in modo sicuro nel portachiavi del telefono
+  crypto: ^3.0.0 # Per hashing sicuro del PIN con SHA256 + salt
 
   # Scambio Dati e Condivisione (Nuovi)
   share_plus: ^13.1.0   # Permette di inviare il file di backup a un altro telefono tramite qualsiasi app

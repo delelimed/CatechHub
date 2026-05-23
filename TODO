@@ -1,9 +1,14 @@
-sistema export (2) +
-
 genera apk (1) -
     - auto update al rilascio di nuove versioni
+    - ottimizza in velocità
 
-mio gruppo (4) *
+sistema export (2)
+
+Integra sussidio diocesano (3)
+
+---- FIRST BETA RELEASE ----
+
+mio gruppo (4) *codex
     -aggiungi visualizzazione rapida:
         - nome cognome nascita
         - nome e cognome, numero genitori
@@ -11,8 +16,10 @@ mio gruppo (4) *
         - assenze
     - visualizza se documenti in attesa
 
-Integra sussidio diocesano (3) +
+Integra crittazione completa dei dati (5) *codex
 
-Integra crittazione completa dei dati (5) *
+Integra condivisione cifrata via qr (6) *codex
 
-Integra condivisione cifrata via qr (6) *
+Integra salvataggio di file di backup (7) *codex
+
+Inserisci manuale utente (8) *codex

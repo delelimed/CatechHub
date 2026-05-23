@@ -16,7 +16,12 @@ class LocalDatabase {
   static const _secureStorage = FlutterSecureStorage();
   static const _encryptionKeyName = 'secure_database_key';
 
+  static late final HiveAesCipher _cipher;
+  static bool _initialized = false;
+
   static Future<void> init() async {
+    if (_initialized) return;
+
     await Hive.initFlutter();
 
     var encryptionKeyString = await _secureStorage.read(key: _encryptionKeyName);
@@ -29,17 +34,19 @@ class LocalDatabase {
       );
     }
 
-    final cipher = HiveAesCipher(base64Url.decode(encryptionKeyString));
+    _cipher = HiveAesCipher(base64Url.decode(encryptionKeyString));
 
     await Future.wait([
-      Hive.openBox(authBox, encryptionCipher: cipher),
-      Hive.openBox<Map>(classesBox, encryptionCipher: cipher),
-      Hive.openBox<Map>(studentsBox, encryptionCipher: cipher),
-      Hive.openBox<Map>(planningBox, encryptionCipher: cipher),
-      Hive.openBox<Map>(attendanceBox, encryptionCipher: cipher),
-      Hive.openBox<Map>(documentsBox, encryptionCipher: cipher),
-      Hive.openBox<Map>(documentDeliveriesBox, encryptionCipher: cipher),
+      Hive.openBox(authBox, encryptionCipher: _cipher),
+      Hive.openBox<Map>(classesBox, encryptionCipher: _cipher),
+      Hive.openBox<Map>(studentsBox, encryptionCipher: _cipher),
+      Hive.openBox<Map>(planningBox, encryptionCipher: _cipher),
+      Hive.openBox<Map>(attendanceBox, encryptionCipher: _cipher),
+      Hive.openBox<Map>(documentsBox, encryptionCipher: _cipher),
+      Hive.openBox<Map>(documentDeliveriesBox, encryptionCipher: _cipher),
     ]);
+
+    _initialized = true;
   }
 
   static Box auth() => Hive.box(authBox);

@@ -56,24 +56,27 @@ class ClassesRepository {
     await _box.delete(id);
 
     final planningBox = LocalDatabase.planning();
-    final meetingIds = planningBox.keys.where((key) {
-      final data = LocalDatabase.toStringDynamicMap(planningBox.get(key));
-      return data['classId'] == id;
-    }).toList();
+    final attendanceBox = LocalDatabase.attendance();
 
-    for (final meetingId in meetingIds) {
-      await planningBox.delete(meetingId);
-      await LocalDatabase.attendance().delete(meetingId);
+    final keysToDelete = <dynamic>[];
+    for (final key in planningBox.keys) {
+      final data = LocalDatabase.toStringDynamicMap(planningBox.get(key));
+      if (data['classId'] == id) keysToDelete.add(key);
     }
 
-    final attendanceBox = LocalDatabase.attendance();
-    final orphanAttendanceIds = attendanceBox.keys.where((key) {
-      final data = LocalDatabase.toStringDynamicMap(attendanceBox.get(key));
-      return data['classId'] == id;
-    }).toList();
+    for (final key in keysToDelete) {
+      await planningBox.delete(key);
+      await attendanceBox.delete(key);
+    }
 
-    for (final attendanceId in orphanAttendanceIds) {
-      await attendanceBox.delete(attendanceId);
+    final attendanceKeysToDelete = <dynamic>[];
+    for (final key in attendanceBox.keys) {
+      final data = LocalDatabase.toStringDynamicMap(attendanceBox.get(key));
+      if (data['classId'] == id) attendanceKeysToDelete.add(key);
+    }
+
+    for (final key in attendanceKeysToDelete) {
+      await attendanceBox.delete(key);
     }
   }
 

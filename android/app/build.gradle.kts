@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.registro_catechismo"
+    namespace = "com.delelimed.registro_catechismo"
     
     compileSdk = 36 
     ndkVersion = flutter.ndkVersion
@@ -26,22 +26,9 @@ android {
 
     buildTypes {
         release {
-            // TODO: Aggiungi qui la tua configurazione di firma (Keystore) per la produzione.
             signingConfig = signingConfigs.getByName("debug")
-            
-            // --- ATTIVAZIONE SICUREZZA E OTTIMIZZAZIONE (Kotlin DSL) ---
-            
-            // Attiva l'ottimizzazione e l'offuscamento del codice nativo/Java/Kotlin tramite R8
-            isMinifyEnabled = true
-            
-            // Rimuove automaticamente le risorse (immagini, layout) non utilizzate dai pacchetti
-            isShrinkResources = true
-            
-            // Specifica le regole di ProGuard da applicare
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
@@ -54,4 +41,8 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Removed Google Play dependencies - not needed for local-only app
 }

@@ -2,7 +2,7 @@ name: CatechHub
 description: "Il tuo registro di catechismo"
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 0.1.2+1
 
 environment:
   sdk: ^3.12.0
@@ -31,9 +31,14 @@ dependencies:
   flutter_animate: ^4.5.2
   intl: ^0.20.2
   url_launcher: ^6.3.0
+  http: ^1.2.0
+  package_info_plus: ^10.0.0
+  permission_handler: ^11.3.0
+  flutter_local_notifications: ^17.0.0
   pdf: ^3.10.0
   printing: ^5.11.0
   cupertino_icons: ^1.0.8
+  collection: ^1.18.0
 
 dev_dependencies:
   flutter_test:

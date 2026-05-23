@@ -43,15 +43,24 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final authService = ref.read(authServiceProvider);
       final isConfigured = authService.isPinConfigured;
-      final canBiometric =
-          await _localAuth.isDeviceSupported() ||
-          await _localAuth.canCheckBiometrics;
+      debugPrint('Login initState - PIN configurato: $isConfigured');
+
+      final isDeviceSupported = await _localAuth.isDeviceSupported();
+      final canCheckBiometrics = await _localAuth.canCheckBiometrics;
+      debugPrint('Login initState - Device supportato: $isDeviceSupported, Can check: $canCheckBiometrics');
+
+      final availableBiometrics = await _localAuth.getAvailableBiometrics();
+      debugPrint('Login initState - Biometriche disponibili: $availableBiometrics');
+
+      final canBiometric = (isDeviceSupported || canCheckBiometrics) && availableBiometrics.isNotEmpty;
 
       if (mounted) {
         setState(() {
           _isFirstSetup = !isConfigured;
           _biometricAvailable = canBiometric && isConfigured;
+          debugPrint('Login initState - Biometrica disponibile: $_biometricAvailable');
           if (_biometricAvailable) {
+            debugPrint('Login initState - Avvio autenticazione biometrica automatica');
             _authenticateWithBiometrics();
           }
         });

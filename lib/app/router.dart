@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/storage/local_database.dart';
+import '../features/auth/login_page.dart';
 import '../features/classes/my_group_page.dart';
 import '../features/classes/group_management_page.dart';
 import '../features/dashboard/dashboard_page.dart';
-import '../features/classes/classes_page.dart';
-import '../features/classes/class_detail_page.dart';
 import '../features/students/students_page.dart';
 import '../shared/models/student_model.dart';
 import '../features/students/student_detail_page.dart';
@@ -16,8 +15,8 @@ import '../features/planning/planning_page.dart';
 import '../features/documents/documents_page.dart';
 import '../features/settings/settings_page.dart';
 import '../features/settings/privacy.dart';
-import '../features/documents/document_detail_page.dart'; 
-import '../features/auth/login_page.dart';
+import '../features/documents/document_detail_page.dart';
+import '../features/sussidio/sussidio.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -42,44 +41,30 @@ final appRouter = GoRouter(
     /// AUTH (Schermata di sblocco locale)
     GoRoute(
       path: '/login',
-      builder: (_, __) => const LoginPage(),
+      builder: (context, state) => const LoginPage(),
     ),
 
     /// DASHBOARD
     GoRoute(
       path: '/',
-      builder: (_, __) => const DashboardPage(),
-    ),
-
-    /// CLASSES
-    GoRoute(
-      path: '/classes',
-      builder: (_, __) => const ClassesPage(),
-    ),
-
-    GoRoute(
-      path: '/class-detail',
-      builder: (_, state) {
-        final classId = state.extra as String;
-        return ClassDetailPage(classId: classId);
-      },
+      builder: (context, state) => const DashboardPage(),
     ),
 
     /// STUDENTS
     GoRoute(
       path: '/students',
-      builder: (_, __) => const StudentsPage(),
+      builder: (context, state) => const StudentsPage(),
     ),
 
     GoRoute(
       path: '/student-detail',
-      builder: (_, __) => const StudentDetailPage(),
+      builder: (context, state) => const StudentDetailPage(),
     ),
 
     /// ATTENDANCE FLOW
     GoRoute(
       path: '/attendance-meetings',
-      builder: (_, __) => const AttendanceMeetingsPage(),
+      builder: (context, state) => const AttendanceMeetingsPage(),
     ),
 
     GoRoute(
@@ -93,23 +78,23 @@ final appRouter = GoRouter(
     /// PLANNING
     GoRoute(
       path: '/planning',
-      builder: (_, __) => const PlanningPage(),
+      builder: (context, state) => const PlanningPage(),
     ),
 
     /// DOCUMENTS
     GoRoute(
       path: '/documents',
-      builder: (_, __) => const DocumentsPage(),
+      builder: (context, state) => const DocumentsPage(),
     ),
 
     GoRoute(
       path: '/document-detail',
-      builder: (_, state) {
-        final extraData = state.extra as Map<String, dynamic>;
+      builder: (context, state) {
+        final extraData = state.extra as Map<String, dynamic>? ?? {};
         
         return DocumentDetailPage(
-          document: extraData['document'] as Map<String, dynamic>,
-          students: extraData['students'] as List<Student>,
+          document: extraData['document'] as Map<String, dynamic>? ?? {},
+          students: extraData['students'] as List<Student>? ?? [],
         );
       },
     ),
@@ -117,24 +102,30 @@ final appRouter = GoRouter(
     /// SETTINGS
     GoRoute(
       path: '/settings',
-      builder: (_, __) => const SettingsPage(),
+      builder: (context, state) => const SettingsPage(),
     ),
 
     GoRoute(
       path: '/privacy-security',
-      builder: (_, __) => const PrivacySecurityPage(),
+      builder: (context, state) => const PrivacySecurityPage(),
     ),
 
     /// MY GROUP
     GoRoute(
       path: '/my-group',
-      builder: (_, __) => const MyGroupPage(),
+      builder: (context, state) => const MyGroupPage(),
     ),
 
     /// GROUP MANAGEMENT
     GoRoute(
       path: '/group-management',
-      builder: (_, __) => const GroupManagementPage(),
+      builder: (context, state) => const GroupManagementPage(),
+    ),
+
+    /// SUSSIDIO
+    GoRoute(
+      path: '/sussidio',
+      builder: (context, state) => const SussidioPage(),
     ),
   ],
 );

@@ -1,5 +1,11 @@
 import '../../core/storage/local_database.dart';
 import '../../shared/models/planning_meeting.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+final planningRepositoryProvider =
+    Provider<PlanningRepository>((ref) {
+  return PlanningRepository();
+});
 
 class PlanningRepository {
   final _box = LocalDatabase.planning();

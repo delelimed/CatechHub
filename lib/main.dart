@@ -1,6 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'app/router.dart';
 import 'core/auth/auth_provider.dart';
@@ -10,6 +16,15 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('it_IT', null);
   await LocalDatabase.init();
+
+  // Reset della sessione al startup: forza il re-login anche se l'app è stata killata
+  LocalDatabase.auth().put('isLoggedIn', false);
+
+  // Inizializza il plugin delle notifiche locali
+  await UpdateService.initNotifications();
+
+  // Avvia il controllo degli aggiornamenti in background senza bloccare il main
+  UpdateService.checkForUpdates();
 
   runApp(const ProviderScope(child: MyApp()));
 }
@@ -63,6 +78,98 @@ class _ErrorScreen extends StatelessWidget {
           child: Text(message, textAlign: TextAlign.center),
         ),
       ),
+    );
+  }
+}
+
+/// Servizio che gestisce il controllo delle release su GitHub e l'invio delle notifiche
+class UpdateService {
+  static final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
+
+  /// Configura il sistema di notifiche locali e definisce l'azione al clic
+  static Future<void> initNotifications() async {
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    
+    const InitializationSettings initializationSettings = InitializationSettings(
+      android: initializationSettingsAndroid,
+    );
+
+    await _notificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) async {
+        if (response.payload != null) {
+          final url = Uri.parse(response.payload!);
+          if (await canLaunchUrl(url)) {
+            await launchUrl(url, mode: LaunchMode.externalApplication);
+          }
+        }
+      },
+    );
+  }
+
+  /// Verifica la presenza di nuove versioni richiedendo i permessi necessari
+  static Future<void> checkForUpdates() async {
+    // Richiede il permesso di notifica (fondamentale su Android 13+)
+    if (await Permission.notification.request().isGranted) {
+      try {
+        // Recupera la versione corrente dell'APK installato
+        final packageInfo = await PackageInfo.fromPlatform();
+        final currentVersion = packageInfo.version;
+
+        // Richiesta HTTP alle API pubbliche di GitHub
+        final response = await http.get(
+          Uri.parse('https://api.github.com/repos/delelimed/CatechHub/releases/latest'),
+        );
+
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          final String latestVersion = (data['tag_name'] as String).replaceAll('v', '');
+          final String downloadUrl = data['html_url'];
+
+          // Se la versione su GitHub è più recente, mostra la notifica
+          if (_isVersionNewer(currentVersion, latestVersion)) {
+            _showUpdateNotification(latestVersion, downloadUrl);
+          }
+        }
+      } catch (e) {
+        // Fallisce silenziosamente per evitare crash se l'utente è offline all'avvio
+        debugPrint('Errore controllo aggiornamenti: $e');
+      }
+    }
+  }
+
+  /// Algoritmo di confronto per versioni in formato semantico (es. 1.2.0 > 1.1.9)
+  static bool _isVersionNewer(String current, String latest) {
+    List<int> currentParts = current.split('.').map(int.parse).toList();
+    List<int> latestParts = latest.split('.').map(int.parse).toList();
+
+    for (int i = 0; i < latestParts.length; i++) {
+      if (i >= currentParts.length) return true;
+      if (latestParts[i] > currentParts[i]) return true;
+      if (latestParts[i] < currentParts[i]) return false;
+    }
+    return false;
+  }
+
+  /// Genera e mostra la notifica push locale nel centro notifiche di Android
+  static Future<void> _showUpdateNotification(String version, String url) async {
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'update_channel_id',
+      'Aggiornamenti App',
+      channelDescription: 'Notifiche per i nuovi aggiornamenti di CatechHub',
+      importance: Importance.max,
+      priority: Priority.high,
+    );
+
+    const NotificationDetails platformDetails = NotificationDetails(android: androidDetails);
+
+    await _notificationsPlugin.show(
+      0,
+      'Aggiornamento Disponibile!',
+      'È presente la versione $version. Tocca qui per scaricarla.',
+      platformDetails,
+      payload: url,
     );
   }
 }

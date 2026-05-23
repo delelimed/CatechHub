@@ -89,26 +89,53 @@ class AuthService {
 
   Future<bool> unlockWithBiometrics() async {
     try {
-      final canAuthenticate =
-          await _localAuth.isDeviceSupported() ||
-          await _localAuth.canCheckBiometrics;
-      if (!canAuthenticate) return false;
+      final isDeviceSupported = await _localAuth.isDeviceSupported();
+      final canCheckBiometrics = await _localAuth.canCheckBiometrics;
+
+      debugPrint('Biometric check - Supported: $isDeviceSupported, CanCheck: $canCheckBiometrics');
+
+      if (!isDeviceSupported && !canCheckBiometrics) {
+        debugPrint('Dispositivo non supporta biometrica');
+        return false;
+      }
+
+      final availableBiometrics = await _localAuth.getAvailableBiometrics();
+      debugPrint('Biometriche disponibili: $availableBiometrics');
+
+      if (availableBiometrics.isEmpty) {
+        debugPrint('Nessuna biometrica configurata sul dispositivo');
+        return false;
+      }
 
       final authenticated = await _localAuth.authenticate(
         localizedReason: 'Autenticati per sbloccare il Registro',
         options: const AuthenticationOptions(
           biometricOnly: true,
           stickyAuth: false,
+          useErrorDialogs: true,
         ),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          debugPrint('Timeout autenticazione biometrica');
+          return false;
+        },
       );
 
-      if (!authenticated) return false;
+      if (!authenticated) {
+        debugPrint('Autenticazione biometrica fallita o annullata');
+        return false;
+      }
 
       final storedHash = _box.get('local_pin_hash');
-      if (storedHash == null) return false;
+      if (storedHash == null) {
+        debugPrint('PIN non configurato');
+        return false;
+      }
 
       await _box.put('isLoggedIn', true);
       _cachedUser = null;
+      debugPrint('Autenticazione biometrica riuscita');
       return true;
     } catch (e) {
       debugPrint('Errore biometric auth: $e');

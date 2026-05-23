@@ -6,7 +6,7 @@ import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/models/student_model.dart';
 import '../students/students_repository.dart';
-import '../students/students_add_page.dart';
+import '../students/students_add_page.dart' hide classesRepoProvider;
 import '../students/edit_student_page.dart';
 import 'classes_provider.dart';
 import 'classes_repository.dart';
@@ -54,7 +54,7 @@ class GroupManagementPage extends ConsumerWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => AddStudentPage(classId: myClass.id),
+                  builder: (_) => const AddStudentPage(),
                 ),
               ).then((_) {
                 ref.refresh(classesStreamProvider);
@@ -130,14 +130,16 @@ class _GroupHeader extends ConsumerWidget {
                     schoolClass.id,
                     schoolClass.copyWith(name: controller.text),
                   );
-                  onNameChanged();
                   if (context.mounted) {
                     Navigator.pop(context);
+                    onNameChanged();
                   }
                 } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Errore: $e')),
-                  );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Errore: $e')),
+                    );
+                  }
                 }
               }
             },

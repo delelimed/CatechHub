@@ -1,4 +1,10 @@
 import '../../core/storage/local_database.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+final attendanceRepositoryProvider =
+    Provider<AttendanceRepository>((ref) {
+  return AttendanceRepository();
+});
 
 class AttendanceRepository {
   final _box = LocalDatabase.attendance();

@@ -10,7 +10,7 @@ import '../../shared/models/student_model.dart';
 import '../classes/classes_provider.dart';
 import '../meetings/attendance_repository.dart';
 import '../students/students_provider.dart';
-import 'print_service.dart';
+import 'attendance_print_page.dart';
 
 /// Modello di supporto locale che unisce lo studente alle sue statistiche e assenze consecutive
 class _StudentWithStats {
@@ -142,13 +142,11 @@ class MyGroupPage extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: isDesktop
                         ? _DesktopActions(
-                            classId: myClass.id,
-                            className: myClass.name,
+                            schoolClass: myClass,
                             students: studentsWithStats,
                           )
                         : _MobileActions(
-                            classId: myClass.id,
-                            className: myClass.name,
+                            schoolClass: myClass,
                             students: studentsWithStats,
                           ),
                   ),
@@ -197,13 +195,11 @@ class MyGroupPage extends ConsumerWidget {
 /// MOBILE ACTIONS
 /// =========================
 class _MobileActions extends StatelessWidget {
-  final String classId;
-  final String className;
+  final SchoolClass schoolClass;
   final List<_StudentWithStats> students;
 
   const _MobileActions({
-    required this.classId,
-    required this.className,
+    required this.schoolClass,
     required this.students,
   });
 
@@ -220,7 +216,7 @@ class _MobileActions extends StatelessWidget {
                 compact: true,
                 isPrimary: true,
                 onTap: () {
-                  context.push('/attendance-meetings', extra: classId);
+                  context.push('/attendance-meetings', extra: schoolClass.id);
                 },
               ),
             ),
@@ -230,17 +226,12 @@ class _MobileActions extends StatelessWidget {
                 icon: Icons.print_rounded,
                 label: 'Stampa appelli',
                 compact: true,
-                onTap: () async {
-                  await PrintService.printAttendanceReport(
-                    className: className,
-                    students: students.map((s) {
-                      return PrintStudentData(
-                        fullName: '${s.student.name} ${s.student.surname}',
-                        present: s.totalPresence,
-                        absent: s.totalAbsence,
-                        consecutiveAbsences: s.consecutiveAbsences,
-                      );
-                    }).toList(),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AttendancePrintPage(schoolClass: schoolClass),
+                    ),
                   );
                 },
               ),
@@ -256,13 +247,11 @@ class _MobileActions extends StatelessWidget {
 /// DESKTOP ACTIONS
 /// =========================
 class _DesktopActions extends StatelessWidget {
-  final String classId;
-  final String className;
+  final SchoolClass schoolClass;
   final List<_StudentWithStats> students;
 
   const _DesktopActions({
-    required this.classId,
-    required this.className,
+    required this.schoolClass,
     required this.students,
   });
 
@@ -276,7 +265,7 @@ class _DesktopActions extends StatelessWidget {
             label: 'Gestione appelli',
             isPrimary: true,
             onTap: () {
-              context.push('/attendance-meetings', extra: classId);
+              context.push('/attendance-meetings', extra: schoolClass.id);
             },
           ),
         ),
@@ -285,17 +274,12 @@ class _DesktopActions extends StatelessWidget {
           child: _ActionButton(
             icon: Icons.print_rounded,
             label: 'Stampa appelli',
-            onTap: () async {
-              await PrintService.printAttendanceReport(
-                className: className,
-                students: students.map((s) {
-                  return PrintStudentData(
-                    fullName: '${s.student.name} ${s.student.surname}',
-                    present: s.totalPresence,
-                    absent: s.totalAbsence,
-                    consecutiveAbsences: s.consecutiveAbsences,
-                  );
-                }).toList(),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AttendancePrintPage(schoolClass: schoolClass),
+                ),
               );
             },
           ),

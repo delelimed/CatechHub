@@ -1,5 +1,11 @@
 import '../../core/storage/local_database.dart';
 import '../../shared/models/student_model.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+final studentsRepositoryProvider =
+    Provider<StudentsRepository>((ref) {
+  return StudentsRepository();
+});
 
 class StudentsRepository {
   final _box = LocalDatabase.students();
@@ -8,6 +14,7 @@ class StudentsRepository {
     final id = student.id.isEmpty ? LocalDatabase.newId('student') : student.id;
     await _box.put(id, student.toMap());
   }
+
 
   Stream<List<Student>> getAllStudents() {
     return LocalDatabase.watchList(
@@ -62,3 +69,5 @@ class StudentsRepository {
     }
   }
 }
+
+

@@ -23,6 +23,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        
+        // AGGIUNTO: Abilita il desugaring nelle opzioni di compilazione
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -32,6 +35,9 @@ android {
         targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        // AGGIUNTO: Previene errori sul limite dei metodi (consigliato con il desugaring)
+        multiDexEnabled = true
     }
 
     signingConfigs {
@@ -68,4 +74,7 @@ flutter {
 
 dependencies {
     // Removed Google Play dependencies - not needed for local-only app
+    
+    // AGGIUNTO: Dipendenza nativa per il desugaring (sintassi Kotlin DSL)
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.3")
 }

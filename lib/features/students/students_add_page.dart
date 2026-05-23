@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:collection/collection.dart';
 
+import '../../core/auth/auth_service.dart';
+import '../../core/storage/local_database.dart';
 import '../../shared/models/student_model.dart';
 import 'students_repository.dart';
+import '../classes/classes_provider.dart';
 import '../classes/classes_repository.dart';
 
 final studentsRepoProvider = Provider((ref) => StudentsRepository());
 final classesRepoProvider = Provider((ref) => ClassesRepository());
 
 class AddStudentPage extends ConsumerStatefulWidget {
-  final String? classId;
-
-  const AddStudentPage({super.key, this.classId});
+  const AddStudentPage({super.key});
 
   @override
   ConsumerState<AddStudentPage> createState() =>
@@ -178,8 +180,9 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
                     return;
                   }
 
+                  final studentId = LocalDatabase.newId('student');
                   final student = Student(
-                    id: '',
+                    id: studentId,
                     name: name.text,
                     surname: surname.text,
                     birthDate: birthDate!,
@@ -190,18 +193,25 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
                     fatherSurname: fatherSurname.text,
                     fatherPhone: fatherPhone.text,
                     studentPhone: studentPhone.text,
+                    notes: notes.text,
                   );
 
                   try {
+                    final repo = ref.read(studentsRepoProvider);
                     await repo.addStudent(student);
 
-                    if (widget.classId != null) {
-                      final classesRepo = ref.read(classesRepoProvider);
-                      await classesRepo.addStudentToClass(
-                        widget.classId!,
-                        student.id,
+                    final classesAsync = ref.read(classesStreamProvider);
+                    final classesRepo = ref.read(classesRepoProvider);
+
+                    classesAsync.whenData((classes) async {
+                      final myClass = classes.firstWhereOrNull(
+                        (c) => c.catechistIds.contains(AuthService.localUserId),
                       );
-                    }
+
+                      if (myClass != null) {
+                        await classesRepo.addStudentToClass(myClass.id, studentId);
+                      }
+                    });
 
                     if (context.mounted) {
                       Navigator.pop(context);

@@ -620,7 +620,6 @@ class _QuickActionsGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actions = [
-      _ActionItem(title: 'Classi', icon: Icons.groups, path: '/classes'),
       _ActionItem(
         title: 'Registro',
         icon: Icons.check_circle_outline,
@@ -630,6 +629,11 @@ class _QuickActionsGrid extends StatelessWidget {
         title: 'Documenti',
         icon: Icons.description_outlined,
         path: '/documents',
+      ),
+      _ActionItem(
+        title: 'Sussidio',
+        icon: Icons.book,
+        path: '/sussidio',
       ),
     ];
 

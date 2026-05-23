@@ -1,4 +1,4 @@
-package com.example.registro_catechismo
+package com.delelimed.registro_catechismo
 
 import io.flutter.embedding.android.FlutterActivity
 

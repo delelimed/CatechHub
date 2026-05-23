@@ -264,7 +264,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             keyboardType: TextInputType.number,
                             obscureText: true,
                             textAlign: TextAlign.center,
-                            maxLength: 6,
+                            maxLength: 12,
                             inputFormatters: [
                               FilteringTextInputFormatter.digitsOnly,
                             ],

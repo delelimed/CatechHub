@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/auth/auth_service.dart';
+import '../../core/storage/local_database.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/models/class_model.dart';
 import 'classes_provider.dart';
@@ -13,62 +15,81 @@ class ClassesPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final classesAsync = ref.watch(classesStreamProvider);
 
-    return AppScaffold(
-      title: 'Gruppi',
+    return classesAsync.when(
+      data: (classes) {
+        final isFirstUser = classes.length == 1 &&
+            classes[0].catechistIds.contains(AuthService.localUserId) &&
+            classes[0].catechistIds.length == 1;
 
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color(0xFF174A7E),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text(
-          'Nuova classe',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-        onPressed: () => _showAddClass(context, ref),
+        return AppScaffold(
+          title: 'Gruppi',
+          floatingActionButton: isFirstUser
+              ? null
+              : FloatingActionButton.extended(
+                  backgroundColor: const Color(0xFF174A7E),
+                  foregroundColor: Colors.white,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text(
+                    'Nuova classe',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  onPressed: () => _showAddClass(context, ref),
+                ),
+          child: classes.isEmpty
+              ? const _EmptyState(
+                  icon: Icons.groups_rounded,
+                  title: 'Nessuna classe',
+                  subtitle: 'Crea la prima classe per iniziare.',
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: classes.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (_, index) {
+                    final c = classes[index];
+                    final canEditOnly = isFirstUser && index == 0;
+
+                    return _ClassCard(
+                      name: c.name,
+                      students: c.studentIds.length,
+                      catechists: c.catechistIds.length,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                ClassDetailPage(classId: c.id),
+                          ),
+                        );
+                      },
+                      onDelete: canEditOnly
+                          ? null
+                          : () {
+                              ref.read(classesRepoProvider).deleteClass(c.id);
+                            },
+                      canEditOnly: canEditOnly,
+                      classId: c.id,
+                      className: c.name,
+                      onEditName: canEditOnly
+                          ? (newName) {
+                              ref.read(classesRepoProvider).updateClass(
+                                    c.id,
+                                    c.copyWith(name: newName),
+                                  );
+                            }
+                          : null,
+                    );
+                  },
+                ),
+        );
+      },
+      loading: () => const AppScaffold(
+        title: 'Gruppi',
+        child: Center(child: CircularProgressIndicator()),
       ),
-
-      child: classesAsync.when(
-        data: (classes) {
-          if (classes.isEmpty) {
-            return const _EmptyState(
-              icon: Icons.groups_rounded,
-              title: 'Nessuna classe',
-              subtitle: 'Crea la prima classe per iniziare.',
-            );
-          }
-
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: classes.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (_, index) {
-              final c = classes[index];
-
-              return _ClassCard(
-                name: c.name,
-                students: c.studentIds.length,
-                catechists: c.catechistIds.length,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          ClassDetailPage(classId: c.id),
-                    ),
-                  );
-                },
-                onDelete: () {
-                  ref.read(classesRepoProvider).deleteClass(c.id);
-                },
-              );
-            },
-          );
-        },
-
-        loading: () =>
-            const Center(child: CircularProgressIndicator()),
-
-        error: (e, _) => Center(child: Text('Errore: $e')),
+      error: (e, _) => AppScaffold(
+        title: 'Gruppi',
+        child: Center(child: Text('Errore: $e')),
       ),
     );
   }
@@ -126,17 +147,63 @@ class _ClassCard extends StatelessWidget {
   final String name;
   final int students;
   final int catechists;
-
   final VoidCallback onTap;
-  final VoidCallback onDelete;
+  final VoidCallback? onDelete;
+  final bool canEditOnly;
+  final String classId;
+  final String className;
+  final Function(String)? onEditName;
 
   const _ClassCard({
     required this.name,
     required this.students,
     required this.catechists,
     required this.onTap,
-    required this.onDelete,
+    this.onDelete,
+    this.canEditOnly = false,
+    required this.classId,
+    required this.className,
+    this.onEditName,
   });
+
+  void _showEditNameDialog(BuildContext context) {
+    final controller = TextEditingController(text: name);
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: const Text('Modifica nome gruppo'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'Nome gruppo',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annulla'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF174A7E),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              if (controller.text.isNotEmpty) {
+                onEditName?.call(controller.text);
+              }
+              Navigator.pop(context);
+            },
+            child: const Text('Salva'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -216,22 +283,40 @@ class _ClassCard extends StatelessWidget {
             ),
 
             /// MENU
-            PopupMenuButton<String>(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              onSelected: (value) {
-                if (value == 'delete') {
-                  onDelete();
-                }
-              },
-              itemBuilder: (_) => const [
-                PopupMenuItem(
-                  value: 'delete',
-                  child: Text('Elimina'),
+            if (canEditOnly)
+              PopupMenuButton<String>(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
-              ],
-            ),
+                onSelected: (value) {
+                  if (value == 'edit') {
+                    _showEditNameDialog(context);
+                  }
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(
+                    value: 'edit',
+                    child: Text('Modifica nome'),
+                  ),
+                ],
+              )
+            else
+              PopupMenuButton<String>(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                onSelected: (value) {
+                  if (value == 'delete') {
+                    onDelete?.call();
+                  }
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Text('Elimina'),
+                  ),
+                ],
+              ),
           ],
         ),
       ),

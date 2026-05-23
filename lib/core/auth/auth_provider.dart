@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'auth_service.dart';
+import '../../shared/models/class_model.dart';
+import '../storage/local_database.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) {
   return AuthService();
@@ -69,6 +71,19 @@ class LocalAuthNotifier
         lastName: lastName,
         groupName: groupName,
       );
+
+      if (success) {
+        final classBox = LocalDatabase.classes();
+        final classId = LocalDatabase.newId('class');
+        final newClass = SchoolClass(
+          id: classId,
+          name: groupName,
+          studentIds: [],
+          catechistIds: [AuthService.localUserId],
+        );
+        await classBox.put(classId, newClass.toMap());
+      }
+
       state = AsyncValue.data(success ? _authService.currentUser : null);
       return success;
     } catch (e, stack) {

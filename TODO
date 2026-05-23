@@ -1,6 +1,5 @@
 genera apk (1) -
     - auto update al rilascio di nuove versioni
-    - ottimizza in velocità
 
 sistema export (2)
 
@@ -16,10 +15,8 @@ mio gruppo (4) *codex
         - assenze
     - visualizza se documenti in attesa
 
-Integra crittazione completa dei dati (5) *codex
+Integra condivisione cifrata via qr (5) *codex
 
-Integra condivisione cifrata via qr (6) *codex
+Integra salvataggio di file di backup (6) *codex
 
-Integra salvataggio di file di backup (7) *codex
-
-Inserisci manuale utente (8) *codex
+Inserisci manuale utente (7) *codex

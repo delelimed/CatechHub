@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/storage/local_database.dart';
 import '../features/classes/my_group_page.dart';
+import '../features/classes/group_management_page.dart';
 import '../features/dashboard/dashboard_page.dart';
 import '../features/classes/classes_page.dart';
 import '../features/classes/class_detail_page.dart';
@@ -128,6 +129,12 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/my-group',
       builder: (_, __) => const MyGroupPage(),
+    ),
+
+    /// GROUP MANAGEMENT
+    GoRoute(
+      path: '/group-management',
+      builder: (_, __) => const GroupManagementPage(),
     ),
   ],
 );

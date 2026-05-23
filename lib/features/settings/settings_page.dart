@@ -26,10 +26,7 @@ class SettingsPage extends ConsumerWidget {
               /// =========================
               _ProfileCard(
                 name: data['name'] ?? '',
-                email: data['email'] ?? '',
-                role: canManageCatechists
-                    ? 'Amministratore'
-                    : 'Catechista',
+                role: 'Catechista',
               ),
 
               const SizedBox(height: 20),
@@ -42,21 +39,11 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: 12),
 
               _SettingsItem(
-                icon: Icons.people_alt_rounded,
-                title: 'Ragazzi',
-                subtitle: 'Visualizza e gestisci i ragazzi',
-                color: const Color(0xFF174A7E),
-                onTap: () => context.go('/students'),
-              ),
-
-              const SizedBox(height: 12),
-
-              _SettingsItem(
                 icon: Icons.groups_rounded,
-                title: 'Gruppi',
-                subtitle: 'Crea e gestisci i gruppi',
+                title: 'Gestione Gruppo',
+                subtitle: 'Gestisci il gruppo e i ragazzi',
                 color: const Color(0xFF174A7E),
-                onTap: () => context.go('/classes'),
+                onTap: () => context.go('/group-management'),
               ),
 
               const SizedBox(height: 24),
@@ -104,12 +91,10 @@ class SettingsPage extends ConsumerWidget {
 
 class _ProfileCard extends StatelessWidget {
   final String name;
-  final String email;
   final String role;
 
   const _ProfileCard({
     required this.name,
-    required this.email,
     required this.role,
   });
 
@@ -155,30 +140,13 @@ class _ProfileCard extends StatelessWidget {
                     color: Color(0xFF174A7E),
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 12),
                 Text(
-                  email,
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF174A7E).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    role,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF174A7E),
-                    ),
+                  role,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF174A7E),
                   ),
                 ),
               ],

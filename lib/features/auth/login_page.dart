@@ -28,6 +28,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   bool _isConfirmingStage = false;
   bool _isFirstSetup = false;
   bool _biometricAvailable = false;
+  bool _showPin = false;
 
   String _firstPin = '';
   String? _errorMessage;
@@ -50,6 +51,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         setState(() {
           _isFirstSetup = !isConfigured;
           _biometricAvailable = canBiometric && isConfigured;
+          if (_biometricAvailable) {
+            _authenticateWithBiometrics();
+          }
         });
       }
     });
@@ -59,6 +63,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   void dispose() {
     _pinController.dispose();
     _confirmPinController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _groupController.dispose();
     super.dispose();
   }
 
@@ -208,110 +215,31 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         Text(
                           '"${randomQuote.text}"',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(fontStyle: FontStyle.italic),
+                          style: const TextStyle(
+                            fontStyle: FontStyle.italic,
+                            fontSize: 13,
+                            color: Colors.grey,
+                          ),
                         ),
 
                         const SizedBox(height: 28),
 
                         if (isLoading)
-                          const CircularProgressIndicator()
-                        else ...[
-                          Text(
-                            _isFirstSetup
-                                ? (_isConfirmingStage
-                                      ? "Conferma PIN"
-                                      : "Crea il tuo account")
-                                : "Inserisci PIN",
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-
-                          const SizedBox(height: 12),
-
-                          if (_isFirstSetup && !_isConfirmingStage) ...[
-                            TextField(
-                              controller: _firstNameController,
-                              textCapitalization: TextCapitalization.words,
-                              decoration: const InputDecoration(
-                                labelText: 'Nome',
-                                border: OutlineInputBorder(),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            TextField(
-                              controller: _lastNameController,
-                              textCapitalization: TextCapitalization.words,
-                              decoration: const InputDecoration(
-                                labelText: 'Cognome',
-                                border: OutlineInputBorder(),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            TextField(
-                              controller: _groupController,
-                              textCapitalization: TextCapitalization.words,
-                              decoration: const InputDecoration(
-                                labelText: 'Gruppo',
-                                border: OutlineInputBorder(),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                          ],
-
-                          TextField(
-                            controller: _isConfirmingStage
-                                ? _confirmPinController
-                                : _pinController,
-                            keyboardType: TextInputType.number,
-                            obscureText: true,
-                            textAlign: TextAlign.center,
-                            maxLength: 12,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
+                          const Column(
+                            children: [
+                              CircularProgressIndicator(),
+                              SizedBox(height: 16),
+                              Text("Caricamento..."),
                             ],
-                            decoration: const InputDecoration(
-                              counterText: "",
-                              hintText: "••••",
-                            ),
-                            onSubmitted: (_) => _handleSubmit(),
-                          ),
-
-                          if (_errorMessage != null) ...[
-                            const SizedBox(height: 10),
-                            Text(
-                              _errorMessage!,
-                              style: const TextStyle(color: Colors.red),
-                            ),
-                          ],
-
-                          const SizedBox(height: 20),
-
-                          SizedBox(
-                            width: double.infinity,
-                            height: 50,
-                            child: ElevatedButton(
-                              onPressed: _handleSubmit,
-                              child: Text(
-                                _isFirstSetup
-                                    ? (_isConfirmingStage
-                                          ? "Conferma"
-                                          : "Continua")
-                                    : "Sblocca",
-                              ),
-                            ),
-                          ),
-
-                          if (!_isFirstSetup && _biometricAvailable) ...[
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 48,
-                              child: OutlinedButton.icon(
-                                icon: const Icon(Icons.fingerprint),
-                                label: const Text('Usa impronta digitale'),
-                                onPressed: _authenticateWithBiometrics,
-                              ),
-                            ),
-                          ],
+                          )
+                        else if (_isFirstSetup) ...[
+                          if (!_isConfirmingStage)
+                            _buildFirstSetupForm()
+                          else
+                            _buildPinConfirmationForm(),
+                        ]
+                        else ...[
+                          _buildLoginForm(),
                         ],
 
                         const SizedBox(height: 20),
@@ -336,7 +264,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
                         const Text(
                           "Realizzato con ❤️ da DELELI",
-                          style: TextStyle(fontSize: 12),
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
                         ),
                       ],
                     ),
@@ -345,6 +273,312 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoginForm() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          "Sblocca Registro",
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF174A7E),
+          ),
+        ),
+        const SizedBox(height: 24),
+        if (_biometricAvailable) ...[
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF174A7E),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: _authenticateWithBiometrics,
+              icon: const Icon(Icons.fingerprint, size: 28),
+              label: const Text(
+                'Usa impronta digitale',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(child: Container(height: 1, color: Colors.grey.shade300)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'oppure',
+                  style: TextStyle(color: Colors.grey.shade600),
+                ),
+              ),
+              Expanded(child: Container(height: 1, color: Colors.grey.shade300)),
+            ],
+          ),
+          const SizedBox(height: 16),
+        ],
+        Text(
+          _biometricAvailable ? 'Inserisci PIN' : 'Sblocca con PIN',
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey,
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildPinInputField(_pinController),
+        if (_errorMessage != null) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.red.shade200),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _errorMessage!,
+                    style: TextStyle(
+                      color: Colors.red.shade700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: ElevatedButton(
+            onPressed: _handleSubmit,
+            child: const Text('Sblocca'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFirstSetupForm() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          "Crea il tuo account",
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF174A7E),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          "Passo 1 di 3 - Informazioni personali",
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+        ),
+        const SizedBox(height: 24),
+        _buildTextField(_firstNameController, 'Nome', Icons.person),
+        const SizedBox(height: 12),
+        _buildTextField(_lastNameController, 'Cognome', Icons.person_outline),
+        const SizedBox(height: 12),
+        _buildTextField(_groupController, 'Gruppo', Icons.groups),
+        const SizedBox(height: 20),
+        Text(
+          "Scegli un PIN",
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey,
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildPinInputField(_pinController),
+        if (_errorMessage != null) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.red.shade200),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _errorMessage!,
+                    style: TextStyle(
+                      color: Colors.red.shade700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: ElevatedButton(
+            onPressed: _handleSubmit,
+            child: const Text('Continua'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPinConfirmationForm() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          "Conferma PIN",
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF174A7E),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          "Passo 2 di 3 - Conferma il PIN",
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          "Reinserisci il PIN per confermare",
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey,
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildPinInputField(_confirmPinController),
+        if (_errorMessage != null) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.red.shade200),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _errorMessage!,
+                    style: TextStyle(
+                      color: Colors.red.shade700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: ElevatedButton(
+            onPressed: _handleSubmit,
+            child: const Text('Crea account'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPinInputField(TextEditingController controller) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _errorMessage != null ? Colors.red.shade300 : Colors.grey.shade300,
+          width: _errorMessage != null ? 2 : 1,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              obscureText: !_showPin,
+              textAlign: TextAlign.center,
+              maxLength: 12,
+              style: const TextStyle(
+                fontSize: 24,
+                letterSpacing: 4,
+                fontWeight: FontWeight.bold,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+              ],
+              decoration: const InputDecoration(
+                counterText: "",
+                border: InputBorder.none,
+                hintText: "••••",
+                hintStyle: TextStyle(letterSpacing: 4),
+              ),
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (_) => _handleSubmit(),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => setState(() => _showPin = !_showPin),
+            child: Icon(
+              _showPin ? Icons.visibility : Icons.visibility_off,
+              color: Colors.grey,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTextField(
+    TextEditingController controller,
+    String label,
+    IconData icon,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: TextField(
+        controller: controller,
+        textCapitalization: TextCapitalization.words,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon, color: const Color(0xFF174A7E)),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.all(16),
         ),
       ),
     );

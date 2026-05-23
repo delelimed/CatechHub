@@ -1,3 +1,13 @@
+import java.util.Properties
+import java.io.FileInputStream
+
+// Carica il file local.properties
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(FileInputStream(localPropertiesFile))
+}
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -24,13 +34,26 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("sharedConfig") {
+            // Recupera i valori in sicurezza
+            val keyFile = localProperties.getProperty("keystore.file")
+            
+            storeFile = if (keyFile != null) file(keyFile) else null
+            storePassword = localProperties.getProperty("keystore.password")
+            keyAlias = localProperties.getProperty("keystore.alias")
+            keyPassword = localProperties.getProperty("keystore.alias.password")
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("sharedConfig")
             isMinifyEnabled = false
             isShrinkResources = false
         }
     }
+
 }
 
 kotlin {

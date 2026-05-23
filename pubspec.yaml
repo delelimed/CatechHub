@@ -53,4 +53,11 @@ flutter:
 
   assets:
     - assets/images/logo.png
+    - assets/images/Copertina-GuidaGenerale.png
+    - assets/images/Copertina-IIE.png
+    - assets/images/Copertina-IIIE.png
+    - assets/images/Copertina-IVE.png
+    - assets/images/Copertina-VE.png
+    - assets/images/Copertina-IM.png
+    - assets/images/Copertina-IIM.png
     - assets/pdf/

@@ -3,11 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/models/student_model.dart';
 import 'students_repository.dart';
+import '../classes/classes_repository.dart';
 
 final studentsRepoProvider = Provider((ref) => StudentsRepository());
+final classesRepoProvider = Provider((ref) => ClassesRepository());
 
 class AddStudentPage extends ConsumerStatefulWidget {
-  const AddStudentPage({super.key});
+  final String? classId;
+
+  const AddStudentPage({super.key, this.classId});
 
   @override
   ConsumerState<AddStudentPage> createState() =>
@@ -190,6 +194,14 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
 
                   try {
                     await repo.addStudent(student);
+
+                    if (widget.classId != null) {
+                      final classesRepo = ref.read(classesRepoProvider);
+                      await classesRepo.addStudentToClass(
+                        widget.classId!,
+                        student.id,
+                      );
+                    }
 
                     if (context.mounted) {
                       Navigator.pop(context);

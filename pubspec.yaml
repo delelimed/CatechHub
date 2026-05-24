@@ -2,7 +2,7 @@ name: CatechHub
 description: "Il tuo registro di catechismo"
 publish_to: 'none'
 
-version: 0.1.2+1
+version: 0.2.0+2
 
 environment:
   sdk: ^3.12.0
@@ -58,11 +58,3 @@ flutter:
 
   assets:
     - assets/images/logo.png
-    - assets/images/Copertina-GuidaGenerale.png
-    - assets/images/Copertina-IIE.png
-    - assets/images/Copertina-IIIE.png
-    - assets/images/Copertina-IVE.png
-    - assets/images/Copertina-VE.png
-    - assets/images/Copertina-IM.png
-    - assets/images/Copertina-IIM.png
-    - assets/pdf/

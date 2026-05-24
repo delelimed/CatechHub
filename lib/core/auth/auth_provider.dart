@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'auth_service.dart';
 import '../../shared/models/class_model.dart';
 import '../storage/local_database.dart';
@@ -36,7 +35,16 @@ class LocalAuthNotifier
   Future<bool> unlock(String pin) async {
     state = const AsyncValue.loading();
     try {
-      final success = await _authService.signInWithPin(pin);
+      final success = await _authService.signInWithPin(pin).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          state = AsyncValue.error(
+            Exception('Timeout durante il login'),
+            StackTrace.current,
+          );
+          return false;
+        },
+      );
       state = AsyncValue.data(success ? _authService.currentUser : null);
       return success;
     } catch (e, stack) {
@@ -48,7 +56,16 @@ class LocalAuthNotifier
   Future<bool> unlockWithBiometrics() async {
     state = const AsyncValue.loading();
     try {
-      final success = await _authService.unlockWithBiometrics();
+      final success = await _authService.unlockWithBiometrics().timeout(
+        const Duration(seconds: 40),
+        onTimeout: () {
+          state = AsyncValue.error(
+            Exception('Timeout durante autenticazione biometrica'),
+            StackTrace.current,
+          );
+          return false;
+        },
+      );
       state = AsyncValue.data(success ? _authService.currentUser : null);
       return success;
     } catch (e, stack) {
@@ -70,6 +87,15 @@ class LocalAuthNotifier
         firstName: firstName,
         lastName: lastName,
         groupName: groupName,
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          state = AsyncValue.error(
+            Exception('Timeout durante la configurazione'),
+            StackTrace.current,
+          );
+          return false;
+        },
       );
 
       if (success) {

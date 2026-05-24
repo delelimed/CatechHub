@@ -7,7 +7,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'bible_quote.dart';
 import '../../core/auth/auth_provider.dart';
-import '../../core/auth/auth_service.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -129,29 +128,59 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       final lastName = _lastNameController.text.trim();
       final groupName = _groupController.text.trim();
 
-      final ok = await auth.setupAndUnlock(
-        pin,
-        firstName: firstName,
-        lastName: lastName,
-        groupName: groupName,
-      );
-
-      if (!ok && mounted) {
-        setState(
-          () => _errorMessage = "Errore durante la creazione del profilo.",
+      try {
+        final ok = await auth.setupAndUnlock(
+          pin,
+          firstName: firstName,
+          lastName: lastName,
+          groupName: groupName,
+        ).timeout(
+          const Duration(seconds: 15),
+          onTimeout: () async {
+            if (mounted) {
+              setState(() => _errorMessage = "Timeout: controlla la connessione");
+            }
+            return false;
+          },
         );
+
+        if (!ok && mounted) {
+          setState(
+            () => _errorMessage = "Errore durante la creazione del profilo.",
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _errorMessage = "Errore: riprova");
+          debugPrint('Setup error: $e');
+        }
       }
 
       return;
     }
 
-    final ok = await auth.unlock(pin);
+    try {
+      final ok = await auth.unlock(pin).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () async {
+          if (mounted) {
+            setState(() => _errorMessage = "Timeout: controlla la connessione");
+          }
+          return false;
+        },
+      );
 
-    if (!ok && mounted) {
-      setState(() {
-        _errorMessage = "PIN errato";
-        _pinController.clear();
-      });
+      if (!ok && mounted) {
+        setState(() {
+          _errorMessage = "PIN errato";
+          _pinController.clear();
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _errorMessage = "Errore: riprova");
+        debugPrint('Login error: $e');
+      }
     }
   }
 
@@ -236,9 +265,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         if (isLoading)
                           const Column(
                             children: [
-                              CircularProgressIndicator(),
+                              SizedBox(height: 8),
+                              CircularProgressIndicator(
+                                strokeWidth: 3,
+                              ),
                               SizedBox(height: 16),
-                              Text("Caricamento..."),
+                              Text(
+                                "Verifica in corso...",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              SizedBox(height: 24),
                             ],
                           )
                         else if (_isFirstSetup) ...[
@@ -288,6 +327,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   Widget _buildLoginForm() {
+    final authState = ref.watch(authStateProvider);
+    final isLoading = authState.isLoading;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -308,7 +350,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 backgroundColor: const Color(0xFF174A7E),
                 foregroundColor: Colors.white,
               ),
-              onPressed: _authenticateWithBiometrics,
+              onPressed: isLoading ? null : _authenticateWithBiometrics,
               icon: const Icon(Icons.fingerprint, size: 28),
               label: const Text(
                 'Usa impronta digitale',
@@ -341,7 +383,31 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           ),
         ),
         const SizedBox(height: 12),
-        _buildPinInputField(_pinController),
+        if (!isLoading) _buildPinInputField(_pinController),
+        if (isLoading)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: SizedBox(
+              height: 48,
+              child: Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         if (_errorMessage != null) ...[
           const SizedBox(height: 12),
           Container(
@@ -373,7 +439,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           width: double.infinity,
           height: 50,
           child: ElevatedButton(
-            onPressed: _handleSubmit,
+            onPressed: isLoading ? null : _handleSubmit,
             child: const Text('Sblocca'),
           ),
         ),
@@ -382,6 +448,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   Widget _buildFirstSetupForm() {
+    final authState = ref.watch(authStateProvider);
+    final isLoading = authState.isLoading;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -398,22 +467,37 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         ),
         const SizedBox(height: 24),
-        _buildTextField(_firstNameController, 'Nome', Icons.person),
-        const SizedBox(height: 12),
-        _buildTextField(_lastNameController, 'Cognome', Icons.person_outline),
-        const SizedBox(height: 12),
-        _buildTextField(_groupController, 'Gruppo', Icons.groups),
-        const SizedBox(height: 20),
-        Text(
-          "Scegli un PIN",
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey,
+        if (!isLoading) ...[
+          _buildTextField(_firstNameController, 'Nome', Icons.person),
+          const SizedBox(height: 12),
+          _buildTextField(_lastNameController, 'Cognome', Icons.person_outline),
+          const SizedBox(height: 12),
+          _buildTextField(_groupController, 'Gruppo', Icons.groups),
+          const SizedBox(height: 20),
+          Text(
+            "Scegli un PIN",
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey,
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
-        _buildPinInputField(_pinController),
+          const SizedBox(height: 12),
+          _buildPinInputField(_pinController),
+        ] else
+          const SizedBox(
+            height: 150,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 12),
+                  Text('Creazione account in corso...'),
+                ],
+              ),
+            ),
+          ),
         if (_errorMessage != null) ...[
           const SizedBox(height: 12),
           Container(
@@ -445,7 +529,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           width: double.infinity,
           height: 50,
           child: ElevatedButton(
-            onPressed: _handleSubmit,
+            onPressed: isLoading ? null : _handleSubmit,
             child: const Text('Continua'),
           ),
         ),
@@ -454,6 +538,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   Widget _buildPinConfirmationForm() {
+    final authState = ref.watch(authStateProvider);
+    final isLoading = authState.isLoading;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -479,7 +566,15 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           ),
         ),
         const SizedBox(height: 12),
-        _buildPinInputField(_confirmPinController),
+        if (!isLoading)
+          _buildPinInputField(_confirmPinController)
+        else
+          const SizedBox(
+            height: 60,
+            child: Center(
+              child: CircularProgressIndicator(),
+            ),
+          ),
         if (_errorMessage != null) ...[
           const SizedBox(height: 12),
           Container(
@@ -511,7 +606,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           width: double.infinity,
           height: 50,
           child: ElevatedButton(
-            onPressed: _handleSubmit,
+            onPressed: isLoading ? null : _handleSubmit,
             child: const Text('Crea account'),
           ),
         ),

@@ -46,16 +46,24 @@ class AuthService {
     }
 
     try {
-      final salt = DateTime.now().microsecondsSinceEpoch.toString();
-      final pinHash = _hashPin(pin, salt);
-      await _box.put('local_pin_hash', '$salt:$pinHash');
-      await _box.put('first_name', firstName.trim());
-      await _box.put('last_name', lastName.trim());
-      await _box.put('group_name', groupName.trim());
-      await _box.put('local_user_name', '$firstName $lastName'.trim());
-      await _box.put('isLoggedIn', true);
-      _cachedUser = null;
-      return true;
+      return await Future.delayed(Duration.zero, () async {
+        final salt = DateTime.now().microsecondsSinceEpoch.toString();
+        final pinHash = _hashPin(pin, salt);
+        await _box.put('local_pin_hash', '$salt:$pinHash');
+        await _box.put('first_name', firstName.trim());
+        await _box.put('last_name', lastName.trim());
+        await _box.put('group_name', groupName.trim());
+        await _box.put('local_user_name', '$firstName $lastName'.trim());
+        await _box.put('isLoggedIn', true);
+        _cachedUser = null;
+        return true;
+      }).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          debugPrint('Timeout setup PIN');
+          return false;
+        },
+      );
     } catch (e) {
       debugPrint('Errore durante la configurazione del PIN: $e');
       return false;
@@ -64,23 +72,31 @@ class AuthService {
 
   Future<bool> signInWithPin(String inputPin) async {
     try {
-      final storedHash = _box.get('local_pin_hash') as String?;
-      if (storedHash == null) return false;
+      return await Future.delayed(Duration.zero, () async {
+        final storedHash = _box.get('local_pin_hash') as String?;
+        if (storedHash == null) return false;
 
-      final parts = storedHash.split(':');
-      if (parts.length != 2) return false;
+        final parts = storedHash.split(':');
+        if (parts.length != 2) return false;
 
-      final salt = parts[0];
-      final savedHash = parts[1];
-      final computedHash = _hashPin(inputPin, salt);
+        final salt = parts[0];
+        final savedHash = parts[1];
+        final computedHash = _hashPin(inputPin, salt);
 
-      if (computedHash == savedHash) {
-        await _box.put('isLoggedIn', true);
-        _cachedUser = null;
-        return true;
-      }
+        if (computedHash == savedHash) {
+          await _box.put('isLoggedIn', true);
+          _cachedUser = null;
+          return true;
+        }
 
-      return false;
+        return false;
+      }).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          debugPrint('Timeout verifica PIN');
+          return false;
+        },
+      );
     } catch (e) {
       debugPrint('Errore durante il controllo del PIN: $e');
       return false;

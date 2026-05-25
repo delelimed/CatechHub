@@ -12,11 +12,17 @@ import 'package:wiredash/wiredash.dart'; // <-- Importazione di Wiredash
 import 'app/router.dart';
 import 'core/auth/auth_provider.dart';
 import 'core/storage/local_database.dart';
+import 'core/analytics/analytics_service.dart';
+import 'core/analytics/analytics_provider.dart';
+import 'core/analytics/event_tracking_service.dart';
+
+final navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('it_IT', null);
   await LocalDatabase.init();
+  await AnalyticsService.init();
 
   // Inizializza il plugin delle notifiche locali
   await UpdateService.initNotifications();
@@ -34,17 +40,23 @@ class MyApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateProvider);
     final router = ref.watch(appRouterProvider);
+    final analyticsConsent = ref.watch(analyticsConsentProvider);
 
-    // Recupero sicuro delle chiavi a tempo di compilazione tramite --dart-define o --dart-define-from-file
-    const String wiredashProjectId = String.fromEnvironment('WIREDASH_PROJECT_ID');
-    const String wiredashApiSecret = String.fromEnvironment('WIREDASH_API_SECRET');
+    // Inizializza event tracking
+    EventTrackingService.init(analyticsConsent);
+
+    // Mostra popup di consenso alla prima apertura
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showAnalyticsConsentIfNeeded(context, ref);
+    });
 
     return Wiredash(
-      projectId: wiredashProjectId,
-      secret: wiredashApiSecret,
+      projectId: const String.fromEnvironment('WIREDASH_PROJECT_ID'),
+      secret: const String.fromEnvironment('WIREDASH_API_SECRET'),
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         theme: ThemeData(primaryColor: const Color(0xFF174A7E)),
+        navigatorKey: navigatorKey,
         home: authState.when(
           data: (_) {
             return Router(
@@ -56,6 +68,53 @@ class MyApp extends ConsumerWidget {
           loading: () => const _LoadingScreen(),
           error: (err, _) => _ErrorScreen(message: 'Errore Auth: $err'),
         ),
+      ),
+    );
+  }
+
+  void _showAnalyticsConsentIfNeeded(BuildContext context, WidgetRef ref) {
+    final box = LocalDatabase.auth();
+    final hasShownConsent = box.get('consent_shown', defaultValue: false);
+
+    if (!hasShownConsent && context.mounted) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (context.mounted) {
+          _showConsentDialog(context, ref);
+          box.put('consent_shown', true);
+        }
+      });
+    }
+  }
+
+  void _showConsentDialog(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Analisi e Feedback'),
+        content: const Text(
+          'Desideri permettere a CatechHub di raccogliere dati anonimi '
+          'sulla tua esperienza utente? Questo ci aiuta a migliorare l\'app.\n\n'
+          'Puoi cambiare questa preferenza in qualsiasi momento dalle impostazioni.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              ref.read(analyticsConsentProvider.notifier).setConsent(false);
+              EventTrackingService.setEnabled(false);
+              Navigator.pop(context);
+            },
+            child: const Text('Rifiuta'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              ref.read(analyticsConsentProvider.notifier).setConsent(true);
+              EventTrackingService.setEnabled(true);
+              Navigator.pop(context);
+            },
+            child: const Text('Accetta'),
+          ),
+        ],
       ),
     );
   }

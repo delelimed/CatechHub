@@ -131,10 +131,8 @@ class _GroupHeader extends ConsumerWidget {
                     schoolClass.copyWith(name: controller.text),
                   );
                   if (context.mounted) {
+                    onNameChanged();
                     Navigator.pop(context);
-                    Future.microtask(() {
-                      onNameChanged();
-                    });
                   }
                 } catch (e) {
                   if (context.mounted) {

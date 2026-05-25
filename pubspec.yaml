@@ -2,7 +2,7 @@ name: CatechHub
 description: "Il tuo registro di catechismo"
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.0.1+1
 
 environment:
   sdk: ^3.12.0
@@ -14,7 +14,7 @@ dependencies:
   # Gestione Stato e Navigazione (Mantenuti)
   flutter_riverpod: ^2.6.1
   go_router: ^17.2.3
-  local_auth: ^2.3.1
+  local_auth: ^2.1.0
 
   # Database Locale e Crittografia (Nuovi)
   hive_flutter: ^1.1.0
@@ -42,6 +42,8 @@ dependencies:
   collection: ^1.18.0
   wiredash: ^2.6.1
   flutter_dotenv: ^6.0.1
+  image_picker: ^1.1.0 # Scattare/selezionare foto e video
+  path_provider: ^2.1.0 # Accedere app documents directory
 
 dev_dependencies:
   flutter_test:

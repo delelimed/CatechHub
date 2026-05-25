@@ -33,12 +33,31 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
   final fatherPhone = TextEditingController();
   final studentPhone = TextEditingController();
 
+  final allergies = TextEditingController();
   final notes = TextEditingController();
 
   DateTime? birthDate;
+  Set<String> selectedExits = {};
+  String? customExitName;
 
   bool get isDesktop =>
       MediaQuery.of(context).size.width > 900;
+
+  @override
+  void dispose() {
+    name.dispose();
+    surname.dispose();
+    motherName.dispose();
+    motherSurname.dispose();
+    fatherName.dispose();
+    fatherSurname.dispose();
+    motherPhone.dispose();
+    fatherPhone.dispose();
+    studentPhone.dispose();
+    allergies.dispose();
+    notes.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -146,6 +165,28 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
             const SizedBox(height: 16),
 
             /// =========================
+            /// ALLERGIE E USCITE
+            /// =========================
+            _Section(
+              title: 'Allergie e Uscite',
+              children: [
+                _Field(allergies, 'Allergie', maxLines: 2),
+                const SizedBox(height: 16),
+                _ExitsSelector(
+                  selectedExits: selectedExits,
+                  onSelectionChanged: (exits, custom) {
+                    setState(() {
+                      selectedExits = exits;
+                      customExitName = custom;
+                    });
+                  },
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            /// =========================
             /// NOTE
             /// =========================
             _Section(
@@ -181,6 +222,18 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
                   }
 
                   final studentId = LocalDatabase.newId('student');
+
+                  String? autonomousExits;
+                  if (selectedExits.isNotEmpty) {
+                    if (selectedExits.contains('altro') && customExitName != null && customExitName!.isNotEmpty) {
+                      autonomousExits = 'altro:$customExitName';
+                    } else if (selectedExits.length == 1) {
+                      autonomousExits = selectedExits.first;
+                    } else {
+                      autonomousExits = selectedExits.join(',');
+                    }
+                  }
+
                   final student = Student(
                     id: studentId,
                     name: name.text,
@@ -193,6 +246,8 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
                     fatherSurname: fatherSurname.text,
                     fatherPhone: fatherPhone.text,
                     studentPhone: studentPhone.text,
+                    allergies: allergies.text.isNotEmpty ? allergies.text : null,
+                    autonomousExits: autonomousExits,
                     notes: notes.text,
                   );
 
@@ -371,8 +426,9 @@ class _ParentCard extends StatelessWidget {
 class _Field extends StatelessWidget {
   final TextEditingController controller;
   final String label;
+  final int maxLines;
 
-  const _Field(this.controller, this.label);
+  const _Field(this.controller, this.label, {this.maxLines = 1});
 
   @override
   Widget build(BuildContext context) {
@@ -380,6 +436,7 @@ class _Field extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: TextField(
         controller: controller,
+        maxLines: maxLines,
         decoration: InputDecoration(
           labelText: label,
           filled: true,
@@ -416,6 +473,154 @@ class _NotesField extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
         ),
+      ),
+    );
+  }
+}
+
+/// =========================
+/// EXITS SELECTOR
+/// =========================
+class _ExitsSelector extends StatefulWidget {
+  final Set<String> selectedExits;
+  final Function(Set<String>, String?) onSelectionChanged;
+
+  const _ExitsSelector({
+    required this.selectedExits,
+    required this.onSelectionChanged,
+  });
+
+  @override
+  State<_ExitsSelector> createState() =>
+      _ExitsSelectorState();
+}
+
+class _ExitsSelectorState extends State<_ExitsSelector> {
+  late Set<String> selected;
+  late TextEditingController customController;
+
+  @override
+  void initState() {
+    super.initState();
+    selected = Set.from(widget.selectedExits);
+    customController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    customController.dispose();
+    super.dispose();
+  }
+
+  void _updateSelection() {
+    widget.onSelectionChanged(selected, customController.text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Chi accompagna l\'uscita?',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _ExitChip(
+              label: 'Autonomo',
+              selected: selected.contains('autonomo'),
+              onChanged: (isSelected) {
+                setState(() {
+                  if (isSelected) {
+                    selected.add('autonomo');
+                  } else {
+                    selected.remove('autonomo');
+                  }
+                  _updateSelection();
+                });
+              },
+            ),
+            _ExitChip(
+              label: 'Genitori',
+              selected: selected.contains('genitori'),
+              onChanged: (isSelected) {
+                setState(() {
+                  if (isSelected) {
+                    selected.add('genitori');
+                  } else {
+                    selected.remove('genitori');
+                  }
+                  _updateSelection();
+                });
+              },
+            ),
+            _ExitChip(
+              label: 'Altro',
+              selected: selected.contains('altro'),
+              onChanged: (isSelected) {
+                setState(() {
+                  if (isSelected) {
+                    selected.add('altro');
+                  } else {
+                    selected.remove('altro');
+                    customController.clear();
+                  }
+                  _updateSelection();
+                });
+              },
+            ),
+          ],
+        ),
+        if (selected.contains('altro')) ...[
+          const SizedBox(height: 12),
+          TextField(
+            controller: customController,
+            decoration: InputDecoration(
+              labelText: 'Specifica chi accompagna',
+              filled: true,
+              fillColor: Colors.grey.shade50,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            onChanged: (_) => _updateSelection(),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// =========================
+/// EXIT CHIP
+/// =========================
+class _ExitChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final Function(bool) onChanged;
+
+  const _ExitChip({
+    required this.label,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: onChanged,
+      backgroundColor: Colors.grey.shade100,
+      selectedColor: const Color(0xFF174A7E),
+      labelStyle: TextStyle(
+        color: selected ? Colors.white : Colors.black,
+        fontWeight: FontWeight.w500,
       ),
     );
   }

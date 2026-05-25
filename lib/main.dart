@@ -220,7 +220,7 @@ class UpdateService {
   }
 
   /// Genera e mostra la notifica push locale nel centro notifiche di Android
-static Future<void> _showUpdateNotification(String version, String url) async {
+  static Future<void> _showUpdateNotification(String version, String url) async {
   const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
     'update_channel_id',
     'Aggiornamenti App',

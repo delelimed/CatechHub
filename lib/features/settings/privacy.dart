@@ -67,8 +67,7 @@ class PrivacySecurityPage extends ConsumerWidget {
                 'L\'app rispetta il Regolamento Generale sulla Protezione dei Dati (GDPR). '
                 'Tutti i dati personali, in particolare i dati dei ragazzi, non lasciano mai il dispositivo e rimangono completamente locali. '
                 'I dati non vengono condivisi con server remoti, cloud o terze parti. '
-                'Tutti i dati sono trattati secondo i principi di liceita, correttezza e trasparenza. '
-                'Hai il diritto di accedere, rettificare o eliminare i tuoi dati in qualsiasi momento.',
+                'Tutti i dati sono trattati secondo i principi di liceita, correttezza e trasparenza.',
             icon: Icons.gavel_rounded,
           ),
           const SizedBox(height: 24),
@@ -156,7 +155,7 @@ class _AnalyticsCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   analyticsEnabled
-                      ? 'Raccolta dati attivata. I tuoi dati sono anonimi.'
+                      ? 'Raccolta dati attivata. Solo i feedback e gli screenshot inviati volontariamente vengono catturati.'
                       : 'Raccolta dati disattivata.',
                   style: TextStyle(
                     fontSize: 13,

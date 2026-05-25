@@ -31,10 +31,11 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
 
   late TextEditingController studentPhone;
   late TextEditingController allergies;
-  late TextEditingController autonomousExits;
   late TextEditingController notes;
 
   bool editMode = false;
+  Set<String> selectedExits = {};
+  String? customExitName;
 
   @override
   void initState() {
@@ -55,8 +56,17 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
 
     studentPhone = TextEditingController(text: s.studentPhone);
     allergies = TextEditingController(text: s.allergies ?? '');
-    autonomousExits = TextEditingController(text: s.autonomousExits ?? '');
     notes = TextEditingController(text: s.notes ?? '');
+
+    // Parse autonomousExits
+    if (s.autonomousExits != null && s.autonomousExits!.isNotEmpty) {
+      if (s.autonomousExits!.startsWith('altro:')) {
+        selectedExits.add('altro');
+        customExitName = s.autonomousExits!.replaceFirst('altro:', '');
+      } else {
+        selectedExits.addAll(s.autonomousExits!.split(','));
+      }
+    }
   }
 
   // =========================
@@ -198,11 +208,21 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
             const SizedBox(height: 16),
 
             _Section(
-              title: 'Allergie e Uscite Autonome',
+              title: 'Allergie e Uscite',
               children: [
                 _Field(allergies, 'Allergie', maxLines: 3, enabled: editMode),
-                const SizedBox(height: 12),
-                _Field(autonomousExits, 'Uscite Autonome (padre/madre/altro)', maxLines: 3, enabled: editMode),
+                const SizedBox(height: 16),
+                _EditExitsSelector(
+                  selectedExits: selectedExits,
+                  customExitName: customExitName,
+                  editMode: editMode,
+                  onSelectionChanged: (exits, custom) {
+                    setState(() {
+                      selectedExits = exits;
+                      customExitName = custom;
+                    });
+                  },
+                ),
               ],
             ),
 
@@ -226,6 +246,17 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
                 ),
                 onPressed: editMode
                     ? () async {
+                        String? autonomousExits;
+                        if (selectedExits.isNotEmpty) {
+                          if (selectedExits.contains('altro') && customExitName != null && customExitName!.isNotEmpty) {
+                            autonomousExits = 'altro:$customExitName';
+                          } else if (selectedExits.length == 1) {
+                            autonomousExits = selectedExits.first;
+                          } else {
+                            autonomousExits = selectedExits.join(',');
+                          }
+                        }
+
                         final updated = Student(
                           id: widget.student.id,
                           name: name.text,
@@ -238,9 +269,9 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
                           fatherSurname: fatherSurname.text,
                           fatherPhone: fatherPhone.text,
                           studentPhone: studentPhone.text,
-                          allergies: allergies.text,
-                          autonomousExits: autonomousExits.text,
-                          notes: notes.text,
+                          allergies: allergies.text.isNotEmpty ? allergies.text : null,
+                          autonomousExits: autonomousExits,
+                          notes: notes.text.isNotEmpty ? notes.text : null,
                         );
 
                         await repo.updateStudent(
@@ -256,6 +287,173 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// =========================
+// EDIT EXITS SELECTOR
+// =========================
+class _EditExitsSelector extends StatefulWidget {
+  final Set<String> selectedExits;
+  final String? customExitName;
+  final bool editMode;
+  final Function(Set<String>, String?) onSelectionChanged;
+
+  const _EditExitsSelector({
+    required this.selectedExits,
+    required this.customExitName,
+    required this.editMode,
+    required this.onSelectionChanged,
+  });
+
+  @override
+  State<_EditExitsSelector> createState() =>
+      _EditExitsSelectorState();
+}
+
+class _EditExitsSelectorState extends State<_EditExitsSelector> {
+  late Set<String> selected;
+  late TextEditingController customController;
+
+  @override
+  void initState() {
+    super.initState();
+    selected = Set.from(widget.selectedExits);
+    customController = TextEditingController(text: widget.customExitName ?? '');
+  }
+
+  @override
+  void dispose() {
+    customController.dispose();
+    super.dispose();
+  }
+
+  void _updateSelection() {
+    widget.onSelectionChanged(selected, customController.text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.editMode)
+          const Text(
+            'Chi accompagna l\'uscita?',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          )
+        else
+          Text(
+            'Chi accompagna l\'uscita: ${selected.isEmpty ? 'Non specificato' : selected.join(', ')}',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
+            ),
+          ),
+        const SizedBox(height: 12),
+        if (widget.editMode)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _ExitChip(
+                label: 'Autonomo',
+                selected: selected.contains('autonomo'),
+                onChanged: (isSelected) {
+                  setState(() {
+                    if (isSelected) {
+                      selected.add('autonomo');
+                    } else {
+                      selected.remove('autonomo');
+                    }
+                    _updateSelection();
+                  });
+                },
+              ),
+              _ExitChip(
+                label: 'Genitori',
+                selected: selected.contains('genitori'),
+                onChanged: (isSelected) {
+                  setState(() {
+                    if (isSelected) {
+                      selected.add('genitori');
+                    } else {
+                      selected.remove('genitori');
+                    }
+                    _updateSelection();
+                  });
+                },
+              ),
+              _ExitChip(
+                label: 'Altro',
+                selected: selected.contains('altro'),
+                onChanged: (isSelected) {
+                  setState(() {
+                    if (isSelected) {
+                      selected.add('altro');
+                    } else {
+                      selected.remove('altro');
+                      customController.clear();
+                    }
+                    _updateSelection();
+                  });
+                },
+              ),
+            ],
+          ),
+        if (widget.editMode && selected.contains('altro')) ...[
+          const SizedBox(height: 12),
+          TextField(
+            controller: customController,
+            decoration: InputDecoration(
+              labelText: 'Specifica chi accompagna',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onChanged: (_) => _updateSelection(),
+          ),
+        ],
+        if (!widget.editMode && selected.contains('altro'))
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              'Altro: ${customController.text}',
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// =========================
+// EXIT CHIP
+// =========================
+class _ExitChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final Function(bool) onChanged;
+
+  const _ExitChip({
+    required this.label,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: onChanged,
+      backgroundColor: Colors.grey.shade100,
+      selectedColor: const Color(0xFF174A7E),
+      labelStyle: TextStyle(
+        color: selected ? Colors.white : Colors.black,
+        fontWeight: FontWeight.w500,
       ),
     );
   }

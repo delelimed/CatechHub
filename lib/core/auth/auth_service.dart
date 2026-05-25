@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:local_auth/local_auth.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../storage/local_database.dart';
 
@@ -75,10 +76,10 @@ class AuthService {
   Future<bool> signInWithPin(String inputPin) async {
     try {
       return await Future.delayed(Duration.zero, () async {
-        final storedHash = _box.get('local_pin_hash') as String?;
-        if (storedHash == null) return false;
+        final storedHashValue = _box.get('local_pin_hash');
+        if (storedHashValue is! String) return false;
 
-        final parts = storedHash.split(':');
+        final parts = storedHashValue.split(':');
         if (parts.length != 2) return false;
 
         final salt = parts[0];
@@ -107,21 +108,28 @@ class AuthService {
 
   Future<bool> unlockWithBiometrics() async {
     try {
+      // Verifica supporto biometrico senza richiedere permessi aggiuntivi
+      // permission_handler non ha una permission specifica per biometria
+
       final isDeviceSupported = await _localAuth.isDeviceSupported();
+      debugPrint('Dispositivo supportato: $isDeviceSupported');
+
       final canCheckBiometrics = await _localAuth.canCheckBiometrics;
+      debugPrint('Can check biometrics: $canCheckBiometrics');
 
       if (!isDeviceSupported || !canCheckBiometrics) {
         debugPrint('Dispositivo non supporta biometria');
         return false;
       }
 
-      final storedHash = _box.get('local_pin_hash');
-      if (storedHash == null) {
+      final storedHashValue = _box.get('local_pin_hash');
+      if (storedHashValue is! String) {
         debugPrint('PIN non configurato - impossibile usare biometria');
         return false;
       }
 
       final availableBiometrics = await _localAuth.getAvailableBiometrics();
+      debugPrint('Biometrie disponibili: $availableBiometrics');
 
       if (availableBiometrics.isEmpty) {
         debugPrint('Nessuna biometria configurata sul dispositivo');
@@ -131,7 +139,7 @@ class AuthService {
       final authenticated = await _localAuth.authenticate(
         localizedReason: 'Autenticati per sbloccare il Registro',
         options: const AuthenticationOptions(
-          biometricOnly: true,
+          biometricOnly: false,
           stickyAuth: false,
           useErrorDialogs: true,
         ),

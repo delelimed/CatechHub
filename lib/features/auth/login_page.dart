@@ -51,7 +51,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       final availableBiometrics = await _localAuth.getAvailableBiometrics();
       debugPrint('Login initState - Biometriche disponibili: $availableBiometrics');
 
-      final canBiometric = (isDeviceSupported || canCheckBiometrics) && availableBiometrics.isNotEmpty;
+      final canBiometric = isDeviceSupported && canCheckBiometrics && availableBiometrics.isNotEmpty;
 
       if (mounted) {
         setState(() {

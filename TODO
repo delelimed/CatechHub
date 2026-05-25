@@ -1,21 +1,22 @@
 ---- FIRST STABLE RELEASE - v1.0.0 ----
 
-mio gruppo *codex - v1.1.0 (4)
+mio gruppo *codex - v1.2.0 (4)
     -aggiungi visualizzazione rapida:
         - nome cognome nascita numero
         - nome e cognome, numero genitori
         - allergie ed autorizzazioni
         - documenti
         - note
+        - allegati
         - assenze
 
-Integra salvataggio foto e pdf per ragazzo, per evento - v1.2.0 (5)
+Integra salvataggio foto e pdf per ragazzo, per evento - v1.1.0 (5)
 
-Integra gestione riunioni (no appello) - v1.3.0 (10)
+Integra gestione riunioni (no appello) - v1.1.0 (10)
 
-Integra condivisione cifrata via qr - v2.0.0 (5) *codex 
+Integra condivisione cifrata via qr - v1.3.0 (5) *codex 
 
-Integra salvataggio di file di backup - v2.1.0 (7) *codex
+Integra salvataggio di file di backup - v1.4.0 (7) *codex
 
 Inserisci manuale utente
 

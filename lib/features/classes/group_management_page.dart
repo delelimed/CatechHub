@@ -132,10 +132,13 @@ class _GroupHeader extends ConsumerWidget {
                   );
                   if (context.mounted) {
                     Navigator.pop(context);
-                    onNameChanged();
+                    Future.microtask(() {
+                      onNameChanged();
+                    });
                   }
                 } catch (e) {
                   if (context.mounted) {
+                    Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Errore: $e')),
                     );

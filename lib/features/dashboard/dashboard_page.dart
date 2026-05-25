@@ -631,9 +631,14 @@ class _QuickActionsGrid extends StatelessWidget {
         path: '/documents',
       ),
       _ActionItem(
-        title: 'Sussidio',
-        icon: Icons.book,
-        path: '/sussidio',
+        title: 'Allergie',
+        icon: Icons.warning_rounded,
+        path: '/allergies',
+      ),
+      _ActionItem(
+        title: 'Uscite Autonome',
+        icon: Icons.person_outline,
+        path: '/autonomous-exits',
       ),
     ];
 

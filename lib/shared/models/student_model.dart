@@ -15,7 +15,9 @@ class Student {
   final String fatherPhone;
   final String studentPhone;
 
-  final String? notes; // 👈 AGGIUNTO
+  final String? allergies;
+  final String? autonomousExits;
+  final String? notes;
 
   Student({
     required this.id,
@@ -30,7 +32,9 @@ class Student {
     required this.fatherPhone,
     required this.studentPhone,
     this.classId,
-    this.notes, // 👈 AGGIUNTO
+    this.allergies,
+    this.autonomousExits,
+    this.notes,
   });
 
   factory Student.fromMap(String id, Map<String, dynamic> data) {
@@ -52,7 +56,9 @@ class Student {
       fatherPhone: data['fatherPhone'] ?? '',
       studentPhone: data['studentPhone'] ?? '',
 
-      notes: data['notes'], // 👈 AGGIUNTO
+      allergies: data['allergies'],
+      autonomousExits: data['autonomousExits'],
+      notes: data['notes'],
     );
   }
 
@@ -73,7 +79,9 @@ class Student {
       'fatherPhone': fatherPhone,
       'studentPhone': studentPhone,
 
-      'notes': notes, // 👈 AGGIUNTO
+      'allergies': allergies,
+      'autonomousExits': autonomousExits,
+      'notes': notes,
     };
   }
 }

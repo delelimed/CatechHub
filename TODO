@@ -1,14 +1,6 @@
----- FIRST BETA RELEASE ----
-
-Ottimizzazione del codice di produzione (1)
-
 ---- FIRST STABLE RELEASE - v1.0.0 ----
 
-Integra gestione allergie ed uscite autonome - v1.1.0 (2) 
-
-Sistema notifiche, mostrando icona applicazione e non flutter - v1.2.0 (3)
-
-mio gruppo *codex - v1.3.0 (4)
+mio gruppo *codex - v1.1.0 (4)
     -aggiungi visualizzazione rapida:
         - nome cognome nascita numero
         - nome e cognome, numero genitori
@@ -17,15 +9,16 @@ mio gruppo *codex - v1.3.0 (4)
         - note
         - assenze
 
-Integra salvataggio foto e pdf per ragazzo, per evento - v1.4.0 (5)
+Integra salvataggio foto e pdf per ragazzo, per evento - v1.2.0 (5)
 
-Integra gestione riunioni (no appello) - v1.5.0 (10)
+Integra gestione riunioni (no appello) - v1.3.0 (10)
 
 Integra condivisione cifrata via qr - v2.0.0 (5) *codex 
 
-Integra condivisione tra dispositivi bluetooth - v2.1.0 (6)
+Integra salvataggio di file di backup - v2.1.0 (7) *codex
 
-Integra salvataggio di file di backup - v2.2.0 (7) *codex
+Inserisci manuale utente
 
-Inserisci manuale utente - v2.2.1 (8) *codex
+Inserisci Readme.md
 
+Inserisci GitHub Pages

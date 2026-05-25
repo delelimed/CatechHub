@@ -49,12 +49,14 @@ class AuthService {
       return await Future.delayed(Duration.zero, () async {
         final salt = DateTime.now().microsecondsSinceEpoch.toString();
         final pinHash = _hashPin(pin, salt);
+
         await _box.put('local_pin_hash', '$salt:$pinHash');
         await _box.put('first_name', firstName.trim());
         await _box.put('last_name', lastName.trim());
         await _box.put('group_name', groupName.trim());
         await _box.put('local_user_name', '$firstName $lastName'.trim());
         await _box.put('isLoggedIn', true);
+
         _cachedUser = null;
         return true;
       }).timeout(
@@ -108,18 +110,21 @@ class AuthService {
       final isDeviceSupported = await _localAuth.isDeviceSupported();
       final canCheckBiometrics = await _localAuth.canCheckBiometrics;
 
-      debugPrint('Biometric check - Supported: $isDeviceSupported, CanCheck: $canCheckBiometrics');
+      if (!isDeviceSupported || !canCheckBiometrics) {
+        debugPrint('Dispositivo non supporta biometria');
+        return false;
+      }
 
-      if (!isDeviceSupported && !canCheckBiometrics) {
-        debugPrint('Dispositivo non supporta biometrica');
+      final storedHash = _box.get('local_pin_hash');
+      if (storedHash == null) {
+        debugPrint('PIN non configurato - impossibile usare biometria');
         return false;
       }
 
       final availableBiometrics = await _localAuth.getAvailableBiometrics();
-      debugPrint('Biometriche disponibili: $availableBiometrics');
 
       if (availableBiometrics.isEmpty) {
-        debugPrint('Nessuna biometrica configurata sul dispositivo');
+        debugPrint('Nessuna biometria configurata sul dispositivo');
         return false;
       }
 
@@ -132,10 +137,7 @@ class AuthService {
         ),
       ).timeout(
         const Duration(seconds: 30),
-        onTimeout: () {
-          debugPrint('Timeout autenticazione biometrica');
-          return false;
-        },
+        onTimeout: () => false,
       );
 
       if (!authenticated) {
@@ -143,14 +145,9 @@ class AuthService {
         return false;
       }
 
-      final storedHash = _box.get('local_pin_hash');
-      if (storedHash == null) {
-        debugPrint('PIN non configurato');
-        return false;
-      }
-
       await _box.put('isLoggedIn', true);
       _cachedUser = null;
+
       debugPrint('Autenticazione biometrica riuscita');
       return true;
     } catch (e) {
@@ -169,7 +166,9 @@ class AuthService {
       _cachedUser = null;
       return null;
     }
+
     if (_cachedUser != null) return _cachedUser;
+
     _cachedUser = {
       'uid': localUserId,
       'name': _box.get('local_user_name', defaultValue: localUserName),
@@ -180,6 +179,7 @@ class AuthService {
       'role': 'catechist',
       'canManageCatechists': true,
     };
+
     return _cachedUser;
   }
 }

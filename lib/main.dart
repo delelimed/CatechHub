@@ -220,23 +220,25 @@ class UpdateService {
   }
 
   /// Genera e mostra la notifica push locale nel centro notifiche di Android
-  static Future<void> _showUpdateNotification(String version, String url) async {
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'update_channel_id',
-      'Aggiornamenti App',
-      channelDescription: 'Notifiche per i nuovi aggiornamenti di CatechHub',
-      importance: Importance.max,
-      priority: Priority.high,
-    );
+static Future<void> _showUpdateNotification(String version, String url) async {
+  const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    'update_channel_id',
+    'Aggiornamenti App',
+    channelDescription: 'Notifiche per i nuovi aggiornamenti di CatechHub',
+    importance: Importance.max,
+    priority: Priority.high,
+    icon: '@mipmap/ic_launcher',
+  );
 
-    const NotificationDetails platformDetails = NotificationDetails(android: androidDetails);
+  const NotificationDetails platformDetails =
+      NotificationDetails(android: androidDetails);
 
-    await _notificationsPlugin.show(
-      0,
-      'Aggiornamento Disponibile!',
-      'È presente la versione $version. Tocca qui per scaricarla.',
-      platformDetails,
-      payload: url,
-    );
-  }
+  await _notificationsPlugin.show(
+    0,
+    'Aggiornamento Disponibile!',
+    'È presente la versione $version. Tocca qui per scaricarla.',
+    platformDetails,
+    payload: url,
+  );
+}
 }

@@ -65,7 +65,9 @@ class PrivacySecurityPage extends ConsumerWidget {
             title: 'Conformita GDPR',
             content:
                 'L\'app rispetta il Regolamento Generale sulla Protezione dei Dati (GDPR). '
-                'Tutti i dati personali sono trattati secondo i principi di liceita, correttezza e trasparenza. '
+                'Tutti i dati personali, in particolare i dati dei ragazzi, non lasciano mai il dispositivo e rimangono completamente locali. '
+                'I dati non vengono condivisi con server remoti, cloud o terze parti. '
+                'Tutti i dati sono trattati secondo i principi di liceita, correttezza e trasparenza. '
                 'Hai il diritto di accedere, rettificare o eliminare i tuoi dati in qualsiasi momento.',
             icon: Icons.gavel_rounded,
           ),

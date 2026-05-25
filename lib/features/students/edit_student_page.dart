@@ -30,6 +30,8 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
   late TextEditingController fatherPhone;
 
   late TextEditingController studentPhone;
+  late TextEditingController allergies;
+  late TextEditingController autonomousExits;
   late TextEditingController notes;
 
   bool editMode = false;
@@ -52,7 +54,8 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
     fatherPhone = TextEditingController(text: s.fatherPhone);
 
     studentPhone = TextEditingController(text: s.studentPhone);
-
+    allergies = TextEditingController(text: s.allergies ?? '');
+    autonomousExits = TextEditingController(text: s.autonomousExits ?? '');
     notes = TextEditingController(text: s.notes ?? '');
   }
 
@@ -195,6 +198,17 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
             const SizedBox(height: 16),
 
             _Section(
+              title: 'Allergie e Uscite Autonome',
+              children: [
+                _Field(allergies, 'Allergie', maxLines: 3, enabled: editMode),
+                const SizedBox(height: 12),
+                _Field(autonomousExits, 'Uscite Autonome (padre/madre/altro)', maxLines: 3, enabled: editMode),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            _Section(
               title: 'Note',
               children: [
                 _Field(notes, 'Note', maxLines: 5, enabled: editMode),
@@ -224,6 +238,8 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
                           fatherSurname: fatherSurname.text,
                           fatherPhone: fatherPhone.text,
                           studentPhone: studentPhone.text,
+                          allergies: allergies.text,
+                          autonomousExits: autonomousExits.text,
                           notes: notes.text,
                         );
 

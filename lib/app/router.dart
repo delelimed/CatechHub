@@ -18,7 +18,8 @@ import '../features/documents/documents_page.dart';
 import '../features/settings/settings_page.dart';
 import '../features/settings/privacy.dart';
 import '../features/documents/document_detail_page.dart';
-import '../features/sussidio/sussidio.dart';
+import '../features/students/allergies_page.dart';
+import '../features/students/autonomous_exits_page.dart';
 
 class _AuthStateNotifier extends ChangeNotifier {
   _AuthStateNotifier(Ref ref) {
@@ -128,10 +129,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       builder: (context, state) => const GroupManagementPage(),
     ),
 
-    /// SUSSIDIO
+    /// ALLERGIES
     GoRoute(
-      path: '/sussidio',
-      builder: (context, state) => const SussidioPage(),
+      path: '/allergies',
+      builder: (context, state) => const AllergiesPage(),
+    ),
+
+    /// AUTONOMOUS EXITS
+    GoRoute(
+      path: '/autonomous-exits',
+      builder: (context, state) => const AutonomousExitsPage(),
     ),
   ],
   );

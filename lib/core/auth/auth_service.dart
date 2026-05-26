@@ -140,7 +140,7 @@ class AuthService {
         localizedReason: 'Autenticati per sbloccare il Registro',
         options: const AuthenticationOptions(
           biometricOnly: false,
-          stickyAuth: false,
+          stickyAuth: true,
           useErrorDialogs: true,
         ),
       ).timeout(

@@ -31,7 +31,7 @@ android {
     defaultConfig {
         applicationId = "com.delelimed.registro_catechismo"
         
-        minSdk = flutter.minSdkVersion
+        minSdk = 30
         targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName

@@ -1,5 +1,11 @@
 ---- FIRST STABLE RELEASE - v1.0.0 ----
 
+integra blocco automatico a chiusura dell'applicazione, anche mediante killing da drawer
+
+Integra cancellazione parziale o totale del database
+
+Ottimizza codice
+
 mio gruppo *codex - v1.2.0 (4)
     -aggiungi visualizzazione rapida:
         - nome cognome nascita numero
@@ -17,6 +23,8 @@ Integra gestione riunioni (no appello) - v1.1.0 (10)
 Integra condivisione cifrata via qr - v1.3.0 (5) *codex 
 
 Integra salvataggio di file di backup - v1.4.0 (7) *codex
+
+Integra code obfuscation
 
 Inserisci manuale utente
 

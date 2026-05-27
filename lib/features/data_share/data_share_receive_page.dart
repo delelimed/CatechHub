@@ -159,6 +159,9 @@ class _DataShareReceivePageState extends State<DataShareReceivePage> {
       await DataExportService.importData(receivedData);
 
       // Importazione completata
+      setState(() {
+        _isImporting = false;
+      });
       if (mounted) {
         _showSuccessDialog();
       }

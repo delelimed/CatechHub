@@ -3,13 +3,11 @@ import 'dart:typed_data';
 
 import '../storage/encrypted_file_storage.dart';
 import '../storage/local_database.dart';
-import '../storage/encrypted_file_storage.dart';
 import '../../shared/models/student_model.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/models/planning_meeting.dart';
 import '../../shared/models/attachment_model.dart';
 import 'encryption_service.dart';
-import 'dart:convert';
 
 class DataExportService {
   // Esporta tutti i dati dal database
@@ -125,8 +123,19 @@ class DataExportService {
         .where((a) => a.parentType == parentType)
         .toList();
 
-    // Nota: I file binari non vengono esportati via QR code per limitazioni di dimensione
-    // Verranno esportati solo i metadati
+    // Includi i dati binari (base64) di ogni allegato
+    final List<Map<String, dynamic>> attachmentsWithData = [];
+    for (final a in filteredAttachments) {
+      final map = a.toMap()..['id'] = a.id;
+      try {
+        final fileBytes = await EncryptedFileStorage.read(a.id);
+        map['fileData'] = base64Encode(fileBytes);
+      } catch (_) {
+        // File non trovato su disco: esporta solo i metadati
+      }
+      attachmentsWithData.add(map);
+    }
+
     return {
       'attachments': attachmentsWithData,
       'parentType': parentType,

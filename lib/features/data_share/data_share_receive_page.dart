@@ -160,6 +160,9 @@ class _DataShareReceivePageState extends State<DataShareReceivePage> {
 
       // Importazione completata
       if (mounted) {
+        setState(() {
+          _isImporting = false;
+        });
         _showSuccessDialog();
       }
     } catch (e) {

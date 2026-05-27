@@ -165,6 +165,50 @@ class AuthService {
     }
   }
 
+  Future<bool> changePin(String oldPin, String newPin) async {
+    try {
+      return await Future.delayed(Duration.zero, () async {
+        // Verify old PIN first
+        final storedHashValue = _box.get('local_pin_hash');
+        if (storedHashValue is! String) return false;
+
+        final parts = storedHashValue.split(':');
+        if (parts.length != 2) return false;
+
+        final salt = parts[0];
+        final savedHash = parts[1];
+        final computedHash = _hashPin(oldPin, salt);
+
+        if (computedHash != savedHash) {
+          debugPrint('PIN vecchio non corretto');
+          return false;
+        }
+
+        // Validate new PIN
+        if (newPin.length < 4) {
+          debugPrint('Il nuovo PIN deve essere di almeno 4 cifre');
+          return false;
+        }
+
+        // Generate new hash with new salt
+        final newSalt = DateTime.now().microsecondsSinceEpoch.toString();
+        final newPinHash = _hashPin(newPin, newSalt);
+
+        await _box.put('local_pin_hash', '$newSalt:$newPinHash');
+        return true;
+      }).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          debugPrint('Timeout cambio PIN');
+          return false;
+        },
+      );
+    } catch (e) {
+      debugPrint('Errore durante il cambio del PIN: $e');
+      return false;
+    }
+  }
+
   Future<void> signOut() async {
     _sessionUnlocked = false;
     _cachedUser = null;

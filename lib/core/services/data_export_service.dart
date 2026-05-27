@@ -1,10 +1,12 @@
 import '../storage/local_database.dart';
+import '../storage/encrypted_file_storage.dart';
 import '../../shared/models/student_model.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/models/planning_meeting.dart';
 import '../../shared/models/attachment_model.dart';
 import 'encryption_service.dart';
 import 'dart:convert';
+import 'dart:typed_data';
 
 class DataExportService {
   // Esporta tutti i dati dal database
@@ -109,7 +111,7 @@ class DataExportService {
   }
 
   // Esporta allegati per tipo specifico (student o meeting)
-  static Map<String, dynamic> _exportAllegatiPerTipo(String parentType) {
+  static Future<Map<String, dynamic>> _exportAllegatiPerTipo(String parentType) async {
     final allAttachments = LocalDatabase.values(
       LocalDatabase.attachments(),
       (id, data) => Attachment.fromMap(id, data),
@@ -120,12 +122,27 @@ class DataExportService {
         .where((a) => a.parentType == parentType)
         .toList();
 
-    // Nota: I file binari non vengono esportati via QR code per limitazioni di dimensione
-    // Verranno esportati solo i metadati
+    // Esporta allegati con dati binari
+    final attachmentsWithData = <Map<String, dynamic>>[];
+    for (final attachment in filteredAttachments) {
+      final attachmentMap = attachment.toMap();
+      attachmentMap['id'] = attachment.id;
+      
+      // Includi i dati binari del file
+      try {
+        final fileData = await EncryptedFileStorage.read(attachment.id);
+        attachmentMap['fileData'] = base64Encode(fileData);
+      } catch (e) {
+        // Se il file non esiste, continua senza i dati
+        attachmentMap['fileData'] = null;
+      }
+      
+      attachmentsWithData.add(attachmentMap);
+    }
+
     return {
-      'attachments': filteredAttachments.map((a) => a.toMap()..['id'] = a.id).toList(),
+      'attachments': attachmentsWithData,
       'parentType': parentType,
-      'note': 'I file binari non sono inclusi nella condivisione QR code',
     };
   }
 

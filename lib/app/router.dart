@@ -17,6 +17,7 @@ import '../features/documents/documents_page.dart';
 import '../features/settings/settings_page.dart';
 import '../features/settings/privacy.dart';
 import '../features/settings/delete_data_page.dart';
+import '../features/settings/change_pin_page.dart';
 import '../features/documents/document_detail_page.dart';
 import '../features/students/allergies_page.dart';
 import '../features/students/autonomous_exits_page.dart';
@@ -130,6 +131,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     GoRoute(
       path: '/delete-data',
       builder: (context, state) => const DeleteDataPage(),
+    ),
+
+    GoRoute(
+      path: '/change-pin',
+      builder: (context, state) => const ChangePinPage(),
     ),
 
     /// MY GROUP

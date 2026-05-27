@@ -106,6 +106,18 @@ class SettingsPage extends ConsumerWidget {
           const SizedBox(height: 12),
 
           _SettingsItem(
+            icon: Icons.password_rounded,
+            title: 'Cambia PIN',
+            subtitle: 'Modifica il tuo PIN di accesso',
+            color: const Color(0xFF174A7E),
+            onTap: () {
+              context.go('/change-pin');
+            },
+          ),
+
+          const SizedBox(height: 12),
+
+          _SettingsItem(
             icon: Icons.delete_forever_rounded,
             title: 'Cancella dati salvati',
             subtitle: 'Elimina anagrafica, presenze, giornate o allegati',

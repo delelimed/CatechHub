@@ -21,13 +21,13 @@ class _DataShareSelectionPageState extends ConsumerState<DataShareSelectionPage>
 
   bool _isLoading = false;
 
-  void _startSharing() {
+  Future<void> _startSharing() async {
     setState(() {
       _isLoading = true;
     });
 
     // Prepara i dati selezionati (allegati inclusi automaticamente)
-    final selectedData = DataExportService.exportSelectiveData(
+    final selectedData = await DataExportService.exportSelectiveData(
       _includeAnagrafica,
       _includeAgenda,
       _includeProgrammazione,
@@ -43,7 +43,9 @@ class _DataShareSelectionPageState extends ConsumerState<DataShareSelectionPage>
     ref.read(dataSharePinProvider.notifier).state = pin;
 
     // Naviga alla pagina di invio
-    context.go('/data-share/send');
+    if (mounted) {
+      context.go('/data-share/send');
+    }
   }
 
   void _startReceiving() {

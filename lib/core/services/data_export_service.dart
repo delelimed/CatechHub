@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import '../storage/encrypted_file_storage.dart';
 import '../storage/local_database.dart';
 import '../storage/encrypted_file_storage.dart';
 import '../../shared/models/student_model.dart';
@@ -6,17 +10,16 @@ import '../../shared/models/planning_meeting.dart';
 import '../../shared/models/attachment_model.dart';
 import 'encryption_service.dart';
 import 'dart:convert';
-import 'dart:typed_data';
 
 class DataExportService {
   // Esporta tutti i dati dal database
-  static Map<String, dynamic> exportAllData() {
+  static Future<Map<String, dynamic>> exportAllData() async {
     final Map<String, dynamic> allData = {
       'anagrafica': _exportAnagrafica(),
-      'allegati_studenti': _exportAllegatiPerTipo('student'),
+      'allegati_studenti': await _exportAllegatiPerTipo('student'),
       'agenda': _exportAgenda(),
       'programmazione': _exportProgrammazione(),
-      'allegati_giornate': _exportAllegatiPerTipo('meeting'),
+      'allegati_giornate': await _exportAllegatiPerTipo('meeting'),
       'documenti': _exportDocumenti(),
     };
 
@@ -24,13 +27,13 @@ class DataExportService {
   }
 
   // Esporta dati selettivi basati su opzioni
-  static Map<String, dynamic> exportSelectiveData(bool includeAnagrafica, bool includeAgenda, bool includeProgrammazione, bool includeDocumenti, bool includeAllegati) {
+  static Future<Map<String, dynamic>> exportSelectiveData(bool includeAnagrafica, bool includeAgenda, bool includeProgrammazione, bool includeDocumenti, bool includeAllegati) async {
     final Map<String, dynamic> selectiveData = {};
 
     if (includeAnagrafica) {
       selectiveData['anagrafica'] = _exportAnagrafica();
       // Includi automaticamente allegati dei ragazzi
-      selectiveData['allegati_studenti'] = _exportAllegatiPerTipo('student');
+      selectiveData['allegati_studenti'] = await _exportAllegatiPerTipo('student');
     }
 
     if (includeAgenda) {
@@ -40,7 +43,7 @@ class DataExportService {
     if (includeProgrammazione) {
       selectiveData['programmazione'] = _exportProgrammazione();
       // Includi automaticamente allegati delle giornate
-      selectiveData['allegati_giornate'] = _exportAllegatiPerTipo('meeting');
+      selectiveData['allegati_giornate'] = await _exportAllegatiPerTipo('meeting');
     }
 
     if (includeDocumenti) {
@@ -122,24 +125,8 @@ class DataExportService {
         .where((a) => a.parentType == parentType)
         .toList();
 
-    // Esporta allegati con dati binari
-    final attachmentsWithData = <Map<String, dynamic>>[];
-    for (final attachment in filteredAttachments) {
-      final attachmentMap = attachment.toMap();
-      attachmentMap['id'] = attachment.id;
-      
-      // Includi i dati binari del file
-      try {
-        final fileData = await EncryptedFileStorage.read(attachment.id);
-        attachmentMap['fileData'] = base64Encode(fileData);
-      } catch (e) {
-        // Se il file non esiste, continua senza i dati
-        attachmentMap['fileData'] = null;
-      }
-      
-      attachmentsWithData.add(attachmentMap);
-    }
-
+    // Nota: I file binari non vengono esportati via QR code per limitazioni di dimensione
+    // Verranno esportati solo i metadati
     return {
       'attachments': attachmentsWithData,
       'parentType': parentType,
@@ -284,7 +271,7 @@ class DataExportService {
   static Future<void> _importAllegati(Map<String, dynamic> allegatiData, String parentType) async {
     final attachmentsBox = LocalDatabase.attachments();
 
-    // Rimuovi solo gli allegati del tipo specificato
+    // Rimuovi solo gli allegati del tipo specificato (inclusi i file su disco)
     final allAttachments = LocalDatabase.values(
       LocalDatabase.attachments(),
       (id, data) => Attachment.fromMap(id, data),
@@ -292,16 +279,25 @@ class DataExportService {
 
     for (final attachment in allAttachments) {
       if (attachment.parentType == parentType) {
+        await EncryptedFileStorage.delete(attachment.id);
         await attachmentsBox.delete(attachment.id);
       }
     }
 
-    // Importa allegati (solo metadati)
+    // Importa allegati con dati binari
     final attachments = allegatiData['attachments'] as List<dynamic>?;
     if (attachments != null) {
       for (final attachmentData in attachments) {
-        final attachmentMap = attachmentData as Map<String, dynamic>;
+        final attachmentMap = Map<String, dynamic>.from(attachmentData as Map);
         final id = attachmentMap['id'] as String? ?? LocalDatabase.newId('attachment');
+
+        // Salva i dati binari nel file storage se presenti
+        final fileDataB64 = attachmentMap.remove('fileData') as String?;
+        if (fileDataB64 != null && fileDataB64.isNotEmpty) {
+          final fileBytes = Uint8List.fromList(base64Decode(fileDataB64));
+          await EncryptedFileStorage.write(id, fileBytes);
+        }
+
         await attachmentsBox.put(id, attachmentMap);
       }
     }
@@ -311,15 +307,32 @@ class DataExportService {
   static Future<void> _importAllegatiGenerici(Map<String, dynamic> allegatiData) async {
     final attachmentsBox = LocalDatabase.attachments();
 
+    // Elimina file su disco prima di svuotare il box
+    final existingAttachments = LocalDatabase.values(
+      LocalDatabase.attachments(),
+      (id, data) => Attachment.fromMap(id, data),
+    );
+    for (final attachment in existingAttachments) {
+      await EncryptedFileStorage.delete(attachment.id);
+    }
+
     // Svuota box esistente
     await attachmentsBox.clear();
 
-    // Importa allegati (solo metadati)
+    // Importa allegati con dati binari
     final attachments = allegatiData['attachments'] as List<dynamic>?;
     if (attachments != null) {
       for (final attachmentData in attachments) {
-        final attachmentMap = attachmentData as Map<String, dynamic>;
+        final attachmentMap = Map<String, dynamic>.from(attachmentData as Map);
         final id = attachmentMap['id'] as String? ?? LocalDatabase.newId('attachment');
+
+        // Salva i dati binari nel file storage se presenti
+        final fileDataB64 = attachmentMap.remove('fileData') as String?;
+        if (fileDataB64 != null && fileDataB64.isNotEmpty) {
+          final fileBytes = Uint8List.fromList(base64Decode(fileDataB64));
+          await EncryptedFileStorage.write(id, fileBytes);
+        }
+
         await attachmentsBox.put(id, attachmentMap);
       }
     }
@@ -340,8 +353,8 @@ class DataExportService {
   }
 
   // Esporta tutti i dati cifrati con password
-  static String exportEncryptedData(String password) {
-    final allData = exportAllData();
+  static Future<String> exportEncryptedData(String password) async {
+    final allData = await exportAllData();
     return EncryptionService.encryptData(allData, password);
   }
 

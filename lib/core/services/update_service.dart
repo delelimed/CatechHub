@@ -20,8 +20,9 @@ class UpdateService {
   }
 
   static Future<void> initNotifications() async {
-    const androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const settings = InitializationSettings(android: androidSettings);
 
     await _notificationsPlugin.initialize(
@@ -53,8 +54,7 @@ class UpdateService {
       if (response.statusCode != 200) return;
 
       final data = json.decode(response.body) as Map<String, dynamic>;
-      final latestVersion =
-          (data['tag_name'] as String).replaceAll('v', '');
+      final latestVersion = (data['tag_name'] as String).replaceAll('v', '');
 
       if (_isVersionNewer(currentVersion, latestVersion)) {
         await _showUpdateNotification(latestVersion);
@@ -95,7 +95,7 @@ class UpdateService {
     await _notificationsPlugin.show(
       id: 0,
       title: 'Aggiornamento disponibile',
-      body: 'Versione $version. Tocca per maggiori informazioni.',
+      body: 'Versione $version. Tocca per aprire la pagina Aggiornamenti.',
       notificationDetails: platformDetails,
       payload: 'update_available', // Payload per aprire la pagina
     );

@@ -32,16 +32,19 @@ class DataExportService {
     bool includeAgenda,
     bool includeProgrammazione,
     bool includeDocumenti,
-    bool includeAllegati,
+    bool includeContactNotes,
+    bool includeAnagraficaAttachments,
+    bool includeAgendaAttachments,
   ) async {
     final Map<String, dynamic> selectiveData = {};
 
     if (includeAnagrafica) {
       selectiveData['anagrafica'] = _exportAnagrafica();
-      // Includi automaticamente allegati dei ragazzi
-      selectiveData['allegati_studenti'] = await _exportAllegatiPerTipo(
-        'student',
-      );
+      if (includeAnagraficaAttachments) {
+        selectiveData['allegati_studenti'] = await _exportAllegatiPerTipo(
+          'student',
+        );
+      }
     }
 
     if (includeAgenda) {
@@ -50,18 +53,18 @@ class DataExportService {
 
     if (includeProgrammazione) {
       selectiveData['programmazione'] = _exportProgrammazione();
-      // Includi automaticamente allegati delle giornate
-      selectiveData['allegati_giornate'] = await _exportAllegatiPerTipo(
-        'meeting',
-      );
+      if (includeAgendaAttachments) {
+        selectiveData['allegati_giornate'] = await _exportAllegatiPerTipo(
+          'meeting',
+        );
+      }
     }
 
     if (includeDocumenti) {
       selectiveData['documenti'] = _exportDocumenti();
     }
 
-    // Le note di contatto vengono sempre incluse con l'anagrafica
-    if (includeAnagrafica) {
+    if (includeContactNotes) {
       selectiveData['note_contatto'] = _exportNoteContatto();
     }
 

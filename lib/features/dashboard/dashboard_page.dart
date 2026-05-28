@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../../core/auth/auth_service.dart';
 import '../../shared/models/planning_meeting.dart';
 import '../../shared/widgets/app_scaffold.dart';
+import '../auth/bible_quote.dart';
 import '../classes/classes_provider.dart';
 import '../documents/documents_repository.dart';
 import '../meetings/attendance_repository.dart';
@@ -20,6 +23,11 @@ class DashboardPage extends ConsumerWidget {
     String classId,
   ) {
     return attendance.where((record) => record['classId'] == classId).toList();
+  }
+
+  BibleQuote _randomQuote() {
+    final index = Random().nextInt(bibleQuotes.length);
+    return bibleQuotes[index];
   }
 
   double _calculatePresenceRate(List<Map<String, dynamic>> attendanceRecords) {
@@ -192,6 +200,8 @@ class DashboardPage extends ConsumerWidget {
                       child: ListView(
                         padding: EdgeInsets.all(padding),
                         children: [
+                          _QuoteSnippet(quote: _randomQuote()),
+                          const SizedBox(height: 10),
                           _SectionTitle('Il tuo prossimo impegno'),
                           const SizedBox(height: 10),
                           _NextMeetingCard(
@@ -368,6 +378,38 @@ class _NextMeetingCard extends StatelessWidget {
                 ],
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuoteSnippet extends StatelessWidget {
+  final BibleQuote quote;
+
+  const _QuoteSnippet({required this.quote});
+
+  @override
+  Widget build(BuildContext context) {
+    return _Panel(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '“${quote.text}”',
+            style: TextStyle(
+              fontSize: 13,
+              fontStyle: FontStyle.italic,
+              color: Colors.grey.shade800,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            quote.reference,
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
           ),
         ],
       ),

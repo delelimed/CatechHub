@@ -239,7 +239,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         const SizedBox(height: 16),
 
                         const Text(
-                          "Registro del Catechista",
+                          "CatechHub",
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 22,
@@ -292,26 +292,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
                         const SizedBox(height: 20),
 
-                        OutlinedButton.icon(
-                          onPressed: () async {
-                            final uri = Uri.parse(
-                              "https://www.diocesisabina.it/sussidiocatechesi/",
-                            );
-                            if (await canLaunchUrl(uri)) {
-                              await launchUrl(
-                                uri,
-                                mode: LaunchMode.externalApplication,
-                              );
-                            }
-                          },
-                          icon: const Icon(Icons.open_in_new),
-                          label: const Text("Sussidio Catechesi"),
-                        ),
-
                         const SizedBox(height: 16),
 
                         const Text(
-                          "Realizzato con ❤️ da DELELI",
+                          "Realizzato con ❤️ da un catechista per i catechisti",
                           style: TextStyle(fontSize: 12, color: Colors.grey),
                         ),
                       ],

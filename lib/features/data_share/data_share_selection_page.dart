@@ -10,14 +10,19 @@ class DataShareSelectionPage extends ConsumerStatefulWidget {
   const DataShareSelectionPage({super.key});
 
   @override
-  ConsumerState<DataShareSelectionPage> createState() => _DataShareSelectionPageState();
+  ConsumerState<DataShareSelectionPage> createState() =>
+      _DataShareSelectionPageState();
 }
 
-class _DataShareSelectionPageState extends ConsumerState<DataShareSelectionPage> {
+class _DataShareSelectionPageState
+    extends ConsumerState<DataShareSelectionPage> {
   bool _includeAnagrafica = true;
   bool _includeAgenda = true;
   bool _includeProgrammazione = true;
   bool _includeDocumenti = true;
+  bool _includeContactNotes = false;
+  bool _includeAnagraficaAttachments = true;
+  bool _includeAgendaAttachments = true;
 
   bool _isLoading = false;
 
@@ -26,13 +31,15 @@ class _DataShareSelectionPageState extends ConsumerState<DataShareSelectionPage>
       _isLoading = true;
     });
 
-    // Prepara i dati selezionati (allegati inclusi automaticamente)
+    // Prepara i dati selezionati in base alle opzioni dell'utente
     final selectedData = await DataExportService.exportSelectiveData(
       _includeAnagrafica,
       _includeAgenda,
       _includeProgrammazione,
       _includeDocumenti,
-      true, // Allegati inclusi automaticamente
+      _includeContactNotes,
+      _includeAnagraficaAttachments,
+      _includeAgendaAttachments,
     );
 
     // Genera PIN
@@ -69,17 +76,52 @@ class _DataShareSelectionPageState extends ConsumerState<DataShareSelectionPage>
                   const _InfoCard(),
                   const SizedBox(height: 24),
 
-                  const _SectionTitle(title: 'Seleziona contenuti da condividere'),
+                  const _SectionTitle(
+                    title: 'Seleziona contenuti da condividere',
+                  ),
                   const SizedBox(height: 16),
 
                   _ShareOption(
                     icon: Icons.people_rounded,
                     title: 'Anagrafica',
-                    subtitle: 'Studenti, classi e allegati',
+                    subtitle: 'Studenti e classi',
                     value: _includeAnagrafica,
                     onChanged: (value) {
                       setState(() {
                         _includeAnagrafica = value ?? false;
+                        if (!_includeAnagrafica) {
+                          _includeAnagraficaAttachments = false;
+                          _includeContactNotes = false;
+                        }
+                      });
+                    },
+                  ),
+
+                  _ShareOption(
+                    icon: Icons.attachment_rounded,
+                    title: 'Allegati studenti',
+                    subtitle: 'Includi i file collegati agli studenti',
+                    value: _includeAnagraficaAttachments,
+                    enabled: _includeAnagrafica,
+                    onChanged: (value) {
+                      if (!_includeAnagrafica) return;
+                      setState(() {
+                        _includeAnagraficaAttachments = value ?? false;
+                      });
+                    },
+                  ),
+
+                  _ShareOption(
+                    icon: Icons.note_rounded,
+                    title: 'Note contatto',
+                    subtitle:
+                        'Includi le note di contatto associate agli studenti',
+                    value: _includeContactNotes,
+                    enabled: _includeAnagrafica,
+                    onChanged: (value) {
+                      if (!_includeAnagrafica) return;
+                      setState(() {
+                        _includeContactNotes = value ?? false;
                       });
                     },
                   ),
@@ -92,6 +134,23 @@ class _DataShareSelectionPageState extends ConsumerState<DataShareSelectionPage>
                     onChanged: (value) {
                       setState(() {
                         _includeAgenda = value ?? false;
+                        if (!_includeAgenda) {
+                          _includeAgendaAttachments = false;
+                        }
+                      });
+                    },
+                  ),
+
+                  _ShareOption(
+                    icon: Icons.attachment_rounded,
+                    title: 'Allegati agenda',
+                    subtitle: 'Includi i file collegati agli incontri',
+                    value: _includeAgendaAttachments,
+                    enabled: _includeAgenda,
+                    onChanged: (value) {
+                      if (!_includeAgenda) return;
+                      setState(() {
+                        _includeAgendaAttachments = value ?? false;
                       });
                     },
                   ),
@@ -196,11 +255,7 @@ class _InfoCard extends StatelessWidget {
           const Text(
             'Condividi i tuoi dati tra dispositivi in modo completamente offline e sicuro usando QR code animati. '
             'I dati sono protetti da un PIN di 8 cifre.',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              height: 1.5,
-            ),
+            style: TextStyle(color: Colors.white, fontSize: 14, height: 1.5),
           ),
         ],
       ),
@@ -232,6 +287,7 @@ class _ShareOption extends StatelessWidget {
   final String title;
   final String subtitle;
   final bool value;
+  final bool enabled;
   final ValueChanged<bool?> onChanged;
 
   const _ShareOption({
@@ -240,6 +296,7 @@ class _ShareOption extends StatelessWidget {
     required this.subtitle,
     required this.value,
     required this.onChanged,
+    this.enabled = true,
   });
 
   @override
@@ -270,22 +327,21 @@ class _ShareOption extends StatelessWidget {
         ),
         title: Text(
           title,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
           subtitle,
           style: TextStyle(
             fontSize: 13,
-            color: Colors.grey.shade600,
+            color: enabled ? Colors.grey.shade600 : Colors.grey.shade400,
           ),
         ),
         trailing: Switch(
           value: value,
-          onChanged: onChanged,
+          onChanged: enabled ? onChanged : null,
           activeColor: const Color(0xFF174A7E),
+          inactiveThumbColor: enabled ? null : Colors.grey.shade400,
+          inactiveTrackColor: enabled ? null : Colors.grey.shade300,
         ),
       ),
     );
@@ -353,20 +409,13 @@ class _ModeButton extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: color,
-              size: 28,
-            ),
+            Icon(Icons.chevron_right_rounded, color: color, size: 28),
           ],
         ),
       ),

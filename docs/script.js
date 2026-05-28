@@ -306,10 +306,20 @@ async function fetchDownloadCount() {
     try {
         while (true) {
             const url = `https://api.github.com/repos/${owner}/${repo}/releases?per_page=${perPage}&page=${page}`;
-            const res = await fetch(url);
-            if (!res.ok) break;
+            const res = await fetch(url, {
+                headers: {
+                    'Accept': 'application/vnd.github.v3+json',
+                },
+            });
+            if (!res.ok) {
+                throw new Error(`GitHub API error: ${res.status} ${res.statusText}`);
+            }
             const releases = await res.json();
-            if (!Array.isArray(releases) || releases.length === 0) break;
+            if (!Array.isArray(releases)) {
+                console.error('Unexpected GitHub API response:', releases);
+                break;
+            }
+            if (releases.length === 0) break;
 
             let stop = false;
             for (const r of releases) {
@@ -350,7 +360,11 @@ async function fetchDownloadCount() {
     }
 }
 
-// Run download count fetch on DOM ready
-document.addEventListener('DOMContentLoaded', () => {
+// Run download count fetch when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchDownloadCount();
+    });
+} else {
     fetchDownloadCount();
-});
+}

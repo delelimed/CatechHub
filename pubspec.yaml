@@ -2,7 +2,7 @@ name: CatechHub
 description: "Il tuo registro di catechismo"
 publish_to: 'none'
 
-version: 1.2.1+3
+version: 1.2.3+0
 
 environment:
   sdk: '>=3.12.0 <4.0.0'

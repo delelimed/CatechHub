@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CatechHub - Informazioni tecniche e sicurezza</title>
+    <meta name="description" content="Scopri come funziona CatechHub, l'app per catechismo e gestionale parrocchiale, con informazioni su sicurezza, requisiti e backup.">
+    <meta name="keywords" content="catechismo, gestione parrocchiale, sicurezza app, backup offline, registro presenze, software per parrocchie">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://catechhub-dev.github.io/CatechHub/technical.html">
+    <meta property="og:title" content="CatechHub - Informazioni tecniche e sicurezza">
+    <meta property="og:description" content="Scopri i dettagli tecnici di CatechHub, l'app per la gestione catechismo e la sicurezza dei dati parrocchiali.">
+    <meta property="og:image" content="https://catechhub-dev.github.io/CatechHub/logo.png">
+    <meta property="og:url" content="https://catechhub-dev.github.io/CatechHub/technical.html">
+    <meta property="og:site_name" content="CatechHub">
+    <meta property="og:type" content="article">
+    <meta property="og:locale" content="it_IT">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="CatechHub - Informazioni tecniche e sicurezza">
+    <meta name="twitter:description" content="Scopri i dettagli tecnici di CatechHub, l'app per catechismo e la sicurezza dei dati parrocchiali.">
+    <meta name="twitter:image" content="https://catechhub-dev.github.io/CatechHub/logo.png">
+    <meta name="theme-color" content="#4B5563">
+    <link rel="icon" href="logo.png">
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "CatechHub",
+      "url": "https://catechhub-dev.github.io/CatechHub/",
+      "description": "App per gestione catechismo e registro parrocchiale offline, con gestione ragazzi, presenze, documenti e sicurezza.",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Android, iOS",
+      "inLanguage": "it",
+      "author": {
+        "@type": "Organization",
+        "name": "CatechHub"
+      },
+      "image": "https://catechhub-dev.github.io/CatechHub/logo.png"
+    }
+    </script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <img src="logo.png" alt="CatechHub Logo" class="nav-logo">
+                <span>CatechHub</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="index.html" class="nav-link">Home</a></li>
+                <li><a href="technical.html" class="nav-link active">Tecnico</a></li>
+                <li><a href="#security" class="nav-link">Sicurezza</a></li>
+                <li><a href="#requirements" class="nav-link">Requisiti</a></li>
+                <li><a href="#opensource" class="nav-link">Open Source</a></li>
+            </ul>
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="home" class="hero">
+        <div class="hero-overlay"></div>
+        <div class="container">
+            <div class="hero-content">
+                <img src="logo.png" alt="CatechHub Logo" class="hero-logo">
+                <h1 class="hero-title">
+                    <span class="gradient-text">Informazioni Tecniche</span>
+                </h1>
+                <p class="hero-subtitle">Scopri come funziona CatechHub sotto il cofano</p>
+                <p class="hero-description">
+                    Dettagli sulla sicurezza, requisiti di sistema, architettura open source e molto altro.
+                    Tutto trasparente, tutto sotto il tuo controllo.
+                </p>
+                <div class="hero-buttons">
+                    <a href="#security" class="btn btn-primary">
+                        <i class="fas fa-shield-alt"></i>
+                        Sicurezza
+                    </a>
+                    <a href="index.html" class="btn btn-secondary">
+                        <i class="fas fa-home"></i>
+                        Torna alla Home
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Security Section -->
+    <section id="security" class="security">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Come Funziona la <span class="highlight">Sicurezza</span></h2>
+                <p class="section-subtitle">La tua privacy è la nostra priorità assoluta</p>
+            </div>
+
+            <div class="security-grid">
+                <div class="security-card">
+                    <div class="security-icon">
+                        <i class="fas fa-lock"></i>
+                    </div>
+                    <h3>Crittografia Locale</h3>
+                    <p>Tutti i dati sono criptati localmente sul dispositivo utilizzando algoritmi di crittografia moderni e sicuri. Nessun dato viene mai inviato a server esterni.</p>
+                </div>
+
+                <div class="security-card">
+                    <div class="security-icon">
+                        <i class="fas fa-fingerprint"></i>
+                    </div>
+                    <h3>Autenticazione Biometrica</h3>
+                    <p>Sblocco dell'app tramite impronta digitale o riconoscimento facciale, se supportato dal dispositivo. Combinabile con PIN personalizzabile.</p>
+                </div>
+
+                <div class="security-card">
+                    <div class="security-icon">
+                        <i class="fas fa-key"></i>
+                    </div>
+                    <h3>PIN Personalizzabile</h3>
+                    <p>Configura un PIN di sicurezza personalizzato per proteggere l'accesso all'app. Il PIN è obbligatorio e può essere modificato in qualsiasi momento.</p>
+                </div>
+
+                <div class="security-card">
+                    <div class="security-icon">
+                        <i class="fas fa-wifi-slash"></i>
+                    </div>
+                    <h3>100% Offline</h3>
+                    <p>L'app funziona completamente senza connessione internet. Nessuna comunicazione con server esterni, nessun tracking, nessuna condivisione di dati.</p>
+                </div>
+
+                <div class="security-card">
+                    <div class="security-icon">
+                        <i class="fas fa-eye-slash"></i>
+                    </div>
+                    <h3>Privacy Schermo</h3>
+                    <p>Opzione per oscurare lo schermo quando l'app è in background, proteggendo i dati da occhi indiscreti. Attivabile dalle impostazioni.</p>
+                </div>
+
+                <div class="security-card">
+                    <div class="security-icon">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <h3>Database Sicuro</h3>
+                    <p>Il database locale è protetto da crittografia e accessibile solo tramite autenticazione. I backup sono esportati in formato JSON criptato.</p>
+                </div>
+            </div>
+
+            <div class="security-details">
+                <h3><i class="fas fa-info-circle"></i> Dettagli Tecnici</h3>
+                <div class="detail-item">
+                    <h4>Crittografia</h4>
+                    <p>Utilizziamo librerie di crittografia standard del settore per proteggere i dati a riposo. La chiave di crittografia è derivata dal PIN/biometria dell'utente.</p>
+                </div>
+                <div class="detail-item">
+                    <h4>Archiviazione</h4>
+                    <p>Tutti i dati sono memorizzati nella memoria interna del dispositivo Android, in aree protette del filesystem. Nessun dato viene memorizzato su SD card esterne.</p>
+                </div>
+                <div class="detail-item">
+                    <h4>Permessi</h4>
+                    <p>L'app richiede solo i permessi strettamente necessari: camera (per QR code e foto), storage (per salvataggio locale). Nessun permesso di rete o posizione.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Requirements Section -->
+    <section id="requirements" class="requirements">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Requisiti <span class="highlight">Minimi</span></h2>
+                <p class="section-subtitle">Cosa serve per utilizzare CatechHub</p>
+            </div>
+
+            <div class="requirements-container">
+                <div class="requirements-card">
+                    <div class="req-icon">
+                        <i class="fab fa-android"></i>
+                    </div>
+                    <h3>Sistema Operativo</h3>
+                    <ul>
+                        <li>Android 10.0 (API Level 29) o superiore</li>
+                        <li>Testato su Android 10, 11, 12, 13, 14</li>
+                        <li>Compatibile con la maggior parte dei dispositivi moderni</li>
+                    </ul>
+                </div>
+
+                <div class="requirements-card">
+                    <div class="req-icon">
+                        <i class="fas fa-memory"></i>
+                    </div>
+                    <h3>Hardware</h3>
+                    <ul>
+                        <li>RAM: Minimo 2GB (raccomandati 3GB+)</li>
+                        <li>Spazio di archiviazione: ~100MB per l'app</li>
+                        <li>Spazio aggiuntivo per dati e allegati (variabile)</li>
+                    </ul>
+                </div>
+
+                <div class="requirements-card">
+                    <div class="req-icon">
+                        <i class="fas fa-camera"></i>
+                    </div>
+                    <h3>Periferiche</h3>
+                    <ul>
+                        <li>Camera (obbligatoria per QR code e foto)</li>
+                        <li>Biometria (opzionale ma raccomandata)</li>
+                        <li>Touchscreen</li>
+                    </ul>
+                </div>
+
+                <div class="requirements-card">
+                    <div class="req-icon">
+                        <i class="fas fa-hdd"></i>
+                    </div>
+                    <h3>Archiviazione</h3>
+                    <ul>
+                        <li>Memoria interna richiesta</li>
+                        <li>SD card non supportata per dati sensibili</li>
+                        <li>Backup esportabili in formato JSON</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="compatibility-note">
+                <h4><i class="fas fa-check-circle"></i> Note di Compatibilità</h4>
+                <p>CatechHub è stato testato su una vasta gamma di dispositivi Android. Se riscontri problemi di compatibilità, ti invitiamo a segnalarli tramite GitHub Issues per permetterci di migliorare l'app.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Open Source Section -->
+    <section id="opensource" class="opensource">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Progetto <span class="highlight">Open Source</span></h2>
+                <p class="section-subtitle">Trasparenza totale, codice aperto a tutti</p>
+            </div>
+
+            <div class="opensource-content">
+                <div class="opensource-intro">
+                    <p>CatechHub è un progetto completamente open source. Questo significa che il codice sorgente è pubblico, verificabile da chiunque e liberamente utilizzabile. Crediamo nella trasparenza e nella condivisione della conoscenza.</p>
+                </div>
+
+                <div class="opensource-grid">
+                    <div class="os-card">
+                        <div class="os-icon">
+                            <i class="fab fa-github"></i>
+                        </div>
+                        <h3>Repository GitHub</h3>
+                        <p>Il codice completo è disponibile su GitHub. Puoi clonare il repository, studiare il codice, proporre modifiche e contribuire allo sviluppo.</p>
+                        <a href="https://github.com/CatechHub-dev/CatechHub" class="btn-download">
+                            <i class="fab fa-github"></i>
+                            Visita Repository
+                        </a>
+                    </div>
+
+                    <div class="os-card">
+                        <div class="os-icon">
+                            <i class="fas fa-code-branch"></i>
+                        </div>
+                        <h3>Contribuisci</h3>
+                        <p>Sei uno sviluppatore? Puoi contribuire con codice, segnalare bug, proporre nuove funzionalità o migliorare la documentazione. Ogni contributo è benvenuto!</p>
+                        <a href="https://github.com/CatechHub-dev/CatechHub/blob/main/CONTRIBUTING.md" class="btn-download">
+                            <i class="fas fa-hands-helping"></i>
+                            Come Contribuire
+                        </a>
+                    </div>
+
+                    <div class="os-card">
+                        <div class="os-icon">
+                            <i class="fas fa-bug"></i>
+                        </div>
+                        <h3>Segnala Bug</h3>
+                        <p>Trovato un problema? Apri una issue su GitHub con tutti i dettagli. La community e gli sviluppatori lavoreranno per risolverlo il prima possibile.</p>
+                        <a href="https://github.com/CatechHub-dev/CatechHub/issues" class="btn-download">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Segnala Bug
+                        </a>
+                    </div>
+
+                    <div class="os-card">
+                        <div class="os-icon">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <h3>Licenza</h3>
+                        <p>CatechHub è rilasciato sotto licenza open source. Puoi usarlo, modificarlo e distribuirlo liberamente, rispettando i termini della licenza.</p>
+                        <a href="https://github.com/CatechHub-dev/CatechHub/blob/main/LICENSE" class="btn-download">
+                            <i class="fas fa-balance-scale"></i>
+                            Leggi Licenza
+                        </a>
+                    </div>
+                </div>
+
+                <div class="tech-stack">
+                    <h3><i class="fas fa-layer-group"></i> Stack Tecnologico</h3>
+                    <div class="tech-grid">
+                        <div class="tech-item">
+                            <i class="fab fa-flutter"></i>
+                            <span>Flutter</span>
+                        </div>
+                        <div class="tech-item">
+                            <i class="fab fa-dart"></i>
+                            <span>Dart</span>
+                        </div>
+                        <div class="tech-item">
+                            <i class="fas fa-database"></i>
+                            <span>SQLite</span>
+                        </div>
+                        <div class="tech-item">
+                            <i class="fas fa-shield-alt"></i>
+                            <span>Flutter Secure Storage</span>
+                        </div>
+                        <div class="tech-item">
+                            <i class="fas fa-qrcode"></i>
+                            <span>QR Code Scanner</span>
+                        </div>
+                        <div class="tech-item">
+                            <i class="fas fa-file-pdf"></i>
+                            <span>PDF Generation</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <div class="nav-brand">
+                        <img src="logo.png" alt="CatechHub Logo" class="nav-logo">
+                        <span>CatechHub</span>
+                    </div>
+                    <p>Il tuo registro di catechismo sempre con te</p>
+                </div>
+
+                <div class="footer-links">
+                    <div class="footer-section">
+                        <h4>Link Utili</h4>
+                        <ul>
+                            <li><a href="index.html">Home</a></li>
+                            <li><a href="technical.html">Tecnico</a></li>
+                            <li><a href="#security">Sicurezza</a></li>
+                            <li><a href="#requirements">Requisiti</a></li>
+                            <li><a href="#opensource">Open Source</a></li>
+                        </ul>
+                    </div>
+
+                    <div class="footer-section">
+                        <h4>Progetto</h4>
+                        <ul>
+                            <li><a href="https://github.com/CatechHub-dev/CatechHub">GitHub</a></li>
+                            <li><a href="https://github.com/CatechHub-dev/CatechHub/issues">Segnala Bug</a></li>
+                            <li><a href="https://github.com/CatechHub-dev/CatechHub/blob/main/README.md">Documentazione</a></li>
+                        </ul>
+                    </div>
+
+                    <div class="footer-section">
+                        <h4>Contatto</h4>
+                        <ul>
+                            <li><a href="mailto:CatechHub.app@proton.me"><i class="fas fa-envelope"></i> CatechHub.app@proton.me</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <p>&copy; 2026 CatechHub. Sviluppato con <i class="fas fa-heart"></i> da un catechista per i catechisti.</p>
+                <p>Open Source • Gratuito • Trasparente</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

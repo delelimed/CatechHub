@@ -47,9 +47,9 @@ class _BackButtonHandlerState extends State<BackButtonHandler> {
     // Ottieni la posizione corrente dal router
     final location = widget.router.routeInformationProvider.value.uri.path;
     
-    // Se non siamo sulla dashboard, naviga alla dashboard
+    // Se non siamo sulla dashboard, torna alla dashboard senza accumulare stack.
     if (location != '/') {
-      widget.router.push('/');
+      widget.router.go('/');
       return;
     }
 

@@ -1,8 +1,9 @@
 name: CatechHub
 description: "Il tuo registro di catechismo"
 publish_to: 'none'
+license: MIT
 
-version: 1.2.3+1
+version: 1.2.4+1
 
 environment:
   sdk: '>=3.12.0 <4.0.0'
@@ -23,6 +24,7 @@ dependencies:
   flutter_secure_storage: ^10.3.1 # Aggiornato alla massima build stabile per la tua toolchain
   crypto: ^3.0.3
   encrypt: ^5.0.3
+  pointycastle: ^3.9.1
 
   # Scambio Dati (backup futuro)
   file_picker: ^12.0.0-beta.4            # Aggiornato all'ultima release stabile nativa

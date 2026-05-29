@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_service.dart';
 import '../../shared/models/class_model.dart';
@@ -23,6 +26,17 @@ class LocalAuthNotifier
     Future.microtask(_checkInitialState);
   }
 
+  Future<T> _withTimeout<T>(
+    Future<T> future,
+    Duration duration,
+    String timeoutMessage,
+  ) {
+    return future.timeout(
+      duration,
+      onTimeout: () => throw TimeoutException(timeoutMessage),
+    );
+  }
+
   Future<void> _checkInitialState() async {
     try {
       final logged = _authService.isUnlocked;
@@ -35,15 +49,10 @@ class LocalAuthNotifier
   Future<bool> unlock(String pin) async {
     state = const AsyncValue.loading();
     try {
-      final success = await _authService.signInWithPin(pin).timeout(
-        const Duration(seconds: 15),
-        onTimeout: () {
-          state = AsyncValue.error(
-            Exception('Timeout durante il login'),
-            StackTrace.current,
-          );
-          return false;
-        },
+      final success = await _withTimeout(
+        _authService.signInWithPin(pin),
+        const Duration(seconds: 30),
+        'Timeout durante il login',
       );
       state = AsyncValue.data(success ? _authService.currentUser : null);
       return success;
@@ -56,15 +65,10 @@ class LocalAuthNotifier
   Future<bool> unlockWithBiometrics() async {
     state = const AsyncValue.loading();
     try {
-      final success = await _authService.unlockWithBiometrics().timeout(
-        const Duration(seconds: 40),
-        onTimeout: () {
-          state = AsyncValue.error(
-            Exception('Timeout durante autenticazione biometrica'),
-            StackTrace.current,
-          );
-          return false;
-        },
+      final success = await _withTimeout(
+        _authService.unlockWithBiometrics(),
+        const Duration(seconds: 45),
+        'Timeout durante autenticazione biometrica',
       );
       state = AsyncValue.data(success ? _authService.currentUser : null);
       return success;
@@ -82,32 +86,31 @@ class LocalAuthNotifier
   }) async {
     state = const AsyncValue.loading();
     try {
-      final success = await _authService.setupInitialPin(
-        pin,
-        firstName: firstName,
-        lastName: lastName,
-        groupName: groupName,
-      ).timeout(
-        const Duration(seconds: 15),
-        onTimeout: () {
-          state = AsyncValue.error(
-            Exception('Timeout durante la configurazione'),
-            StackTrace.current,
-          );
-          return false;
-        },
+      final success = await _withTimeout(
+        _authService.setupInitialPin(
+          pin,
+          firstName: firstName,
+          lastName: lastName,
+          groupName: groupName,
+        ),
+        const Duration(seconds: 30),
+        'Timeout durante la configurazione',
       );
 
       if (success) {
-        final classBox = LocalDatabase.classes();
-        final classId = LocalDatabase.newId('class');
-        final newClass = SchoolClass(
-          id: classId,
-          name: groupName,
-          studentIds: [],
-          catechistIds: [AuthService.localUserId],
-        );
-        await classBox.put(classId, newClass.toMap());
+        try {
+          final classBox = LocalDatabase.classes();
+          final classId = LocalDatabase.newId('class');
+          final newClass = SchoolClass(
+            id: classId,
+            name: groupName,
+            studentIds: [],
+            catechistIds: [AuthService.localUserId],
+          );
+          await classBox.put(classId, newClass.toMap());
+        } catch (e, stack) {
+          debugPrint('Errore durante la creazione del gruppo iniziale: $e');
+        }
       }
 
       state = AsyncValue.data(success ? _authService.currentUser : null);
@@ -125,6 +128,19 @@ class LocalAuthNotifier
       state = const AsyncValue.data(null);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
+    }
+  }
+
+  Future<bool> changePin(String oldPin, String newPin) async {
+    try {
+      return await _withTimeout(
+        _authService.changePin(oldPin, newPin),
+        const Duration(seconds: 30),
+        'Timeout durante il cambio PIN',
+      );
+    } catch (e, stack) {
+      debugPrint('Errore durante il cambio PIN: $e');
+      return false;
     }
   }
 }

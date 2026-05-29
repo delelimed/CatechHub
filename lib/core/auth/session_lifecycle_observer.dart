@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -6,7 +7,7 @@ import '../security/privacy_settings.dart';
 import '../services/update_service.dart';
 import 'auth_provider.dart';
 
-/// Blocca la sessione dopo 120 secondi quando l'app va in background.
+/// Blocca la sessione dopo 120 secondi in background, se richiesto dalle privacy settings.
 class SessionLifecycleObserver extends ConsumerStatefulWidget {
   const SessionLifecycleObserver({super.key, required this.child});
 
@@ -40,14 +41,16 @@ class _SessionLifecycleObserverState
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
-      // Avvia il timer di 120 secondi quando l'app va in background
       _hasBeenPaused = true;
       _lockTimer?.cancel();
-      _lockTimer = Timer(const Duration(seconds: 120), () {
-        ref.read(authStateProvider.notifier).lock();
-      });
+
+      final privacy = ref.read(privacySettingsProvider);
+      if (privacy.lockOnBackground) {
+        _lockTimer = Timer(const Duration(seconds: 120), () {
+          ref.read(authStateProvider.notifier).lock();
+        });
+      }
     } else if (state == AppLifecycleState.resumed) {
-      // Cancella il timer se l'app torna in primo piano
       _lockTimer?.cancel();
 
       if (_hasBeenPaused) {

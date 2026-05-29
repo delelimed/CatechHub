@@ -1,6 +1,9 @@
 import 'dart:convert';
-import 'package:crypto/crypto.dart';
 import 'dart:math';
+
+import 'package:crypto/crypto.dart';
+
+import 'encryption_service.dart';
 
 class DataShareOptions {
   final bool includeAnagrafica;
@@ -19,22 +22,20 @@ class DataShareOptions {
 }
 
 class DataPackage {
-  final String pin;
-  final Map<String, dynamic> data;
+  final String encryptedData;
   final int totalChunks;
   final String checksum;
 
   DataPackage({
-    required this.pin,
-    required this.data,
+    required this.encryptedData,
     required this.totalChunks,
     required this.checksum,
   });
 
   Map<String, dynamic> toMap() {
     return {
-      'pin': pin,
-      'data': data,
+      'v': 2,
+      'encryptedData': encryptedData,
       'totalChunks': totalChunks,
       'checksum': checksum,
     };
@@ -42,8 +43,7 @@ class DataPackage {
 
   factory DataPackage.fromMap(Map<String, dynamic> map) {
     return DataPackage(
-      pin: map['pin'] ?? '',
-      data: Map<String, dynamic>.from(map['data'] ?? {}),
+      encryptedData: map['encryptedData'] ?? '',
       totalChunks: map['totalChunks'] ?? 1,
       checksum: map['checksum'] ?? '',
     );
@@ -64,12 +64,7 @@ class QRChunk {
   });
 
   Map<String, dynamic> toMap() {
-    return {
-      'i': chunkIndex,
-      't': totalChunks,
-      'd': data,
-      'c': checksum,
-    };
+    return {'i': chunkIndex, 't': totalChunks, 'd': data, 'c': checksum};
   }
 
   factory QRChunk.fromMap(Map<String, dynamic> map) {
@@ -91,36 +86,32 @@ class QRChunk {
 }
 
 class QRDataService {
-  static const int maxQRSize = 1200; // Massimi caratteri per QR code (ridotto per migliore leggibilità)
+  static const int maxQRSize = 1200;
   static const int pinLength = 8;
 
-  // Genera PIN di 8 cifre
   static String generatePin() {
     final random = Random.secure();
     return List.generate(pinLength, (_) => random.nextInt(10)).join();
   }
 
-  // Verifica PIN
-  static bool verifyPin(String inputPin, String expectedPin) {
-    return inputPin == expectedPin;
-  }
-
-  // Calcola checksum dei dati
   static String calculateChecksum(Map<String, dynamic> data) {
     final jsonString = jsonEncode(data);
     final bytes = utf8.encode(jsonString);
     final digest = sha256.convert(bytes);
-    return digest.toString().substring(0, 8); // Prime 8 caratteri
+    return digest.toString().substring(0, 8);
   }
 
-  // Comprime dati JSON usando base64 semplice
+  static String calculatePayloadChecksum(String data) {
+    final bytes = utf8.encode(data);
+    final digest = sha256.convert(bytes);
+    return digest.toString().substring(0, 12);
+  }
+
   static String compressData(Map<String, dynamic> data) {
     final jsonString = jsonEncode(data);
-    final encoded = base64Encode(utf8.encode(jsonString));
-    return encoded;
+    return base64Encode(utf8.encode(jsonString));
   }
 
-  // Decomprime dati
   static Map<String, dynamic> decompressData(String compressed) {
     try {
       final decoded = utf8.decode(base64Decode(compressed));
@@ -130,32 +121,41 @@ class QRDataService {
     }
   }
 
-  // Segmenta dati in chunk per QR code
   static List<String> segmentData(String data) {
-    final List<String> chunks = [];
-    for (int i = 0; i < data.length; i += maxQRSize) {
+    final chunks = <String>[];
+    for (var i = 0; i < data.length; i += maxQRSize) {
       final end = (i + maxQRSize < data.length) ? i + maxQRSize : data.length;
       chunks.add(data.substring(i, end));
     }
     return chunks;
   }
 
-  // Crea pacchetto dati completo
-  static DataPackage createPackage(
-    Map<String, dynamic> data,
-    String pin,
-  ) {
-    final checksum = calculateChecksum(data);
+  static DataPackage createPackage(Map<String, dynamic> data, String pin) {
+    final now = DateTime.now().toUtc();
+    final expiresAt = now.add(const Duration(minutes: 3));
+
+    final packagePayload = {
+      'meta': {
+        'createdAt': now.toIso8601String(),
+        'expiresAt': expiresAt.toIso8601String(),
+      },
+      'payload': data,
+    };
+
+    final encryptedData = EncryptionService.encryptData(
+      packagePayload,
+      pin,
+      iterations: EncryptionService.fastShareIterations,
+    );
+    final checksum = calculatePayloadChecksum(encryptedData);
 
     return DataPackage(
-      pin: pin,
-      data: data,
-      totalChunks: 0, // Verrà calcolato dopo la segmentazione
+      encryptedData: encryptedData,
+      totalChunks: 0,
       checksum: checksum,
     );
   }
 
-  // Genera QR chunk da inviare
   static QRChunk createQRChunk(String data, int index, int total) {
     final chunkChecksum = _calculateChunkChecksum(data);
     return QRChunk(
@@ -166,72 +166,83 @@ class QRDataService {
     );
   }
 
-  // Calcola checksum per singolo chunk
   static String _calculateChunkChecksum(String data) {
     final bytes = utf8.encode(data);
     final digest = sha256.convert(bytes);
     return digest.toString().substring(0, 4);
   }
 
-  // Verifica integrità chunk
   static bool verifyChunkChecksum(QRChunk chunk) {
     final expectedChecksum = _calculateChunkChecksum(chunk.data);
     return chunk.checksum == expectedChecksum;
   }
 
-  // Verifica checksum del pacchetto completo
   static bool verifyPackageChecksum(DataPackage package) {
-    final expectedChecksum = calculateChecksum(package.data);
+    final expectedChecksum = calculatePayloadChecksum(package.encryptedData);
     return package.checksum == expectedChecksum;
   }
 
-  // Assembla chunk ricevuti
   static String assembleChunks(List<QRChunk> chunks) {
-    // Ordina chunk per indice
     chunks.sort((a, b) => a.chunkIndex.compareTo(b.chunkIndex));
-    
-    // Verifica che tutti i chunk siano presenti
+
     if (chunks.isEmpty) return '';
-    
+
     final total = chunks.first.totalChunks;
     if (chunks.length != total) {
       throw Exception('Mancano ${total - chunks.length} chunk');
     }
 
-    // Verifica checksum di ogni chunk
     for (final chunk in chunks) {
       if (!verifyChunkChecksum(chunk)) {
         throw Exception('Checksum non valido per chunk ${chunk.chunkIndex}');
       }
     }
 
-    // Assembla dati
     return chunks.map((chunk) => chunk.data).join();
   }
 
-  // Estrae dati dal pacchetto ricevuto
-  static Map<String, dynamic> extractPackageData(String assembledData) {
+  static DataPackage extractPackage(String assembledData) {
     try {
-      final packageMap = jsonDecode(assembledData) as Map<String, dynamic>;
-      final package = DataPackage.fromMap(packageMap);
-      
-      // I dati non sono più compressi internamente
-      return Map<String, dynamic>.from(package.data);
+      final package = DataPackage.fromMap(decompressData(assembledData));
+      if (!verifyPackageChecksum(package)) {
+        throw Exception('Checksum del pacchetto non valido');
+      }
+      return package;
     } catch (e) {
       throw Exception('Errore nell\'estrazione dei dati: $e');
     }
   }
 
-  // Prepara dati per condivisione basato su opzioni
+  static Map<String, dynamic> extractPackageData(
+    String assembledData,
+    String pin,
+  ) {
+    final package = extractPackage(assembledData);
+    final decrypted = EncryptionService.decryptData(package.encryptedData, pin);
+
+    if (!decrypted.containsKey('meta') || !decrypted.containsKey('payload')) {
+      throw Exception('Pacchetto crittografato non valido');
+    }
+
+    final meta = Map<String, dynamic>.from(decrypted['meta'] as Map);
+    final expiresAt = DateTime.parse(meta['expiresAt'] as String).toUtc();
+    final now = DateTime.now().toUtc();
+
+    if (now.isAfter(expiresAt)) {
+      throw Exception('Il pacchetto QR è scaduto');
+    }
+
+    return Map<String, dynamic>.from(decrypted['payload'] as Map);
+  }
+
   static Map<String, dynamic> prepareDataForShare(
     DataShareOptions options,
     Map<String, dynamic> allData,
   ) {
-    final Map<String, dynamic> shareData = {};
+    final shareData = <String, dynamic>{};
 
     if (options.includeAnagrafica) {
       shareData['anagrafica'] = allData['anagrafica'] ?? {};
-      // Includi automaticamente allegati dei ragazzi
       shareData['allegati_studenti'] = allData['allegati_studenti'] ?? {};
     }
 
@@ -241,7 +252,6 @@ class QRDataService {
 
     if (options.includeProgrammazione) {
       shareData['programmazione'] = allData['programmazione'] ?? {};
-      // Includi automaticamente allegati delle giornate
       shareData['allegati_giornate'] = allData['allegati_giornate'] ?? {};
     }
 

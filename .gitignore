@@ -7,6 +7,12 @@
 .atom/
 .build/
 .env
+local.properties
+android/local.properties
+*.jks
+*.keystore
+*.p12
+*.pem
 .buildlog/
 .history
 .svn/

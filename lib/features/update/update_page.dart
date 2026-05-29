@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
@@ -56,11 +57,13 @@ class _UpdatePageState extends ConsumerState<UpdatePage> {
           // Ottieni l'URL dell'APK
           final assets = data['assets'] as List<dynamic>;
           String? apkUrl;
+          String? apkDigest;
 
           for (final asset in assets) {
             if (asset['name'] is String &&
                 (asset['name'] as String).endsWith('.apk')) {
               apkUrl = asset['browser_download_url'] as String;
+              apkDigest = asset['digest'] as String?;
               break;
             }
           }
@@ -73,6 +76,7 @@ class _UpdatePageState extends ConsumerState<UpdatePage> {
               'body': data['body'] as String? ?? '',
               'html_url': data['html_url'] as String? ?? '',
               'apk_url': apkUrl,
+              'apk_digest': apkDigest,
               'published_at': data['published_at'] as String? ?? '',
             };
             _isLoading = false;
@@ -100,10 +104,19 @@ class _UpdatePageState extends ConsumerState<UpdatePage> {
 
   Future<void> _downloadAndInstall() async {
     final apkUrl = _releaseInfo?['apk_url'] as String?;
+    final apkDigest = _releaseInfo?['apk_digest'] as String?;
     if (apkUrl == null) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('URL APK non disponibile')));
+      return;
+    }
+    if (apkDigest == null || !apkDigest.startsWith('sha256:')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossibile verificare la firma del download'),
+        ),
+      );
       return;
     }
 
@@ -144,6 +157,11 @@ class _UpdatePageState extends ConsumerState<UpdatePage> {
       }
 
       final bytes = response.bodyBytes;
+      final expectedDigest = apkDigest.substring('sha256:'.length);
+      final actualDigest = sha256.convert(bytes).toString();
+      if (actualDigest != expectedDigest) {
+        throw Exception('Verifica integrita APK fallita');
+      }
 
       // Simula progresso di download
       for (int i = 0; i <= 100; i += 10) {

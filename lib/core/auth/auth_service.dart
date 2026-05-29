@@ -1,10 +1,25 @@
 import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:crypto/crypto.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:local_auth_android/local_auth_android.dart'; // Opzionale, per configurazioni avanzate Android
 
+import '../services/encryption_service.dart';
 import '../storage/local_database.dart';
+
+Map<String, String> _computePinHash(Map<String, dynamic> args) {
+  final pin = args['pin'] as String;
+  final salt = base64Decode(args['salt'] as String);
+  final iterations = args['iterations'] as int;
+  final hashBytes = EncryptionService.derivePasswordKeyBytes(
+    pin,
+    Uint8List.fromList(salt),
+    iterations: iterations,
+  );
+  return {'hash': base64Encode(hashBytes)};
+}
 
 class AuthService {
   static const localUserId = 'local_catechist_id';
@@ -27,8 +42,80 @@ class AuthService {
         _box.containsKey('group_name');
   }
 
-  String _hashPin(String pin, String salt) {
-    return sha256.convert(utf8.encode(pin + salt)).toString();
+  static const _pinHashVersion = 'v2';
+  static const _pinHashIterations = 210000;
+
+  String _hashPin(
+    String pin,
+    Uint8List salt, {
+    int iterations = _pinHashIterations,
+  }) {
+    final hash = EncryptionService.derivePasswordKeyBytes(
+      pin,
+      salt,
+      iterations: iterations,
+    );
+    return base64Encode(hash);
+  }
+
+  bool _constantTimeEquals(String a, String b) {
+    final aBytes = utf8.encode(a);
+    final bBytes = utf8.encode(b);
+    var diff = aBytes.length ^ bBytes.length;
+    for (var i = 0; i < aBytes.length && i < bBytes.length; i++) {
+      diff |= aBytes[i] ^ bBytes[i];
+    }
+    return diff == 0;
+  }
+
+  Future<void> _storePinHash(String pin) async {
+    final salt = EncryptionService.secureRandomBytes(16);
+
+    final result = await compute(_computePinHash, {
+      'pin': pin,
+      'salt': base64Encode(salt),
+      'iterations': _pinHashIterations,
+    });
+
+    await _box.put(
+      'local_pin_hash',
+      '$_pinHashVersion:$_pinHashIterations:${base64Encode(salt)}:${result['hash']}',
+    );
+  }
+
+  Future<bool> _verifyStoredPin(String pin, Object? storedHashValue) async {
+    if (storedHashValue is! String) return false;
+
+    final parts = storedHashValue.split(':');
+    if (parts.length == 4 && parts[0] == _pinHashVersion) {
+      final iterations = int.tryParse(parts[1]);
+      if (iterations == null) return false;
+
+      final result = await compute(_computePinHash, {
+        'pin': pin,
+        'salt': parts[2],
+        'iterations': iterations,
+      });
+
+      return _constantTimeEquals(result['hash']!, parts[3]);
+    }
+
+    if (parts.length == 2) {
+      final legacySalt = parts[0];
+      final legacyHash = parts[1];
+      final legacyComputedHash = legacySha256(pin + legacySalt);
+      final ok = _constantTimeEquals(legacyComputedHash, legacyHash);
+      if (ok) {
+        await _storePinHash(pin);
+      }
+      return ok;
+    }
+
+    return false;
+  }
+
+  String legacySha256(String value) {
+    return sha256.convert(utf8.encode(value)).toString();
   }
 
   Future<bool> setupInitialPin(
@@ -50,26 +137,15 @@ class AuthService {
     }
 
     try {
-      return await Future.delayed(Duration.zero, () async {
-        final salt = DateTime.now().microsecondsSinceEpoch.toString();
-        final pinHash = _hashPin(pin, salt);
-
-        await _box.put('local_pin_hash', '$salt:$pinHash');
-        await _box.put('first_name', firstName.trim());
-        await _box.put('last_name', lastName.trim());
-        await _box.put('group_name', groupName.trim());
-        await _box.put('local_user_name', '$firstName $lastName'.trim());
-        _sessionUnlocked = true;
-        _cachedUser = null;
-        return true;
-      }).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          debugPrint('Timeout setup PIN');
-          return false;
-        },
-      );
-    } catch (e) {
+      await _storePinHash(pin);
+      await _box.put('first_name', firstName.trim());
+      await _box.put('last_name', lastName.trim());
+      await _box.put('group_name', groupName.trim());
+      await _box.put('local_user_name', '$firstName $lastName'.trim());
+      _sessionUnlocked = true;
+      _cachedUser = null;
+      return true;
+    } catch (e, stack) {
       debugPrint('Errore durante la configurazione del PIN: $e');
       return false;
     }
@@ -77,32 +153,17 @@ class AuthService {
 
   Future<bool> signInWithPin(String inputPin) async {
     try {
-      return await Future.delayed(Duration.zero, () async {
-        final storedHashValue = _box.get('local_pin_hash');
-        if (storedHashValue is! String) return false;
-
-        final parts = storedHashValue.split(':');
-        if (parts.length != 2) return false;
-
-        final salt = parts[0];
-        final savedHash = parts[1];
-        final computedHash = _hashPin(inputPin, salt);
-
-        if (computedHash == savedHash) {
-          _sessionUnlocked = true;
-          _cachedUser = null;
-          return true;
-        }
-
-        return false;
-      }).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          debugPrint('Timeout verifica PIN');
-          return false;
-        },
+      final valid = await _verifyStoredPin(
+        inputPin,
+        _box.get('local_pin_hash'),
       );
-    } catch (e) {
+      if (valid) {
+        _sessionUnlocked = true;
+        _cachedUser = null;
+        return true;
+      }
+      return false;
+    } catch (e, stack) {
       debugPrint('Errore durante il controllo del PIN: $e');
       return false;
     }
@@ -139,15 +200,12 @@ class AuthService {
       }
 
       final authenticated = await _localAuth
-    .authenticate(
-      localizedReason: 'Autenticati per sbloccare il Registro',
-      biometricOnly: false,
-      persistAcrossBackgrounding: true,
-    )
-    .timeout(
-      const Duration(seconds: 30),
-      onTimeout: () => false,
-    );
+          .authenticate(
+            localizedReason: 'Autenticati per sbloccare il Registro',
+            biometricOnly: false,
+            persistAcrossBackgrounding: true,
+          )
+          .timeout(const Duration(seconds: 30), onTimeout: () => false);
 
       if (!authenticated) {
         debugPrint('Autenticazione biometrica fallita o annullata');
@@ -167,42 +225,20 @@ class AuthService {
 
   Future<bool> changePin(String oldPin, String newPin) async {
     try {
-      return await Future.delayed(Duration.zero, () async {
-        // Verify old PIN first
-        final storedHashValue = _box.get('local_pin_hash');
-        if (storedHashValue is! String) return false;
+      // Verify old PIN first
+      if (!await _verifyStoredPin(oldPin, _box.get('local_pin_hash'))) {
+        debugPrint('PIN vecchio non corretto');
+        return false;
+      }
 
-        final parts = storedHashValue.split(':');
-        if (parts.length != 2) return false;
+      // Validate new PIN
+      if (newPin.length < 4) {
+        debugPrint('Il nuovo PIN deve essere di almeno 4 cifre');
+        return false;
+      }
 
-        final salt = parts[0];
-        final savedHash = parts[1];
-        final computedHash = _hashPin(oldPin, salt);
-
-        if (computedHash != savedHash) {
-          debugPrint('PIN vecchio non corretto');
-          return false;
-        }
-
-        // Validate new PIN
-        if (newPin.length < 4) {
-          debugPrint('Il nuovo PIN deve essere di almeno 4 cifre');
-          return false;
-        }
-
-        // Generate new hash with new salt
-        final newSalt = DateTime.now().microsecondsSinceEpoch.toString();
-        final newPinHash = _hashPin(newPin, newSalt);
-
-        await _box.put('local_pin_hash', '$newSalt:$newPinHash');
-        return true;
-      }).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          debugPrint('Timeout cambio PIN');
-          return false;
-        },
-      );
+      await _storePinHash(newPin);
+      return true;
     } catch (e) {
       debugPrint('Errore durante il cambio del PIN: $e');
       return false;

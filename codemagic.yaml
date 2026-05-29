@@ -1,32 +1,52 @@
 workflows:
-  ios_release:
-    name: iOS Release Build
+  ios_unsigned:
+    name: iOS unsigned build
+    instance_type: mac_mini_m2
     max_build_duration: 120
-    trigger:
-      - push
-    branches:
-      only:
-        - main
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
     environment:
       flutter: stable
       xcode: latest
       cocoapods: default
-      vars:
-        FLUTTER_BUILD_MODE: release
     scripts:
       - name: Install Flutter dependencies
-        script: |
-          flutter pub get
+        script: flutter pub get
       - name: Install CocoaPods dependencies
         script: |
           cd ios
           pod install --repo-update
           cd ..
-      - name: Build iOS IPA
-        script: |
-          flutter build ipa --release --no-codesign
+      - name: Build iOS without signing
+        script: flutter build ios --release --no-codesign
     artifacts:
-      - build/ios/ipa/*.ipa
-    publishing:
-      email:
-        recipients: []
+      - build/ios/iphoneos/Runner.app
+      - build/ios/iphoneos/*.app
+
+  windows_release:
+    name: Windows release build
+    instance_type: windows_x2
+    max_build_duration: 120
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+    environment:
+      flutter: stable
+    scripts:
+      - name: Enable Windows desktop
+        script: flutter config --enable-windows-desktop
+      - name: Install Flutter dependencies
+        script: flutter pub get
+      - name: Build Windows release
+        script: flutter build windows --release
+    artifacts:
+      - build/windows/x64/runner/Release/**

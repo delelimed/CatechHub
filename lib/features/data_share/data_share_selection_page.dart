@@ -25,33 +25,50 @@ class _DataShareSelectionPageState
   bool _includeAgendaAttachments = true;
 
   bool _isLoading = false;
+  String? _errorMessage;
 
   Future<void> _startSharing() async {
     setState(() {
       _isLoading = true;
+      _errorMessage = null;
     });
 
-    // Prepara i dati selezionati in base alle opzioni dell'utente
-    final selectedData = await DataExportService.exportSelectiveData(
-      _includeAnagrafica,
-      _includeAgenda,
-      _includeProgrammazione,
-      _includeDocumenti,
-      _includeContactNotes,
-      _includeAnagraficaAttachments,
-      _includeAgendaAttachments,
-    );
+    try {
+      // Prepara i dati selezionati in base alle opzioni dell'utente
+      final selectedData = await DataExportService.exportSelectiveData(
+        _includeAnagrafica,
+        _includeAgenda,
+        _includeProgrammazione,
+        _includeDocumenti,
+        _includeContactNotes,
+        _includeAnagraficaAttachments,
+        _includeAgendaAttachments,
+      );
 
-    // Genera PIN
-    final pin = QRDataService.generatePin();
+      // Genera PIN
+      final pin = QRDataService.generatePin();
 
-    // Salva dati e PIN nei provider
-    ref.read(dataShareDataProvider.notifier).state = selectedData;
-    ref.read(dataSharePinProvider.notifier).state = pin;
+      // Salva dati e PIN nei provider
+      ref.read(dataShareDataProvider.notifier).state = selectedData;
+      ref.read(dataSharePinProvider.notifier).state = pin;
 
-    // Naviga alla pagina di invio
-    if (mounted) {
-      context.go('/data-share/send');
+      // Naviga alla pagina di invio
+      if (mounted) {
+        context.go('/data-share/send');
+      }
+    } catch (e, stack) {
+      debugPrint('Errore durante l\'esportazione dei dati: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Impossibile preparare i dati per il QR: $e';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -75,6 +92,25 @@ class _DataShareSelectionPageState
                 children: [
                   const _InfoCard(),
                   const SizedBox(height: 24),
+                  if (_errorMessage != null) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.red.shade200),
+                      ),
+                      child: Text(
+                        _errorMessage!,
+                        style: TextStyle(
+                          color: Colors.red.shade800,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
 
                   const _SectionTitle(
                     title: 'Seleziona contenuti da condividere',

@@ -16,7 +16,7 @@ class DataShareReceivePage extends StatefulWidget {
 class _DataShareReceivePageState extends State<DataShareReceivePage> {
   final List<QRChunk> _receivedChunks = [];
   final Set<int> _receivedChunkIndices = {};
-  String? _pin;
+  String? _assembledPackageData;
   final TextEditingController _pinController = TextEditingController();
   bool _isScanning = true;
   bool _isVerifyingPin = false;
@@ -89,20 +89,10 @@ class _DataShareReceivePageState extends State<DataShareReceivePage> {
     // Assembla i chunk
     try {
       final assembledData = QRDataService.assembleChunks(_receivedChunks);
-      final decompressedData = QRDataService.decompressData(assembledData);
-      final package = DataPackage.fromMap(decompressedData);
-
-      // Verifica checksum del pacchetto
-      if (!QRDataService.verifyPackageChecksum(package)) {
-        setState(() {
-          _errorMessage = 'Checksum del pacchetto non valido';
-          _isScanning = true;
-        });
-        return;
-      }
+      QRDataService.extractPackage(assembledData);
 
       setState(() {
-        _pin = package.pin;
+        _assembledPackageData = assembledData;
       });
     } catch (e) {
       setState(() {
@@ -113,9 +103,9 @@ class _DataShareReceivePageState extends State<DataShareReceivePage> {
   }
 
   void _verifyAndImport() {
-    if (_pin == null) {
+    if (_assembledPackageData == null) {
       setState(() {
-        _errorMessage = 'PIN non disponibile';
+        _errorMessage = 'Pacchetto dati non disponibile';
       });
       return;
     }
@@ -128,30 +118,21 @@ class _DataShareReceivePageState extends State<DataShareReceivePage> {
       return;
     }
 
-    if (!QRDataService.verifyPin(inputPin, _pin!)) {
-      setState(() {
-        _errorMessage = 'PIN non corretto';
-      });
-      return;
-    }
-
-    // PIN corretto, procedi con importazione
     setState(() {
-      _isVerifyingPin = false;
+      _isVerifyingPin = true;
       _isImporting = true;
       _errorMessage = null;
     });
 
-    _importData();
+    _importData(inputPin);
   }
 
-  Future<void> _importData() async {
+  Future<void> _importData(String pin) async {
     try {
-      // Assembla i dati
-      final assembledData = QRDataService.assembleChunks(_receivedChunks);
-      final decompressedData = QRDataService.decompressData(assembledData);
-      final package = DataPackage.fromMap(decompressedData);
-      final receivedData = package.data;
+      final receivedData = QRDataService.extractPackageData(
+        _assembledPackageData!,
+        pin,
+      );
 
       // Verifica integrità dati per pacchetti selettivi
       if (!DataExportService.verifyDataIntegrity(
@@ -172,17 +153,20 @@ class _DataShareReceivePageState extends State<DataShareReceivePage> {
       // Importazione completata
       setState(() {
         _isImporting = false;
+        _isVerifyingPin = false;
       });
       if (mounted) {
         setState(() {
           _isImporting = false;
+          _isVerifyingPin = false;
         });
         _showSuccessDialog();
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Errore nell\'importazione dei dati: $e';
+        _errorMessage = 'PIN non corretto o dati non validi';
         _isImporting = false;
+        _isVerifyingPin = false;
         _isScanning = true;
       });
     }
@@ -218,7 +202,7 @@ class _DataShareReceivePageState extends State<DataShareReceivePage> {
     setState(() {
       _receivedChunks.clear();
       _receivedChunkIndices.clear();
-      _pin = null;
+      _assembledPackageData = null;
       _pinController.clear();
       _isScanning = true;
       _isVerifyingPin = false;
@@ -249,9 +233,8 @@ class _DataShareReceivePageState extends State<DataShareReceivePage> {
           children: [
             if (_isImporting)
               _ImportingCard()
-            else if (_pin != null)
+            else if (_assembledPackageData != null)
               _PinVerificationCard(
-                pin: _pin!,
                 controller: _pinController,
                 onVerify: _verifyAndImport,
                 onReset: _resetScanning,
@@ -398,14 +381,12 @@ class _ScanningCardState extends State<_ScanningCard> {
 }
 
 class _PinVerificationCard extends StatelessWidget {
-  final String pin;
   final TextEditingController controller;
   final VoidCallback onVerify;
   final VoidCallback onReset;
   final String? errorMessage;
 
   const _PinVerificationCard({
-    required this.pin,
     required this.controller,
     required this.onVerify,
     required this.onReset,

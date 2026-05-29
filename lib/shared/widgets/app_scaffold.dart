@@ -59,6 +59,7 @@ class AppScaffold extends StatelessWidget {
 
     final location = GoRouterState.of(context).uri.toString();
     final currentIndex = _indexFromLocation(location);
+    final showBackToHome = location != '/';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F8FC),
@@ -130,6 +131,17 @@ class AppScaffold extends StatelessWidget {
                       ),
                       child: Row(
                         children: [
+                          if (showBackToHome) ...[
+                            Tooltip(
+                              message: 'Torna alla Home',
+                              child: IconButton(
+                                icon: const Icon(Icons.arrow_back_rounded),
+                                color: const Color(0xFF174A7E),
+                                onPressed: () => context.go('/'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
                           Expanded(
                             child: Text(
                               title,

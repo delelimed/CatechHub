@@ -106,8 +106,8 @@
                     <div class="security-icon">
                         <i class="fas fa-lock"></i>
                     </div>
-                    <h3>Crittografia Locale</h3>
-                    <p>Tutti i dati sono criptati localmente sul dispositivo utilizzando algoritmi di crittografia moderni e sicuri. Nessun dato viene mai inviato a server esterni.</p>
+                    <h3>Crittografia AES-256</h3>
+                    <p>Tutti i dati dell'app sono protetti con crittografia AES-256. Le caselle Hive e gli allegati vengono cifrati in locale usando HiveAesCipher e la stessa chiave sicura.</p>
                 </div>
 
                 <div class="security-card">
@@ -115,15 +115,15 @@
                         <i class="fas fa-fingerprint"></i>
                     </div>
                     <h3>Autenticazione Biometrica</h3>
-                    <p>Sblocco dell'app tramite impronta digitale o riconoscimento facciale, se supportato dal dispositivo. Combinabile con PIN personalizzabile.</p>
+                    <p>Sblocco con impronta digitale o riconoscimento facciale tramite il sistema nativo Android. Biometria disponibile solo dopo il primo PIN e senza memorizzare dati biometrici nell'app.</p>
                 </div>
 
                 <div class="security-card">
                     <div class="security-icon">
                         <i class="fas fa-key"></i>
                     </div>
-                    <h3>PIN Personalizzabile</h3>
-                    <p>Configura un PIN di sicurezza personalizzato per proteggere l'accesso all'app. Il PIN è obbligatorio e può essere modificato in qualsiasi momento.</p>
+                    <h3>PIN Sicuro</h3>
+                    <p>Il PIN locale è salvato solo come hash PBKDF2-HMAC-SHA256 con salt casuale e 210.000 iterazioni. Non viene mai archiviato in chiaro.</p>
                 </div>
 
                 <div class="security-card">
@@ -131,7 +131,7 @@
                         <i class="fas fa-wifi-slash"></i>
                     </div>
                     <h3>100% Offline</h3>
-                    <p>L'app funziona completamente senza connessione internet. Nessuna comunicazione con server esterni, nessun tracking, nessuna condivisione di dati.</p>
+                    <p>L'app funziona completamente senza connessione internet. I tuoi dati rimangono sul dispositivo: nessun server, nessun cloud, nessun tracking.</p>
                 </div>
 
                 <div class="security-card">
@@ -139,15 +139,15 @@
                         <i class="fas fa-eye-slash"></i>
                     </div>
                     <h3>Privacy Schermo</h3>
-                    <p>Opzione per oscurare lo schermo quando l'app è in background, proteggendo i dati da occhi indiscreti. Attivabile dalle impostazioni.</p>
+                    <p>Opzione per oscurare lo schermo quando l'app è in background, proteggendo i dati da occhi indiscreti e da accessi non autorizzati.</p>
                 </div>
 
                 <div class="security-card">
                     <div class="security-icon">
                         <i class="fas fa-database"></i>
                     </div>
-                    <h3>Database Sicuro</h3>
-                    <p>Il database locale è protetto da crittografia e accessibile solo tramite autenticazione. I backup sono esportati in formato JSON criptato.</p>
+                    <h3>Backup e Condivisione Protetti</h3>
+                    <p>I backup JSON sono cifrati e le condivisioni QR sono protette con PIN a 8 cifre e AES-256-GCM, con checksum e validità temporanea.</p>
                 </div>
             </div>
 
@@ -155,15 +155,19 @@
                 <h3><i class="fas fa-info-circle"></i> Dettagli Tecnici</h3>
                 <div class="detail-item">
                     <h4>Crittografia</h4>
-                    <p>Utilizziamo librerie di crittografia standard del settore per proteggere i dati a riposo. La chiave di crittografia è derivata dal PIN/biometria dell'utente.</p>
+                    <p>La crittografia locale usa AES-256 per Hive e per i file allegati. I backup e le condivisioni QR usano AES-256-GCM, con chiavi derivate tramite PBKDF2-HMAC-SHA256.</p>
+                </div>
+                <div class="detail-item">
+                    <h4>Gestione chiavi</h4>
+                    <p>La chiave di cifratura del database è generata automaticamente e conservata in Flutter Secure Storage, che si appoggia al Keystore Android. Il PIN è conservato solo come hash sicuro.</p>
                 </div>
                 <div class="detail-item">
                     <h4>Archiviazione</h4>
-                    <p>Tutti i dati sono memorizzati nella memoria interna del dispositivo Android, in aree protette del filesystem. Nessun dato viene memorizzato su SD card esterne.</p>
+                    <p>I dati sono salvati nell'area privata dell'app (Application Support) e non vengono scritti in cartelle pubbliche o sulla SD. Gli allegati non sono accessibili dalla galleria.</p>
                 </div>
                 <div class="detail-item">
                     <h4>Permessi</h4>
-                    <p>L'app richiede solo i permessi strettamente necessari: camera (per QR code e foto), storage (per salvataggio locale). Nessun permesso di rete o posizione.</p>
+                    <p>L'app richiede solo i permessi strettamente necessari: camera per QR e foto, storage privato per backup e allegati. Non serve posizione e, per default, non usa rete.</p>
                 </div>
             </div>
         </div>
@@ -185,7 +189,7 @@
                     <h3>Sistema Operativo</h3>
                     <ul>
                         <li>Android 10.0 (API Level 29) o superiore</li>
-                        <li>Testato su Android 10, 11, 12, 13, 14</li>
+                        <li>Testato su Android 13, 16</li>
                         <li>Compatibile con la maggior parte dei dispositivi moderni</li>
                     </ul>
                 </div>
@@ -229,7 +233,7 @@
 
             <div class="compatibility-note">
                 <h4><i class="fas fa-check-circle"></i> Note di Compatibilità</h4>
-                <p>CatechHub è stato testato su una vasta gamma di dispositivi Android. Se riscontri problemi di compatibilità, ti invitiamo a segnalarli tramite GitHub Issues per permetterci di migliorare l'app.</p>
+                <p>CatechHub è stato testato su un limitato numero di dispositivi Android. Se riscontri problemi di compatibilità, ti invitiamo a segnalarli tramite GitHub Issues per permetterci di migliorare l'app.</p>
             </div>
         </div>
     </section>
@@ -310,11 +314,15 @@
                         </div>
                         <div class="tech-item">
                             <i class="fas fa-database"></i>
-                            <span>SQLite</span>
+                            <span>Hive (database locale crittografato)</span>
                         </div>
                         <div class="tech-item">
                             <i class="fas fa-shield-alt"></i>
                             <span>Flutter Secure Storage</span>
+                        </div>
+                        <div class="tech-item">
+                            <i class="fas fa-lock"></i>
+                            <span>AES-256 / GCM</span>
                         </div>
                         <div class="tech-item">
                             <i class="fas fa-qrcode"></i>
@@ -367,6 +375,7 @@
                         <h4>Contatto</h4>
                         <ul>
                             <li><a href="mailto:CatechHub.app@proton.me"><i class="fas fa-envelope"></i> CatechHub.app@proton.me</a></li>
+                            <li><a href="https://github.com/CatechHub-dev/CatechHub"><i class="fab fa-github"></i> github.com/CatechHub-dev/CatechHub</a></li>
                         </ul>
                     </div>
                 </div>

@@ -75,8 +75,8 @@ class _ChangePinPageState extends ConsumerState<ChangePinPage> {
       return;
     }
 
-    final authService = ref.read(authServiceProvider);
-    final success = await authService.changePin(oldPin, newPin);
+    final authNotifier = ref.read(authStateProvider.notifier);
+    final success = await authNotifier.changePin(oldPin, newPin);
 
     if (!mounted) return;
 

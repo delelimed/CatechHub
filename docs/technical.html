@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Documentazione Tecnica — CatechHub</title>
+<link rel="icon" href="logo.png" type="image/png">
+<link rel="stylesheet" href="style.css">
+<script src="js/version.js" defer></script>
+<script src="js/nav.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">☰</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
+
+<section class="page-header">
+  <div class="container">
+    <h1>Documentazione Tecnica</h1>
+    <p>Architettura, crittografia e funzionamento interno</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <div class="breadcrumb"><a href="index.html">Home</a> / Documentazione Tecnica</div>
+
+    <div class="toc">
+      <h3>Indice</h3>
+      <ul>
+        <li><a href="#bootstrap">Architettura del bootstrap</a></li>
+        <li><a href="#hive">Hive Database Layer</a></li>
+        <li><a href="#encryption">EncryptionService</a></li>
+        <li><a href="#sync">Sync Engine (ClassicSyncEngine)</a></li>
+        <li><a href="#security">Security architecture</a></li>
+        <li><a href="#riverpod">Riverpod State Architecture</a></li>
+        <li><a href="#export">Data Export/Backup format</a></li>
+        <li><a href="#recovery">Hive corruption recovery</a></li>
+        <li><a href="#cascade">Cascade deletion</a></li>
+        <li><a href="#threat">Threat model</a></li>
+      </ul>
+    </div>
+
+    <h2 id="bootstrap">1. Architettura del bootstrap</h2>
+    <p>L'applicazione esegue un bootstrap sequenziale in 6 fasi (<code>main.dart</code>), ciascuna con initializzazione bloccante e propagazione errori. La funzione <code>main()</code> coordina il flusso tramite <code>AsyncNotifierProvider</code>:</p>
+
+    <pre>
+Future&lt;void&gt; main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await runZonedGuarded(() async {
+    final bootstrap = BootstrapService();
+    await bootstrap.phase0();  // Binding Flutter
+    await bootstrap.phase1();  // Servizi Dart (Clock, Logger, PathProvider)
+    await bootstrap.phase2();  // Hive init + auto-recovery
+    await bootstrap.phase3();  // Apertura Box con corruption recovery
+    await bootstrap.phase4();  // Analytics / Privacy
+    await bootstrap.phase5();  // Servizi aggiornamenti
+    await bootstrap.phase6();  // runApp
+  }, _fatalErrorHandler);
+}
+    </pre>
+
+    <pre>
+  Bootstrap Sequence (6 synchronous phases)
+  ┌──────────┐   ┌──────────┐   ┌───────────┐   ┌───────────┐   ┌────────────┐   ┌──────────┐
+  │ Phase 0  │   │ Phase 1  │   │ Phase 2   │   │ Phase 3   │   │ Phase 4    │   │ Phase 5  │
+  │ Binding  │──▶│ Services │──▶│ Hive init │──▶│ Box Open  │──▶│ Analytics/ │──▶│ runApp   │
+  │ Flutter  │   │ Dart     │   │+Recovery  │   │ 13 boxes  │   │ Privacy    │   │          │
+  └──────────┘   └──────────┘   └───────────┘   └───────────┘   └────────────┘   └──────────┘
+       │              │              │               │               │              │
+       ▼              ▼              ▼               ▼               ▼              ▼
+  Irreversible    Non-blocking   Retry w/     Per-box        Non-critical   N/A
+  if fails        if fails       recovery     recovery
+    </pre>
+
+    <h3>3.4 HKDF — Session Key derivation</h3>
+    <pre>
+final HKDF_INFO = 'CatechHub_SessionKey_v2';
+// info = HKDF_INFO + deviceIdA + deviceIdB (UTF-8 encoded)
+    </pre>
+    <p>Dopo lo scambio ECDH, il shared secret viene derivato tramite HKDF con SHA-256 per produrre la chiave di sessione AES-256-GCM. L'info string include gli ID dei due dispositivi per garantire chiavi uniche per coppia di dispositivi.</p>
+
+    <h3>3.5 Legacy CBC fallback</h3>
+    <p>Per compatibilità con i pacchetti v1 (prime versioni dell'app), <code>EncryptionService</code> implementa un fallback su AES-256-CBC con padding PKCS7. Il campo <code>"alg": "AES-256-CBC"</code> nel JSON del pacchetto determina l'uso del fallback.</p>
+
+    <h3>3.6 Formato del pacchetto cifrato</h3>
+    <pre>
+{
+  "v": 2,               // versione formato
+  "kdf": "PBKDF2",      // key derivation function
+  "iter": 210000,       // iterazioni PBKDF2
+  "alg": "AES-256-GCM", // algoritmo cifratura
+  "salt": "aGVsbG8=",   // salt base64
+  "nonce": "d29ybGQ=",  // nonce base64
+  "data": "Y2l0ZXJv"    // ciphertext + tag base64
+}
+    </pre>
+
+    <pre>
+  Encryption/Decryption Flow
+  ┌─────────────────────────────────────────────────────────────────┐
+  │                        ENCRYPT                                   │
+  │  Plaintext JSON                                                   │
+  │      │                                                            │
+  │      ▼                                                            │
+  │  ┌──────────────────────┐    ┌──────────────────────────┐        │
+  │  │ Generate random      │    │ PBKDF2-HMAC-SHA256       │        │
+  │  │ salt (16B)           │───▶│ password + salt          │        │
+  │  └──────────────────────┘    │ 210,000 iterations       │        │
+  │                              └────────────┬─────────────┘        │
+  │                                           ▼                       │
+  │                              ┌──────────────────────────┐        │
+  │                              │ 256-bit encryption key   │        │
+  │                              └────────────┬─────────────┘        │
+  │                                           ▼                       │
+  │  ┌──────────────────────┐    ┌──────────────────────────┐        │
+  │  │ Generate random      │    │ AES-256-GCM encrypt      │        │
+  │  │ nonce (12B)          │───▶│ (plaintext + key)        │        │
+  │  └──────────────────────┘    └────────────┬─────────────┘        │
+  │                                           ▼                       │
+  │                              ┌──────────────────────────┐        │
+  │                              │ ciphertext + GCM tag     │        │
+  │                              │ (128-bit authentication) │        │
+  │                              └──────────────────────────┘        │
+  │                                                                   │
+  │                        DECRYPT                                   │
+  │  Packaged JSON ──▶ Parse fields ──▶ PBKDF2(key) ──▶              │
+  │  AES-256-GCM decrypt ──▶ Verify tag ──▶ Plaintext               │
+  └─────────────────────────────────────────────────────────────────┘
+    </pre>
+
+    <h2 id="security">5. Security architecture</h2>
+
+    <h3>5.1 freeRASP</h3>
+    <p>Libreria di runtime application self-protection (RASP) che rileva 8 categorie di minacce:</p>
+    <table class="sec-table">
+      <thead><tr><th>Categoria</th><th>Rilevamento</th></tr></thead>
+      <tbody>
+        <tr><td>Root / Magisk / KernelSU</td><td>Superuser binary, mount namespace, SELinux</td></tr>
+        <tr><td>Emulator</td><td>Build fingerprint, QEMU drivers, Goldfish CPU</td></tr>
+        <tr><td>App Integrity</td><td>Firma APK modificata, debug build</td></tr>
+        <tr><td>Hooking / Frida / Xposed</td><td>Librerie di hooking, classLoader injection</td></tr>
+        <tr><td>Device Binding</td><td>Google SafetyNet / Play Integrity attestation</td></tr>
+        <tr><td>ADB</td><td>USB debugging enabled</td></tr>
+        <tr><td>Debugger</td><td>JDWP attached, debug flag</td></tr>
+        <tr><td>Developer Options</td><td>Impostazioni sviluppatore attive</td></tr>
+      </tbody>
+    </table>
+
+    <p>Configurazione: <code>killOnBypass = false</code> (l'utente riceve una schermata di blocco personalizzata <code>SecurityBlockScreen</code> ma non viene forzato alla chiusura).</p>
+
+    <h3>5.2 Auth — local_auth</h3>
+    <pre>
+Authentication auth = Authentication();
+bool canAuth = await auth.canCheckBiometrics || await auth.isDeviceSupported();
+// biometricOnly = false → fallback a PIN/Pattern/Password del dispositivo
+    </pre>
+    <p>La sessione vive esclusivamente in RAM: nessun token persistito. Il timeout background è di 120 secondi. Allo scadere, la sessione viene invalidata e l'utente deve riautenticarsi.</p>
+
+    <h3>5.3 Screen security</h3>
+    <pre>
+// MainActivity.kt
+if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
+  window.setFlags(
+    WindowManager.LayoutParams.FLAG_SECURE,
+    WindowManager.LayoutParams.FLAG_SECURE
+  );
+}
+    </pre>
+    <p><code>FLAG_SECURE</code> blocca screenshot, screen recording e la visualizzazione nelle recenti apps.</p>
+
+    <pre>
+  Defense-in-Depth Security Stack
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  Layer 7: freeRASP (root, emulator, hooking, app integrity)    │
+  ├─────────────────────────────────────────────────────────────────┤
+  │  Layer 6: E2EE Sync (ECDH P-256 + HKDF + AES-256-GCM)         │
+  ├─────────────────────────────────────────────────────────────────┤
+  │  Layer 5: Biometric Auth + Session in RAM (120s timeout)       │
+  ├─────────────────────────────────────────────────────────────────┤
+  │  Layer 4: HiveAesCipher — AES-256-GCM at rest                  │
+  ├─────────────────────────────────────────────────────────────────┤
+  │  Layer 3: AndroidKeyStore — hardware-backed key isolation       │
+  ├─────────────────────────────────────────────────────────────────┤
+  │  Layer 2: PBKDF2-HMAC-SHA256 — 210,000 iterations               │
+  ├─────────────────────────────────────────────────────────────────┤
+  │  Layer 1: Device OS encryption + PIN/Biometric lock screen      │
+  └─────────────────────────────────────────────────────────────────┘
+  Even if one layer is breached, underlying layers still protect data.
+    </pre>
+
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

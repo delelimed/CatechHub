@@ -1,4 +1,13 @@
+/// Repository per la gestione delle presenze (attendance) su Hive.
+///
+/// In CateREG, fornisce operazioni CRUD per i record di presenza associati
+/// a ogni incontro. Ogni record è salvato nella box Hive `attendance` con:
+/// - meetingId (chiave univoca)
+/// - date, classId, presence (mappa studentId -> "Presente"/"Assente"/"Giustificato")
+/// Espone sia stream (per UI reattiva) che accesso sincrono (per calcoli offline
+/// come il controllo di 2+ assenze consecutive).
 import '../../core/storage/local_database.dart';
+import '../../shared/utils/auth_utils.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final attendanceRepositoryProvider =
@@ -35,11 +44,13 @@ class AttendanceRepository {
     required String classId,
     required Map<String, String> presence,
   }) async {
+    final catechistName = getCurrentCatechistName();
     await _box.put(meetingId, {
       'meetingId': meetingId,
       'date': date.toIso8601String(),
       'classId': classId,
       'presence': presence,
+      'lastModifiedBy': catechistName,
     });
   }
 }

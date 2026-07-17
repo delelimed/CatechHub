@@ -1,320 +1,108 @@
-# CatechHub - Technical Documentation
+# CatechHub
 
-CatechHub is a Flutter-based mobile application for local catechism register management. The application provides secure, offline-first data storage with PIN-based and biometric authentication, designed specifically for Android devices.
+![CatechHub](assets/images/logo.png)
 
-## Project Status
+## Registro elettronico di catechismo — offline, sicuro, peer-to-peer
 
-**Version:** 1.2.0  
-**Status:** Stable Release  
-**Platform:** Android (API 21+)  
-**Flutter SDK:** ^3.12.0
+<p align="center">
+  <img src="https://img.shields.io/github/v/release/delelimed/CatechHub?style=flat-square&label=versione&color=blue" alt="Versione"/>
+  <img src="https://img.shields.io/github/actions/workflow/status/delelimed/CatechHub/android-build.yml?style=flat-square&label=build&branch=debug" alt="Build"/>
+  <img src="https://img.shields.io/github/downloads/delelimed/CatechHub/total?style=flat-square&label=downloads&color=success" alt="Download"/>
+  <img src="https://img.shields.io/badge/licenza-MIT-green?style=flat-square" alt="Licenza"/>
+  <img src="https://img.shields.io/badge/Android-API%2030%2B-brightgreen?style=flat-square&logo=android" alt="Android"/>
+  <img src="https://img.shields.io/badge/flutter-3.12%2B-02569B?style=flat-square&logo=flutter" alt="Flutter"/>
+  <img src="https://img.shields.io/badge/crittografia-AES--256--GCM-orange?style=flat-square" alt="Crittografia"/>
+  <img src="https://img.shields.io/badge/privacy-offline--first-purple?style=flat-square" alt="Privacy"/>
+  <img src="https://img.shields.io/badge/sincronizzazione-P2P%20Bluetooth-0082FC?style=flat-square" alt="Sync"/>
+</p>
 
-## Technology Stack
+---
 
-### Core Framework
-- **Flutter**: ^3.12.0 - UI framework and cross-platform development
-- **Dart**: ^3.12.0 - Programming language
+CatechHub è un'applicazione mobile creata **da un catechista per i catechisti**. Digitalizza il registro parrocchiale in modo completo, sicuro e rispettoso della privacy dei minori. Tutti i dati restano sul tuo dispositivo, protetti da crittografia AES-256-GCM. Nessun cloud, nessun server centrale, nessuna connessione internet necessaria.
 
-### State Management & Navigation
-- **flutter_riverpod**: ^2.6.1 - State management and dependency injection
-- **go_router**: ^17.2.3 - Declarative routing and navigation
+## Perché CatechHub?
 
-### Authentication & Security
-- **local_auth**: ^2.1.0 - Biometric authentication (fingerprint, face recognition)
-- **flutter_secure_storage**: ^10.2.0 - Secure key-value storage for encryption keys
-- **crypto**: ^3.0.0 - Cryptographic operations (SHA-256 hashing)
+| Problema | Soluzione CatechHub |
+| --- | --- |
+| Fogli di carta persi o illeggibili | Anagrafica digitale con ricerca immediata |
+| Dati sensibili di minori su cloud (o su fogli accessibili a tutti...) | **Zero dati su server esterni** — tutto rimane sul dispositivo |
+| App che richiedono internet | **100% offline** — funziona anche in montagna o nelle sale più schermate |
+| Condivisione complicata tra catechisti | **Sync P2P via Bluetooth** — crittografato end-to-end |
+| Privacy sacrificata per la comodità | **Privacy by design** — biometria, schermo protetto, dati cifrati |
 
-### Data Storage
-- **hive_flutter**: ^1.1.0 - Local NoSQL database for offline data persistence
-- **hive_generator**: ^2.0.1 - Code generation for Hive type adapters
-- **build_runner**: ^2.4.9 - Code generation for Hive adapters
+## Sicurezza — Difesa a Strati
 
-### QR Code & Data Sharing
-- **qr_flutter**: ^4.1.0 - QR code generation
-- **mobile_scanner**: ^5.0.0 - QR code scanning and camera integration
+CatechHub adotta un approccio **defense-in-depth**, dove ogni livello è progettato per proteggere i dati anche se quello precedente venisse superato:
 
-### File Management
-- **file_picker**: ^12.0.0-beta.4 - File selection for data import/export
-- **image_picker**: ^1.1.0 - Image capture and selection
-- **path_provider**: ^2.1.0 - File system path access
-- **open_filex**: ^4.5.0 - File opening and viewing
+| Cosa protegge | Come lo fa |
+| --- | --- |
+| **Accesso all'app** | Solo con impronta digitale / riconoscimento facciale / PIN del telefono — nessuna password personalizzata da ricordare |
+| **Dati sul telefono** | Cifrati con **AES-256-GCM** — illeggibili anche se il file viene copiato |
+| **Dati in sincronizzazione** | End-to-end encryption con scambio chiavi **ECDH P-256** via QR code |
+| **Schermo** | Blocco screenshot e screen recording non autorizzati |
+| **Runtime** | freeRASP rileva e blocca root, emulatori, tampering e hacking |
+| **Sessione** | Blocco automatico dopo 2 minuti in background |
+| **Backup** | Protetto da password con derivazione PBKDF2 (210.000 iterazioni) |
 
-### PDF & Printing
-- **pdf**: ^3.10.0 - PDF generation
-- **printing**: ^5.11.0 - PDF printing and sharing
+> **Nessun dato personale lascia mai il tuo telefono** se non durante una sincronizzazione volontaria con un altro catechista di tua fiducia.
 
-### UI & Utilities
-- **intl**: ^0.20.2 - Internationalization and date formatting
-- **url_launcher**: ^6.3.0 - URL launching for external links
-- **http**: ^1.2.0 - HTTP client for API calls
-- **package_info_plus**: ^10.0.0 - Package and app version information
-- **device_info_plus**: ^13.1.0 - Device information access
-- **permission_handler**: ^11.3.0 - Runtime permission management
-- **flutter_local_notifications**: ^17.0.0 - Local notifications
-- **wiredash**: ^2.6.1 - In-app feedback and bug reporting
+## Cosa Puoi Fare
 
-## Architecture Overview
+- **Anagrafica ragazzi** — Aggiungi, modifica, cerca e organizza gli iscritti in gruppi
+- **Presenze** — Crea giornate, fai l'appello, visualizza statistiche
+- **Programmazione** — Pianifica incontri e associa materiale catechetico
+- **Documenti** — Gestisci il ciclo di vita: crea, consegna, attendi riconsegna, archivia
+- **Note contatti** — Tieni traccia delle comunicazioni con le famiglie
+- **Condivisione QR** — Esporta e importa moduli selezionati in modo sicuro
+- **Backup crittografato** — Salva e ripristina tutto il database con un file `.catechub`
+- **Sync P2P Bluetooth** — Sincronizza i dati con altri catechisti in modo sicuro e automatico
+- **PDF e stampa** — Genera report presenze e liste gruppi
+- **Allergie e uscite autonome** — Gestisci informazioni sensibili con visibilità immediata
 
-### Application Architecture
+## Tecnologie
+
+| Area | Strumento |
+| --- | --- |
+| Framework | Flutter & Dart |
+| Stato | Riverpod |
+| Database locale | Hive (cifrato AES) |
+| Crittografia | PointyCastle, cryptography (AES-256-GCM, PBKDF2, ECDH, HKDF) |
+| Sincronizzazione | Bluetooth RFCOMM + protocollo CRDT |
+| Autenticazione | Biometria nativa Android |
+| QR Code | mobile_scanner, qr_flutter |
+| PDF | pdf, printing |
+| Sicurezza runtime | freeRASP (Talsec) |
+
+## Per Iniziare
+
+1. **Scarica l'APK** dall'ultima [release su GitHub](https://github.com/delelimed/CatechHub/releases)
+2. **Installa sul telefono Android** (versione 10.0 o superiore)
+3. **Avvia e segui il setup guidato** — nome, cognome, gruppo
+4. **Inizia a inserire i tuoi ragazzi** — il resto è intuitivo
+
+Non serve registrazione, account, email o connessione internet.
+
+## Stato del Progetto
+
+- **Versione corrente:** [![GitHub Release](https://img.shields.io/github/v/release/delelimed/CatechHub?style=flat-square&label=v)](https://github.com/delelimed/CatechHub/releases/latest) [![GitHub Downloads](https://img.shields.io/github/downloads/delelimed/CatechHub/total?style=flat-square&label=downloads)](https://github.com/delelimed/CatechHub/releases/latest)
+- **Piattaforma:** Android (minSdk 30)
+- **Licenza:** MIT — libero da usare, modificare e distribuire
+
+## Future Implementazioni
+
+Vedi la [roadmap completa](FUTURE.md) per le funzionalità in sviluppo, pianificate e in valutazione.
+
+## Documentazione
+
+- [Documentazione utente](https://delelimed.github.io/CatechHub/)
+- [Documentazione tecnica](https://delelimed.github.io/CatechHub/technical.html)
+- [Informativa Privacy](https://delelimed.github.io/CatechHub/privacy.html)
+- [Sviluppatore](https://delelimed.github.io/CatechHub/developer.html)
+
+## Licenza
+
+```text
+MIT License — Copyright (c) 2026 CatechHub
+
+Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.
 ```
-┌─────────────────────────────────────────┐
-│           Presentation Layer            │
-│  (Widgets, Pages, UI Components)        │
-├─────────────────────────────────────────┤
-│         Business Logic Layer            │
-│  (Providers, Services, Controllers)    │
-├─────────────────────────────────────────┤
-│           Data Layer                    │
-│  (Repository, Local Storage, APIs)     │
-├─────────────────────────────────────────┤
-│         Infrastructure Layer            │
-│  (Auth, Security, Network, Storage)    │
-└─────────────────────────────────────────┘
-```
-
-### Security Architecture
-- **Authentication**: PIN-based with SHA-256 hashing + salt
-- **Biometric**: Device-local fingerprint/face recognition
-- **Data Encryption**: AES encryption for sensitive data
-- **Secure Storage**: Flutter Secure Storage for encryption keys
-- **Screen Security**: Privacy settings to prevent screenshots
-- **Session Management**: Automatic session timeout
-
-### Data Flow
-```
-User Input → UI → Provider → Service → Repository → Local Storage
-                ↓        ↓         ↓           ↓
-            Validation  Business Logic  Encryption  Persistence
-```
-
-## Project Structure
-
-```
-lib/
-├── main.dart                          # Application entry point
-├── app/
-│   ├── router.dart                     # GoRouter configuration
-│   └── go_router_refresh_stream.dart   # Router refresh stream
-├── core/
-│   ├── auth/
-│   │   ├── auth_provider.dart          # Authentication state management
-│   │   ├── auth_service.dart           # Authentication business logic
-│   │   └── session_lifecycle_observer.dart # Session lifecycle management
-│   ├── storage/
-│   │   └── local_database.dart         # Hive database initialization
-│   ├── services/
-│   │   ├── data_export_service.dart    # Data export/import functionality
-│   │   ├── qr_data_service.dart        # QR code data handling
-│   │   └── update_service.dart         # App update management
-│   ├── navigation/
-│   │   └── back_button_handler.dart    # Android back button handling
-│   ├── security/
-│   │   └── privacy_settings.dart       # Privacy and security settings
-│   └── analytics/
-│       ├── analytics_provider.dart     # Analytics state management
-│       ├── analytics_service.dart     # Analytics tracking
-│       └── event_tracking_service.dart # Event tracking service
-├── features/
-│   ├── auth/
-│   │   └── login_page.dart             # Login and PIN entry
-│   ├── dashboard/
-│   │   └── dashboard_page.dart         # Main dashboard
-│   ├── students/
-│   │   ├── students_page.dart          # Student list
-│   │   ├── student_detail_page.dart    # Student details
-│   │   ├── allergies_page.dart        # Allergy management
-│   │   └── autonomous_exits_page.dart  # Exit permissions
-│   ├── classes/
-│   │   ├── classes_page.dart           # Class management
-│   │   ├── class_detail_page.dart      # Class details
-│   │   ├── my_group_page.dart          # Group management
-│   │   ├── group_management_page.dart  # Group administration
-│   │   └── attendance_print_page.dart  # Attendance printing
-│   ├── meetings/
-│   │   ├── attendance_meetings_page.dart # Meeting management
-│   │   └── attendance_page.dart        # Attendance tracking
-│   ├── planning/
-│   │   └── planning_page.dart         # Programming/planning
-│   ├── documents/
-│   │   ├── documents_page.dart        # Document management
-│   │   └── document_detail_page.dart  # Document details
-│   ├── data_share/
-│   │   ├── data_share_selection_page.dart # Data share options
-│   │   ├── data_share_send_page.dart  # QR sending
-│   │   └── data_share_receive_page.dart # QR receiving
-│   ├── settings/
-│   │   ├── settings_page.dart         # Settings management
-│   │   ├── privacy.dart               # Privacy settings
-│   │   └── delete_data_page.dart      # Data deletion
-│   ├── phone_verification/
-│   │   └── verify_number_page.dart    # Phone verification
-│   ├── update/
-│   │   └── update_page.dart           # App updates
-│   └── attachments/
-│       └── widgets/
-│           └── attachments_section.dart # Attachment widgets
-└── shared/
-    ├── widgets/
-    │   └── app_scaffold.dart           # App scaffold wrapper
-    └── models/
-        └── student_model.dart         # Student data model
-```
-
-## Development Setup
-
-### Prerequisites
-- Flutter SDK >= 3.12.0
-- Dart SDK >= 3.12.0
-- Android Studio / VS Code with Flutter extension
-- Android device or emulator (API 21+)
-- Git
-
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/CatechHub-dev/CatechHub.git
-cd CatechHub
-
-# Install dependencies
-flutter pub get
-
-# Generate Hive adapters (if needed)
-flutter pub run build_runner build --delete-conflicting-outputs
-```
-
-### Running the Application
-
-```bash
-# Debug mode
-flutter run
-
-# Release mode
-flutter run --release
-
-# Specific device
-flutter run -d <device-id>
-
-# APK build
-flutter build apk
-
-# App bundle build
-flutter build appbundle
-```
-
-## Data Management
-
-### Local Storage (Hive)
-- **Database**: Hive NoSQL database
-- **Location**: App-specific directory on device
-- **Encryption**: AES encryption for sensitive boxes
-- **Key Storage**: Flutter Secure Storage for encryption keys
-
-### Data Models
-```dart
-// Student Model
-class Student {
-  final String id;
-  final String name;
-  final String surname;
-  final List<String> allergies;
-  final Map<String, dynamic> attachments;
-  // ... other fields
-}
-
-// Meeting Model
-class Meeting {
-  final String id;
-  final DateTime date;
-  final String topic;
-  final Map<String, bool> attendance;
-  // ... other fields
-}
-```
-
-### Data Export/Import
-- **Format**: JSON with base64 encoding
-- **Compression**: Base64 encoding for data size reduction
-- **Security**: Checksum verification using SHA-256
-- **QR Sharing**: Chunked QR code transmission (max 600 chars per QR)
-
-## QR Code System
-
-### QR Code Generation
-- **Library**: qr_flutter
-- **Error Correction**: Level L (7%) for maximum readability
-- **Chunk Size**: 600 characters per QR code
-- **Data Format**: JSON with metadata (chunk index, total chunks, checksum)
-
-### QR Code Scanning
-- **Library**: mobile_scanner
-- **Authentication**: PIN-based verification after data reception
-- **Integrity**: SHA-256 checksum validation per chunk and complete package
-- **Assembly**: Automatic chunk reassembly and validation
-
-### QR Data Structure
-```json
-{
-  "i": 0,              // chunk index
-  "t": 3,              // total chunks
-  "d": "base64data",   // encoded data
-  "c": "checksum"      // chunk checksum
-}
-```
-
-## Security Implementation
-
-### Authentication Flow
-1. **PIN Setup**: User creates 8-digit PIN during first launch
-2. **PIN Storage**: SHA-256 hash stored in local storage
-3. **Biometric**: Optional biometric enrollment after PIN setup
-4. **Session**: Automatic session timeout after inactivity
-5. **Screen Lock**: Privacy mode to prevent screenshots
-
-### Data Encryption
-- **Algorithm**: AES-256-CBC
-- **Key Management**: Flutter Secure Storage
-- **Scope**: Personal data, sensitive information
-- **Performance**: Optimized encryption for mobile devices
-
-### Permissions
-- **Camera**: QR code scanning
-- **Storage**: Data export/import and file attachments
-- **Biometric**: Fingerprint/face recognition
-- **Notifications**: Update alerts
-
-## Testing
-
-### Unit Tests
-```bash
-flutter test
-```
-
-### Integration Tests
-```bash
-flutter test integration_test/
-```
-
-### Widget Tests
-```bash
-flutter test test/widget/
-```
-
-## Build & Deployment
-
-### Android Build
-```bash
-# Debug APK
-flutter build apk --debug
-
-# Release APK
-flutter build apk --release
-
-# App Bundle (Play Store)
-flutter build appbundle --release
-```
-
-### Build Configuration
-- **Minimum SDK**: 21 (Android 5.0)
-- **Target SDK**: 34 (Android 14)
-- **Compile SDK**: 34

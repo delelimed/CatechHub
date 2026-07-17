@@ -3,6 +3,13 @@ import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/models/student_model.dart';
 import './students_repository.dart';
 
+/// Schermata di consultazione uscite: raggruppa gli studenti in tre
+/// sezioni distinte — autorizzati a uscire da soli (autonomo),
+/// prelevamento dai genitori e prelevamento da altro (con dettaglio).
+/// Legge i dati dal Box `students` via [StudentsRepository.getAllStudentsSync]
+/// e filtra sul campo [Student.autonomousExits].
+/// Flusso: accessibile dalla navigazione globale per verifica rapida
+/// delle autorizzazioni uscita.
 class AutonomousExitsPage extends StatelessWidget {
   const AutonomousExitsPage({super.key});
 
@@ -99,9 +106,9 @@ class _Section extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: color.withOpacity(0.3)),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
           ),
           child: Row(
             children: [

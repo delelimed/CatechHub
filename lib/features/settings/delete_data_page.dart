@@ -1,3 +1,14 @@
+/// Pagina per la cancellazione selettiva dei dati del registro catechistico.
+///
+/// L'utente può scegliere una o più categorie da eliminare tra:
+/// - Anagrafica ragazzi (nome, genitori, allergie, consegne documenti)
+/// - Presenze / appelli registrati
+/// - Giornate e riunioni (programmazione)
+/// - Allegati (foto e PDF cifrati)
+///
+/// Mostra il conteggio attuale per ogni categoria tramite [DataDeletionService].
+/// La cancellazione è definitiva e irreversibile sul dispositivo, previa
+/// conferma tramite dialog.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/storage/data_deletion_service.dart';
@@ -96,8 +107,14 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
         return 'Presenze / appelli';
       case DataDeletionCategory.giornate:
         return 'Giornate e riunioni';
+      case DataDeletionCategory.catechesi:
+        return 'Catechesi';
+      case DataDeletionCategory.noteContatto:
+        return 'Note di contatto';
       case DataDeletionCategory.allegati:
         return 'Foto e PDF allegati';
+      case DataDeletionCategory.documenti:
+        return 'Documenti e consegne';
     }
   }
 
@@ -109,8 +126,14 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
         return 'Tutti gli appelli registrati';
       case DataDeletionCategory.giornate:
         return 'Programmazione incontri, giornate e riunioni';
+      case DataDeletionCategory.catechesi:
+        return 'Argomenti e contenuti delle catechesi';
+      case DataDeletionCategory.noteContatto:
+        return 'Comunicazioni con le famiglie';
       case DataDeletionCategory.allegati:
         return 'Tutti i file cifrati (foto e PDF)';
+      case DataDeletionCategory.documenti:
+        return 'Certificati, autorizzazioni e consegne';
     }
   }
 
@@ -122,8 +145,14 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
         return _counts.attendance;
       case DataDeletionCategory.giornate:
         return _counts.planning;
+      case DataDeletionCategory.catechesi:
+        return _counts.catechesi;
+      case DataDeletionCategory.noteContatto:
+        return _counts.contactNotes;
       case DataDeletionCategory.allegati:
         return _counts.attachments;
+      case DataDeletionCategory.documenti:
+        return _counts.documents;
     }
   }
 
@@ -261,8 +290,14 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
         return Icons.fact_check_rounded;
       case DataDeletionCategory.giornate:
         return Icons.event_note_rounded;
+      case DataDeletionCategory.catechesi:
+        return Icons.menu_book_rounded;
+      case DataDeletionCategory.noteContatto:
+        return Icons.contact_mail_rounded;
       case DataDeletionCategory.allegati:
         return Icons.attach_file_rounded;
+      case DataDeletionCategory.documenti:
+        return Icons.description_rounded;
     }
   }
 }

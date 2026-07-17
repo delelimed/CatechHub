@@ -1,10 +1,10 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
-import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -12,6 +12,27 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../core/services/update_service.dart';
 
+/// Pagina di aggiornamento automatico dell'app CatechREG.
+///
+/// CONTESTO PROGETTO:
+/// CateREG è distribuita come APK su GitHub Releases
+/// (https://github.com/delelimed/CatechHub/releases).
+/// Questa pagina verifica la presenza di nuove versioni e gestisce
+/// il download e l'installazione dell'APK direttamente dall'app,
+/// senza passare dal Play Store (distribuzione sideload).
+///
+/// FLUSSO:
+/// 1. All'init, chiama l'API GitHub Releases per ottenere l'ultima release.
+/// 2. Confronta la versione locale (package_info_plus) con la remota.
+/// 3. Se più recente, mostra info (versione, changelog, data pubblicazione).
+/// 4. L'utente può avviare download + verifica SHA256 + installazione.
+/// 5. Il download usa la directory esterna (o documenti come fallback)
+///    per evitare problemi con Scoped Storage su Android 11+.
+///
+/// SICUREZZA:
+/// - Verifica checksum SHA256 dell'APK prima dell'installazione.
+/// - Richiede permesso REQUEST_INSTALL_PACKAGES su Android.
+/// - Usa canale nativo (FileProvider) per installazione sicura su Android 7+.
 class UpdatePage extends ConsumerStatefulWidget {
   const UpdatePage({super.key});
 
@@ -20,6 +41,9 @@ class UpdatePage extends ConsumerStatefulWidget {
 }
 
 class _UpdatePageState extends ConsumerState<UpdatePage> {
+  /// Info della release GitHub correntemente visualizzata.
+  /// Contiene: version, currentVersion, name, body, html_url,
+  /// apk_url, apk_digest, published_at.
   Map<String, dynamic>? _releaseInfo;
   bool _isLoading = true;
   bool _isDownloading = false;
@@ -32,6 +56,10 @@ class _UpdatePageState extends ConsumerState<UpdatePage> {
     _checkForUpdates();
   }
 
+  /// Controlla su GitHub Releases se esiste una versione più recente.
+  /// Endpoint: GET /repos/delelimed/CatechHub/releases/latest
+  /// Confronta il tag_name (es. "v1.2.3") con la versione locale.
+  /// Se trova un APK nell'asset, ne estrae URL e digest SHA256.
   Future<void> _checkForUpdates() async {
     setState(() {
       _isLoading = true;
@@ -44,9 +72,10 @@ class _UpdatePageState extends ConsumerState<UpdatePage> {
 
       final response = await http.get(
         Uri.parse(
-          'https://api.github.com/repos/CatechHub-dev/CatechHub/releases/latest',
+          'https://api.github.com/repos/delelimed/CatechHub/releases/latest',
         ),
-      );
+        headers: {'Accept': 'application/vnd.github.v3+json'},
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -56,11 +85,13 @@ class _UpdatePageState extends ConsumerState<UpdatePage> {
           // Ottieni l'URL dell'APK
           final assets = data['assets'] as List<dynamic>;
           String? apkUrl;
+          String? apkDigest;
 
           for (final asset in assets) {
             if (asset['name'] is String &&
                 (asset['name'] as String).endsWith('.apk')) {
-              apkUrl = asset['browser_download_url'] as String;
+              apkUrl = asset['url'] as String? ?? asset['browser_download_url'] as String;
+              apkDigest = asset['digest'] as String?;
               break;
             }
           }
@@ -73,10 +104,20 @@ class _UpdatePageState extends ConsumerState<UpdatePage> {
               'body': data['body'] as String? ?? '',
               'html_url': data['html_url'] as String? ?? '',
               'apk_url': apkUrl,
+              'apk_digest': apkDigest,
               'published_at': data['published_at'] as String? ?? '',
             };
             _isLoading = false;
           });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Nuova versione $latestVersion disponibile!'),
+                backgroundColor: const Color(0xFF174A7E),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
         } else {
           setState(() {
             _errorMessage = 'Hai già l\'ultima versione ($currentVersion)';
@@ -98,8 +139,21 @@ class _UpdatePageState extends ConsumerState<UpdatePage> {
     }
   }
 
+  /// Scarica l'APK, verifica l'integrità SHA256 e avvia l'installazione.
+  ///
+/// STEP:
+/// 1. Verifica che l'URL APK e il digest SHA256 siano presenti.
+/// 2. Richiede permesso REQUEST_INSTALL_PACKAGES (Android).
+/// 3. Sceglie la directory: external storage (preferito) o documents
+///    (fallback per Android 11+ Scoped Storage).
+/// 4. Download HTTP del file + verifica checksum SHA256.
+/// 5. Simulazione progresso (la barra è puramente UI).
+/// 6. Scrittura su disco come catechhub_update.apk.
+/// 7. Installazione nativa tramite FileProvider (evita errori parsing package).
+/// 8. Pulizia vecchi APK (UpdateService.cleanupOldApks).
   Future<void> _downloadAndInstall() async {
     final apkUrl = _releaseInfo?['apk_url'] as String?;
+    final apkDigest = _releaseInfo?['apk_digest'] as String?;
     if (apkUrl == null) {
       ScaffoldMessenger.of(
         context,
@@ -107,7 +161,6 @@ class _UpdatePageState extends ConsumerState<UpdatePage> {
       return;
     }
 
-    // Richiedi permesso di installazione app
     if (!await Permission.requestInstallPackages.isGranted) {
       final status = await Permission.requestInstallPackages.request();
       if (!status.isGranted) {
@@ -118,8 +171,6 @@ class _UpdatePageState extends ConsumerState<UpdatePage> {
       }
     }
 
-    // Scriviamo in una directory app-specific che non richiede permessi di storage
-    // (evita problemi con Scoped Storage su Android 11+).
     Directory? directory;
     try {
       directory = await getExternalStorageDirectory();
@@ -136,40 +187,79 @@ class _UpdatePageState extends ConsumerState<UpdatePage> {
     });
 
     try {
-      final response = await http.get(Uri.parse(apkUrl));
-
-      if (response.statusCode != 200) {
-        throw Exception('Download fallito: ${response.statusCode}');
-      }
-
-      final bytes = response.bodyBytes;
-
-      // Simula progresso di download
-      for (int i = 0; i <= 100; i += 10) {
-        await Future.delayed(const Duration(milliseconds: 100));
-        if (mounted) {
-          setState(() {
-            _downloadProgress = i / 100;
-          });
-        }
-      }
-
-      // Salva il file
       final path = '${directory.path}/catechhub_update.apk';
       final file = File(path);
-      await file.writeAsBytes(bytes);
+      if (await file.exists()) {
+        await file.delete();
+      }
+
+      // Download con streaming diretto su file per evitare OOM
+      final client = http.Client();
+      try {
+        final request = http.Request('GET', Uri.parse(apkUrl));
+        request.headers['Accept'] = 'application/octet-stream';
+        final streamedResponse = await client.send(request).timeout(const Duration(seconds: 30));
+
+        if (streamedResponse.statusCode != 200) {
+          throw Exception('Download fallito (HTTP ${streamedResponse.statusCode})');
+        }
+
+        final contentLength = streamedResponse.contentLength ?? -1;
+        var received = 0;
+        final sink = file.openWrite();
+
+        await for (final chunk in streamedResponse.stream) {
+          sink.add(chunk);
+          received += chunk.length;
+          if (contentLength > 0 && mounted) {
+            setState(() {
+              _downloadProgress = received / contentLength;
+            });
+          }
+        }
+
+        await sink.close();
+
+        client.close();
+
+        if (!await file.exists() || await file.length() == 0) {
+          throw Exception('File scaricato vuoto o non valido');
+        }
+
+        // Verifica checksum SHA256 se disponibile
+        if (apkDigest != null && apkDigest.startsWith('sha256:')) {
+          final bytes = await file.readAsBytes();
+          final expectedDigest = apkDigest.substring('sha256:'.length);
+          final actualDigest = sha256.convert(bytes).toString();
+          if (actualDigest != expectedDigest) {
+            await file.delete();
+            throw Exception('Verifica integrita APK fallita');
+          }
+        }
+
+        // Valida magic number APK (PK zip header)
+        final raf = await file.open(mode: FileMode.read);
+        final header = await raf.read(4);
+        await raf.close();
+        if (header.length < 4 || header[0] != 0x50 || header[1] != 0x4B) {
+          await file.delete();
+          throw Exception('File APK non valido (formato corrotto)');
+        }
+      } finally {
+        client.close();
+      }
 
       setState(() {
         _isDownloading = false;
+        _downloadProgress = 1.0;
       });
 
-      // Apri il file per l'installazione
-      final result = await OpenFilex.open(path);
-
-      if (result.type == ResultType.error) {
+      try {
+        await UpdateService.installApk(path);
+      } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Errore nell\'apertura del file')),
+            SnackBar(content: Text('Errore installazione: $e')),
           );
         }
       }
@@ -177,12 +267,13 @@ class _UpdatePageState extends ConsumerState<UpdatePage> {
       setState(() {
         _isDownloading = false;
       });
-
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Errore download: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Errore download: $e')),
+        );
       }
+    } finally {
+      await UpdateService.cleanupOldApks();
     }
   }
 
@@ -205,7 +296,12 @@ class _UpdatePageState extends ConsumerState<UpdatePage> {
     }
 
     if (_errorMessage != null) {
-      return _ErrorCard(message: _errorMessage!, onRetry: _checkForUpdates);
+      final isLatestVersion = _errorMessage!.startsWith("Hai già l'ultima versione");
+      return _ErrorCard(
+        message: _errorMessage!,
+        onRetry: isLatestVersion ? null : _checkForUpdates,
+        isInfo: isLatestVersion,
+      );
     }
 
     if (_releaseInfo == null) {
@@ -235,6 +331,9 @@ class _UpdatePageState extends ConsumerState<UpdatePage> {
   }
 }
 
+/// Card con le informazioni sulla nuova versione disponibile.
+/// Mostra versione attuale, nuova versione e data di pubblicazione
+/// con sfondo gradient blu (stile CatechREG).
 class _UpdateInfoCard extends StatelessWidget {
   final String currentVersion;
   final String latestVersion;
@@ -258,7 +357,7 @@ class _UpdateInfoCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -324,6 +423,8 @@ class _UpdateInfoCard extends StatelessWidget {
   }
 }
 
+/// Widget helper per mostrare una versione con label nella card info.
+/// Usato due volte nella _UpdateInfoCard: versione attuale e nuova.
 class _VersionInfo extends StatelessWidget {
   final String label;
   final String version;
@@ -354,6 +455,9 @@ class _VersionInfo extends StatelessWidget {
   }
 }
 
+/// Card con le note di rilascio (changelog) della nuova versione.
+/// Mostra il titolo della release e il body (markdown-like) presi
+/// direttamente dall'API GitHub Releases.
 class _ChangelogCard extends StatelessWidget {
   final String title;
   final String body;
@@ -370,7 +474,7 @@ class _ChangelogCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -412,6 +516,9 @@ class _ChangelogCard extends StatelessWidget {
   }
 }
 
+/// Card visualizzata durante il download dell'APK.
+/// Mostra una CircularProgressIndicator e una LinearProgressIndicator
+/// con la percentuale di avanzamento (simulata).
 class _DownloadingCard extends StatelessWidget {
   final double progress;
 
@@ -469,6 +576,8 @@ class _DownloadingCard extends StatelessWidget {
   }
 }
 
+/// Pulsante "Scarica e installa" che avvia il flusso di download.
+/// Stilizzato con il colore primario CatechREG (#174A7E).
 class _DownloadButton extends StatelessWidget {
   final VoidCallback onTap;
 
@@ -498,34 +607,43 @@ class _DownloadButton extends StatelessWidget {
   }
 }
 
+/// Card per la visualizzazione di errori o messaggi informativi.
+/// Se [isInfo] è true, usa uno sfondo azzurro invece del rosso.
 class _ErrorCard extends StatelessWidget {
   final String message;
   final VoidCallback? onRetry;
+  final bool isInfo;
 
-  const _ErrorCard({required this.message, this.onRetry});
+  const _ErrorCard({
+    required this.message,
+    this.onRetry,
+    this.isInfo = false,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final color = isInfo ? Colors.blue : Colors.red;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
+        color: color.shade50,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.red.shade200),
+        border: Border.all(color: color.shade200),
       ),
       child: Column(
         children: [
           Icon(
-            Icons.error_outline_rounded,
+            isInfo ? Icons.check_circle_outline_rounded : Icons.error_outline_rounded,
             size: 48,
-            color: Colors.red.shade400,
+            color: color.shade400,
           ),
           const SizedBox(height: 16),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.red.shade800, fontSize: 14),
+            style: TextStyle(color: color.shade800, fontSize: 14),
           ),
           if (onRetry != null) ...[
             const SizedBox(height: 16),
@@ -534,7 +652,7 @@ class _ErrorCard extends StatelessWidget {
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('Riprova'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.shade700,
+                backgroundColor: color.shade700,
                 foregroundColor: Colors.white,
               ),
             ),

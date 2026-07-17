@@ -1,0 +1,106 @@
+﻿<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Condivisione QR — CatechHub</title>
+<meta name="description" content="Condividi dati con altri catechisti in modo sicuro, cifrato e senza internet, usando semplicemente un QR code.">
+<link rel="icon" href="../logo.png" type="image/png">
+<link rel="stylesheet" href="../style.css">
+<script src="../js/version.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="../logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
+
+<section class="page-header">
+  <div class="container">
+    <h1>Condivisione QR</h1>
+    <p>Scambia dati con altri catechisti in modo sicuro, senza internet e senza server: basta inquadrare un QR code</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+
+    <div class="breadcrumb"><a href="../index.html">Home</a> / <a href="data-share.html">Condivisione QR</a> / Panoramica</div>
+
+    <h2>Che cos'è</h2>
+    <p>La Condivisione QR ti permette di inviare dati a un altro catechista semplicemente mostrando un QR code sul tuo telefono. Lui lo inquadra con la fotocamera del suo dispositivo e i dati vengono trasferiti. Il tutto è protetto da crittografia e da un PIN di sicurezza. Non serve internet, non serve un server centrale.</p>
+
+    <div class="alert alert-warning">
+      <strong>Nota:</strong> la condivisione QR è ideale per scambi rapidi di dati specifici. Per sincronizzazioni complete e periodiche, usa la <a href="sync.html">Sync P2P Bluetooth</a>.
+    </div>
+
+    <h2>Come funziona</h2>
+
+    <h3>1. Scegli cosa condividere</h3>
+    <p>Selezioni esattamente quali moduli vuoi esportare: anagrafica ragazzi, presenze, documenti, ecc. Puoi scegliere tutto o solo ciò che serve.</p>
+
+    <div class="screenshot-row">
+      <img src="../screen/QR_Selezione.jpg" alt="Selezione moduli da condividere" class="screenshot" style="max-width:300px;">
+    </div>
+
+    <h3>2. Imposti un PIN di protezione</h3>
+    <p>Scegli un PIN numerico (4-6 cifre) che servirà per crittografare i dati. Senza questo PIN, nessuno potrà leggere le informazioni, neppure se intercetta il QR code.</p>
+
+    <div class="screenshot-row">
+      <img src="../screen/QR_Pin.jpg" alt="Impostazione PIN protezione" class="screenshot" style="max-width:300px;">
+    </div>
+
+    <h3>3. Mostri il QR code</h3>
+    <p>L'app genera un QR code che contiene i dati crittografati. Lo mostri al collega che lo inquadra con la fotocamera del suo dispositivo.</p>
+
+    <div class="screenshot-row">
+      <img src="../screen/QR_Preparazione.jpg" alt="Preparazione condivisione QR" class="screenshot" style="max-width:300px;">
+      <img src="../screen/QR_Invio.jpg" alt="Invio QR code" class="screenshot" style="max-width:300px;">
+    </div>
+
+    <h3>4. Il destinatario importa</h3>
+    <p>Il collega scansiona il QR, inserisce il PIN che gli hai comunicato a voce, e i dati vengono importati nel suo CatechHub. L'app gestisce automaticamente eventuali conflitti con i dati esistenti.</p>
+
+    <h2>Sicurezza</h2>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li><strong>Crittografia end-to-end:</strong> i dati sono cifrati con AES-256-GCM</li>
+      <li><strong>Protezione PIN:</strong> anche se il QR viene fotografato, senza PIN i dati sono illeggibili</li>
+      <li><strong>Niente internet:</strong> il trasferimento avviene solo tramite fotocamera, offline</li>
+      <li><strong>Scegli cosa condividere:</strong> decidi tu esattamente quali dati inviare</li>
+    </ul>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div>
+      <strong>CatechHub</strong> <span class="version-tag"></span> — Registro Elettronico di Catechismo<br>
+      <small>Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.</small>
+    </div>
+    <div>
+      <small>
+        &#128231; <a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a> &middot;
+        &#128247; Instagram (prossimamente) &middot;
+        &#9992; Telegram (prossimamente)
+      </small><br>
+      <a href="../privacy.html">Privacy</a> &middot;
+      <a href="../terms.html">Termini</a> &middot;
+      <a href="../infos/index.html">GDPR</a> &middot;
+      <a href="../developer.html">Sviluppatore</a> &middot;
+      <a href="https://github.com/delelimed/CatechHub" class="release-url">GitHub</a><br>
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/nav.js"></script></body>
+</html>

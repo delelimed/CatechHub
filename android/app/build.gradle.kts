@@ -1,7 +1,16 @@
 import java.util.Properties
 import java.io.FileInputStream
 
-// Carica il file local.properties
+// ══════════════════════════════════════════════════════════════════════════════
+// build.gradle.kts — CatechHub (modulo app Android)
+//
+// Configurazione Gradle del modulo principale dell'applicazione CatechHub,
+// un registro elettronico di catechismo costruito con Flutter per Android.
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CARICAMENTO LOCAL.PROPERTIES
+// ─────────────────────────────────────────────────────────────────────────────
 val localProperties = Properties()
 val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
@@ -10,65 +19,81 @@ if (localPropertiesFile.exists()) {
 
 plugins {
     id("com.android.application")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
-    namespace = "com.delelimed.registro_catechismo"
-    
-    compileSdk = 36 
+    namespace = "com.delelimed.catechhub"
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-        
-        // AGGIUNTO: Abilita il desugaring nelle opzioni di compilazione
         isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
         applicationId = "com.delelimed.catechhub"
-        
         minSdk = 30
         targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        
-        // AGGIUNTO: Previene errori sul limite dei metodi (consigliato con il desugaring)
         multiDexEnabled = true
 
-        // Limita le risorse solo alla lingua italiana per ridurre il package finale
-        resourceConfigurations += setOf("it")
-
         ndk {
-            // Build only for arm64-v8a to reduce output size and match target devices
             abiFilters += listOf("arm64-v8a")
         }
     }
 
+    androidResources {
+        localeFilters.add("it")
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CONFIGURAZIONE FIRMA (SIGNING) - OTTIMIZZATA PER PC LOCALE & GITHUB ACTIONS
+    // ─────────────────────────────────────────────────────────────────────────
     signingConfigs {
         create("sharedConfig") {
-            // Recupera i valori in sicurezza
-            val keyFile = localProperties.getProperty("keystore.file")
+            // 1. Controlla prima se siamo su GitHub Actions (leggendo le variabili d'ambiente)
+            val envKeystorePath = System.getenv("SIGNING_KEYSTORE_PATH")
             
-            storeFile = if (keyFile != null) file(keyFile) else null
-            storePassword = localProperties.getProperty("keystore.password")
-            keyAlias = localProperties.getProperty("keystore.alias")
-            keyPassword = localProperties.getProperty("keystore.alias.password")
+            if (envKeystorePath != null) {
+                // Configurazione per GitHub Actions
+                storeFile = file(envKeystorePath)
+                storePassword = System.getenv("SIGNING_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+            } else {
+                // Configurazione locale (dal tuo file local.properties)
+                val keyFile = localProperties.getProperty("keystore.file")
+                storeFile = if (keyFile != null) file(keyFile) else null
+                storePassword = localProperties.getProperty("keystore.password")
+                keyAlias = localProperties.getProperty("keystore.alias")
+                keyPassword = localProperties.getProperty("keystore.alias.password")
+            }
         }
     }
 
     buildTypes {
-        release {
-            signingConfig = signingConfigs.getByName("sharedConfig")
+        debug {
             isMinifyEnabled = false
             isShrinkResources = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro",
-            )
+        }
+
+        release {
+            signingConfig = signingConfigs.getByName("sharedConfig")
+            isMinifyEnabled = true
+            isShrinkResources = true
+
+            file("proguard-rules.pro").let { proguardFile ->
+                if (proguardFile.exists()) {
+                    proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), proguardFile)
+                } else {
+                    proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+                }
+            }
         }
     }
 
@@ -80,10 +105,14 @@ android {
                 "META-INF/LICENSE.txt",
                 "META-INF/NOTICE",
                 "META-INF/NOTICE.txt",
+                "**/*.dbg",
+                "**/*.sym"
             )
         }
+        jniLibs {
+            keepDebugSymbols.clear() 
+        }
     }
-
 }
 
 kotlin {
@@ -97,8 +126,7 @@ flutter {
 }
 
 dependencies {
-    // Removed Google Play dependencies - not needed for local-only app
-    
-    // AGGIUNTO: Dipendenza nativa per il desugaring (sintassi Kotlin DSL)
+    implementation("androidx.multidex:multidex:2.0.1")
+    implementation("androidx.core:core:1.13.1")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

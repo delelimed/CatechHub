@@ -1,3 +1,19 @@
+/// Pagina di backup e ripristino dei dati dell'app CateREG.
+///
+/// - **Esporta backup**: raccoglie tutti i dati (anagrafica, presenze,
+///   programmazione, catechesi, documenti e allegati), li cifra con il PIN
+///   dell'utente tramite [DataExportService.exportEncryptedData] e salva il
+///   file `.catechhub` nella posizione scelta dall'utente (tramite
+///   [FilePicker]).
+/// - **Importa backup**: seleziona un file `.catechhub`, richiede il PIN
+///   di decifratura, verifica la password tramite
+///   [DataExportService.verifyEncryptedPassword], chiede conferma della
+///   sovrascrittura e ripristina tutti i dati tramite
+///   [DataExportService.importEncryptedData].
+///
+/// Entrambe le operazioni verificano il PIN dell'utente prima di procedere.
+/// L'importazione sostituisce completamente i dati esistenti in modo
+/// irreversibile.
 import 'dart:convert';
 import 'dart:io';
 
@@ -10,6 +26,10 @@ import 'package:intl/intl.dart';
 import '../../core/auth/auth_provider.dart';
 import '../../core/services/data_export_service.dart';
 import '../../shared/widgets/app_scaffold.dart';
+import '../classes/classes_provider.dart';
+import '../documents/documents_provider.dart';
+import '../planning/planning_provider.dart';
+import '../students/students_provider.dart';
 
 class BackupPage extends ConsumerStatefulWidget {
   const BackupPage({super.key});
@@ -23,6 +43,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
   bool _isImporting = false;
   String? _statusMessage;
   bool _isError = false;
+  String? _phaseMessage;
 
   // ────────────────────────────────────────────
   //  EXPORT
@@ -37,27 +58,56 @@ class _BackupPageState extends ConsumerState<BackupPage> {
     });
 
     try {
-      // Chiedi il PIN per cifrare il backup
-      final pin = await _askPin(
-        title: 'Cifra Backup',
-        message: 'Inserisci il PIN per proteggere il file di backup.',
+      // Autentica con biometrica/PIN del dispositivo
+      final authService = ref.read(authServiceProvider);
+      final authenticated = await authService.authenticate(
+        localizedReason: 'Autenticati per esportare il backup',
       );
-      if (pin == null) {
-        setState(() => _isExporting = false);
+      if (!authenticated) {
+        if (mounted) {
+          setState(() {
+            _isExporting = false;
+            _statusMessage = 'Autenticazione annullata o fallita';
+            _isError = true;
+          });
+        }
         return;
       }
 
-      // Verifica che il PIN sia quello corretto dell'utente
-      final authService = ref.read(authServiceProvider);
-      final pinValid = await authService.signInWithPin(pin);
-      if (!pinValid) {
-        setState(() {
-          _isExporting = false;
-          _statusMessage = 'PIN non corretto';
-          _isError = true;
-        });
+      // Chiedi il PIN per cifrare il backup (PIN dedicato al file di backup)
+      final pin = await _askPin(
+        title: 'Cifra Backup',
+        message: 'Crea un PIN per proteggere il file di backup.\nQuesto PIN sarà necessario per ripristinare il backup.',
+      );
+      if (pin == null) {
+        if (mounted) setState(() => _isExporting = false);
         return;
       }
+
+      // Conferma PIN
+      final confirmPin = await _askPin(
+        title: 'Conferma PIN',
+        message: 'Reinserisci il PIN per confermare.',
+      );
+      if (confirmPin == null || confirmPin != pin) {
+        if (mounted) {
+          setState(() {
+            _isExporting = false;
+            _statusMessage = 'I PIN non coincidono';
+            _isError = true;
+          });
+        }
+        return;
+      }
+
+      setState(() {
+        _statusMessage = 'Raccolta dati in corso…';
+        _phaseMessage = 'Esportazione anagrafica, presenze e documenti…';
+      });
+      await Future.delayed(Duration.zero);
+
+      setState(() => _phaseMessage = 'Cifratura dati con PIN…');
+      await Future.delayed(Duration.zero);
 
       // Esporta e cifra
       final encrypted = await DataExportService.exportEncryptedData(pin);
@@ -68,50 +118,62 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       final fileName = 'catechhub_backup_$timestamp.catechhub';
 
       String? savedPath;
-      // Try to use saveFile first (with bytes parameter as it's required)
+      bool saved = false;
       try {
         savedPath = await FilePicker.saveFile(
           dialogTitle: 'Salva backup',
           fileName: fileName,
           bytes: bytes,
         );
+        if (savedPath != null) saved = true;
       } catch (e) {
-        // If saveFile fails, try alternative approach
-        final directory = await FilePicker.getDirectoryPath();
-        if (directory != null) {
-          savedPath = '$directory/$fileName';
-          await File(savedPath).writeAsBytes(bytes, flush: true);
+        savedPath = null;
+      }
+
+      // Se saveFile fallisce, usa getDirectoryPath + scrittura manuale
+      if (!saved) {
+        try {
+          final directory = await FilePicker.getDirectoryPath(
+            dialogTitle: 'Seleziona cartella backup',
+          );
+          if (directory != null) {
+            final filePath = '$directory/$fileName';
+            final file = File(filePath);
+            await file.writeAsBytes(bytes, flush: true);
+            savedPath = filePath;
+            saved = true;
+          }
+        } catch (e) {
+          savedPath = null;
         }
       }
 
-      if (savedPath != null) {
-        // Assicura la scrittura del file anche quando FilePicker.saveFile restituisce solo il path
-        final file = File(savedPath);
-        await file.writeAsBytes(bytes, flush: true);
-
-        if (await file.exists()) {
-          final fileSize = await file.length();
-          if (fileSize == 0) {
-            await file.writeAsBytes(bytes, flush: true);
-          }
+      if (saved) {
+        if (mounted) {
+          setState(() {
+            _statusMessage = 'Backup esportato con successo';
+            _isError = false;
+          });
         }
-        setState(() {
-          _statusMessage = 'Backup esportato con successo';
-          _isError = false;
-        });
       } else {
-        setState(() {
-          _statusMessage = 'Esportazione annullata';
-          _isError = false;
-        });
+        if (mounted) {
+          setState(() {
+            _statusMessage = 'Esportazione annullata';
+            _isError = false;
+          });
+        }
       }
     } catch (e) {
-      setState(() {
-        _statusMessage = 'Errore durante l\'esportazione: $e';
-        _isError = true;
-      });
+      if (mounted) {
+        setState(() {
+          _statusMessage = 'Errore durante l\'esportazione: $e';
+          _isError = true;
+        });
+      }
     } finally {
-      setState(() => _isExporting = false);
+      if (mounted) {
+        setState(() => _isExporting = false);
+      }
     }
   }
 
@@ -131,16 +193,17 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       // Seleziona file
       final result = await FilePicker.pickFiles(
         type: FileType.any,
-        withData: false,
       );
       if (result == null || result.files.isEmpty) {
-        setState(() => _isImporting = false);
+        if (mounted) setState(() => _isImporting = false);
         return;
       }
 
       final filePath = result.files.single.path;
       if (filePath == null) {
-        throw Exception('Impossibile leggere il file selezionato: percorso non disponibile');
+        throw Exception(
+          'Impossibile leggere il file selezionato: percorso non disponibile',
+        );
       }
 
       final file = File(filePath);
@@ -148,7 +211,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         throw Exception('Il file selezionato non esiste: $filePath');
       }
 
-      final encryptedData = await file.readAsString();
+      final encryptedData = utf8.decode(await file.readAsBytes());
 
       // Chiedi il PIN per decifrare
       final pin = await _askPin(
@@ -156,44 +219,81 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         message: 'Inserisci il PIN usato per proteggere questo backup.',
       );
       if (pin == null) {
-        setState(() => _isImporting = false);
+        if (mounted) setState(() => _isImporting = false);
         return;
       }
 
       // Verifica PIN provando a decifrare
+      setState(() => _statusMessage = 'Verifica password…');
+      await Future.delayed(Duration.zero);
       if (!DataExportService.verifyEncryptedPassword(encryptedData, pin)) {
-        setState(() {
-          _isImporting = false;
-          _statusMessage = 'PIN non corretto o file non valido';
-          _isError = true;
-        });
+        if (mounted) {
+          setState(() {
+            _isImporting = false;
+            _statusMessage = 'PIN non corretto o file non valido';
+            _isError = true;
+          });
+        }
+        return;
+      }
+
+      // Autentica con biometrica/PIN del dispositivo prima di importare
+      final authService = ref.read(authServiceProvider);
+      final authenticated = await authService.authenticate(
+        localizedReason: 'Autenticati per importare il backup',
+      );
+      if (!authenticated) {
+        if (mounted) {
+          setState(() {
+            _isImporting = false;
+            _statusMessage = 'Autenticazione annullata o fallita';
+            _isError = true;
+          });
+        }
         return;
       }
 
       // Conferma sovrascrittura
       final confirm = await _showConfirmDialog();
       if (confirm != true) {
-        setState(() => _isImporting = false);
+        if (mounted) setState(() => _isImporting = false);
         return;
       }
 
-      // Importa
-      await DataExportService.importEncryptedData(encryptedData, pin);
+      setState(() => _statusMessage = 'Importazione dati in corso…');
+      await Future.delayed(Duration.zero);
+      await DataExportService.importEncryptedData(
+        encryptedData, pin,
+        onPhase: (phase) {
+          if (mounted) setState(() => _phaseMessage = phase);
+        },
+      );
+
+      // Forza il refresh dei provider per aggiornare l'UI
+      ref.invalidate(classesStreamProvider);
+      ref.invalidate(documentsStreamProvider);
+      ref.invalidate(planningRepoProvider);
+      ref.invalidate(studentsRepoProvider);
 
       if (mounted) {
         setState(() {
           _statusMessage = 'Backup importato con successo';
           _isError = false;
+          _phaseMessage = null;
         });
         _showSuccessDialog();
       }
     } catch (e) {
-      setState(() {
-        _statusMessage = 'Errore durante l\'importazione: $e';
-        _isError = true;
-      });
+      if (mounted) {
+        setState(() {
+          _statusMessage = 'Errore durante l\'importazione: $e';
+          _isError = true;
+        });
+      }
     } finally {
-      setState(() => _isImporting = false);
+      if (mounted) {
+        setState(() => _isImporting = false);
+      }
     }
   }
 
@@ -270,7 +370,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         ),
         content: const Text(
           'L\'importazione sostituirà tutti i dati esistenti '
-          '(anagrafica, presenze, programmazione, documenti e allegati). '
+          '(anagrafica, presenze, programmazione, catechesi, documenti e allegati). '
           'Questa operazione non è reversibile.\n\n'
           'Vuoi continuare?',
         ),
@@ -357,9 +457,11 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                   const SizedBox(height: 12),
                   Text(
                     'Il backup include tutti i dati dell\'app: anagrafica, '
-                    'presenze, programmazione, documenti e allegati (foto e PDF).\n\n'
-                    'Il file è protetto dal tuo PIN e può essere importato '
-                    'su un altro dispositivo.',
+                    'presenze, programmazione, catechesi, documenti e allegati (foto e PDF).\n\n'
+                    'Il file è protetto da un PIN che crei al momento dell\'esportazione '
+                    'e che dovrai reinserire per importarlo su un altro dispositivo.\n\n'
+                    'L\'accesso alle operazioni di backup richiede l\'autenticazione '
+                    'con impronta, volto o PIN del tuo dispositivo.',
                     style: TextStyle(fontSize: 13, color: Colors.blue.shade900),
                   ),
                 ],
@@ -392,19 +494,58 @@ class _BackupPageState extends ConsumerState<BackupPage> {
 
             const SizedBox(height: 24),
 
+            // Phase banner (operazioni in corso)
+            if (_phaseMessage != null && (_isImporting || _isExporting))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF174A7E).withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFF174A7E).withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 16, height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: const Color(0xFF174A7E),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _phaseMessage!,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF174A7E),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
             // Status message
             if (_statusMessage != null)
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: _isError
-                      ? Colors.red.withOpacity(0.1)
-                      : Colors.green.withOpacity(0.1),
+                      ? Colors.red.withValues(alpha: 0.1)
+                      : Colors.green.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: _isError
-                        ? Colors.red.withOpacity(0.3)
-                        : Colors.green.withOpacity(0.3),
+                        ? Colors.red.withValues(alpha: 0.3)
+                        : Colors.green.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Row(
@@ -436,6 +577,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
   }
 }
 
+/// Card azione riutilizzabile nella pagina di backup: mostra un'icona,
+/// titolo, sottotitolo, indicatore di caricamento e callback al tap.
 class _ActionCard extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -465,7 +608,7 @@ class _ActionCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),
@@ -477,7 +620,7 @@ class _ActionCard extends StatelessWidget {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.10),
+                color: color.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: isLoading

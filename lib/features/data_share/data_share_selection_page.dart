@@ -1,305 +1,370 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../shared/widgets/app_scaffold.dart';
-import '../../core/services/qr_data_service.dart';
-import '../../core/services/data_export_service.dart';
-import '../../core/providers/data_share_provider.dart';
+import 'package:go_router/go_router.dart';
 
-class DataShareSelectionPage extends ConsumerStatefulWidget {
+import '../../core/providers/data_share_provider.dart';
+import '../../core/services/data_export_service.dart';
+import '../../core/services/qr_data_service.dart';
+import '../../shared/widgets/app_scaffold.dart';
+
+/// Pagina hub per la condivisione e il backup dei dati in CateREG.
+///
+/// Offre tre modalità di trasferimento dati:
+/// 1. **Sincronizzazione nelle vicinanze** — associa e sincronizza con altri catechisti
+/// 2. **Condivisione via QR** — invio/ricezione tramite codici QR animati
+/// 3. **Backup cifrato** — esportazione e importazione di file di backup protetti
+///
+/// Mostra anche un'intestazione informativa che rassicura l'utente sulla
+/// protezione e cifratura dei dati durante qualsiasi operazione di scambio.
+/// Agisce come punto di smistamento verso i flussi di invio e ricezione.
+class DataShareSelectionPage extends ConsumerWidget {
   const DataShareSelectionPage({super.key});
 
   @override
-  ConsumerState<DataShareSelectionPage> createState() => _DataShareSelectionPageState();
-}
-
-class _DataShareSelectionPageState extends ConsumerState<DataShareSelectionPage> {
-  bool _includeAnagrafica = true;
-  bool _includeAgenda = true;
-  bool _includeProgrammazione = true;
-  bool _includeDocumenti = true;
-
-  bool _isLoading = false;
-
-  Future<void> _startSharing() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    // Prepara i dati selezionati (allegati inclusi automaticamente)
-    final selectedData = await DataExportService.exportSelectiveData(
-      _includeAnagrafica,
-      _includeAgenda,
-      _includeProgrammazione,
-      _includeDocumenti,
-      true, // Allegati inclusi automaticamente
-    );
-
-    // Genera PIN
-    final pin = QRDataService.generatePin();
-
-    // Salva dati e PIN nei provider
-    ref.read(dataShareDataProvider.notifier).state = selectedData;
-    ref.read(dataSharePinProvider.notifier).state = pin;
-
-    // Naviga alla pagina di invio
-    if (mounted) {
-      context.go('/data-share/send');
-    }
-  }
-
-  void _startReceiving() {
-    // Naviga alla pagina di ricezione
-    context.go('/data-share/receive');
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return AppScaffold(
-      title: 'Condivisione Dati',
-      child: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF174A7E)),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const _InfoCard(),
-                  const SizedBox(height: 24),
-
-                  const _SectionTitle(title: 'Seleziona contenuti da condividere'),
-                  const SizedBox(height: 16),
-
-                  _ShareOption(
-                    icon: Icons.people_rounded,
-                    title: 'Anagrafica',
-                    subtitle: 'Studenti, classi e allegati',
-                    value: _includeAnagrafica,
-                    onChanged: (value) {
-                      setState(() {
-                        _includeAnagrafica = value ?? false;
-                      });
-                    },
-                  ),
-
-                  _ShareOption(
-                    icon: Icons.calendar_today_rounded,
-                    title: 'Agenda',
-                    subtitle: 'Presenze e incontri',
-                    value: _includeAgenda,
-                    onChanged: (value) {
-                      setState(() {
-                        _includeAgenda = value ?? false;
-                      });
-                    },
-                  ),
-
-                  _ShareOption(
-                    icon: Icons.event_note_rounded,
-                    title: 'Programmazione',
-                    subtitle: 'Pianificazione e allegati giornate',
-                    value: _includeProgrammazione,
-                    onChanged: (value) {
-                      setState(() {
-                        _includeProgrammazione = value ?? false;
-                      });
-                    },
-                  ),
-
-                  _ShareOption(
-                    icon: Icons.folder_rounded,
-                    title: 'Documenti',
-                    subtitle: 'Documenti e consegne',
-                    value: _includeDocumenti,
-                    onChanged: (value) {
-                      setState(() {
-                        _includeDocumenti = value ?? false;
-                      });
-                    },
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  const _SectionTitle(title: 'Modalità di condivisione'),
-                  const SizedBox(height: 16),
-
-                  _ModeButton(
-                    icon: Icons.qr_code_2_rounded,
-                    title: 'Invia Dati',
-                    subtitle: 'Genera QR code per la condivisione',
-                    color: const Color(0xFF174A7E),
-                    onTap: _startSharing,
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  _ModeButton(
-                    icon: Icons.qr_code_scanner_rounded,
-                    title: 'Ricevi Dati',
-                    subtitle: 'Scansiona QR code per ricevere dati',
-                    color: Colors.green,
-                    onTap: _startReceiving,
-                  ),
-                ],
-              ),
-            ),
-    );
-  }
-}
-
-class _InfoCard extends StatelessWidget {
-  const _InfoCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF174A7E), Color(0xFF2E5A8F)],
-        ),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      title: 'Condivisione e backup',
+      child: ListView(
+        padding: const EdgeInsets.all(16),
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.info_rounded,
-                  color: Colors.white,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 16),
-              const Expanded(
-                child: Text(
-                  'Condivisione Offline Sicura',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: const Color(0xFF174A7E),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.enhanced_encryption_rounded, color: Colors.white),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'I dati sono protetti e cifrati. '
+                    'Puoi eseguire backup e ripristino dai file o tramite codici QR.',
+                    style: TextStyle(color: Colors.white, height: 1.35),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          _ActionCard(
+            icon: Icons.sensors_rounded,
+            title: 'Sincronizzazione nelle vicinanze',
+            subtitle: 'Associa e sincronizza con altri catechisti',
+            color: Colors.teal,
+            onTap: () => context.push('/settings/association'),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Condividi i tuoi dati tra dispositivi in modo completamente offline e sicuro usando QR code animati. '
-            'I dati sono protetti da un PIN di 8 cifre.',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              height: 1.5,
-            ),
+          _ActionCard(
+            icon: Icons.qr_code_2_rounded,
+            title: 'Condividi via QR',
+            subtitle: 'Invia o ricevi dati tramite codici QR',
+            color: const Color(0xFF174A7E),
+            onTap: () => _showQrShareOptions(context, ref),
+          ),
+          const SizedBox(height: 16),
+          _ActionCard(
+            icon: Icons.backup_rounded,
+            title: 'Backup cifrato',
+            subtitle: 'Esporta o importa file di backup cifrati',
+            color: Colors.teal,
+            onTap: () => context.push('/backup'),
           ),
         ],
       ),
     );
   }
-}
 
-class _SectionTitle extends StatelessWidget {
-  final String title;
+  void _showQrShareOptions(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.upload_rounded, color: Color(0xFF174A7E)),
+              title: const Text('Invia dati'),
+              subtitle: const Text('Mostra codici QR da scansionare'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showDataSelectionDialog(context, ref);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.download_rounded, color: Colors.green),
+              title: const Text('Ricevi dati'),
+              subtitle: const Text('Scansiona codici QR per importare'),
+              onTap: () {
+                Navigator.pop(ctx);
+                context.push('/data-share/receive');
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-  const _SectionTitle({required this.title});
+  void _showDataSelectionDialog(BuildContext context, WidgetRef ref) {
+    bool includeAnagrafica = true;
+    bool includeAgenda = true;
+    bool includeProgrammazione = true;
+    bool includeDocumenti = true;
+    bool includeContactNotes = false;
+    bool includeCatechesi = false;
+    bool includeAnnotazioni = false;
+    bool _isPreparing = false;
 
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      title.toUpperCase(),
-      style: TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.bold,
-        letterSpacing: 1,
-        color: Colors.grey.shade600,
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.share_rounded, color: Color(0xFF174A7E)),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Seleziona dati da inviare',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: _isPreparing
+                ? const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(color: Color(0xFF174A7E)),
+                        SizedBox(height: 16),
+                        Text('Preparazione dati in corso...'),
+                      ],
+                    ),
+                  )
+                : SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _ModuleCheckbox(
+                          label: 'Anagrafica ragazzi',
+                          subtitle: 'Nomi, cognomi, contatti genitori',
+                          icon: Icons.people_rounded,
+                          value: includeAnagrafica,
+                          onChanged: (v) => setDialogState(
+                            () => includeAnagrafica = v,
+                          ),
+                        ),
+                        _ModuleCheckbox(
+                          label: 'Presenze',
+                          subtitle: 'Registro presenze e assenze',
+                          icon: Icons.fact_check_rounded,
+                          value: includeAgenda,
+                          onChanged: (v) => setDialogState(
+                            () => includeAgenda = v,
+                          ),
+                        ),
+                        _ModuleCheckbox(
+                          label: 'Programmazione',
+                          subtitle: 'Giornate e incontri programmati',
+                          icon: Icons.calendar_month_rounded,
+                          value: includeProgrammazione,
+                          onChanged: (v) => setDialogState(
+                            () => includeProgrammazione = v,
+                          ),
+                        ),
+                        _ModuleCheckbox(
+                          label: 'Documenti',
+                          subtitle: 'Certificati, autorizzazioni, consegne',
+                          icon: Icons.description_rounded,
+                          value: includeDocumenti,
+                          onChanged: (v) => setDialogState(
+                            () => includeDocumenti = v,
+                          ),
+                        ),
+                        _ModuleCheckbox(
+                          label: 'Note di contatto',
+                          subtitle: 'Comunicazioni con le famiglie',
+                          icon: Icons.contact_mail_rounded,
+                          value: includeContactNotes,
+                          onChanged: (v) => setDialogState(
+                            () => includeContactNotes = v,
+                          ),
+                        ),
+                        _ModuleCheckbox(
+                          label: 'Catechesi',
+                          subtitle: 'Argomenti e contenuti delle catechesi',
+                          icon: Icons.menu_book_rounded,
+                          value: includeCatechesi,
+                          onChanged: (v) => setDialogState(
+                            () => includeCatechesi = v,
+                          ),
+                        ),
+                        _ModuleCheckbox(
+                          label: 'Annotazioni giornaliere',
+                          subtitle: 'Note e osservazioni sui ragazzi',
+                          icon: Icons.note_alt_rounded,
+                          value: includeAnnotazioni,
+                          onChanged: (v) => setDialogState(
+                            () => includeAnnotazioni = v,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+          ),
+          actions: _isPreparing
+              ? []
+              : [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Annulla'),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF174A7E),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () async {
+                      setDialogState(() => _isPreparing = true);
+                      try {
+                        final allData = await DataExportService.exportSelectiveData(
+                          includeAnagrafica: includeAnagrafica,
+                          includeAgenda: includeAgenda,
+                          includeProgrammazione: includeProgrammazione,
+                          includeDocumenti: includeDocumenti,
+                          includeContactNotes: includeContactNotes,
+                          includeCatechesi: includeCatechesi,
+                          includeAnnotazioni: includeAnnotazioni,
+                        );
+
+                        final options = DataShareOptions(
+                          includeAnagrafica: includeAnagrafica,
+                          includeAgenda: includeAgenda,
+                          includeProgrammazione: includeProgrammazione,
+                          includeDocumenti: includeDocumenti,
+                          includeContactNotes: includeContactNotes,
+                          includeCatechesi: includeCatechesi,
+                          includeAnnotazioni: includeAnnotazioni,
+                        );
+
+                        final shareData = QRDataService.prepareDataForShare(
+                          options,
+                          allData,
+                        );
+
+                        final pin = QRDataService.generatePin();
+
+                        ref.read(dataShareDataProvider.notifier).state =
+                            shareData;
+                        ref.read(dataSharePinProvider.notifier).state = pin;
+
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (context.mounted) {
+                          context.push('/data-share/send');
+                        }
+                      } catch (e) {
+                        setDialogState(() => _isPreparing = false);
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(content: Text('Errore: $e')),
+                          );
+                        }
+                      }
+                    },
+                    child: const Text('Invia'),
+                  ),
+                ],
+        ),
       ),
     );
   }
 }
 
-class _ShareOption extends StatelessWidget {
-  final IconData icon;
-  final String title;
+class _ModuleCheckbox extends StatelessWidget {
+  final String label;
   final String subtitle;
+  final IconData icon;
   final bool value;
-  final ValueChanged<bool?> onChanged;
+  final ValueChanged<bool> onChanged;
 
-  const _ShareOption({
-    required this.icon,
-    required this.title,
+  const _ModuleCheckbox({
+    required this.label,
     required this.subtitle,
+    required this.icon,
     required this.value,
     required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: const Color(0xFF174A7E).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: const Color(0xFF174A7E)),
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.grey.shade600,
-          ),
-        ),
-        trailing: Switch(
-          value: value,
-          onChanged: onChanged,
-          activeColor: const Color(0xFF174A7E),
+    return InkWell(
+      onTap: () => onChanged(!value),
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Checkbox(
+              value: value,
+              activeColor: const Color(0xFF174A7E),
+              onChanged: (v) => onChanged(v ?? false),
+            ),
+            const SizedBox(width: 8),
+            Icon(icon, color: const Color(0xFF174A7E), size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _ModeButton extends StatelessWidget {
+class _ActionCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final Color color;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
-  const _ModeButton({
+  const _ActionCard({
     required this.icon,
     required this.title,
     required this.subtitle,
@@ -310,63 +375,44 @@ class _ModeButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: onTap,
       borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.3)),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 12,
-              offset: const Offset(0, 4),
+              offset: const Offset(0, 6),
             ),
           ],
         ),
         child: Row(
           children: [
             Container(
-              width: 56,
-              height: 56,
+              width: 46,
+              height: 46,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(14),
+                color: color.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: color, size: 28),
+              child: Icon(icon, color: color),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                    ),
-                  ),
+                  Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
+                  Text(subtitle, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: color,
-              size: 28,
-            ),
+            Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
           ],
         ),
       ),

@@ -1,0 +1,102 @@
+﻿<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Presenze e Appello — CatechHub</title>
+<meta name="description" content="Registra le presenze durante gli incontri di catechismo, tieni traccia delle assenze e ottieni statistiche utili per ogni ragazzo.">
+<link rel="icon" href="../logo.png" type="image/png">
+<link rel="stylesheet" href="../style.css">
+<script src="../js/version.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="../logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
+
+<section class="page-header">
+  <div class="container">
+    <h1>Presenze e Appello</h1>
+    <p>Registra chi c'è e chi manca in modo semplice, veloce e sempre aggiornato</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+
+    <div class="breadcrumb"><a href="../index.html">Home</a> / <a href="attendance.html">Presenze</a> / Panoramica</div>
+
+    <h2>Che cos'è</h2>
+    <p>Il modulo Presenze ti permette di fare l'appello durante ogni incontro di catechismo con pochi tap. Puoi registrare chi è presente, assente o giustificato, vedere le statistiche di ogni ragazzo e tenere d'occhio chi supera il numero massimo di assenze consentite.</p>
+
+    <h2>Crea un incontro e fai l'appello</h2>
+    <p>Prima di registrare le presenze, crei una giornata di incontro con titolo, data e gruppo. Poi, con un tap su ogni nome, puoi segnare rapidamente:</p>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li><strong>Presente</strong> — verde, tutto ok</li>
+      <li><strong>Assente</strong> — rosso, non è venuto</li>
+    </ul>
+    <p>L'interfaccia è pensata per essere usata durante l'incontro, rapida e senza distrarre.</p>
+
+    <div class="screenshot-row">
+      <img src="../screen/Selezione_Giornata_Appello.jpg" alt="Selezione giornata per appello" class="screenshot" style="max-width:300px;">
+      <img src="../screen/Appello.jpg" alt="Schermata appello" class="screenshot" style="max-width:300px;">
+      <img src="../screen/Mio_Gruppo_PreAppello.jpg" alt="Gruppo prima dell'appello" class="screenshot" style="max-width:300px;">
+    </div>
+
+    <h2>Vista d'insieme: la griglia delle giornate</h2>
+    <p>La griglia riepilogativa ti mostra tutti i ragazzi in riga e tutte le giornate in colonna. Ogni cella è colorata in base allo stato (verde/rosso). In un colpo d'occhio vedi la frequenza di ogni ragazzo e puoi individuare chi sta mancando spesso.</p>
+
+    <div class="screenshot-row">
+      <img src="../screen/Giornate.jpg" alt="Griglia riepilogativa giornate" class="screenshot" style="max-width:300px;">
+    </div>
+
+    <h2>Statistiche per ogni ragazzo</h2>
+    <p>Dal profilo di ogni ragazzo puoi vedere quante presenze, assenze e giustificazioni ha accumulato, con tanto di percentuale di frequenza e un grafico che mostra l'andamento nel tempo. Utile per i colloqui con i genitori e per la verifica annuale.</p>
+
+    <h2>Soglia assenze personalizzabile</h2>
+    <p>Puoi impostare un numero massimo di assenze (il default è 6). Quando un ragazzo raggiunge o supera questa soglia, CatechHub te lo segnala con un badge rosso accanto al nome e un avviso nell'app. Così puoi intervenire tempestivamente con la famiglia.</p>
+
+    <h2>Sicurezza e privacy</h2>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>I dati delle presenze sono conservati solo sul tuo dispositivo</li>
+      <li>Nessun dato viene inviato a server esterni</li>
+      <li>Puoi esportare un backup prima di eliminare una giornata</li>
+      <li>L'eliminazione di una giornata è definitiva: i dati delle presenze associati vengono rimossi completamente</li>
+    </ul>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div>
+      <strong>CatechHub</strong> <span class="version-tag"></span> — Registro Elettronico di Catechismo<br>
+      <small>Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.</small>
+    </div>
+    <div>
+      <small>
+        &#128231; <a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a> &middot;
+        &#128247; Instagram (prossimamente) &middot;
+        &#9992; Telegram (prossimamente)
+      </small><br>
+      <a href="../privacy.html">Privacy</a> &middot;
+      <a href="../terms.html">Termini</a> &middot;
+      <a href="../infos/index.html">GDPR</a> &middot;
+      <a href="../developer.html">Sviluppatore</a> &middot;
+      <a href="https://github.com/delelimed/CatechHub" class="release-url">GitHub</a><br>
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/nav.js"></script></body>
+</html>

@@ -1,3 +1,17 @@
+/// Servizio di stampa PDF per CateREG basato su `pdf` e `printing`.
+///
+/// Genera documenti PDF per reportistica delle classi:
+/// - [printAttendanceReport]: report sintetico con nome classe, elenco
+///   studenti (ordinato alfabeticamente), conteggio presenze (P) e assenze (A).
+/// - [printDetailedAttendanceReport]: report dettagliato con una colonna per
+///   ogni incontro programmato, indicando "a" per assente, più totali P/A.
+///
+/// I dati vengono renderizzati in tabelle su formato A4 orizzontale e inviati
+/// al servizio di stampa nativo tramite [Printing.layoutPdf].
+///
+/// Integrazione CateREG: utilizzato da [AttendancePrintPage] per esportare
+/// gli appelli; [PrintStudentData] è il DTO che veicola i dati di uno
+/// studente dal layer dati al layout PDF.
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';

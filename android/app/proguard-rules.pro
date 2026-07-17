@@ -1,100 +1,99 @@
-########################################
-# FLUTTER CORE (OBBLIGATORIO)
-########################################
--keep class io.flutter.embedding.** { *; }
--keep class io.flutter.plugins.** { *; }
--keep class io.flutter.util.** { *; }
--keep class io.flutter.view.** { *; }
--keep class io.flutter.app.** { *; }
--keep class io.flutter.plugins.** { *; }
--keep class io.flutter.embedding.engine.** { *; }
--keep class io.flutter.plugin.** { *; }
+# =========================================================================
+# ABILITAZIONE OTTIMIZZAZIONI AGGRESIVE
+# =========================================================================
+# Consente a R8 di fare passaggi di ottimizzazione più profondi.
+-repackageclasses ''
+-allowaccessmodification
 
+# =========================================================================
+# 1. FLUTTER CORE & ENGINE (Ottimizzato)
+# =========================================================================
+# Invece di bloccare tutto con { *; }, preserviamo solo i punti di ingresso 
+# e le annotazioni usate dal motore Flutter per l'interoperabilità nativa.
+-keep class io.flutter.app.** { public *; }
+-keep class io.flutter.plugin.** { public *; }
+-keep class io.flutter.util.** { public *; }
+-keep class io.flutter.view.** { public *; }
+-keep class io.flutter.embedding.** { public *; }
+-keep class io.flutter.plugins.** { public *; }
 
+# Keep per i metodi nativi (JNI) e i canali di comunicazione
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
+-keepattributes Signature,*Annotation*,InnerClasses,EnclosingMethod
 
-########################################
-# ATTRIBUTI ESSENZIALI & ANNOTATIONS
-########################################
-# Mantiene firme dei metodi e annotazioni necessarie a Riverpod, Hive e i plugin nativi
--keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
-# HIVE CRITICAL FIX
--keep class * extends hive.TypeAdapter { *; }
--keep class * extends hive.HiveObject { *; }
--keep class *.generated.** { *; }
--keep class *Adapter { *; }
+# =========================================================================
+# 2. HIVE (Zona Franca selettiva)
+# =========================================================================
+# Non serve bloccare interamente i package di Hive, ma solo le classi 
+# che estendono HiveObject o che usano le annotazioni per la serializzazione.
+-keep class TypeAdapter { *; }
+-keep class * extends io.isar.hive.HiveObject { *; }
+-keepclasseswithmembers class * {
+    @io.isar.hive.HiveType <fields>;
+    @io.isar.hive.HiveField <fields>;
+}
+# Permetti a R8 di ottimizzare l'interno di Hive ma ignora i warning di build
+-dontwarn io.hybridshapes.hive.**
+-dontwarn io.isar.hive.**
 
--keepattributes Signature, InnerClasses, EnclosingMethod
--keepclassmembers class * {
-  @hive.Field *;
+# =========================================================================
+# 3. LOCAL AUTH & BIOMETRIC (Raffinamento)
+# =========================================================================
+# Manteniamo solo l'interfaccia pubblica e le classi necessarie
+-keep class io.flutter.plugins.localauth.** { public *; }
+-keep class androidx.biometric.BiometricPrompt { public *; }
+-dontwarn androidx.biometric.**
+
+# =========================================================================
+# 4. FLUTTER SECURE STORAGE & TINK (Taglio drastico della memoria)
+# =========================================================================
+# Tink (com.google.crypto.tink) è mastodontico. Dire `-keep class com.google.crypto.tink.** { *; }` 
+# carica in RAM megabyte di crittografia inutilizzata. Lasciamo che R8 elimini il superfluo.
+-keep class com.it_nomads.fluttersecurestorage.** { public *; }
+-dontwarn com.it_nomads.fluttersecurestorage.**
+-dontwarn com.google.crypto.tink.**
+
+# =========================================================================
+# 5. MOBILE SCANNER (ML Kit)
+# =========================================================================
+# ML Kit è un altro gigante. Non bloccare l'intero SDK. Manteniamo solo 
+# i punti di ingresso usati dal plugin per la scansione.
+-keep class com.google.mlkit.vision.barcode.** { public *; }
+-keep class dev.nhancv.mlkit_camera_stream.** { public *; }
+-dontwarn com.google.mlkit.**
+-dontwarn com.google.android.gms.internal.mlkit_vision_barcode.**
+
+# =========================================================================
+# 6. PRINTING, PDF & DEVICE INFO
+# =========================================================================
+# Rimuoviamo il blocco totale `{ *; }` e usiamo `public *` per consentire 
+# l'offuscamento delle logiche interne non visibili dall'esterno.
+-keep class net.nfet.flutter.printing.** { public *; }
+-keep class dev.fluttercommunity.plus.packageinfo.** { public *; }
+-keep class dev.fluttercommunity.plus.deviceinfo.** { public *; }
+
+# =========================================================================
+# 7. TUO CANALE BLUETOOTH NATIVO (ch.catechhub.app)
+# =========================================================================
+# Poiché usi un MethodChannel personalizzato scritto in Kotlin, dobbiamo 
+# assicurarci che la classe del tuo plugin e i metodi richiamati via riflessione 
+# non vengano eliminati. Manteniamo la classe e i suoi membri pubblici.
+-keep class ch.catechhub.app.** {
+    public *;
 }
 
-########################################
-# WIREDASH (SUPPORTO & FEEDBACK)
-########################################
--keep class com.wiredash.** { *; }
--dontwarn com.wiredash.**
--keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod
--keep class com.wiredash.** { *; }
+# =========================================================================
+# 8. COMPONENTI DEFERITI & UTILITY
+# =========================================================================
+-dontwarn com.google.android.play.core.splitcompat.**
+-dontwarn com.google.android.play.core.splitinstall.**
+-dontwarn com.google.android.play.core.tasks.**
 
-########################################
-# HIVE (DATABASE LOCALE)
-########################################
--keep class hive.** { *; }
--keep class * extends hive.HiveObject { *; }
--dontwarn hive.**
-
-########################################
-# SECURE STORAGE
-########################################
--keep class com.it_nomads.fluttersecurestorage.** { *; }
-
-########################################
-# LOCAL AUTH (BIOMETRIC)
-########################################
--keep class io.flutter.plugins.localauth.** { *; }
-# Previene la rimozione delle interfacce biometriche di AndroidX
--keep class androidx.biometric.** { *; }
--keep class androidx.biometric.** { *; }
--keep class androidx.fragment.app.** { *; }
--keep class io.flutter.embedding.android.** { *; }
-
-########################################
-# FILE PICKER & SHARE PLUS
-########################################
--keep class com.mr.flutter.plugin.filepicker.** { *; }
--keep class dev.fluttercommunity.plus.share.** { *; }
-
-########################################
-# PDF / PRINTING
-########################################
--keep class net.nfet.flutter.printing.** { *; }
-
-########################################
-# GOOGLE SERVICES & PLAY STORE (RISOLUZIONE ERRORE COMPILAZIONE)
-########################################
--keep class com.google.android.gms.** { *; }
--keep class com.google.android.play.core.splitcompat.** { *; }
--keep class com.google.android.play.core.splitinstall.** { *; }
--keep class com.google.android.play.core.tasks.** { *; }
-
-# Dice a R8 di ignorare le classi mancanti di Google Play (Deferred Components non usati)
--dontwarn com.google.android.play.core.**
-
-########################################
-# PROTEZIONE SERIALIZZAZIONE JSON (GSON / REFLECTION)
-########################################
-# Molti plugin usano Gson internamente; l'offuscamento distruggerebbe i campi dei JSON
--keepclassmembers class * {
-    @com.google.gson.annotations.SerializedName <fields>;
-}
--dontwarn com.google.errorprone.annotations.**
-
-########################################
-# RIMOZIONE DEI LOG IN RILASCIO (R8 COMPATIBILE)
-########################################
-# Questo metodo non rompe la compilazione di R8 e rimuove i log di Debug e Verbose dall'APK finale
--assumenosideeffects class android.util.Log {
-    public static int d(...);
-    public static int v(...);
-}
--maximumremovedandroidloglevel 3
+# =========================================================================
+# 9. PROTEZIONE FREERASP (TALSEC)
+# =========================================================================
+# Essendo un tool di sicurezza, ha regole rigide. Manteniamo solo la configurazione.
+-keep class com.talsec.RasterConfig { *; }
+-dontwarn com.talsec.**

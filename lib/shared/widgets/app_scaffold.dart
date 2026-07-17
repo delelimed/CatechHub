@@ -1,11 +1,50 @@
+// ══════════════════════════════════════════════════════════════════════════════
+// app_scaffold.dart — CatechHub (widget di layout principale)
+//
+// Scaffold universale dell'applicazione CatechHub. Avvolge ogni pagina
+// dell'app fornendo:
+//   - Sidebar desktop persistente (SideMenu)
+//   - Top bar con titolo contestuale e back-to-home
+//   - Body content container con sfondo bianco e ombreggiatura
+//   - Bottom navigation bar mobile (5 voci: Home, Gruppo, Programma,
+//     Documenti, Impostazioni)
+//
+// CONTESTO PROGETTO:
+//   CatechHub è un'app offline-first per registri di catechismo con
+//   architettura a pagina singola (SPA). Tutte le pagine (dashboard,
+//   anagrafica studenti, presenze, documenti, impostazioni, sync
+//   Bluetooth, catechesi, ecc.) sono renderizzate come child di questo
+//   scaffold, garantendo coerenza visiva e navigazione unificata.
+//   Il widget distingue automaticamente il layout desktop (>= 900px)
+//   con sidebar laterale da quello mobile con bottom navigation bar.
+//
+// USO:
+//   return AppScaffold(
+//     title: 'Dashboard',
+//     child: DashboardContent(),
+//   );
+//
+// DIPENDENZA CRITICA:
+//   Dipende da go_router per:
+//   - Ottenere la route corrente (GoRouterState.of(context))
+//   - Navigare sulle route (context.go())
+//   La mappa route↔indice deve rimanere sincronizzata con router.dart.
+// ══════════════════════════════════════════════════════════════════════════════
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'side_menu.dart';
 
 class AppScaffold extends StatelessWidget {
+  /// Titolo visualizzato nella top bar di ogni pagina.
   final String title;
+
+  /// Contenuto principale della pagina (iniettato da ogni feature).
   final Widget child;
+
+  /// FAB opzionale (es. "Aggiungi studente" in StudentsPage, "Nuovo
+  /// incontro" in PlanningPage, "Nuovo documento" in DocumentsPage).
   final Widget? floatingActionButton;
 
   const AppScaffold({
@@ -15,9 +54,15 @@ class AppScaffold extends StatelessWidget {
     this.floatingActionButton,
   });
 
-  /// =========================
-  /// ROUTE -> INDEX
-  /// =========================
+  /// Converte la path della route corrente nell'indice della
+  /// bottom navigation bar (mobile) o della sidebar evidenziazione.
+  ///
+  /// MANTENERE SINCRONIZZATO CON router.dart:
+  ///   index 0 → '/' (Dashboard)
+  ///   index 1 → '/my-group'
+  ///   index 2 → '/planning'
+  ///   index 3 → '/documents'
+  ///   index 4 → '/settings'
   int _indexFromLocation(String location) {
     if (location.startsWith('/my-group')) return 1;
     if (location.startsWith('/planning')) return 2;
@@ -27,9 +72,8 @@ class AppScaffold extends StatelessWidget {
     return 0;
   }
 
-  /// =========================
-  /// INDEX -> ROUTE
-  /// =========================
+  /// Converte l'indice della navigation bar nella path della route.
+  /// È l'inversa di _indexFromLocation.
   String _routeFromIndex(int index) {
     switch (index) {
       case 0:
@@ -55,24 +99,35 @@ class AppScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    // Breakpoint desktop: oltre 900px mostra la sidebar anziché la
+    // bottom navigation. Questo breakpoint è allineato con le
+    // dimensioni tipiche di tablet orizzontale.
     final isDesktop = MediaQuery.of(context).size.width > 900;
 
+    // Legge la route corrente da GoRouter per determinare:
+    // 1. Quale voce della navigation bar evidenziare (currentIndex)
+    // 2. Se mostrare il pulsante back (solo sottopagine, non sezioni principali)
     final location = GoRouterState.of(context).uri.toString();
     final currentIndex = _indexFromLocation(location);
+    final showBackToHome =
+        !['/', '/my-group', '/planning', '/documents', '/settings']
+            .contains(location);
 
     return Scaffold(
+      // Sfondo grigio chiaro: colore di base dell'intera app.
+      // Tutti i container white si stagliano su questo sfondo.
       backgroundColor: const Color(0xFFF5F8FC),
       floatingActionButton: floatingActionButton,
 
-      /// =========================
-      /// BODY
-      /// =========================
+      // ─── BODY: Sidebar (desktop) + Content ───────────────────────────
       body: SafeArea(
         child: Row(
           children: [
-            /// =========================
-            /// DESKTOP SIDEBAR
-            /// =========================
+            // Sidebar desktop: visibile solo su schermi > 900px.
+            // Include il menu di navigazione SideMenu con sfondo
+            // gradiente blu (#174A7E → #2368B1). Usata da tutte le
+            // pagine come navigazione persistente su tablet/desktop.
             if (isDesktop)
               Container(
                 width: 270,
@@ -89,7 +144,7 @@ class AppScaffold extends StatelessWidget {
                   borderRadius: BorderRadius.circular(28),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.blue.withOpacity(0.15),
+                      color: Colors.blue.withValues(alpha: 0.15),
                       blurRadius: 25,
                       offset: const Offset(0, 12),
                     ),
@@ -98,9 +153,8 @@ class AppScaffold extends StatelessWidget {
                 child: const SideMenu(isSidebar: true),
               ),
 
-            /// =========================
-            /// CONTENT
-            /// =========================
+            // Area contenuto principale: si espande a riempire lo
+            // spazio residuo (Expanded). Include top bar + child.
             Expanded(
               child: Padding(
                 padding: EdgeInsets.only(
@@ -111,9 +165,11 @@ class AppScaffold extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    /// =========================
-                    /// TOP BAR
-                    /// =========================
+                    // ─── TOP BAR ─────────────────────────────────────
+                    // Barra superiore con: back button (opzionale),
+                    // titolo pagina, icona chiesa. Stile coerente su
+                    // tutte le pagine dell'app. Il back button appare
+                    // solo sulle sottopagine (non sulle sezioni principali).
                     Container(
                       height: 78,
                       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -122,7 +178,7 @@ class AppScaffold extends StatelessWidget {
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
+                            color: Colors.black.withValues(alpha: 0.04),
                             blurRadius: 18,
                             offset: const Offset(0, 6),
                           ),
@@ -130,6 +186,23 @@ class AppScaffold extends StatelessWidget {
                       ),
                       child: Row(
                         children: [
+                          if (showBackToHome) ...[
+                            Tooltip(
+                              message: 'Torna alla Home',
+                              child: IconButton(
+                                icon: const Icon(Icons.arrow_back_rounded),
+                                color: const Color(0xFF174A7E),
+                                onPressed: () {
+                                  if (context.canPop()) {
+                                    context.pop();
+                                  } else {
+                                    context.go('/');
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
                           Expanded(
                             child: Text(
                               title,
@@ -140,6 +213,8 @@ class AppScaffold extends StatelessWidget {
                               ),
                             ),
                           ),
+                          // Icona chiesa: elemento decorativo che
+                          // richiama l'ambito pastorale dell'app.
                           Container(
                             width: 44,
                             height: 44,
@@ -158,9 +233,14 @@ class AppScaffold extends StatelessWidget {
 
                     const SizedBox(height: 18),
 
-                    /// =========================
-                    /// PAGE BODY
-                    /// =========================
+                    // ─── PAGE BODY ───────────────────────────────────
+                    // Contenitore bianco con bordi arrotondati e ombra
+                    // leggera. Ogni pagina dell'app viene renderizzata
+                    // qui come child. Questo contenitore garantisce:
+                    // - Sfondo bianco uniforme per tutti i contenuti
+                    // - Spaziatura interna (20px) su tutti i lati
+                    // - Scroll gestito dalla pagina child (ListView,
+                    //   SingleChildScrollView, ecc.)
                     Expanded(
                       child: Container(
                         width: double.infinity,
@@ -170,7 +250,7 @@ class AppScaffold extends StatelessWidget {
                           borderRadius: BorderRadius.circular(28),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
+                              color: Colors.black.withValues(alpha: 0.04),
                               blurRadius: 20,
                               offset: const Offset(0, 8),
                             ),
@@ -187,9 +267,15 @@ class AppScaffold extends StatelessWidget {
         ),
       ),
 
-      /// =========================
-      /// MOBILE NAVIGATION
-      /// =========================
+      // ─── MOBILE BOTTOM NAVIGATION ─────────────────────────────────
+      // Navigazione a 5 voci (Material 3 NavigationBar) visibile solo
+      // su schermi ≤ 900px. Le voci corrispondono alle route principali:
+      //   Home ('/'), Gruppo ('/my-group'), Programma ('/planning'),
+      //   Documenti ('/documents'), Impostazioni ('/settings').
+      // La selezione corrente è determinata da currentIndex derivato
+      // dalla route GoRouter. Il design è coerente con le specifiche
+      // Material 3: indicatorColor trasparente blu, icon filled per
+      // la voce selezionata, outline per le non selezionate.
       bottomNavigationBar: isDesktop
           ? null
           : Padding(
@@ -201,7 +287,7 @@ class AppScaffold extends StatelessWidget {
                   backgroundColor: Colors.white,
                   selectedIndex: currentIndex,
                   indicatorColor:
-                      const Color(0xFF174A7E).withOpacity(0.15),
+                      const Color(0xFF174A7E).withValues(alpha: 0.15),
 
                   onDestinationSelected: (index) {
                     context.go(_routeFromIndex(index));

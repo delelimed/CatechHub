@@ -1,0 +1,98 @@
+﻿<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Programmazione Incontri — CatechHub</title>
+<meta name="description" content="Pianifica l'anno catechistico con calendario, rilevamento conflitti e collegamento al materiale didattico.">
+<link rel="icon" href="../logo.png" type="image/png">
+<link rel="stylesheet" href="../style.css">
+<script src="../js/version.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="../logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
+
+<section class="page-header">
+  <div class="container">
+    <h1>Programmazione Incontri</h1>
+    <p>Pianifica l'intero anno catechistico senza sovrapposizioni e con tutto il materiale a portata di mano</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+
+    <div class="breadcrumb"><a href="../index.html">Home</a> / <a href="planning.html">Pianificazione</a> / Panoramica</div>
+
+    <h2>Che cos'è</h2>
+    <p>La Programmazione Incontri ti aiuta a organizzare l'anno di catechismo in modo ordinato. Puoi creare incontri, assegnarli a un gruppo, collegare materiale didattico e ricevere promemoria. Il sistema ti avvisa automaticamente se tenti di creare due eventi nello stesso giorno per lo stesso gruppo, evitando sovrapposizioni.</p>
+
+    <h2>Cosa puoi fare</h2>
+
+    <h3>Creare un incontro</h3>
+    <p>Ogni incontro ha un titolo, una data, una descrizione dell'attività prevista e il gruppo a cui è rivolto. Puoi anche contrassegnarlo come "riunione organizzativa" per distinguerlo dagli incontri di catechismo veri e propri.</p>
+
+    <div class="screenshot-row">
+      <img src="../screen/Nuova_Giornata.jpg" alt="Schermata creazione nuova giornata" class="screenshot" style="max-width:300px;">
+    </div>
+
+    <h3>Collegare il materiale didattico</h3>
+    <p>Durante la pianificazione, puoi associare a ogni incontro i contenuti della <a href="catechesi.html">Biblioteca Catechetica</a> (testi, schede, riferimenti biblici). Durante la lezione, apri l'incontro e hai tutto il materiale a portata di tap, senza cercare tra fogli o libri.</p>
+
+    <h3>Evitare conflitti di date</h3>
+    <p>CatechHub controlla automaticamente se esiste già un incontro dello stesso tipo nella stessa data per lo stesso gruppo. Se c'è un conflitto, ti avvisa prima di creare o modificare un evento. Puoi comunque forzare il salvataggio se necessario.</p>
+
+    <h3>Calendario annuale</h3>
+    <p>Una vista calendario ti mostra tutti gli incontri pianificati, mese per mese. Gli incontri ordinari e le riunioni hanno colori e icone diverse. Da qui puoi saltare direttamente all'appello per quell'incontro.</p>
+
+    <h3>Promemoria prima dell'incontro</h3>
+    <p>Puoi attivare un promemoria facoltativo che ti avvisa 24 ore prima di ogni incontro. Non dimenticherai mai un appuntamento.</p>
+
+    <h2>Cosa succede quando elimini un incontro</h2>
+    <p>Se elimini un incontro, CatechHub rimuove automaticamente anche le presenze registrate e i collegamenti al materiale. I contenuti della Biblioteca Catechetica restano intatti. È come se quell'incontro non fosse mai esistito, senza lasciare dati sporchi.</p>
+
+    <h2>Sicurezza e privacy</h2>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>Tutti i dati della programmazione restano sul tuo dispositivo</li>
+      <li>Nessuna informazione viene inviata a server esterni</li>
+      <li>L'eliminazione di un incontro è definitiva, ma i dati del gruppo e dei ragazzi non vengono toccati</li>
+    </ul>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div>
+      <strong>CatechHub</strong> <span class="version-tag"></span> — Registro Elettronico di Catechismo<br>
+      <small>Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.</small>
+    </div>
+    <div>
+      <small>
+        &#128231; <a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a> &middot;
+        &#128247; Instagram (prossimamente) &middot;
+        &#9992; Telegram (prossimamente)
+      </small><br>
+      <a href="../privacy.html">Privacy</a> &middot;
+      <a href="../terms.html">Termini</a> &middot;
+      <a href="../infos/index.html">GDPR</a> &middot;
+      <a href="../developer.html">Sviluppatore</a> &middot;
+      <a href="https://github.com/delelimed/CatechHub" class="release-url">GitHub</a><br>
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/nav.js"></script></body>
+</html>

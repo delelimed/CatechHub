@@ -2,9 +2,24 @@ import 'dart:typed_data';
 
 import 'package:image/image.dart' as img;
 
-/// Riduce dimensioni e peso degli allegati prima della cifratura su disco.
+/// Riduce dimensioni e peso degli allegati (immagini, PDF, GIF) prima della
+/// cifratura su disco, ottimizzando l'uso dello spazio nel vault sicuro.
+///
+/// CONTESTO PROGETTO:
+/// CateREG memorizza allegati (documenti, foto ragazzi, avvisi) in un
+/// vault cifrato via [EncryptedFileStorage]. Questo ottimizzatore viene
+/// invocato PRIMA della scrittura, evitando di sprecare spazio su disco
+/// con file ad alta risoluzione non necessari su un dispositivo mobile.
+///
+/// Le soglie sono calibrate per l'uso tipico del registro catechistico:
+/// - Immagini: ridimensionate a 1600px lato lungo, formato JPEG qualità 75
+///   (sufficiente per leggere un documento o riconoscere un volto).
+/// - GIF: solo controllo dimensione (non ricodificabili via libreria image).
+/// - PDF: controllo dimensione; l'utente deve comprimerli esternamente.
 class AttachmentOptimizer {
-  /// Lato lungo massimo in pixel (sufficiente per lettura su schermo).
+  /// Lato lungo massimo in pixel.
+  /// 1600px è sufficiente per leggere un documento o riconoscere un volto
+  /// su qualsiasi schermo mobile/tablet, mantenendo il file leggero.
   static const maxImageLongEdge = 1600;
 
   /// Qualità JPEG (bilanciata tra nitidezza e spazio).
@@ -16,6 +31,9 @@ class AttachmentOptimizer {
   /// GIF animate: solo limite dimensione, senza ricodifica.
   static const maxGifBytes = 2 * 1024 * 1024;
 
+  /// Applica l'ottimizzazione appropriata in base al tipo MIME.
+  /// Delega a [_optimizeImage] o [_optimizePdf]; per formati non supportati
+  /// (es. documenti Office) restituisce l'originale senza modifiche.
   static Future<OptimizedAttachment> optimize({
     required Uint8List bytes,
     required String mimeType,
@@ -105,6 +123,13 @@ class AttachmentOptimizer {
   }
 }
 
+/// Risultato dell'ottimizzazione di un allegato.
+///
+/// Contiene sia i byte ottimizzati che i metadati originali (nome, tipo,
+/// dimensione originale) per permettere al chiamante di:
+/// - Salvare l'allegato ottimizzato su disco tramite [EncryptedFileStorage].
+/// - Calcolare il risparmio in percentuale ([savingsPercent]) per la UI.
+/// - Mantenere il nome originale (con estensione adattata se necessario).
 class OptimizedAttachment {
   const OptimizedAttachment({
     required this.bytes,
@@ -120,7 +145,8 @@ class OptimizedAttachment {
 
   int get savedBytes => bytes.length;
 
-  /// Percentuale di spazio risparmiato (0 se aumentato).
+  /// Percentuale di spazio risparmiato (null se la dimensione non è
+  /// migliorata o se i dati originali sono zero).
   int? get savingsPercent {
     if (originalBytes <= 0 || savedBytes >= originalBytes) return null;
     return ((1 - savedBytes / originalBytes) * 100).round();

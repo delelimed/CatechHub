@@ -1,0 +1,101 @@
+﻿<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Backup Crittografato — CatechHub</title>
+<meta name="description" content="Salva e ripristina tutti i tuoi dati in un file protetto da password e biometria. Sicuro e semplice.">
+<link rel="icon" href="../logo.png" type="image/png">
+<link rel="stylesheet" href="../style.css">
+<script src="../js/version.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="../logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
+
+<section class="page-header">
+  <div class="container">
+    <h1>Backup Crittografato</h1>
+    <p>Proteggi i tuoi dati con un backup sicuro, crittografato e protetto da impronta digitale</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+
+    <div class="breadcrumb"><a href="../index.html">Home</a> / <a href="backup.html">Backup</a> / Panoramica</div>
+
+    <h2>Che cos'è</h2>
+    <p>Il Backup Crittografato ti permette di salvare l'intero database di CatechHub in un file <code>.catechhub</code> protetto da password e autenticazione biometrica. Puoi conservarlo al sicuro, spostarlo su un altro dispositivo o ripristinarlo in caso di necessità.</p>
+
+    <h2>Come fare un backup</h2>
+    <ol style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>Dal menu impostazioni, scegli "Crea backup"</li>
+      <li>Confermi con la tua impronta digitale o riconoscimento facciale</li>
+      <li>Inserisci una password (almeno 8 caratteri)</li>
+      <li>Scegli quali moduli includere (di default sono tutti selezionati)</li>
+      <li>L'app crea il file e ti mostra il progresso dell'operazione</li>
+      <li>Puoi salvarlo sul dispositivo, condividerlo o inviarlo via email</li>
+    </ol>
+
+    <div class="screenshot-row">
+      <img src="../screen/BackUp.jpg" alt="Schermata backup" class="screenshot" style="max-width:300px;">
+    </div>
+
+    <h2>Come ripristinare un backup</h2>
+    <ol style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>Scegli "Ripristina backup" dal menu impostazioni</li>
+      <li>Confermi con biometria e inserisci la password del backup</li>
+      <li>L'app verifica che il file non sia stato manomesso</li>
+      <li>I dati vengono importati senza sovrascrivere quelli più recenti</li>
+    </ol>
+
+    <h2>Niente perdita di dati</h2>
+    <p>Quando ripristini un backup, CatechHub non si limita a sovrascrivere tutto. Confronta ogni singolo record: se nel backup c'è una versione più recente del dato, quella viene presa; altrimenti resta la tua versione locale. I record nuovi vengono aggiunti, quelli esistenti non vengono mai persi.</p>
+
+    <h2>Sicurezza</h2>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li><strong>Crittografia AES-256-GCM:</strong> il file di backup è cifrato con lo standard militare</li>
+      <li><strong>Autenticazione biometrica:</strong> serve l'impronta o il volto per avviare export e import</li>
+      <li><strong>Password obbligatoria:</strong> senza la password giusta, il backup è illeggibile</li>
+      <li><strong>Verifica integrità:</strong> prima di importare, l'app controlla che il file non sia corrotto o manomesso</li>
+      <li>Se il file è danneggiato, l'import viene annullato automaticamente</li>
+    </ul>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div>
+      <strong>CatechHub</strong> <span class="version-tag"></span> — Registro Elettronico di Catechismo<br>
+      <small>Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.</small>
+    </div>
+    <div>
+      <small>
+        &#128231; <a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a> &middot;
+        &#128247; Instagram (prossimamente) &middot;
+        &#9992; Telegram (prossimamente)
+      </small><br>
+      <a href="../privacy.html">Privacy</a> &middot;
+      <a href="../terms.html">Termini</a> &middot;
+      <a href="../infos/index.html">GDPR</a> &middot;
+      <a href="../developer.html">Sviluppatore</a> &middot;
+      <a href="https://github.com/delelimed/CatechHub" class="release-url">GitHub</a><br>
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/nav.js"></script></body>
+</html>

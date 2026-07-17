@@ -1,0 +1,145 @@
+﻿<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sviluppatore — CatechHub</title>
+<link rel="icon" href="logo.png" type="image/png">
+<link rel="stylesheet" href="style.css">
+<script src="js/version.js" defer></script>
+<script src="js/nav.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">☰</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
+
+<section class="page-header">
+  <div class="container">
+    <h1>Sviluppatore</h1>
+    <p>Dietro il progetto CatechHub</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <div class="breadcrumb"><a href="index.html">Home</a> / Sviluppatore</div>
+
+    <div class="dev-card">
+      <div class="dev-avatar">C</div>
+      <h2>Un catechista come te</h2>
+      <p>CatechHub nasce dall'esperienza quotidiana di chi ogni sabato prepara incontri, stampa fogli presenze, raccoglie moduli e cerca di tenere traccia di tutto. È il frutto di anni di servizio in parrocchia e della convinzione che la tecnologia possa essere al servizio della fede, non il contrario.</p>
+    </div>
+
+    <h2>Fatto da un catechista, per i catechisti</h2>
+    <p>Questo progetto è nato per un bisogno reale. Ogni catechista conosce bene la sensazione di avere fogli sparsi, elenchi aggiornati a metà, numeri di telefono scritti su bigliettini. CatechHub è nato per risolvere questi problemi, partendo da zero, imparando strada facendo, con l'obiettivo di creare uno strumento che fosse semplice, sicuro e rispettoso della privacy dei bambini e delle famiglie.</p>
+    <p>Non c'è un'azienda dietro. Non c'è un team di sviluppatori. C'è solo un catechista che ha scritto codice nei ritagli di tempo, con la stessa dedizione con cui prepara gli incontri di catechismo.</p>
+
+    <div class="alert alert-info" style="display:block;">
+      <p style="margin-bottom:0.25rem;"><strong>Progetto solitario ma non chiuso.</strong></p>
+      <p style="margin-bottom:0;">Ogni contributo &egrave; benvenuto. Puoi aprire issue, suggerire migliorie, segnalare bug o proporre codice. CatechHub &egrave; di tutta la comunit&agrave;.</p>
+    </div>
+
+    <h2>Perché open source</h2>
+    <p>La trasparenza è un valore. Condividere il codice significa permettere a chiunque di verificare come i dati vengono trattati, di imparare, di migliorare. In un'app che gestisce dati di minori, la trasparenza non è solo una scelta tecnica: è una responsabilità morale.</p>
+    <p>CatechHub è rilasciato sotto licenza MIT, il che significa che chiunque può usarlo, studiarlo, modificarlo e distribuirlo liberamente. Il codice è pubblico su GitHub perché crediamo che la conoscenza debba essere condivisa.</p>
+
+    <h2>Tech stack</h2>
+    <table class="sec-table">
+      <thead><tr><th>Area</th><th>Strumento</th></tr></thead>
+      <tbody>
+        <tr><td>Linguaggio</td><td>Dart</td></tr>
+        <tr><td>Framework</td><td>Flutter</td></tr>
+        <tr><td>State management</td><td>Riverpod</td></tr>
+        <tr><td>Database locale</td><td>Hive con crittografia AES</td></tr>
+        <tr><td>Crittografia</td><td>PointyCastle, cryptography</td></tr>
+        <tr><td>Autenticazione</td><td>BiometricPrompt (Android)</td></tr>
+        <tr><td>Runtime security</td><td>freeRASP (Talsec)</td></tr>
+        <tr><td>Sincronizzazione</td><td>Bluetooth RFCOMM</td></tr>
+        <tr><td>QR code</td><td>mobile_scanner, qr_flutter</td></tr>
+        <tr><td>PDF</td><td>pdf, printing</td></tr>
+        <tr><td>Repository</td><td>GitHub</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Contatti</h2>
+    <p>Puoi contattarmi o seguire il progetto attraverso questi canali:</p>
+
+    <div style="display:flex;flex-wrap:wrap;gap:1rem;margin:1.5rem 0;">
+      <div class="card" style="flex:1;min-width:200px;">
+        <div style="font-size:1.5rem;margin-bottom:0.25rem;">📧</div>
+        <h3 style="margin-top:0;">Email</h3>
+        <p><a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a></p>
+        <p style="font-size:0.85rem;color:#666;">Per segnalazioni, domande o feedback. Risposta garantita via email crittografata ProtonMail.</p>
+      </div>
+      <div class="card" style="flex:1;min-width:200px;opacity:0.6;">
+        <div style="font-size:1.5rem;margin-bottom:0.25rem;">📸</div>
+        <h3 style="margin-top:0;">Instagram</h3>
+        <p><em>Prossimamente...</em></p>
+        <p style="font-size:0.85rem;color:#666;">Canale Instagram in preparazione. Qui verranno pubblicati aggiornamenti, anteprime e tutorial.</p>
+      </div>
+      <div class="card" style="flex:1;min-width:200px;opacity:0.6;">
+        <div style="font-size:1.5rem;margin-bottom:0.25rem;">✈️</div>
+        <h3 style="margin-top:0;">Telegram</h3>
+        <p><em>Prossimamente...</em></p>
+        <p style="font-size:0.85rem;color:#666;">Canale Telegram in preparazione. Per annunci, aggiornamenti e community di catechisti.</p>
+      </div>
+    </div>
+
+    <p><strong>Dall'app:</strong> CatechHub ha una funzione di segnalazione bug integrata (Wiredash). Dalle Impostazioni → "Feedback e suggerimenti" puoi inviare una segnalazione con dettagli automatici su versione e dispositivo.</p>
+
+    <p>Oppure apri una issue su <a href="https://github.com/delelimed/CatechHub/issues">GitHub</a> per:</p>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>Segnalare bug o problemi tecnici</li>
+      <li>Proporre nuove funzionalità</li>
+      <li>Contribuire con codice</li>
+      <li>Richiedere chiarimenti sulla sicurezza</li>
+    </ul>
+    <p style="font-size:0.85rem;color:#666;">La comunicazione via GitHub è pubblica e visibile a tutti. Per questioni riservate, utilizza l'email <a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a>.</p>
+
+    <div class="alert alert-info" style="display:block;margin-top:2rem;">
+      <p style="margin-bottom:0.25rem;"><strong>Come è stato sviluppato CatechHub</strong></p>
+      <p style="margin-bottom:0;">CatechHub &egrave; stato realizzato con l'ausilio di intelligenza artificiale e <em>vibe coding</em>. Non sono uno sviluppatore di professione: ho descritto le funzionalit&agrave; necessarie all'IA, che ha generato il codice, e ho adattato il risultato alle esigenze reali del catechismo. Questo significa che il codice potrebbe non essere perfetto, ma &egrave; funzionale, verificabile (open source) e migliorabile con il contributo di chiunque.</p>
+    </div>
+
+    <div style="text-align:center;margin:3rem 0;padding:2rem;background:#eef1f8;border-radius:12px;font-style:italic;color:#174A7E;">
+      <p style="font-size:1.1rem;">"Lasciate che i bambini vengano a me, non glielo impedite"</p>
+      <p style="font-size:0.9rem;">— Mc 10,14</p>
+      <p style="margin-top:1rem;">CatechHub è nato per accompagnare i bambini nel cammino di fede.<br>Perché la tecnologia sia al servizio della comunità, e non il contrario.</p>
+    </div>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div>
+      <strong>CatechHub</strong> <span class="version-tag"></span> — Registro Elettronico di Catechismo<br>
+      <small>Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.</small>
+    </div>
+    <div>
+      <small>
+        📧 <a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a> &middot;
+        📸 Instagram (prossimamente) &middot;
+        ✈️ Telegram (prossimamente)
+      </small><br>
+      <a href="privacy.html">Privacy</a> &middot;
+      <a href="terms.html">Termini</a> &middot;
+      <a href="gdpr/index.html">GDPR</a> &middot;
+      <a href="developer.html">Sviluppatore</a> &middot;
+      <a href="https://github.com/delelimed/CatechHub" class="release-url">GitHub</a><br>
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

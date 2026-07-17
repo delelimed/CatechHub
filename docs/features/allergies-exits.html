@@ -1,0 +1,107 @@
+﻿<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Allergie e Uscite Autonome — CatechHub</title>
+<meta name="description" content="Informazioni sensibili sempre in vista: allergie, intolleranze e autorizzazioni alle uscite per la sicurezza dei ragazzi.">
+<link rel="icon" href="../logo.png" type="image/png">
+<link rel="stylesheet" href="../style.css">
+<script src="../js/version.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="../logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
+
+<section class="page-header">
+  <div class="container">
+    <h1>Allergie e Uscite Autonome</h1>
+    <p>Informazioni critiche per la sicurezza dei ragazzi, sempre visibili e protette</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+
+    <div class="breadcrumb"><a href="../index.html">Home</a> / <a href="allergies-exits.html">Allergie e Uscite Autonome</a> / Panoramica</div>
+
+    <h2>Che cos'è</h2>
+    <p>Le allergie e le autorizzazioni alle uscite autonome sono informazioni fondamentali per la sicurezza dei ragazzi durante gli incontri di catechismo. CatechHub le rende visibili in ogni schermata dell'app con badge colorati e avvisi immediati, così non rischi mai di dimenticarle.</p>
+
+    <div class="alert alert-warning">
+      <strong>Dati sensibili:</strong> allergie e informazioni mediche sono protette dalla normativa GDPR (Art. 9). CatechHub le conserva crittografate e l'accesso all'app è protetto da impronta digitale o riconoscimento facciale.
+    </div>
+
+    <h2>Allergie</h2>
+    <p>Per ogni ragazzo puoi registrare le allergie.</p>
+
+
+
+    <div class="screenshot-row">
+      <img src="../screen/Allergie.jpg" alt="Pagina allergie" class="screenshot" style="max-width:300px;">
+    </div>
+
+    <h2>Uscite Autonome</h2>
+    <p>Puoi registrare se un ragazzo è autorizzato a uscire da solo al termine dell'incontro, senza aspettare un genitore. Tre possibilità:</p>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li><strong>Non autorizzato</strong> — deve essere sempre accompagnato (impostazione predefinita)</li>
+      <li><strong>Autorizzato</strong> — può uscire da solo</li>
+      <li><strong>Autorizzato con restrizioni</strong> — può uscire ma a certe condizioni (es. "solo se accompagnato dal fratello maggiore", "solo entro le 18:00")</li>
+    </ul>
+
+    <p>Come per le allergie, un badge <strong>arancione</strong> "Uscita autonoma" appare accanto al nome del ragazzo in tutte le schermate dell'app.</p>
+
+    <div class="screenshot-row">
+      <img src="../screen/Uscite.jpg" alt="Pagina uscite autonome" class="screenshot" style="max-width:300px;">
+    </div>
+
+    <h2>Viste dedicate</h2>
+    <p>Oltre ai badge nelle schermate principali, ci sono pagine apposite che mostrano l'elenco completo e filtrato dei ragazzi con allergie o con autorizzazioni alle uscite. Utili per una verifica rapida prima di un evento o di una gita.</p>
+
+    <h2>Sicurezza e GDPR</h2>
+    <p>Le allergie sono dati relativi alla salute e richiedono protezioni speciali. CatechHub adotta le seguenti misure:</p>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>I dati sulle allergie sono crittografati individualmente con AES-256-GCM</li>
+      <li>L'accesso all'app richiede autenticazione biometrica</li>
+      <li>Il consenso esplicito è richiesto al momento dell'inserimento</li>
+      <li>I dati non vengono sincronizzati via Bluetooth senza autorizzazione esplicita</li>
+      <li>Puoi cancellare selettivamente le informazioni mediche senza perdere gli altri dati del ragazzo</li>
+    </ul>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div>
+      <strong>CatechHub</strong> <span class="version-tag"></span> — Registro Elettronico di Catechismo<br>
+      <small>Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.</small>
+    </div>
+    <div>
+      <small>
+        &#128231; <a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a> &middot;
+        &#128247; Instagram (prossimamente) &middot;
+        &#9992; Telegram (prossimamente)
+      </small><br>
+      <a href="../privacy.html">Privacy</a> &middot;
+      <a href="../terms.html">Termini</a> &middot;
+      <a href="../infos/index.html">GDPR</a> &middot;
+      <a href="../developer.html">Sviluppatore</a> &middot;
+      <a href="https://github.com/delelimed/CatechHub" class="release-url">GitHub</a><br>
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/nav.js"></script></body>
+</html>

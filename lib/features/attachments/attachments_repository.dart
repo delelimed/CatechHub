@@ -1,3 +1,26 @@
+/// Repository CRUD per gli allegati di CateREG.
+///
+/// Gestisce l'intero ciclo di vita di un allegato:
+///
+/// - **Salvataggio**: i byte in ingresso vengono ottimizzati (ridimensionamento
+///   immagini a max 1600px, conversione a JPEG) tramite [AttachmentOptimizer],
+///   poi crittografati e scritti su disco con [EncryptedFileStorage]. I metadati
+///   (nome, tipo, hash SHA-256, dimensione effettiva salvata) sono persistiti
+///   in [LocalDatabase] nella collection `attachments`.
+///
+/// - **Lettura**: [readBytes] restituisce il contenuto decrittografato come
+///   [Uint8List] per la visualizzazione in [AttachmentViewerPage].
+///
+/// - **Eliminazione**: rimuove sia il file crittografato dal vault sia i metadati
+///   dal database locale. L'eliminazione di massa ([deleteAllForParent]) serve
+///   quando un'entità padre (es. una pratica) viene cancellata.
+///
+/// - **Aggiornamento**: [updateAttachmentName] permette di rinominare un allegato
+///   senza toccare il file cifrato.
+///
+/// Ogni allegato è associato a un'entità padre tramite [parentId] e [parentType],
+/// permettendo di recuperare tutti gli allegati di una pratica, fattura, o altra
+/// entità del gestionale CateREG.
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -9,6 +32,11 @@ import '../../core/storage/encrypted_file_storage.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/attachment_model.dart';
 
+/// Provider Riverpod per [AttachmentsRepository].
+///
+/// L'istanza è singleton (Provider, non Family) perché il repository non ha
+/// parametri di configurazione: opera sempre sulla stessa collection del
+/// database locale e sullo stesso vault crittografato.
 final attachmentsRepositoryProvider = Provider<AttachmentsRepository>((ref) {
   return AttachmentsRepository();
 });
@@ -121,5 +149,15 @@ class AttachmentsRepository {
     for (final item in items) {
       await deleteAttachment(item.id);
     }
+  }
+
+  Future<void> updateAttachmentName({
+    required String attachmentId,
+    required String name,
+  }) async {
+    final data = _box.get(attachmentId) as Map<String, dynamic>?;
+    if (data == null) return;
+    data['name'] = name;
+    await _box.put(attachmentId, data);
   }
 }

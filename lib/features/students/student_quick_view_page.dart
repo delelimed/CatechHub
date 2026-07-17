@@ -5,6 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../shared/models/attachment_parent_type.dart';
 import '../../shared/models/contact_note_model.dart';
+import '../../shared/models/planning_meeting.dart';
+import '../../shared/models/student_daily_note_model.dart';
 import '../../shared/models/student_model.dart';
 import '../attachments/widgets/attachments_section.dart';
 import '../contact_notes/contact_notes_repository.dart';
@@ -12,9 +14,15 @@ import '../contact_notes/student_contact_notes_page.dart';
 import '../documents/documents_provider.dart';
 import '../meetings/attendance_repository.dart';
 import '../planning/planning_repository.dart';
+import 'student_daily_notes_repository.dart';
 import 'students_repository.dart';
 
 final studentsRepoProvider = Provider((ref) => StudentsRepository());
+
+final _studentDailyNotesStreamProvider = StreamProvider.autoDispose
+    .family<List<StudentDailyNote>, String>((ref, studentId) {
+  return ref.read(studentDailyNotesRepoProvider).getNotesForStudent(studentId);
+});
 
 final _studentAbsencesProvider = StreamProvider.autoDispose
     .family<List<Map<String, dynamic>>, String>((ref, studentId) {
@@ -49,7 +57,17 @@ final _studentAbsencesProvider = StreamProvider.autoDispose
   });
 });
 
-class StudentQuickViewPage extends ConsumerWidget {
+/// Dashboard riassuntiva completa per un singolo studente: mostra in cards
+/// verticali i dati personali, i genitori (con azioni telefono/WhatsApp),
+/// le allergie e uscite, lo stato dei documenti (consegna/pending), gli
+/// allegati, le note generali (modificabili inline), le annotazioni
+/// giornaliere (CRUD con dialogo), le note di contatto (ultime 3 con
+/// collegamento a tutte) e lo storico assenze.
+/// Usa [Student], [StudentDailyNote], [ContactNote] e [PlanningMeeting];
+/// attinge da [StudentsRepository], [StudentDailyNotesRepository],
+/// [AttendanceRepository], [PlanningRepository] e [DocumentsProvider].
+/// Flusso: nucleo della consultazione rapida, raggiunto da [StudentsPage].
+class StudentQuickViewPage extends ConsumerStatefulWidget {
   final Student student;
 
   const StudentQuickViewPage({
@@ -58,7 +76,27 @@ class StudentQuickViewPage extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StudentQuickViewPage> createState() =>
+      _StudentQuickViewPageState();
+}
+
+class _StudentQuickViewPageState extends ConsumerState<StudentQuickViewPage> {
+  late Student _student;
+
+  @override
+  void initState() {
+    super.initState();
+    _student = widget.student;
+  }
+
+  Future<void> _updateNotes(String? notes) async {
+    final updated = _student.copyWith(notes: notes);
+    await ref.read(studentsRepoProvider).updateStudent(_student.id, updated);
+    setState(() => _student = updated);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
@@ -71,30 +109,93 @@ class StudentQuickViewPage extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _HeaderCard(student: student),
+            _HeaderCard(student: _student),
             const SizedBox(height: 16),
-            _PersonalInfoCard(student: student),
+            _PersonalInfoCard(student: _student),
             const SizedBox(height: 16),
-            _ParentsCard(student: student),
+            _ParentsCard(student: _student),
             const SizedBox(height: 16),
-            _AllergiesCard(student: student),
+            _AllergiesCard(student: _student),
             const SizedBox(height: 16),
-            _DocumentsCard(studentId: student.id),
+            _DocumentsCard(studentId: _student.id),
             const SizedBox(height: 16),
             AttachmentsSection(
-              parentId: student.id,
+              parentId: _student.id,
               parentType: AttachmentParentType.student,
             ),
             const SizedBox(height: 16),
-            _NotesCard(student: student),
+            _NotesCard(
+              student: _student,
+              onEdit: () => _showEditNotesDialog(),
+              onDelete: _student.notes != null && _student.notes!.isNotEmpty
+                  ? () => _showDeleteNotesConfirm()
+                  : null,
+            ),
             const SizedBox(height: 16),
-            _ContactNotesCard(student: student),
+            _DailyAnnotationsCard(studentId: _student.id),
             const SizedBox(height: 16),
-            _AbsencesCard(studentId: student.id),
+            _ContactNotesCard(student: _student),
+            const SizedBox(height: 16),
+            _AbsencesCard(studentId: _student.id),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _showEditNotesDialog() async {
+    final controller = TextEditingController(text: _student.notes ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Modifica note'),
+        content: TextField(
+          controller: controller,
+          maxLines: 5,
+          decoration: const InputDecoration(
+            hintText: 'Inserisci note generali...',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annulla'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Salva'),
+          ),
+        ],
+      ),
+    );
+    if (result != null) {
+      await _updateNotes(result.isEmpty ? null : result);
+    }
+  }
+
+  Future<void> _showDeleteNotesConfirm() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Elimina note'),
+        content: const Text('Vuoi cancellare le note generali?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annulla'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Elimina'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _updateNotes(null);
+    }
   }
 }
 
@@ -115,7 +216,7 @@ class _HeaderCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -409,8 +510,14 @@ class _DocumentsCard extends ConsumerWidget {
 
 class _NotesCard extends StatelessWidget {
   final Student student;
+  final VoidCallback onEdit;
+  final VoidCallback? onDelete;
 
-  const _NotesCard({required this.student});
+  const _NotesCard({
+    required this.student,
+    required this.onEdit,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -418,6 +525,22 @@ class _NotesCard extends StatelessWidget {
       title: 'Note',
       icon: Icons.note_rounded,
       color: Colors.blue,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.edit, size: 20),
+            onPressed: onEdit,
+            tooltip: 'Modifica note',
+          ),
+          if (onDelete != null)
+            IconButton(
+              icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+              onPressed: onDelete,
+              tooltip: 'Elimina note',
+            ),
+        ],
+      ),
       children: [
         if (student.notes != null && student.notes!.isNotEmpty)
           Text(
@@ -434,112 +557,118 @@ class _NotesCard extends StatelessWidget {
   }
 }
 
-class _AbsencesCard extends ConsumerWidget {
+class _DailyAnnotationsCard extends ConsumerWidget {
   final String studentId;
 
-  const _AbsencesCard({required this.studentId});
+  const _DailyAnnotationsCard({required this.studentId});
+
+  Map<String, PlanningMeeting> _meetingsMap(List<PlanningMeeting> meetings) {
+    return {for (var m in meetings) m.id: m};
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final absencesAsync = ref.watch(_studentAbsencesProvider(studentId));
-
+    final notesAsync = ref.watch(_studentDailyNotesStreamProvider(studentId));
     return _InfoCard(
-      title: 'Assenze',
-      icon: Icons.event_busy_rounded,
-      color: Colors.red,
+      title: 'Annotazioni giornaliere',
+      icon: Icons.auto_stories_rounded,
+      color: Colors.indigo,
+      trailing: IconButton(
+        icon: const Icon(Icons.add_circle_outline, size: 22, color: Colors.indigo),
+        onPressed: () => _showAddEditDialog(context, ref, null, null),
+        tooltip: 'Aggiungi annotazione',
+      ),
       children: [
-        absencesAsync.when(
-          loading: () => const Center(
-            child: CircularProgressIndicator(),
-          ),
-          error: (e, _) => Text(
-            'Errore nel caricamento assenze: $e',
-            style: TextStyle(color: Colors.red.shade700),
-          ),
-          data: (absences) {
-            if (absences.isEmpty) {
+        notesAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Text('Errore: $e'),
+          data: (notes) {
+            if (notes.isEmpty) {
               return Text(
-                'Nessuna assenza registrata',
-                style: TextStyle(color: Colors.grey.shade600),
+                'Nessuna annotazione',
+                style: TextStyle(color: Colors.grey.shade600, fontStyle: FontStyle.italic),
               );
             }
-
+            final meetings = PlanningRepository().getMeetingsSync();
+            final meetingMap = _meetingsMap(meetings);
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: absences.map((absence) {
-                final date = absence['date'] as DateTime;
-                final title = absence['meetingTitle'] as String;
-                final activity = absence['meetingActivity'] as String;
-                final isReunion = absence['isReunion'] as bool;
-
+              children: notes.map((note) {
+                final meeting = meetingMap[note.meetingId];
+                final meetingTitle = meeting != null
+                    ? '${DateFormat('dd/MM/yyyy').format(meeting.date)} - ${meeting.title}'
+                    : 'Giornata sconosciuta';
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
+                  margin: const EdgeInsets.only(bottom: 10),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.red.shade50,
+                    color: Colors.indigo.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.shade200, width: 1),
+                    border: Border.all(color: Colors.indigo.withValues(alpha: 0.2)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          Icon(
-                            Icons.calendar_today,
-                            size: 16,
-                            color: Colors.red.shade700,
-                          ),
+                          Icon(Icons.calendar_today, size: 14, color: Colors.indigo.shade300),
                           const SizedBox(width: 6),
-                          Text(
-                            DateFormat('dd/MM/yyyy').format(date),
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.red.shade900,
-                              fontSize: 14,
+                          Expanded(
+                            child: Text(
+                              meetingTitle,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                                color: Colors.indigo.shade700,
+                              ),
                             ),
+                          ),
+                          PopupMenuButton<String>(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            onSelected: (value) {
+                              if (value == 'edit') {
+                                _showAddEditDialog(context, ref, note, meetingTitle);
+                              } else if (value == 'delete') {
+                                _showDeleteConfirm(context, ref, note);
+                              }
+                            },
+                            itemBuilder: (context) => [
+                              const PopupMenuItem(
+                                value: 'edit',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.edit, size: 18),
+                                    SizedBox(width: 8),
+                                    Text('Modifica'),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.delete, size: 18, color: Colors.red),
+                                    SizedBox(width: 8),
+                                    Text('Elimina', style: TextStyle(color: Colors.red)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            icon: const Icon(Icons.more_vert, size: 18),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 6),
+                      Text(
+                        note.text,
+                        style: const TextStyle(fontSize: 13),
+                      ),
                       const SizedBox(height: 4),
                       Text(
-                        title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                        ),
+                        '${DateFormat('dd/MM/yy HH:mm').format(note.createdAt)}${note.updatedAt != note.createdAt ? ' (modificato)' : ''}',
+                        style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                       ),
-                      if (activity.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          activity,
-                          style: TextStyle(
-                            color: Colors.grey.shade700,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                      if (isReunion) ...[
-                        const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.shade100,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            'Riunione catechisti',
-                            style: TextStyle(
-                              color: Colors.orange.shade900,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 );
@@ -548,6 +677,435 @@ class _AbsencesCard extends ConsumerWidget {
           },
         ),
       ],
+    );
+  }
+
+  Future<void> _showAddEditDialog(
+    BuildContext context,
+    WidgetRef ref,
+    StudentDailyNote? existing,
+    String? existingMeetingLabel,
+  ) async {
+    final textController = TextEditingController(text: existing?.text ?? '');
+    final meetings = PlanningRepository().getMeetingsSync()
+      ..sort((a, b) => b.date.compareTo(a.date));
+    String? selectedMeetingId = existing?.meetingId;
+    final themeColor = Colors.indigo;
+
+    final result = await showDialog<Map<String, String>?>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(existing != null ? 'Modifica annotazione' : 'Nuova annotazione'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Giorno di catechesi:', style: TextStyle(fontSize: 13)),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade400),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: selectedMeetingId,
+                    hint: const Text('Seleziona un giorno...'),
+                    isExpanded: true,
+                    items: meetings.map((m) {
+                      return DropdownMenuItem(
+                        value: m.id,
+                        child: Text(
+                          '${DateFormat('dd/MM/yyyy').format(m.date)} - ${m.title}',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (v) {
+                      setDialogState(() => selectedMeetingId = v);
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: textController,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  hintText: 'Scrivi annotazione...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Annulla'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final text = textController.text.trim();
+                if (text.isEmpty || selectedMeetingId == null) return;
+                Navigator.pop(ctx, {
+                  'meetingId': selectedMeetingId!,
+                  'text': text,
+                });
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: themeColor),
+              child: const Text('Salva'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result == null) return;
+
+    final repo = ref.read(studentDailyNotesRepoProvider);
+    if (existing != null) {
+      final updated = existing.copyWith(
+        meetingId: result['meetingId'],
+        text: result['text'],
+        updatedAt: DateTime.now(),
+      );
+      await repo.updateNote(existing.id, updated);
+    } else {
+      final note = StudentDailyNote(
+        id: '',
+        studentId: studentId,
+        meetingId: result['meetingId']!,
+        text: result['text']!,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      await repo.addNote(note);
+    }
+  }
+
+  Future<void> _showDeleteConfirm(
+    BuildContext context,
+    WidgetRef ref,
+    StudentDailyNote note,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Elimina annotazione'),
+        content: const Text('Vuoi cancellare questa annotazione?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annulla'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Elimina'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await ref.read(studentDailyNotesRepoProvider).deleteNote(note.id);
+    }
+  }
+}
+
+class _AbsencesCard extends ConsumerWidget {
+  final String studentId;
+
+  const _AbsencesCard({required this.studentId});
+
+  void _showFullHistory(BuildContext context, WidgetRef ref, String studentId) {
+    final attendanceRepo = AttendanceRepository();
+    final planningRepo = PlanningRepository();
+    final allAttendance = attendanceRepo.getAttendanceSync();
+    final meetings = planningRepo.getMeetingsSync();
+    final meetingMap = {for (var m in meetings) m.id: m};
+
+    final records = <Map<String, dynamic>>[];
+    for (final record in allAttendance) {
+      final presenceMap = Map<String, dynamic>.from(record['presence'] as Map? ?? {});
+      final status = presenceMap[studentId]?.toString();
+      if (status == null) continue;
+
+      final meeting = meetingMap[record['id']];
+      final date = DateTime.tryParse(record['date']?.toString() ?? '') ?? DateTime.now();
+
+      records.add({
+        'date': date,
+        'status': status,
+        'meetingTitle': meeting?.title ?? 'Sconosciuto',
+        'meetingActivity': meeting?.activity ?? '',
+        'isReunion': meeting?.isReunion ?? false,
+      });
+    }
+    records.sort((a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.75,
+        maxChildSize: 0.9,
+        minChildSize: 0.4,
+        expand: false,
+        builder: (ctx, scrollController) => Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Storico presenze',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF174A7E),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: records.isEmpty
+                    ? Center(
+                        child: Text(
+                          'Nessuna presenza registrata',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: scrollController,
+                        itemCount: records.length,
+                        itemBuilder: (_, i) {
+                          final r = records[i];
+                          final date = r['date'] as DateTime;
+                          final isPresent = r['status'] == 'Presente';
+                          final title = r['meetingTitle'] as String;
+                          final activity = r['meetingActivity'] as String;
+                          final isReunion = r['isReunion'] as bool;
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isPresent
+                                  ? Colors.green.shade50
+                                  : Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isPresent
+                                    ? Colors.green.shade200
+                                    : Colors.red.shade200,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: isPresent
+                                        ? Colors.green
+                                        : Colors.red,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      isPresent ? 'P' : 'A',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text(
+                                            DateFormat('dd/MM/yyyy').format(date),
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                              color: isPresent
+                                                  ? Colors.green.shade900
+                                                  : Colors.red.shade900,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          if (isReunion)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: Colors.orange.shade100,
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                'Riunione',
+                                                style: TextStyle(
+                                                  fontSize: 9,
+                                                  color: Colors.orange.shade900,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        title,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      if (activity.isNotEmpty)
+                                        Text(
+                                          activity,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: Colors.grey.shade700,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final absencesAsync = ref.watch(_studentAbsencesProvider(studentId));
+
+    return InkWell(
+      onTap: () => _showFullHistory(context, ref, studentId),
+      borderRadius: BorderRadius.circular(16),
+      child: _InfoCard(
+        title: 'Assenze',
+        icon: Icons.event_busy_rounded,
+        color: Colors.red,
+        trailing: Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 20),
+        children: [
+          absencesAsync.when(
+            loading: () => const Center(
+              child: CircularProgressIndicator(),
+            ),
+            error: (e, _) => Text(
+              'Errore nel caricamento assenze: $e',
+              style: TextStyle(color: Colors.red.shade700),
+            ),
+            data: (absences) {
+              if (absences.isEmpty) {
+                return Text(
+                  'Nessuna assenza registrata',
+                  style: TextStyle(color: Colors.grey.shade600),
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Tocca per vedere lo storico completo',
+                    style: TextStyle(
+                      color: Colors.red.shade400,
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ...absences.take(3).map((absence) {
+                    final date = absence['date'] as DateTime;
+                    final title = absence['meetingTitle'] as String;
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.red.shade200, width: 1),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.calendar_today, size: 14, color: Colors.red.shade700),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  DateFormat('dd/MM/yyyy').format(date),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red.shade900,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                Text(
+                                  title,
+                                  style: const TextStyle(fontSize: 12),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  if (absences.length > 3)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        '+ ${absences.length - 3} altre assenze',
+                        style: TextStyle(
+                          color: Colors.red.shade600,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 }
@@ -603,10 +1161,10 @@ class _ContactNotesCard extends ConsumerWidget {
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: _mediumColor(note.medium).withOpacity(0.05),
+                  color: _mediumColor(note.medium).withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                      color: _mediumColor(note.medium).withOpacity(0.2)),
+                      color: _mediumColor(note.medium).withValues(alpha: 0.2)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -688,12 +1246,14 @@ class _InfoCard extends StatelessWidget {
   final IconData icon;
   final Color color;
   final List<Widget> children;
+  final Widget? trailing;
 
   const _InfoCard({
     required this.title,
     required this.icon,
     required this.color,
     required this.children,
+    this.trailing,
   });
 
   @override
@@ -705,7 +1265,7 @@ class _InfoCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -720,14 +1280,17 @@ class _InfoCard extends StatelessWidget {
               children: [
                 Icon(icon, color: color, size: 24),
                 const SizedBox(width: 12),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: color,
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
                   ),
                 ),
+                if (trailing != null) trailing!,
               ],
             ),
           ),

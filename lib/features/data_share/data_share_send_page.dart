@@ -1,4 +1,6 @@
 import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +9,39 @@ import '../../shared/widgets/app_scaffold.dart';
 import '../../core/services/qr_data_service.dart';
 import '../../core/providers/data_share_provider.dart';
 
+List<Map<String, dynamic>> _buildQrChunkMaps(Map<String, dynamic> args) {
+  final data = Map<String, dynamic>.from(args['data'] as Map);
+  final pin = args['pin'] as String;
+
+  final package = QRDataService.createPackage(data, pin);
+  final compressedPackage = QRDataService.compressData(package.toMap());
+  final chunkStrings = QRDataService.segmentData(compressedPackage);
+
+  return chunkStrings
+      .asMap()
+      .entries
+      .map(
+        (entry) => QRDataService.createQRChunk(
+          entry.value,
+          entry.key,
+          chunkStrings.length,
+        ).toMap(),
+      )
+      .toList();
+}
+
+/// Pagina di invio dati di CateREG tramite QR code animati.
+///
+/// Prepara i dati del registro (catechisti, studenti, presenze, documenti)
+/// suddividendoli in chunk QR compressi e protetti da PIN a 8 cifre.
+/// I chunk vengono mostrati in sequenza animata a 4 FPS, consentendo:
+/// - **Pausa/Riprendi** della rotazione
+/// - **Filtro per intervallo** di chunk (utile per riprendere da chunk persi)
+/// - **Completamento** manuale della trasmissione
+///
+/// Il PIN di sicurezza viene generato a monte e deve essere comunicato
+/// al ricevente per sbloccare l'importazione, garantendo che solo
+/// dispositivi autorizzati possano decifrare i dati trasmessi.
 class DataShareSendPage extends ConsumerStatefulWidget {
   const DataShareSendPage({super.key});
 
@@ -22,13 +57,16 @@ class _DataShareSendPageState extends ConsumerState<DataShareSendPage> {
   Timer? _timer;
   bool _isCompleted = false;
   bool _isPlaying = false;
+  bool _isPreparing = true;
+  String? _errorMessage;
   int? _filterStartChunk;
-  int? _filterEndChunk;
 
   @override
   void initState() {
     super.initState();
-    _initializeData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeData();
+    });
   }
 
   @override
@@ -44,65 +82,67 @@ class _DataShareSendPageState extends ConsumerState<DataShareSendPage> {
     // Recupera i dati dai provider
     final data = ref.read(dataShareDataProvider);
     final pin = ref.read(dataSharePinProvider);
-    
+
     if (data != null && pin != null) {
       setState(() {
         _data = data;
         _pin = pin;
+        _isPreparing = true;
       });
 
-      _prepareChunks();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _prepareChunks();
+      });
     } else {
       // Se non ci sono dati, torna alla selezione
       if (mounted) {
-        context.go('/data-share');
+        context.pop();
       }
     }
   }
 
-  void _prepareChunks() {
+  Future<void> _prepareChunks() async {
     if (_data == null || _pin == null) return;
 
-    // Crea il pacchetto dati
-    final package = QRDataService.createPackage(_data!, _pin!);
-
-    // Comprimi i dati del pacchetto
-    final compressedPackage = QRDataService.compressData(package.toMap());
-
-    // Segmenta in chunk
-    final chunkStrings = QRDataService.segmentData(compressedPackage);
-
-    // Crea QR chunk
     setState(() {
-      _chunks = chunkStrings.asMap().entries.map((entry) {
-        return QRDataService.createQRChunk(
-          entry.value,
-          entry.key,
-          chunkStrings.length,
-        );
-      }).toList();
-
-      _currentChunkIndex = 0;
-      _filterStartChunk = null;
-      _filterEndChunk = null;
-      _startAnimation();
+      _isPreparing = true;
+      _errorMessage = null;
     });
-  }
 
-  List<QRChunk> _getFilteredChunks() {
-    if (_filterStartChunk == null || _filterEndChunk == null) {
-      return _chunks;
+    try {
+      final preparedChunkMaps = await compute(_buildQrChunkMaps, {
+        'data': _data!,
+        'pin': _pin!,
+      });
+
+      if (!mounted) return;
+
+      final preparedChunks = preparedChunkMaps
+          .map((map) => QRChunk.fromMap(Map<String, dynamic>.from(map)))
+          .toList();
+
+      if (!mounted) return;
+
+      setState(() {
+        _chunks = preparedChunks;
+        _currentChunkIndex = 0;
+        _filterStartChunk = null;
+        _isPreparing = false;
+        _startAnimation();
+      });
+    } catch (e) {
+      debugPrint('Errore durante la preparazione dei chunk QR: $e');
+      if (!mounted) return;
+      setState(() {
+        _isPreparing = false;
+        _errorMessage = 'Errore durante la creazione dei QR code: $e';
+      });
     }
-
-    final start = _filterStartChunk!.clamp(0, _chunks.length - 1);
-    final end = (_filterEndChunk! + 1).clamp(0, _chunks.length);
-    return _chunks.sublist(start, end);
   }
 
   void _setChunkFilter(int start, int end) {
     setState(() {
       _filterStartChunk = start;
-      _filterEndChunk = end;
       _currentChunkIndex = start.clamp(0, _chunks.length - 1);
     });
   }
@@ -110,14 +150,13 @@ class _DataShareSendPageState extends ConsumerState<DataShareSendPage> {
   void _clearChunkFilter() {
     setState(() {
       _filterStartChunk = null;
-      _filterEndChunk = null;
       _currentChunkIndex = 0;
     });
   }
 
   void _startAnimation() {
-    // Mostra ogni chunk a 3 FPS (circa 333ms per frame)
-    _timer = Timer.periodic(const Duration(milliseconds: 333), (timer) {
+    // Mostra ogni chunk a 4 FPS (circa 250ms per frame)
+    _timer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
@@ -144,11 +183,11 @@ class _DataShareSendPageState extends ConsumerState<DataShareSendPage> {
 
   void _completeSharing() {
     _pauseAnimation();
-    
+
     // Pulisci i provider
     ref.read(dataShareDataProvider.notifier).state = null;
     ref.read(dataSharePinProvider.notifier).state = null;
-    
+
     setState(() {
       _isCompleted = true;
     });
@@ -168,10 +207,58 @@ class _DataShareSendPageState extends ConsumerState<DataShareSendPage> {
               const Text('Dati non disponibili'),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: () => context.go('/data-share'),
+                onPressed: () => context.pop(),
                 child: const Text('Torna indietro'),
               ),
             ],
+          ),
+        ),
+      );
+    }
+
+    if (_isPreparing) {
+      return AppScaffold(
+        title: 'Preparazione QR',
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              CircularProgressIndicator(color: Color(0xFF174A7E)),
+              SizedBox(height: 16),
+              Text(
+                'Generazione QR in corso… attendi qualche secondo',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 15, color: Colors.black87),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return AppScaffold(
+        title: 'Errore',
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                Text(
+                  _errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 15, color: Colors.black87),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () => context.pop(),
+                  child: const Text('Torna alla selezione'),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -187,7 +274,6 @@ class _DataShareSendPageState extends ConsumerState<DataShareSendPage> {
     }
 
     final currentChunk = _chunks[_currentChunkIndex];
-    final filteredChunks = _getFilteredChunks();
 
     return AppScaffold(
       title: 'Invio Dati',
@@ -263,14 +349,18 @@ class _QRDisplayCard extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
+                color: Colors.blue.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Icon(Icons.filter_list_rounded, color: Colors.blue, size: 20),
+                  const Icon(
+                    Icons.filter_list_rounded,
+                    color: Colors.blue,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   const Text(
                     'Filtro Attivo',
@@ -286,7 +376,10 @@ class _QRDisplayCard extends StatelessWidget {
                     icon: const Icon(Icons.close_rounded, size: 16),
                     label: const Text('Mostra Tutti'),
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
                       elevation: 0,
@@ -304,15 +397,12 @@ class _QRDisplayCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.15),
+                color: Colors.black.withValues(alpha: 0.15),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
               ),
             ],
-            border: Border.all(
-              color: const Color(0xFF174A7E),
-              width: 2,
-            ),
+            border: Border.all(color: const Color(0xFF174A7E), width: 2),
           ),
           child: Column(
             children: [
@@ -321,10 +411,7 @@ class _QRDisplayCard extends StatelessWidget {
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  border: Border.all(
-                    color: Colors.black,
-                    width: 3,
-                  ),
+                  border: Border.all(color: Colors.black, width: 3),
                 ),
                 child: QrImageView(
                   data: chunk.toJson(),
@@ -332,7 +419,12 @@ class _QRDisplayCard extends StatelessWidget {
                   errorCorrectionLevel: QrErrorCorrectLevel.H,
                   size: 380,
                   backgroundColor: Colors.white,
-                  foregroundColor: Colors.black,
+                  eyeStyle: const QrEyeStyle(
+                    color: Colors.black,
+                  ),
+                  dataModuleStyle: const QrDataModuleStyle(
+                    color: Colors.black,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -357,7 +449,9 @@ class _QRDisplayCard extends StatelessWidget {
 
         _InfoText(
           text: isPlaying ? 'In trasmissione...' : 'In pausa',
-          icon: isPlaying ? Icons.autorenew_rounded : Icons.pause_circle_rounded,
+          icon: isPlaying
+              ? Icons.autorenew_rounded
+              : Icons.pause_circle_rounded,
         ),
         const SizedBox(height: 32),
 
@@ -368,7 +462,7 @@ class _QRDisplayCard extends StatelessWidget {
                 icon: Icons.pause_rounded,
                 label: 'Pausa',
                 color: Colors.orange,
-                isActive: !isPlaying,
+                isActive: isPlaying,
                 onTap: isPlaying ? onPause : null,
               ),
             ),
@@ -378,7 +472,7 @@ class _QRDisplayCard extends StatelessWidget {
                 icon: Icons.play_arrow_rounded,
                 label: 'Riprendi',
                 color: Colors.green,
-                isActive: isPlaying,
+                isActive: !isPlaying,
                 onTap: !isPlaying ? onResume : null,
               ),
             ),
@@ -491,8 +585,8 @@ class _ProgressCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            const Color(0xFF174A7E).withOpacity(0.8),
-            const Color(0xFF2E5A8F).withOpacity(0.8),
+            const Color(0xFF174A7E).withValues(alpha: 0.8),
+            const Color(0xFF2E5A8F).withValues(alpha: 0.8),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
@@ -512,11 +606,14 @@ class _ProgressCard extends StatelessWidget {
               ),
               if (hasFilter)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.3),
+                    color: Colors.orange.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                    border: Border.all(color: Colors.orange.withValues(alpha: 0.5)),
                   ),
                   child: const Text(
                     'Filtrato',
@@ -543,7 +640,7 @@ class _ProgressCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
               value: progress,
-              backgroundColor: Colors.white.withOpacity(0.3),
+              backgroundColor: Colors.white.withValues(alpha: 0.3),
               valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
               minHeight: 8,
             ),
@@ -564,17 +661,13 @@ class _PinCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.amber.withOpacity(0.1),
+        color: Colors.amber.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.amber.withOpacity(0.3)),
+        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.security_rounded,
-            color: Colors.amber,
-            size: 24,
-          ),
+          const Icon(Icons.security_rounded, color: Colors.amber, size: 24),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -590,10 +683,7 @@ class _PinCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   'Comunica questo PIN al ricevente: $pin',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.amber.shade900,
-                  ),
+                  style: TextStyle(fontSize: 13, color: Colors.amber.shade900),
                 ),
               ],
             ),
@@ -616,9 +706,9 @@ class _CompletionCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(32),
           decoration: BoxDecoration(
-            color: Colors.green.withOpacity(0.1),
+            color: Colors.green.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.green.withOpacity(0.3)),
+            border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
           ),
           child: Column(
             children: [
@@ -656,10 +746,7 @@ class _CompletionCard extends StatelessWidget {
               Text(
                 'Il ricevente deve inserire questo PIN per completare l\'importazione',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade700,
-                ),
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
               ),
             ],
           ),
@@ -667,7 +754,7 @@ class _CompletionCard extends StatelessWidget {
         const SizedBox(height: 24),
 
         ElevatedButton.icon(
-          onPressed: () => context.go('/data-share'),
+          onPressed: () => context.pop(),
           icon: const Icon(Icons.home_rounded),
           label: const Text('Torna alla selezione'),
           style: ElevatedButton.styleFrom(
@@ -685,29 +772,16 @@ class _InfoText extends StatelessWidget {
   final String text;
   final IconData icon;
 
-  const _InfoText({
-    required this.text,
-    required this.icon,
-  });
+  const _InfoText({required this.text, required this.icon});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(
-          icon,
-          size: 16,
-          color: Colors.grey.shade600,
-        ),
+        Icon(icon, size: 16, color: Colors.grey.shade600),
         const SizedBox(width: 8),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey.shade700,
-          ),
-        ),
+        Text(text, style: TextStyle(fontSize: 14, color: Colors.grey.shade700)),
       ],
     );
   }
@@ -737,13 +811,13 @@ class _ControlButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
           color: isActive && onTap != null
-              ? color.withOpacity(0.1)
-              : Colors.grey.withOpacity(0.1),
+              ? color.withValues(alpha: 0.1)
+              : Colors.grey.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isActive && onTap != null
-                ? color.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.2),
+                ? color.withValues(alpha: 0.3)
+                : Colors.grey.withValues(alpha: 0.2),
           ),
         ),
         child: Column(

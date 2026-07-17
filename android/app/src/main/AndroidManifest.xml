@@ -1,5 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    AndroidManifest.xml — CatechHub
+
+    Manifest principale dell'applicazione CatechHub, un registro elettronico
+    di catechismo per dispositivi Android, costruito con Flutter.
+
+    Questo file dichiara:
+    1. I permessi necessari al funzionamento dell'app, organizzati per dominio
+       (rete, fotocamera, Bluetooth, localizzazione, biometrica, storage)
+    2. La configurazione dell'applicazione (_nome, icono, sicurezza, backup_)
+    3. L'activity principale con le sue proprietà di lancio e configurazione
+    4. Le query per la visibilità dei pacchetti (obbligatorie da Android 11+)
+
+    CONTESTO PROGETTO:
+    CatechHub gestisce dati sensibili di minori (anagrafica, allergie, contatti
+    genitori) e sincronizza i dati tra dispositivi catechisti via Bluetooth
+    RFCOMM, senza server centrale. I permessi Bluetooth e di localizzazione
+    sono fondamentali per la sincronizzazione P2P, mentre i permessi di storage
+    e fotocamera supportano gli allegati cifrati e la scansione QR.
+-->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ════════════════════════════════════════════════════════════════════════ -->
+    <!-- PERMESSI GENERALI DELL'APPLICAZIONE                                    -->
+    <!--                                                                        -->
+    <!-- Permessi richiesti dal core dell'app per funzionalità base che non     -->
+    <!-- rientrano nei domini specifici (Bluetooth, sicurezza, storage).        -->
+    <!-- ════════════════════════════════════════════════════════════════════════ -->
+
+    <!--
+        Rete (INTERNET):
+        Necessario per:
+        - Verificare la disponibilità di aggiornamenti applicazione (funzione update)
+        - Comunicazione con Wiredash per feedback utente
+        - Non utilizzato per trasferire dati personali: tutti i dati sensibili
+          rimangono locali sul dispositivo in base alla filosofia privacy-first
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+        Fotocamera (CAMERA):
+        Necessaria per due funzionalità distinte:
+        1. Scansione codici QR durante il pairing Bluetooth tra dispositivi
+           catechisti (contiene indirizzo MAC + chiave pubblica RSA)
+        2. Scatto foto per gli allegati cifrati degli studenti/incontri
+           (le foto vengono salvate solo internamente all'app, mai in galleria)
+    -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!--
+        Scrittura storage (WRITE_EXTERNAL_STORAGE):
+        - Obsoleta da Android 9+ (API 28+): il sistema ignora questo permesso
+        - Mantenuta con maxSdkVersion="28" per il download dell'APK di aggiornamento
+          su dispositivi Android 8.x e precedenti
+        - Non utilizzata per salvare dati personali degli studenti
+    -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+
+    <!--
+        Lettura storage (READ_EXTERNAL_STORAGE):
+        Opzionale — richiesto solo per payload FILE.
+    -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
+    <!--
+        Permessi media granulari (Android 13+ / API 33+):
+        Introdotti da Google per dare all'utente un controllo più fine su quali
+        media l'app può accedere. Sostituiscono READ_EXTERNAL_STORAGE con
+        accesso mirato a singole categorie di file.
+        - READ_MEDIA_IMAGES: foto scattate per allegati studenti/incontri
+        - READ_MEDIA_VIDEO: video eventualmente allegati
+        - READ_MEDIA_AUDIO: file audio eventualmente allegati
+    -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+
+    <!--
+        Installazione pacchetti (REQUEST_INSTALL_PACKAGES):
+        Obbligatorio da Android 8.0+ (API 26+) per consentire all'app di
+        installare aggiornamenti APK scaricati dall'interno dell'app.
+        Senza questo permesso, il download dell'APK avviene ma l'installazione
+        viene bloccata dal sistema operativo con un errore di sicurezza.
+    -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!--
+        Notifiche (POST_NOTIFICATIONS):
+        - Obbligatorio da Android 13+ (API 33+): senza questo permesso, le
+          notifiche vengono silenziosamente ignorate dal sistema
+        - Utilizzato per: avvisi di aggiornamento disponibile, stato della
+          sincronizzazione Bluetooth, promemoria incontri
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!--
+        Autenticazione biometrica (Android 9+ / API 28+):
+        - BIOMETRIC: API biometriche generiche
+        - USE_BIOMETRIC: API standardizzate per autenticazione biometrica
+        Necessari per local_auth plugin (Android embedding v2 con FlutterFragmentActivity).
+        USE_FINGERPRINT rimosso: deprecato da Android 9+, USE_BIOMETRIC è sufficiente.
+    -->
+    <uses-permission android:name="android.permission.BIOMETRIC" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+
+    <!--
+        USE_FINGERPRINT è DEPRECATO da Android 9 (API 28+).
+        Mantenuto SOLO se minSdkVersion < 28 per compatibilità legacy.
+        CatechHub ha minSdk 30 (Android 10+) → NON serve.
+        Rimosso per ridurre superficie d'attacco e warning Play Store.
+    -->
+
+    <!-- ════════════════════════════════════════════════════════════════════════ -->
+    <!-- PERMESSI GOOGLE NEARBY CONNECTIONS                                     -->
+    <!--                                                                        -->
+    <!-- Sincronizzazione dati P2P tra dispositivi catechisti tramite           -->
+    <!-- Google Nearby Connections (BLE + Wi-Fi P2P).                           -->
+    <!-- ════════════════════════════════════════════════════════════════════════ -->
+
+    <!-- Required for Nearby Connections -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
+
+    <!-- ════════════════════════════════════════════════════════════════════════ -->
+    <!-- DICHIARAZIONE DELL'APPLICAZIONE E ATTIVITÀ PRINCIPALE                  -->
+    <!--                                                                        -->
+    <!-- Configurazione dell'app Android e dell'activity principale Flutter.    -->
+    <!-- L'activity (.MainActivity) è il punto di ingresso nativo che           -->
+    <!-- inizializza il Flutter engine e registra i plugin.                    -->
+    <!-- ════════════════════════════════════════════════════════════════════════ -->
     <application
         android:label="CatechHub"
         android:name="${applicationName}"
@@ -7,7 +145,36 @@
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:usesCleartextTraffic="false"
+        android:requestLegacyExternalStorage="true"
+        android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="31">
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_provider_paths" />
+        </provider>
+
+        <!--
+            Activity principale dell'applicazione.
+            Punto di ingresso Flutter con embedding v2.
+
+            Proprietà:
+            - exported="true": accessibile dall'esterno (necessario per il launcher)
+            - launchMode="singleTop": evita duplicazioni dell'activity nella stack
+            - taskAffinity="": nessuna affinità con task parent (comportamento isolato)
+            - hardwareAccelerated="true": accelerazione GPU per rendering Flutter
+            - windowSoftInputMode="adjustResize": ridimensiona il layout quando
+              appare la tastiera (importante per i form di input)
+
+            configChanges: gestisce i cambiamenti di configurazione senza ricreare
+            l'activity (orientamento, tastiera, densità, lingua, ecc.). Flutter
+            gestisce internamente questi cambiamenti.
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -17,63 +184,73 @@
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
-            <!-- Specifies an Android theme to apply to this Activity as soon as
-                 the Android process has started. This theme is visible to the user
-                 while the Flutter UI initializes. After that, this theme continues
-                 to determine the Window background behind the Flutter UI. -->
+            <!--
+                Tema visualizzato dall'utente durante l'inizializzazione dell'engine
+                Flutter (splash screen). Dopo il bootstrap, il NormalTheme continua
+                a determinare lo sfondo della finestra dell'app.
+            -->
             <meta-data
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+
+            <!--
+                Intent filter principale: registra l'activity come launcher point.
+                MAIN = azione di default, LAUNCHER = icona visibile nel drawer.
+            -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <!-- Don't delete the meta-data below.
-             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
+
+        <!--
+            Meta-data obbligatoria per Flutter embedding v2.
+            Abilita la registrazione automatica dei plugin e la generazione
+            di GeneratedPluginRegistrant.java. Senza questa dichiarazione,
+            l'app non si avvia correttamente.
+        -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
 
-    <!-- Permesso per connettersi a internet e verificare gli aggiornamenti -->
-    <uses-permission android:name="android.permission.INTERNET" />
-
-    <!-- Fotocamera per allegati cifrati (non salvati in galleria) -->
-    <uses-permission android:name="android.permission.CAMERA" />
-
-    <!-- Permessi necessari per gestire il download del file APK -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
-    
-    <!-- Permessi storage per Android <13 (API 32) -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-    
-    <!-- Permessi media per Android 13+ (API 33+) -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
-
-    <!-- Permesso fondamentale per avviare l'installazione dell'APK nei dispositivi recenti (Android 8.0+) -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-
-    <!-- Permesso per mostrare notifiche su Android 13+ -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
-    <!-- Permessi per autenticazione biometrica (impronta digitale e riconoscimento volto) -->
-    <uses-permission android:name="android.permission.BIOMETRIC" />
-    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
-    <uses-permission android:name="android.permission.USE_FINGERPRINT" />
-
-    <!-- Gestione della visibilità dei pacchetti (Android 11+) -->
+    <!-- ════════════════════════════════════════════════════════════════════════ -->
+    <!-- QUERIES PER VISIBILITÀ DEI PACCHETTI (Android 11+ / API 30+)          -->
+    <!--                                                                        -->
+    <!-- Da Android 11, il sistema operativo applica restrizioni alla           -->
+    <!-- visibilità dei pacchetti: un'app può vedere solo se stessa e i         -->
+    <!-- pacchetti dichiarati esplicitamente nelle queries.                      -->
+    <!--                                                                        -->
+    <!-- Senza queste dichiarazioni, gli intenti verso app esterne (browser,    -->
+    <!-- editor di testo, ecc.) vengono bloccati silenziosamente dal sistema,   -->
+    <!-- causando comportamenti inattesi senza errori visibili.                  -->
+    <!--                                                                        -->
+    <!-- NOTA: CatechHub non invia dati personali ad app esterne. Le queries    -->
+    <!-- dichiarate servono esclusivamente per funzionalità di utilità generale -->
+    <!-- (apertura link, elaborazione testo).                                    -->
+    <!-- ════════════════════════════════════════════════════════════════════════ -->
     <queries>
-        <!-- Configurazione di default di Flutter per l'elaborazione del testo -->
+        <!--
+            Elaborazione testo (PROCESS_TEXT):
+            Configurazione di default Flutter per la gestione della selezione
+            testo nelle text field. Consente all'utente di selezionare testo
+            e scegliere un'app di elaborazione (es. traduttore, dizionario).
+            Non trasmette dati personali degli studenti.
+        -->
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
-        
-        <!-- Permette a url_launcher di aprire i link HTTPS di GitHub quando tocchi la notifica -->
+
+        <!--
+            Apertura link HTTPS (VIEW):
+            Consente a url_launcher di aprire i link esterni in un browser:
+            - Link di download aggiornamenti applicazione
+            - Pagine web esterne (risorse catechistiche, documentazione)
+            - Link condivisi dagli utenti
+            Non viene utilizzato per trasferire dati personali.
+        -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.BROWSABLE" />

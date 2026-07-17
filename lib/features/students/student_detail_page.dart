@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../shared/widgets/app_scaffold.dart';
 
+/// Pagina di dettaglio legacy / WIP: mostra dati anagrafici fissi (nome
+/// fittizio "Mario Rossi"), sezioni genitori e azioni future non ancora
+/// implementate (storico appelli, modifica dati, presenze).
+/// File ereditato da una versione precedente; attualmente sostituita
+/// nella navigazione principale da [StudentQuickViewPage].
+/// Si appoggia a [AppScaffold] senza repository sottostante.
 class StudentDetailPage extends StatelessWidget {
   const StudentDetailPage({super.key});
 
@@ -64,7 +70,7 @@ class StudentDetailPage extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 12,
                   offset: const Offset(0, 6),
                 )
@@ -124,13 +130,13 @@ class _ProfileHeader extends StatelessWidget {
         gradient: LinearGradient(
           colors: [
             Colors.white,
-            Colors.blue.shade50.withOpacity(0.5),
+            Colors.blue.shade50.withValues(alpha: 0.5),
           ],
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 16,
             offset: const Offset(0, 10),
           )
@@ -200,7 +206,7 @@ class _Section extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 6),
           )

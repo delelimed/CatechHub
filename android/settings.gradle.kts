@@ -18,9 +18,16 @@ pluginManagement {
 }
 
 plugins {
+    // Loader dei plugin Flutter: gestisce automaticamente la registrazione
+    // di tutti i plugin dichiarati in pubspec.yaml
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
-    id("com.android.application") version "9.0.1" apply false
-    id("org.jetbrains.kotlin.android") version "2.3.20" apply false
+
+    // Android Gradle Plugin 8.11.1: versione richiesta per compatibilità
+    id("com.android.application") version "8.11.1" apply false
+
+    // Kotlin 2.0.21: Versione di sblocco compatibile con l'embedded-kotlin di Gradle
+    // Evita il crash sui metadati del workspace e sul caricamento dei plugin Flutter
+    id("org.jetbrains.kotlin.android") version "2.2.20" apply false
 }
 
 include(":app")

@@ -8,6 +8,12 @@ import '../students/students_repository.dart';
 import 'contact_notes_repository.dart';
 import 'student_contact_notes_page.dart';
 
+/// Pagina principale "Registro di Contatto" di CateREG.
+///
+/// Mostra l'elenco completo di tutti i ragazzi (ordinati per cognome) con
+/// un'anteprima dell'ultima nota di contatto registrata per ciascuno.
+/// Da ogni tile è possibile navigare alla pagina dei dettagli contatto
+/// del singolo studente ([StudentContactNotesPage]).
 class ContactNotesPage extends ConsumerWidget {
   const ContactNotesPage({super.key});
 
@@ -70,6 +76,11 @@ class ContactNotesPage extends ConsumerWidget {
   }
 }
 
+/// Tile per singolo studente nella lista principale.
+///
+/// Mostra iniziale del cognome, nome completo e anteprima dell'ultimo
+/// contatto (data + testo troncato a 40 caratteri). Se non ci sono
+/// contatti, mostra un messaggio "Nessun contatto registrato".
 class _StudentContactTile extends StatelessWidget {
   final Student student;
   final dynamic lastNote;
@@ -95,7 +106,7 @@ class _StudentContactTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -105,7 +116,7 @@ class _StudentContactTile extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 22,
-                backgroundColor: const Color(0xFF174A7E).withOpacity(0.1),
+                backgroundColor: const Color(0xFF174A7E).withValues(alpha: 0.1),
                 child: Text(
                   student.surname.isNotEmpty
                       ? student.surname[0].toUpperCase()

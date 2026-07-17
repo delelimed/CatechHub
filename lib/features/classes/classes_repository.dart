@@ -1,5 +1,20 @@
+/// Repository CRUD per le classi (gruppi catechistici) in CateREG.
+///
+/// Opera sul box Hive `classes` tramite [LocalDatabase.classes] e fornisce:
+/// - Stream e lettura sincrona dell'elenco classi.
+/// - Operazioni di scrittura: add, update, delete con **cascata**:
+///   alla cancellazione di una classe vengono rimossi anche i relativi
+///   record nei box `planning` e `attendance`.
+/// - Gestione delle assegnazioni: aggiunta/rimozione di studenti e
+///   catechisti a una classe.
+/// - All'update, se degli studenti vengono rimossi dalla classe, i relativi
+///   record di presenza vengono automaticamente puliti dal box `attendance`.
+///
+/// Integrazione CateREG: usato da [classesRepoProvider] e da tutte le
+/// pagine che necessitano di leggere o modificare i dati delle classi.
 import '../../core/storage/local_database.dart';
 import '../../shared/models/class_model.dart';
+import '../../shared/utils/auth_utils.dart';
 
 class ClassesRepository {
   final _box = LocalDatabase.classes();
@@ -20,12 +35,14 @@ class ClassesRepository {
 
   Future<void> addClass(SchoolClass c) async {
     final id = c.id.isEmpty ? LocalDatabase.newId('class') : c.id;
-    await _box.put(id, c.copyWith(id: id).toMap());
+    final catechistName = getCurrentCatechistName();
+    await _box.put(id, c.copyWith(id: id, lastModifiedBy: catechistName).toMap());
   }
 
   Future<void> updateClass(String id, SchoolClass c) async {
     final previous = _getClass(id);
-    await _box.put(id, c.copyWith(id: id).toMap());
+    final catechistName = getCurrentCatechistName();
+    await _box.put(id, c.copyWith(id: id, lastModifiedBy: catechistName).toMap());
 
     if (previous == null) return;
 

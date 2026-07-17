@@ -1,13 +1,34 @@
+/// Pagina di verifica numeri di telefono per CateREG.
+///
+/// Questa schermata consente agli operatori di cercare un numero di telefono
+/// nell'anagrafica studenti e visualizzare i relativi abbinamenti (studente,
+/// madre, padre). È pensata per supportare la comunicazione tramite WhatsApp
+/// con le famiglie: l'operatore può chiamare o avviare una chat WhatsApp
+/// direttamente dal risultato della ricerca.
+///
+/// CateREG è un gestionale per centri catechistici parrocchiali che tiene
+/// traccia degli studenti iscritti, dei loro genitori e dei relativi
+/// recapiti telefonici. Questa pagina è cruciale per aggiornare e verificare
+/// i contatti telefonici prima di inviare comunicazioni di gruppo.
+library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../shared/models/student_model.dart';
+//import '../../shared/models/student_model.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../students/students_repository.dart';
 
+/// Provider del repository studenti, usato per interrogare l'anagrafica.
 final studentsRepoProvider = Provider((ref) => StudentsRepository());
 
+/// Schermata principale di verifica numeri di telefono.
+///
+/// Widget [ConsumerStatefulWidget] che ospita la ricerca di un recapito
+/// telefonico nel database studenti. L'utente digita un numero, la pagina
+/// interroga il repository e mostra tutti gli abbinamenti trovati tra
+/// studenti e genitori, offrendo azioni rapide (chiamata / WhatsApp).
 class VerifyNumberPage extends ConsumerStatefulWidget {
   const VerifyNumberPage({super.key});
 
@@ -15,9 +36,18 @@ class VerifyNumberPage extends ConsumerStatefulWidget {
   ConsumerState<VerifyNumberPage> createState() => _VerifyNumberPageState();
 }
 
+/// Stato interno di [VerifyNumberPage].
+///
+/// Mantiene il controller del campo di ricerca, l'elenco dei risultati
+/// trovati e un flag che indica se è in corso una query sul repository.
 class _VerifyNumberPageState extends ConsumerState<VerifyNumberPage> {
+  /// Controller per il campo di input del numero di telefono.
   final _phoneController = TextEditingController();
+
+  /// Elenco degli abbinamenti trovati dall'ultima ricerca.
   final List<PhoneMatch> _matches = [];
+
+  /// Indica se è in corso una ricerca nel repository studenti.
   bool _isSearching = false;
 
   @override
@@ -26,6 +56,11 @@ class _VerifyNumberPageState extends ConsumerState<VerifyNumberPage> {
     super.dispose();
   }
 
+  /// Avvia la ricerca nel database studenti.
+  ///
+  /// Normalizza il numero inserito, interroga il repository e confronta
+  /// ogni studente sui tre campi telefono (studente, madre, padre).
+  /// I risultati vengono aggiunti a [_matches] e la UI viene aggiornata.
   Future<void> _searchNumber() async {
     final phoneNumber = _phoneController.text.trim();
     if (phoneNumber.isEmpty) return;
@@ -92,21 +127,36 @@ class _VerifyNumberPageState extends ConsumerState<VerifyNumberPage> {
     });
   }
 
+  /// Normalizza un numero di telefono rimuovendo tutto ciò che non è cifra.
+  ///
+  /// Utile per il confronto tra numeri formattati diversamente
+  /// (es. "333 123 4567" vs "3331234567").
   String _normalizePhone(String phone) {
     return phone.replaceAll(RegExp(r'[^0-9]'), '');
   }
 
+  /// Avvia una chiamata telefonica verso il numero specificato.
+  ///
+  /// Utilizza [launchUrl] con schema `tel:` per delegare al dialer di sistema.
   Future<void> _callNumber(String phone) async {
     final uri = Uri.parse('tel:$phone');
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
+  /// Avvia una chat WhatsApp verso il numero specificato.
+  ///
+  /// Normalizza il numero e costruisce l'URL `https://wa.me/<numero>`
+  /// per aprire WhatsApp con il numero già precompilato.
   Future<void> _whatsappNumber(String phone) async {
     final normalized = _normalizePhone(phone);
     final uri = Uri.parse('https://wa.me/$normalized');
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
+  /// Costruisce l'interfaccia della pagina.
+  ///
+  /// Mostra una card di ricerca in alto; se ci sono risultati li elenca
+  /// con [_MatchCard], altrimenti mostra un messaggio di nessun risultato.
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
@@ -146,9 +196,18 @@ class _VerifyNumberPageState extends ConsumerState<VerifyNumberPage> {
   }
 }
 
+/// Card di input per la ricerca del numero di telefono.
+///
+/// Contiene un [TextField] con tastiera telefonica e un pulsante "Cerca".
+/// Mostra un indicatore di caricamento quando la ricerca è in corso.
 class _SearchCard extends StatelessWidget {
+  /// Controller per il campo di inserimento del numero.
   final TextEditingController controller;
+
+  /// Indica se la ricerca è in corso (mostra spinner e disabilita il pulsante).
   final bool isSearching;
+
+  /// Callback invocata quando l'utente preme "Cerca".
   final VoidCallback onSearch;
 
   const _SearchCard({
@@ -165,7 +224,7 @@ class _SearchCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -229,9 +288,19 @@ class _SearchCard extends StatelessWidget {
   }
 }
 
+/// Card che visualizza un singolo abbinamento trovato.
+///
+/// Mostra il nome della persona, il numero di telefono e, se si tratta
+/// di un genitore, lo studente associato. Offre due pulsanti di azione:
+/// chiamata telefonica e apertura chat WhatsApp.
 class _MatchCard extends StatelessWidget {
+  /// Dati dell'abbinamento da visualizzare.
   final PhoneMatch match;
+
+  /// Callback per avviare una chiamata al numero trovato.
   final VoidCallback onCall;
+
+  /// Callback per aprire WhatsApp con il numero trovato.
   final VoidCallback onWhatsapp;
 
   const _MatchCard({
@@ -249,7 +318,7 @@ class _MatchCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -258,7 +327,7 @@ class _MatchCard extends StatelessWidget {
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
         leading: CircleAvatar(
-          backgroundColor: _getMatchColor(match.type).withOpacity(0.1),
+          backgroundColor: _getMatchColor(match.type).withValues(alpha: 0.1),
           child: Icon(
             _getMatchIcon(match.type),
             color: _getMatchColor(match.type),
@@ -309,6 +378,8 @@ class _MatchCard extends StatelessWidget {
     );
   }
 
+  /// Restituisce il colore associato al tipo di abbinamento:
+  /// blu per lo studente, rosa per la madre, indaco per il padre.
   Color _getMatchColor(PhoneMatchType type) {
     switch (type) {
       case PhoneMatchType.student:
@@ -320,6 +391,8 @@ class _MatchCard extends StatelessWidget {
     }
   }
 
+  /// Restituisce l'icona appropriata per il tipo di abbinamento:
+  /// persona per lo studente, donna per la madre, uomo per il padre.
   IconData _getMatchIcon(PhoneMatchType type) {
     switch (type) {
       case PhoneMatchType.student:
@@ -332,6 +405,10 @@ class _MatchCard extends StatelessWidget {
   }
 }
 
+/// Widget mostrato quando la ricerca non produce alcun risultato.
+///
+/// Esibisce un'icona di ricerca vuota e un messaggio che invita
+/// l'operatore a provare con un numero diverso.
 class _EmptyResult extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -371,13 +448,41 @@ class _EmptyResult extends StatelessWidget {
   }
 }
 
-enum PhoneMatchType { student, mother, father }
+/// Tipologia di abbinamento telefonico.
+///
+/// Distingue se il numero appartiene direttamente allo studente,
+/// alla madre o al padre.
+enum PhoneMatchType {
+  /// Numero dello studente stesso.
+  student,
 
+  /// Numero della madre.
+  mother,
+
+  /// Numero del padre.
+  father,
+}
+
+/// Modello dati che rappresenta un abbinamento trovato tra un numero
+/// di telefono e un soggetto nell'anagrafica.
+///
+/// Contiene il tipo di relazione (studente/genitore), il nome della
+/// persona, il recapito e, opzionalmente, il nome dello studente
+/// associato (quando il match riguarda un genitore).
 class PhoneMatch {
+  /// Tipo di abbinamento (studente, madre, padre).
   final PhoneMatchType type;
+
+  /// Nome della persona abbinata.
   final String name;
+
+  /// Numero di telefono corrispondente.
   final String phone;
+
+  /// Nome dello studente associato (solo per i genitori).
   final String? studentName;
+
+  /// ID dello studente associato.
   final String? studentId;
 
   PhoneMatch({

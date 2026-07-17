@@ -9,8 +9,15 @@ import '../classes/classes_provider.dart';
 import '../planning/planning_provider.dart';
 import 'attendance_repository.dart';
 
-class AttendanceMeetingsPage extends ConsumerWidget {
+class AttendanceMeetingsPage extends ConsumerStatefulWidget {
   const AttendanceMeetingsPage({super.key});
+
+  @override
+  ConsumerState<AttendanceMeetingsPage> createState() => _AttendanceMeetingsPageState();
+}
+
+class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage> {
+  bool _showPast = false;
 
   Stream<Map<String, bool>> _getAttendanceStatus() {
     return AttendanceRepository().getAttendance().map((records) {
@@ -19,7 +26,7 @@ class AttendanceMeetingsPage extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final classesAsync = ref.watch(classesStreamProvider);
     final planningRepo = ref.watch(planningRepoProvider);
@@ -55,16 +62,33 @@ class AttendanceMeetingsPage extends ConsumerWidget {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              final meetings = meetingsSnapshot.data!
+              final now = DateTime.now();
+              final today = DateTime(now.year, now.month, now.day);
+
+              var meetings = meetingsSnapshot.data!
                   .where((m) => m.classId == classId && !m.isReunion)
-                  .toList()
-                ..sort((a, b) => b.date.compareTo(a.date));
+                  .toList();
+
+              if (_showPast) {
+                meetings = meetings.where((m) => m.date.isBefore(today)).toList();
+                meetings.sort((a, b) => b.date.compareTo(a.date));
+              } else {
+                meetings = meetings.where((m) => !m.date.isBefore(today)).toList();
+                meetings.sort((a, b) => a.date.compareTo(b.date));
+              }
 
               if (meetings.isEmpty) {
-                return const _EmptyState(
-                  icon: Icons.event_note_rounded,
-                  title: 'Nessun incontro',
-                  subtitle: 'Non ci sono incontri programmati per la tua classe.',
+                return Column(
+                  children: [
+                    _buildToggleBar(),
+                    const Expanded(
+                      child: _EmptyState(
+                        icon: Icons.event_note_rounded,
+                        title: 'Nessun incontro',
+                        subtitle: 'Non ci sono incontri programmati per la tua classe.',
+                      ),
+                    ),
+                  ],
                 );
               }
 
@@ -73,155 +97,133 @@ class AttendanceMeetingsPage extends ConsumerWidget {
                 builder: (context, attendanceSnapshot) {
                   final attendanceMap = attendanceSnapshot.data ?? {};
 
-                  return ListView.separated(
+                  return ListView.builder(
                     padding: const EdgeInsets.only(
                       bottom: 100,
-                      left: 16,
-                      right: 16,
+                      left: 4,
+                      right: 4,
                       top: 16,
                     ),
-                    itemCount: meetings.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 14),
+                    itemCount: meetings.length + 1,
                     itemBuilder: (context, index) {
-                      final m = meetings[index];
+                      if (index == 0) {
+                        return Column(
+                          children: [
+                            _buildToggleBar(),
+                            const SizedBox(height: 14),
+                            _GridButton(
+                              onTap: () => context.push('/attendance-grid'),
+                            ),
+                          ],
+                        );
+                      }
+                      final m = meetings[index - 1];
                       final exists = attendanceMap[m.id] ?? false;
-                      final formattedDate =
-                          DateFormat('dd MMMM yyyy', 'it_IT').format(m.date);
 
-                      return InkWell(
-                        borderRadius: BorderRadius.circular(24),
-                        onTap: () => context.push('/attendance', extra: m),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.white,
-                                Colors.blue.shade50.withOpacity(0.35),
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(24),
+                          onTap: () => context.push('/attendance', extra: m),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.white,
+                                  Colors.blue.shade50.withValues(alpha: 0.35),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(color: Colors.blue.shade100),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.04),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 8),
+                                ),
                               ],
                             ),
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(color: Colors.blue.shade100),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.04),
-                                blurRadius: 16,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 74,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF174A7E),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      DateFormat('dd').format(m.date),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    Text(
-                                      DateFormat('MMM', 'it_IT')
-                                          .format(m.date)
-                                          .toUpperCase(),
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 18),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      formattedDate,
-                                      style: theme.textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        color: const Color(0xFF174A7E),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.menu_book_rounded,
-                                          size: 18,
-                                          color: Colors.orange.shade700,
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 56,
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF174A7E),
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        DateFormat('dd').format(m.date),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.bold,
                                         ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            m.title,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w500,
+                                      ),
+                                      Text(
+                                        DateFormat('MMM', 'it_IT')
+                                            .format(m.date)
+                                            .toUpperCase(),
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        m.title,
+                                        style: theme.textTheme.titleMedium?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: const Color(0xFF174A7E),
+                                        ),
+                                      ),
+                                      if (exists) ...[
+                                        const SizedBox(height: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.green.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(
+                                              color: Colors.green.withValues(alpha: 0.4),
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'Presenza già registrata',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.green,
                                             ),
                                           ),
                                         ),
                                       ],
-                                    ),
-                                    if (m.activity.trim().isNotEmpty) ...[
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        m.activity,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: Colors.grey.shade700,
-                                          fontSize: 13,
-                                        ),
-                                      ),
                                     ],
-                                    if (exists) ...[
-                                      const SizedBox(height: 10),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.green.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(
-                                            color: Colors.green.withOpacity(0.4),
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          'Presenza gia registrata',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.green,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
+                                  ),
                                 ),
-                              ),
-                              const Icon(
-                                Icons.arrow_forward_ios_rounded,
-                                size: 16,
-                                color: Colors.grey,
-                              ),
-                            ],
+                                const Icon(
+                                  Icons.arrow_forward_ios_rounded,
+                                  size: 16,
+                                  color: Colors.grey,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       );
@@ -232,6 +234,156 @@ class AttendanceMeetingsPage extends ConsumerWidget {
             },
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildToggleBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: SizedBox(
+        height: 42,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          children: [
+            _ToggleChip(
+              label: _showPast ? 'Prossimi' : 'Passati',
+              icon: _showPast ? Icons.upcoming_rounded : Icons.history_rounded,
+              onTap: () {
+                setState(() => _showPast = !_showPast);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ToggleChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _ToggleChip({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF174A7E),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GridButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _GridButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF174A7E), Color(0xFF2A6BB0)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.blue.withValues(alpha: 0.2),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.grid_view_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Visualizza Griglia',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Registro presenze completo',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.75),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Text(
+                'Apri',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

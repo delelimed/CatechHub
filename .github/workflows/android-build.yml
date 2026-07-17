@@ -1,0 +1,79 @@
+name: Flutter Android Signed Build
+
+on:
+  # Permette di far partire l'azione manualmente a comando dalla scheda "Actions" di GitHub
+  workflow_dispatch:
+
+  # Fa partire l'azione automaticamente ad ogni push sul ramo develop
+  push:
+    branches:
+      - develop
+      
+  # Fa partire l'azione ad ogni Pull Request verso il ramo develop
+  pull_request:
+    branches:
+      - develop
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Scarica il codice sorgente
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Configura Java (JDK 17 richiesto per le versioni recenti di Flutter/Gradle)
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      # 3. Configura Flutter con la cache per velocizzare le build successive
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      # 4. Scarica i pacchetti di Flutter
+      - name: Install dependencies
+        run: flutter pub get
+
+      # 5. Ricrea il file .env partendo dal Secret di GitHub
+      - name: Create .env file
+        run: |
+          echo "${{ secrets.ENV_FILE }}" > .env
+
+      # 6. Verifica che non ci siano errori di sintassi o analisi nel codice
+      - name: Run Flutter Analyzer
+        run: flutter analyze
+
+      # 7. Decodifica il Keystore in un file fisico temporaneo
+      - name: Decode Keystore File
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > /tmp/keystore.jks
+
+      # 8. Compila l'APK firmato passando le credenziali come variabili d'ambiente
+      - name: Build Signed Android APK
+        env:
+          SIGNING_KEYSTORE_PATH: /tmp/keystore.jks
+          SIGNING_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: flutter build apk --release --dart-define-from-file=.env --target-platform=android-arm64 --obfuscate --split-debug-info=./debug_info
+
+      # 9. Salva l'APK firmato finale negli Artifacts di GitHub scaricabili
+      - name: Upload Signed APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-signed-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+      # 10. Salva anche i file di debug generati dall'offuscamento
+      - name: Upload Debug Info (Obfuscation Symbols)
+        uses: actions/upload-artifact@v4
+        with:
+          name: CatechHub-Debug-Info
+          path: ./debug_info

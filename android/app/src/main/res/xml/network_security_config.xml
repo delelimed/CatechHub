@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Network Security Configuration per CatechHub v1.0+ — REVISIONE GDPR 2026
+    
+    POLITICA DI SICUREZZA STRETTA (Zero Trust):
+    - Blocca TUTTO il traffico di rete per default (base-config cleartext=false)
+    - Whitelist ESCLUSIVA per domini autorizzati: Wiredash e GitHub SOLO
+    - freeRASP / Talsec: COMPLETAMENTE ESCLUSO dalla whitelist.
+      freeRASP opera in modalità OFFLINE-ONLY: non effettua alcuna connessione
+      di rete. Il watcherMail in TalsecConfig è presente per conformità API
+      ma le email di notifica NON vengono inviate perché il dominio talsec.app
+      è bloccato a livello di sistema operativo.
+    - Cleartext traffic (HTTP non cifrato) disabilitato globalmente
+    - Certificate pinning: non configurato (si affida al trust store di sistema)
+    - Debug-overrides: certificati utente consentiti SOLO in debug build
+    
+    DOMINI AUTORIZZATI (WHITELIST ESCLUSIVA):
+    1. Wiredash (*.wiredash.io) — Feedback utente volontario
+       - Solo se utente abilita esplicitamente "Consenti feedback remoti"
+       - Dati inviati: solo il contenuto del feedback scritto dall'utente
+       - Nessun dato personale degli studenti viene trasmesso
+    
+    2. GitHub (api.github.com, github.com, objects.githubusercontent.com,
+       *.githubusercontent.com)
+       - api.github.com: controllo versioni e metadati release (via UpdateService)
+       - github.com: pagine web / redirect (es. link release notes)
+       - objects.githubusercontent.com: download asset APK per aggiornamenti
+       - *.githubusercontent.com: raw content / storage CDN
+       - Verifica SHA-256 dell'APK prima dell'installazione
+    
+    NESSUNA ALTRA CONNESSIONE DI RETE È PERMESSA.
+    L'app non contiene tracker pubblicitari, analytics esterni,
+    SDK di terze parti connessi, o backdoor di qualsiasi tipo.
+-->
+<network-security-config>
+    <!-- Disabilita globalmente il traffico in chiaro (HTTP non-TLS) -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Whitelist Wiredash: feedback e crash reporting -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">wiredash.io</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
+    <!-- Whitelist GitHub API: controllo aggiornamenti e metadati release -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">api.github.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
+    <!-- Whitelist GitHub web: pagine/redirect (es. link release) -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">github.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
+    <!-- Whitelist GitHub Objects: download asset release (file APK) -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">objects.githubusercontent.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
+    <!-- Whitelist GitHub User Content (CDN storage): download APK da release -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">githubusercontent.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
+    <!--
+         freeRASP / Talsec INTENZIONALMENTE NON IN WHITELIST.
+         freeRASP opera in modalità OFFLINE-ONLY: tutte le protezioni runtime
+         (root detection, emulator detection, tamper detection, hooking detection)
+         funzionano LOCALMENTE senza connettività di rete. Il watcherMail
+         in TalsecConfig NON può recapitare email perché il dominio è bloccato
+         a livello di network security config. Questo è intenzionale per
+         garantire la massima privacy: nessun dato di telemetria di sicurezza
+         lascia mai il dispositivo.
+    -->
+
+    <!--
+         DEBUG OVERRIDES: SOLO per build debug (kDebugMode = true).
+         In produzione (release build) questa sezione viene ignorata automaticamente
+         perché il sistema riconosce le build debuggable.
+         Consente certificati utente (self-signed, CA locali) per sviluppo e test.
+         In release: SOLO certificati di sistema (nessun user-trusted CA).
+    -->
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>

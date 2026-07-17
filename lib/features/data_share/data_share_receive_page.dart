@@ -1,27 +1,48 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../core/services/qr_data_service.dart';
 import '../../core/services/data_export_service.dart';
+import '../classes/classes_provider.dart';
+import '../documents/documents_provider.dart';
+import '../planning/planning_provider.dart';
+import '../students/students_provider.dart';
 
-class DataShareReceivePage extends StatefulWidget {
+/// Pagina di ricezione dati di CateREG tramite scansione QR.
+///
+/// Acquisisce tramite fotocamera i chunk QR generati dal mittente,
+/// li assembla in ordine e richiede il PIN a 8 cifre per decifrare
+/// e importare i dati nel database locale.
+///
+/// Il flusso prevede quattro fasi:
+/// 1. **Scansione** — acquisizione progressiva dei chunk QR con pausa
+/// 2. **Verifica checksum** — ogni chunk viene convalidato singolarmente
+/// 3. **Richiesta PIN** — l'utente inserisce il PIN fornito dal mittente
+/// 4. **Importazione** — i dati decifrati sostituiscono quelli esistenti
+///
+/// Mostra in tempo reale l'avanzamento, l'elenco dei chunk mancanti
+/// e istruzioni passo-passo per guidare l'operatore.
+class DataShareReceivePage extends ConsumerStatefulWidget {
   const DataShareReceivePage({super.key});
 
   @override
-  State<DataShareReceivePage> createState() => _DataShareReceivePageState();
+  ConsumerState<DataShareReceivePage> createState() => _DataShareReceivePageState();
 }
 
-class _DataShareReceivePageState extends State<DataShareReceivePage> {
+class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
   final List<QRChunk> _receivedChunks = [];
   final Set<int> _receivedChunkIndices = {};
-  String? _pin;
+  String? _assembledPackageData;
   final TextEditingController _pinController = TextEditingController();
   bool _isScanning = true;
   bool _isVerifyingPin = false;
   bool _isImporting = false;
   String? _errorMessage;
+  String? _phaseMessage;
   int _totalChunks = 0;
 
   @override
@@ -89,20 +110,10 @@ class _DataShareReceivePageState extends State<DataShareReceivePage> {
     // Assembla i chunk
     try {
       final assembledData = QRDataService.assembleChunks(_receivedChunks);
-      final decompressedData = QRDataService.decompressData(assembledData);
-      final package = DataPackage.fromMap(decompressedData);
-
-      // Verifica checksum del pacchetto
-      if (!QRDataService.verifyPackageChecksum(package)) {
-        setState(() {
-          _errorMessage = 'Checksum del pacchetto non valido';
-          _isScanning = true;
-        });
-        return;
-      }
+      QRDataService.extractPackage(assembledData);
 
       setState(() {
-        _pin = package.pin;
+        _assembledPackageData = assembledData;
       });
     } catch (e) {
       setState(() {
@@ -113,9 +124,9 @@ class _DataShareReceivePageState extends State<DataShareReceivePage> {
   }
 
   void _verifyAndImport() {
-    if (_pin == null) {
+    if (_assembledPackageData == null) {
       setState(() {
-        _errorMessage = 'PIN non disponibile';
+        _errorMessage = 'Pacchetto dati non disponibile';
       });
       return;
     }
@@ -128,32 +139,24 @@ class _DataShareReceivePageState extends State<DataShareReceivePage> {
       return;
     }
 
-    if (!QRDataService.verifyPin(inputPin, _pin!)) {
-      setState(() {
-        _errorMessage = 'PIN non corretto';
-      });
-      return;
-    }
-
-    // PIN corretto, procedi con importazione
     setState(() {
-      _isVerifyingPin = false;
+      _isVerifyingPin = true;
       _isImporting = true;
       _errorMessage = null;
     });
 
-    _importData();
+    Future.delayed(Duration.zero, () => _importData(inputPin));
   }
 
-  Future<void> _importData() async {
+  Future<void> _importData(String pin) async {
     try {
-      // Assembla i dati
-      final assembledData = QRDataService.assembleChunks(_receivedChunks);
-      final decompressedData = QRDataService.decompressData(assembledData);
-      final package = DataPackage.fromMap(decompressedData);
-      final receivedData = package.data;
+      setState(() => _phaseMessage = 'Decifratura dati…');
+      final receivedData = QRDataService.extractPackageData(
+        _assembledPackageData!,
+        pin,
+      );
 
-      // Verifica integrità dati per pacchetti selettivi
+      setState(() => _phaseMessage = 'Verifica integrità dati…');
       if (!DataExportService.verifyDataIntegrity(
         receivedData,
         requireFullPackage: false,
@@ -162,28 +165,44 @@ class _DataShareReceivePageState extends State<DataShareReceivePage> {
           _errorMessage = 'Integrità dei dati non valida';
           _isImporting = false;
           _isScanning = true;
+          _phaseMessage = null;
         });
         return;
       }
 
-      // Importa i dati
-      await DataExportService.importData(receivedData);
+      setState(() => _phaseMessage = 'Importazione dati in corso…');
+      await DataExportService.importData(
+        receivedData,
+        onPhase: (phase) {
+          if (mounted) setState(() => _phaseMessage = phase);
+        },
+      );
 
-      // Importazione completata
+      ref.invalidate(classesStreamProvider);
+      ref.invalidate(documentsStreamProvider);
+      ref.invalidate(planningRepoProvider);
+      ref.invalidate(studentsRepoProvider);
+
       setState(() {
         _isImporting = false;
+        _isVerifyingPin = false;
+        _phaseMessage = null;
       });
       if (mounted) {
         setState(() {
           _isImporting = false;
+          _isVerifyingPin = false;
+          _phaseMessage = null;
         });
         _showSuccessDialog();
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Errore nell\'importazione dei dati: $e';
+        _errorMessage = 'PIN non corretto o dati non validi';
         _isImporting = false;
+        _isVerifyingPin = false;
         _isScanning = true;
+        _phaseMessage = null;
       });
     }
   }
@@ -218,7 +237,7 @@ class _DataShareReceivePageState extends State<DataShareReceivePage> {
     setState(() {
       _receivedChunks.clear();
       _receivedChunkIndices.clear();
-      _pin = null;
+      _assembledPackageData = null;
       _pinController.clear();
       _isScanning = true;
       _isVerifyingPin = false;
@@ -248,10 +267,9 @@ class _DataShareReceivePageState extends State<DataShareReceivePage> {
         child: Column(
           children: [
             if (_isImporting)
-              _ImportingCard()
-            else if (_pin != null)
+              _ImportingCard(phaseMessage: _phaseMessage)
+            else if (_assembledPackageData != null)
               _PinVerificationCard(
-                pin: _pin!,
                 controller: _pinController,
                 onVerify: _verifyAndImport,
                 onReset: _resetScanning,
@@ -382,7 +400,7 @@ class _ScanningCardState extends State<_ScanningCard> {
             const SizedBox(width: 12),
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => context.go('/data-share'),
+                onPressed: () => context.pop(),
                 icon: const Icon(Icons.cancel_rounded),
                 label: const Text('Annulla'),
               ),
@@ -398,14 +416,12 @@ class _ScanningCardState extends State<_ScanningCard> {
 }
 
 class _PinVerificationCard extends StatelessWidget {
-  final String pin;
   final TextEditingController controller;
   final VoidCallback onVerify;
   final VoidCallback onReset;
   final String? errorMessage;
 
   const _PinVerificationCard({
-    required this.pin,
     required this.controller,
     required this.onVerify,
     required this.onReset,
@@ -419,9 +435,9 @@ class _PinVerificationCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: Colors.green.withOpacity(0.1),
+            color: Colors.green.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.green.withOpacity(0.3)),
+            border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
           ),
           child: Column(
             children: [
@@ -493,6 +509,10 @@ class _PinVerificationCard extends StatelessWidget {
 }
 
 class _ImportingCard extends StatelessWidget {
+  final String? phaseMessage;
+
+  const _ImportingCard({this.phaseMessage});
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -505,6 +525,18 @@ class _ImportingCard extends StatelessWidget {
             'Importazione in corso...',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
+          if (phaseMessage != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              phaseMessage!,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: const Color(0xFF174A7E).withValues(alpha: 0.8),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           Text(
             'I dati vengono salvati. Non chiudere l\'app.',
@@ -541,8 +573,8 @@ class _ProgressInfo extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                const Color(0xFF174A7E).withOpacity(0.8),
-                const Color(0xFF2E5A8F).withOpacity(0.8),
+                const Color(0xFF174A7E).withValues(alpha: 0.8),
+                const Color(0xFF2E5A8F).withValues(alpha: 0.8),
               ],
             ),
             borderRadius: BorderRadius.circular(12),
@@ -588,7 +620,7 @@ class _ProgressInfo extends StatelessWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -608,7 +640,7 @@ class _ProgressInfo extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                   child: LinearProgressIndicator(
                     value: receivedCount / totalChunks,
-                    backgroundColor: Colors.white.withOpacity(0.3),
+                    backgroundColor: Colors.white.withValues(alpha: 0.3),
                     valueColor: const AlwaysStoppedAnimation<Color>(
                       Colors.white,
                     ),
@@ -624,9 +656,9 @@ class _ProgressInfo extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.1),
+              color: Colors.orange.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.orange.withOpacity(0.3)),
+              border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
             ),
             child: Row(
               children: [
@@ -677,9 +709,9 @@ class _ErrorMessage extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.1),
+        color: Colors.red.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.red.withOpacity(0.3)),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [

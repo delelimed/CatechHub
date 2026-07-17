@@ -1,3 +1,24 @@
+/// Widget che mostra la sezione "Foto e documenti" all'interno delle schede
+/// di dettaglio di CateREG (pratiche, clienti, fatture, ecc.).
+///
+/// Funzionalità principali:
+///
+/// - **Elenco reattivo**: usa uno [StreamBuilder] con [AttachmentsRepository.watchForParent]
+///   per aggiornarsi automaticamente quando gli allegati del padre cambiano.
+///
+/// - **Aggiunta file**: tramite [ImagePicker] (camera/galleria) o [FilePicker] (PDF).
+///   Le foto vengono scattate/selezionate con qualità 70% e max 2048px, poi passate
+///   al repository che le ottimizzerà ulteriormente.
+///
+/// - **Rinomina**: dialogo modale che preserva automaticamente l'estensione originale.
+///
+/// - **Eliminazione**: conferma con dialogo prima di rimuovere l'allegato sia
+///   dal vault crittografato che dal database.
+///
+/// - **Visualizzazione**: apre [AttachmentViewerPage] per la preview full-screen.
+///
+/// Il parametro [readOnly] disabilita tutte le azioni modificative (aggiungi,
+/// rinomina, elimina), utile in contesti di sola consultazione.
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,21 +35,20 @@ class AttachmentsSection extends ConsumerWidget {
     required this.parentId,
     required this.parentType,
     this.title = 'Foto e documenti',
+    this.readOnly = false,
   });
 
   final String parentId;
   final String parentType;
   final String title;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final repo = ref.watch(attachmentsRepositoryProvider);
 
     return StreamBuilder<List<Attachment>>(
-      stream: repo.watchForParent(
-        parentId: parentId,
-        parentType: parentType,
-      ),
+      stream: repo.watchForParent(parentId: parentId, parentType: parentType),
       builder: (context, snapshot) {
         final attachments = snapshot.data ?? [];
 
@@ -40,7 +60,7 @@ class AttachmentsSection extends ConsumerWidget {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -51,7 +71,11 @@ class AttachmentsSection extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.lock_rounded, color: Color(0xFF174A7E), size: 20),
+                  const Icon(
+                    Icons.lock_rounded,
+                    color: Color(0xFF174A7E),
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -63,12 +87,13 @@ class AttachmentsSection extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'Aggiungi',
-                    onPressed: () => _showAddMenu(context, ref),
-                    icon: const Icon(Icons.add_circle_outline_rounded),
-                    color: const Color(0xFF174A7E),
-                  ),
+                  if (!readOnly)
+                    IconButton(
+                      tooltip: 'Aggiungi',
+                      onPressed: () => _showAddMenu(context, ref),
+                      icon: const Icon(Icons.add_circle_outline_rounded),
+                      color: const Color(0xFF174A7E),
+                    ),
                 ],
               ),
               const SizedBox(height: 4),
@@ -89,6 +114,7 @@ class AttachmentsSection extends ConsumerWidget {
                 ...attachments.map(
                   (att) => _AttachmentTile(
                     attachment: att,
+                    readOnly: readOnly,
                     onOpen: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
@@ -96,8 +122,12 @@ class AttachmentsSection extends ConsumerWidget {
                         ),
                       );
                     },
-                    onDelete: () => _confirmDelete(context, ref, att),
-                    onRename: () => _renameAttachment(context, ref, att),
+                    onDelete: readOnly
+                        ? null
+                        : () => _confirmDelete(context, ref, att),
+                    onRename: readOnly
+                        ? null
+                        : () => _renameAttachment(context, ref, att),
                   ),
                 ),
             ],
@@ -150,9 +180,9 @@ class AttachmentsSection extends ConsumerWidget {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Errore: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Errore: $e')));
       }
     }
   }
@@ -185,11 +215,13 @@ class AttachmentsSection extends ConsumerWidget {
     if (file == null) return;
 
     // Genera un nome appropriato per il file
-    String fileName = file.name.isNotEmpty ? file.name : 'file_${DateTime.now().millisecondsSinceEpoch}';
-    
+    String fileName = file.name.isNotEmpty
+        ? file.name
+        : 'file_${DateTime.now().millisecondsSinceEpoch}';
+
     // Chiedi all'utente di confermare o modificare il nome
     final finalName = await _askForFileName(context, fileName);
-    
+
     final repo = ref.read(attachmentsRepositoryProvider);
     final saved = await repo.addFromPath(
       parentId: parentId,
@@ -220,32 +252,37 @@ class AttachmentsSection extends ConsumerWidget {
     final finalName = await _askForFileName(context, file.name);
 
     final repo = ref.read(attachmentsRepositoryProvider);
-    final saved = path != null
-        ? await repo.addFromPath(
-            parentId: parentId,
-            parentType: parentType,
-            filePath: path,
-            name: finalName,
-            mimeType: 'application/pdf',
-          )
-        : file.bytes != null
-            ? await repo.addFromBytes(
-                parentId: parentId,
-                parentType: parentType,
-                name: finalName,
-                mimeType: 'application/pdf',
-                bytes: file.bytes!,
-              )
-            : throw Exception('Impossibile leggere il PDF selezionato');
+    final saved;
+    if (path != null) {
+      saved = await repo.addFromPath(
+        parentId: parentId,
+        parentType: parentType,
+        filePath: path,
+        name: finalName,
+        mimeType: 'application/pdf',
+      );
+    } else {
+      final bytes = await file.readAsBytes();
+      saved = await repo.addFromBytes(
+        parentId: parentId,
+        parentType: parentType,
+        name: finalName,
+        mimeType: 'application/pdf',
+        bytes: bytes,
+      );
+    }
 
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_savedMessage(saved.size, 'PDF'))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_savedMessage(saved.size, 'PDF'))));
     }
   }
 
-  Future<String> _askForFileName(BuildContext context, String defaultName) async {
+  Future<String> _askForFileName(
+    BuildContext context,
+    String defaultName,
+  ) async {
     final controller = TextEditingController(text: defaultName);
     final result = await showDialog<String>(
       context: context,
@@ -279,15 +316,17 @@ class AttachmentsSection extends ConsumerWidget {
     WidgetRef ref,
     Attachment att,
   ) async {
-    final controller = TextEditingController(text: att.name);
+    final originalExtension = _extensionOf(att.name);
+    final controller = TextEditingController(text: _stripExtension(att.name));
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Rinomina allegato'),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: 'Nuovo nome del file',
+            suffixText: originalExtension,
           ),
           autofocus: true,
         ),
@@ -305,15 +344,42 @@ class AttachmentsSection extends ConsumerWidget {
     );
     controller.dispose();
 
-    if (result != null && result.trim().isNotEmpty && result != att.name) {
-      // Implementare la rinomina nel repository se necessario
-      // Per ora, mostriamo solo un messaggio
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Funzionalità di rinomina in arrivo')),
-        );
+    final typedName = result?.trim();
+    if (typedName != null && typedName.isNotEmpty) {
+      final preservedName = _preserveExtension(
+        att.name,
+        _stripExtension(typedName),
+      );
+      if (preservedName != att.name) {
+        await ref
+            .read(attachmentsRepositoryProvider)
+            .updateAttachmentName(attachmentId: att.id, name: preservedName);
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Nome aggiornato in "$preservedName"')),
+          );
+        }
       }
     }
+  }
+
+  String _preserveExtension(String originalName, String newName) {
+    final originalExtension = _extensionOf(originalName);
+    if (originalExtension.isEmpty) return newName.trim();
+    return '${newName.trim()}$originalExtension';
+  }
+
+  String _stripExtension(String name) {
+    final index = name.lastIndexOf('.');
+    if (index < 0) return name.trim();
+    return name.substring(0, index).trim();
+  }
+
+  String _extensionOf(String name) {
+    final index = name.lastIndexOf('.');
+    if (index < 0 || index == name.length - 1) return '';
+    return name.substring(index);
   }
 
   String _savedMessage(int bytes, String type) {
@@ -360,33 +426,40 @@ class AttachmentsSection extends ConsumerWidget {
 
     await ref.read(attachmentsRepositoryProvider).deleteAttachment(att.id);
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Allegato eliminato')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Allegato eliminato')));
     }
   }
 }
 
+/// Singola riga di allegato nella lista di [AttachmentsSection].
+///
+/// Mostra l'icona (immagine/PDF/file generico), il nome, la dimensione
+/// formattata, la data e i pulsanti di rinomina/eliminazione in base al
+/// parametro [readOnly]. Al tap apre [AttachmentViewerPage].
 class _AttachmentTile extends StatelessWidget {
   const _AttachmentTile({
     required this.attachment,
+    required this.readOnly,
     required this.onOpen,
-    required this.onDelete,
-    required this.onRename,
+    this.onDelete,
+    this.onRename,
   });
 
   final Attachment attachment;
+  final bool readOnly;
   final VoidCallback onOpen;
-  final VoidCallback onDelete;
-  final VoidCallback onRename;
+  final VoidCallback? onDelete;
+  final VoidCallback? onRename;
 
   @override
   Widget build(BuildContext context) {
     final icon = attachment.isImage
         ? Icons.image_rounded
         : attachment.isPdf
-            ? Icons.picture_as_pdf_rounded
-            : Icons.insert_drive_file_rounded;
+        ? Icons.picture_as_pdf_rounded
+        : Icons.insert_drive_file_rounded;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -402,21 +475,28 @@ class _AttachmentTile extends StatelessWidget {
         subtitle: Text(
           '${attachment.sizeLabel} · ${_formatDate(attachment.createdAt)}',
         ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.edit_rounded, color: Colors.blue),
-              onPressed: onRename,
-              tooltip: 'Rinomina',
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
-              onPressed: onDelete,
-              tooltip: 'Elimina',
-            ),
-          ],
-        ),
+        trailing: readOnly
+            ? null
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (onRename != null)
+                    IconButton(
+                      icon: const Icon(Icons.edit_rounded, color: Colors.blue),
+                      onPressed: onRename,
+                      tooltip: 'Rinomina',
+                    ),
+                  if (onDelete != null)
+                    IconButton(
+                      icon: const Icon(
+                        Icons.delete_outline_rounded,
+                        color: Colors.red,
+                      ),
+                      onPressed: onDelete,
+                      tooltip: 'Elimina',
+                    ),
+                ],
+              ),
         onTap: onOpen,
       ),
     );

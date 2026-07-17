@@ -1,13 +1,29 @@
+// ══════════════════════════════════════════════════════════════════════════════
+// login_page.dart — CatechHub (Login SOLO biometrico nativo / profilo iniziale)
+// 
+// FLUSSO:
+// 1. App avviata → controlla isProfileConfigured
+// 2. Se NON configurato → Form profilo (nome, cognome, gruppo) → setupInitialProfile → sblocca
+// 3. Se configurato → Verifica hasSecureLockScreen()
+//    - Se FALSE → HardLockScreen (bloccante, non chiudibile)
+//    - Se TRUE → Mostra pulsante "Accedi con Impronta/Faccia/PIN Telefono"
+// 4. Tap pulsante → unlockWithBiometrics() (biometricOnly: false = fallback PIN telefono)
+// 5. Successo → Home
+//
+// NESSUN PIN app. NESSUN campo PIN. Solo biometria nativa Android.
+// ══════════════════════════════════════════════════════════════════════════════
+
+import 'dart:async';
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:local_auth/local_auth.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'bible_quote.dart';
 import '../../core/auth/auth_provider.dart';
 
+/// Schermata di accesso principale - SOLO autenticazione nativa dispositivo.
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
 
@@ -18,21 +34,14 @@ class LoginPage extends ConsumerStatefulWidget {
 class _LoginPageState extends ConsumerState<LoginPage> {
   late final BibleQuote randomQuote;
 
-  final _pinController = TextEditingController();
-  final _confirmPinController = TextEditingController();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _groupController = TextEditingController();
 
-  bool _isConfirmingStage = false;
   bool _isFirstSetup = false;
-  bool _biometricAvailable = false;
-  bool _showPin = false;
-
-  String _firstPin = '';
+  bool _hasSecureLockScreen = false;
+  bool _checkedLockScreen = false;
   String? _errorMessage;
-
-  final _localAuth = LocalAuthentication();
 
   @override
   void initState() {
@@ -41,27 +50,22 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final authService = ref.read(authServiceProvider);
-      final isConfigured = authService.isPinConfigured;
-      debugPrint('Login initState - PIN configurato: $isConfigured');
+      final isConfigured = authService.isProfileConfigured;
+      debugPrint('Login initState - Profilo configurato: $isConfigured');
 
-      final isDeviceSupported = await _localAuth.isDeviceSupported();
-      final canCheckBiometrics = await _localAuth.canCheckBiometrics;
-      debugPrint('Login initState - Device supportato: $isDeviceSupported, Can check: $canCheckBiometrics');
+      if (!isConfigured) {
+        if (mounted) setState(() => _isFirstSetup = true);
+        return;
+      }
 
-      final availableBiometrics = await _localAuth.getAvailableBiometrics();
-      debugPrint('Login initState - Biometriche disponibili: $availableBiometrics');
-
-      final canBiometric = isDeviceSupported && canCheckBiometrics && availableBiometrics.isNotEmpty;
+      // Profilo esiste: verifica se il dispositivo ha lockscreen attivo
+      final hasLock = await authService.hasSecureLockScreen();
+      debugPrint('Login initState - Lockscreen attivo: $hasLock');
 
       if (mounted) {
         setState(() {
-          _isFirstSetup = !isConfigured;
-          _biometricAvailable = canBiometric && isConfigured;
-          debugPrint('Login initState - Biometrica disponibile: $_biometricAvailable');
-          if (_biometricAvailable) {
-            debugPrint('Login initState - Avvio autenticazione biometrica automatica');
-            _authenticateWithBiometrics();
-          }
+          _hasSecureLockScreen = hasLock;
+          _checkedLockScreen = true;
         });
       }
     });
@@ -69,122 +73,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   @override
   void dispose() {
-    _pinController.dispose();
-    _confirmPinController.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
     _groupController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleSubmit() async {
-    HapticFeedback.mediumImpact();
-    setState(() => _errorMessage = null);
-
-    final controller = _isConfirmingStage
-        ? _confirmPinController
-        : _pinController;
-    final pin = controller.text.trim();
-
-    if (pin.length < 4) {
-      setState(() => _errorMessage = "Il PIN deve essere di almeno 4 cifre");
-      return;
-    }
-
-    final auth = ref.read(authStateProvider.notifier);
-
-    if (_isFirstSetup) {
-      if (!_isConfirmingStage) {
-        final firstName = _firstNameController.text.trim();
-        final lastName = _lastNameController.text.trim();
-        final groupName = _groupController.text.trim();
-
-        if (firstName.isEmpty || lastName.isEmpty || groupName.isEmpty) {
-          setState(
-            () => _errorMessage = "Nome, cognome e gruppo sono obbligatori.",
-          );
-          return;
-        }
-
-        _firstPin = pin;
-        _pinController.clear();
-
-        setState(() => _isConfirmingStage = true);
-        return;
-      }
-
-      if (_firstPin != pin) {
-        _pinController.clear();
-        _confirmPinController.clear();
-
-        setState(() {
-          _isConfirmingStage = false;
-          _errorMessage = "I PIN non corrispondono.";
-        });
-        return;
-      }
-
-      final firstName = _firstNameController.text.trim();
-      final lastName = _lastNameController.text.trim();
-      final groupName = _groupController.text.trim();
-
-      try {
-        final ok = await auth.setupAndUnlock(
-          pin,
-          firstName: firstName,
-          lastName: lastName,
-          groupName: groupName,
-        ).timeout(
-          const Duration(seconds: 15),
-          onTimeout: () async {
-            if (mounted) {
-              setState(() => _errorMessage = "Timeout: controlla la connessione");
-            }
-            return false;
-          },
-        );
-
-        if (!ok && mounted) {
-          setState(
-            () => _errorMessage = "Errore durante la creazione del profilo.",
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          setState(() => _errorMessage = "Errore: riprova");
-          debugPrint('Setup error: $e');
-        }
-      }
-
-      return;
-    }
-
-    try {
-      final ok = await auth.unlock(pin).timeout(
-        const Duration(seconds: 15),
-        onTimeout: () async {
-          if (mounted) {
-            setState(() => _errorMessage = "Timeout: controlla la connessione");
-          }
-          return false;
-        },
-      );
-
-      if (!ok && mounted) {
-        setState(() {
-          _errorMessage = "PIN errato";
-          _pinController.clear();
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _errorMessage = "Errore: riprova");
-        debugPrint('Login error: $e');
-      }
-    }
-  }
-
-  Future<void> _authenticateWithBiometrics() async {
+  Future<void> _handleBiometricUnlock() async {
     HapticFeedback.mediumImpact();
     setState(() => _errorMessage = null);
 
@@ -192,10 +87,34 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final ok = await auth.unlockWithBiometrics();
 
     if (!ok && mounted) {
-      setState(
-        () => _errorMessage =
-            "Autenticazione biometrica non riuscita. Usa il PIN.",
-      );
+      setState(() {
+        _errorMessage = 'Autenticazione non riuscita. Riprova.';
+      });
+    }
+  }
+
+  Future<void> _handleSetupProfile() async {
+    HapticFeedback.mediumImpact();
+    setState(() => _errorMessage = null);
+
+    final firstName = _firstNameController.text.trim();
+    final lastName = _lastNameController.text.trim();
+    final groupName = _groupController.text.trim();
+
+    if (firstName.isEmpty || lastName.isEmpty || groupName.isEmpty) {
+      setState(() => _errorMessage = 'Nome, cognome e gruppo sono obbligatori.');
+      return;
+    }
+
+    final auth = ref.read(authStateProvider.notifier);
+    final ok = await auth.setupInitialProfile(
+      firstName: firstName,
+      lastName: lastName,
+      groupName: groupName,
+    );
+
+    if (!ok && mounted) {
+      setState(() => _errorMessage = 'Errore durante la configurazione. Riprova.');
     }
   }
 
@@ -203,6 +122,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
     final isLoading = authState.isLoading;
+
+    // Se già sbloccato, non dovremmo essere qui (router gestisce redirect)
+    // Ma per sicurezza mostriamo loading
+    if (isLoading) {
+      return _buildLoadingScreen();
+    }
 
     return Scaffold(
       body: Container(
@@ -230,16 +155,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Image.asset(
-                          "assets/images/logo.png",
+                          'assets/images/logo.png',
                           height: 120,
                           errorBuilder: (_, __, ___) =>
                               const Icon(Icons.menu_book, size: 80),
                         ),
-
                         const SizedBox(height: 16),
-
                         const Text(
-                          "Registro del Catechista",
+                          'CatechHub',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 22,
@@ -247,9 +170,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             color: Color(0xFF174A7E),
                           ),
                         ),
-
                         const SizedBox(height: 20),
-
                         Text(
                           '"${randomQuote.text}"',
                           textAlign: TextAlign.center,
@@ -259,59 +180,24 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             color: Colors.grey,
                           ),
                         ),
-
                         const SizedBox(height: 28),
 
-                        if (isLoading)
-                          const Column(
-                            children: [
-                              SizedBox(height: 8),
-                              CircularProgressIndicator(
-                                strokeWidth: 3,
-                              ),
-                              SizedBox(height: 16),
-                              Text(
-                                "Verifica in corso...",
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              SizedBox(height: 24),
-                            ],
-                          )
-                        else if (_isFirstSetup) ...[
-                          if (!_isConfirmingStage)
-                            _buildFirstSetupForm()
-                          else
-                            _buildPinConfirmationForm(),
-                        ]
-                        else ...[
-                          _buildLoginForm(),
+                        // Contenuto dinamico in base allo stato
+                        if (_isFirstSetup) ...[
+                          _buildFirstSetupForm(isLoading),
+                        ] else if (!_checkedLockScreen) ...[
+                          _buildCheckingLockScreen(),
+                        ] else if (!_hasSecureLockScreen) ...[
+                          // HARD LOCK SCREEN - Non chiudibile, non bypassabile
+                          const HardLockScreen(),
+                        ] else ...[
+                          _buildUnlockForm(isLoading),
                         ],
 
                         const SizedBox(height: 20),
-
-                        OutlinedButton.icon(
-                          onPressed: () async {
-                            final uri = Uri.parse(
-                              "https://www.diocesisabina.it/sussidiocatechesi/",
-                            );
-                            if (await canLaunchUrl(uri)) {
-                              await launchUrl(
-                                uri,
-                                mode: LaunchMode.externalApplication,
-                              );
-                            }
-                          },
-                          icon: const Icon(Icons.open_in_new),
-                          label: const Text("Sussidio Catechesi"),
-                        ),
-
-                        const SizedBox(height: 16),
-
                         const Text(
-                          "Realizzato con ❤️ da DELELI",
+                          'Realizzato con ❤️\n da un catechista per i catechisti',
+                          textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 12, color: Colors.grey),
                         ),
                       ],
@@ -326,64 +212,166 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     );
   }
 
-  Widget _buildLoginForm() {
-    final authState = ref.watch(authStateProvider);
-    final isLoading = authState.isLoading;
+  Widget _buildLoadingScreen() {
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFEAF4FF), Color(0xFFD5E8FF), Color(0xFFB9D7FF)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                CircularProgressIndicator(strokeWidth: 3),
+                SizedBox(height: 18),
+                Text(
+                  'Sto caricando il profilo...',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF174A7E),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
+  Widget _buildCheckingLockScreen() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(height: 8),
+        const CircularProgressIndicator(strokeWidth: 3),
+        const SizedBox(height: 16),
+        const Text(
+          'Verifica sicurezza dispositivo...',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF174A7E),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFirstSetupForm(bool isLoading) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          "Sblocca Registro",
+          'Crea il tuo profilo',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.bold,
             color: const Color(0xFF174A7E),
           ),
         ),
+        const SizedBox(height: 8),
+        const Text(
+          'L\'app usa il blocco schermo del tuo telefono (impronta, volto, PIN) '
+          'per proteggere i dati. Non serve creare un PIN separato.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12, color: Colors.grey),
+        ),
         const SizedBox(height: 24),
-        if (_biometricAvailable) ...[
+        if (!isLoading) ...[
+          _buildTextField(_firstNameController, 'Nome', Icons.person),
+          const SizedBox(height: 12),
+          _buildTextField(_lastNameController, 'Cognome', Icons.person_outline),
+          const SizedBox(height: 12),
+          _buildTextField(_groupController, 'Gruppo / Parrocchia', Icons.groups),
+          const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
-            height: 56,
-            child: ElevatedButton.icon(
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _handleSetupProfile,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF174A7E),
                 foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
-              onPressed: isLoading ? null : _authenticateWithBiometrics,
-              icon: const Icon(Icons.fingerprint, size: 28),
-              label: const Text(
-                'Usa impronta digitale',
+              child: const Text(
+                'Crea profilo e accedi',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(child: Container(height: 1, color: Colors.grey.shade300)),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  'oppure',
-                  style: TextStyle(color: Colors.grey.shade600),
-                ),
+        ] else ...[
+          const SizedBox(
+            height: 150,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 12),
+                  Text('Creazione profilo in corso...'),
+                ],
               ),
-              Expanded(child: Container(height: 1, color: Colors.grey.shade300)),
-            ],
+            ),
           ),
-          const SizedBox(height: 16),
         ],
-        Text(
-          _biometricAvailable ? 'Inserisci PIN' : 'Sblocca con PIN',
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey,
+        if (_errorMessage != null) ...[
+          const SizedBox(height: 12),
+          _buildErrorMessage(_errorMessage!),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildUnlockForm(bool isLoading) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text(
+          'Sblocca Registro',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF174A7E),
           ),
         ),
-        const SizedBox(height: 12),
-        if (!isLoading) _buildPinInputField(_pinController),
+        const SizedBox(height: 8),
+        Text(
+          'Usa l\'impronta digitale, il riconoscimento facciale '
+          'o il PIN/Pattern del tuo telefono.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF174A7E),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            onPressed: isLoading ? null : _handleBiometricUnlock,
+            icon: const Icon(Icons.fingerprint, size: 28),
+            label: const Text(
+              'Accedi con impronta / volto / PIN telefono',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
         if (isLoading)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -410,258 +398,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           ),
         if (_errorMessage != null) ...[
           const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.red.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.red.shade200),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _errorMessage!,
-                    style: TextStyle(
-                      color: Colors.red.shade700,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          _buildErrorMessage(_errorMessage!),
         ],
-        const SizedBox(height: 20),
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: ElevatedButton(
-            onPressed: isLoading ? null : _handleSubmit,
-            child: const Text('Sblocca'),
-          ),
-        ),
       ],
-    );
-  }
-
-  Widget _buildFirstSetupForm() {
-    final authState = ref.watch(authStateProvider);
-    final isLoading = authState.isLoading;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          "Crea il tuo account",
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: const Color(0xFF174A7E),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          "Passo 1 di 3 - Informazioni personali",
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-        ),
-        const SizedBox(height: 24),
-        if (!isLoading) ...[
-          _buildTextField(_firstNameController, 'Nome', Icons.person),
-          const SizedBox(height: 12),
-          _buildTextField(_lastNameController, 'Cognome', Icons.person_outline),
-          const SizedBox(height: 12),
-          _buildTextField(_groupController, 'Gruppo', Icons.groups),
-          const SizedBox(height: 20),
-          Text(
-            "Scegli un PIN",
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildPinInputField(_pinController),
-        ] else
-          const SizedBox(
-            height: 150,
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 12),
-                  Text('Creazione account in corso...'),
-                ],
-              ),
-            ),
-          ),
-        if (_errorMessage != null) ...[
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.red.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.red.shade200),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _errorMessage!,
-                    style: TextStyle(
-                      color: Colors.red.shade700,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-        const SizedBox(height: 20),
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: ElevatedButton(
-            onPressed: isLoading ? null : _handleSubmit,
-            child: const Text('Continua'),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPinConfirmationForm() {
-    final authState = ref.watch(authStateProvider);
-    final isLoading = authState.isLoading;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          "Conferma PIN",
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: const Color(0xFF174A7E),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          "Passo 2 di 3 - Conferma il PIN",
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-        ),
-        const SizedBox(height: 24),
-        Text(
-          "Reinserisci il PIN per confermare",
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey,
-          ),
-        ),
-        const SizedBox(height: 12),
-        if (!isLoading)
-          _buildPinInputField(_confirmPinController)
-        else
-          const SizedBox(
-            height: 60,
-            child: Center(
-              child: CircularProgressIndicator(),
-            ),
-          ),
-        if (_errorMessage != null) ...[
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.red.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.red.shade200),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _errorMessage!,
-                    style: TextStyle(
-                      color: Colors.red.shade700,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-        const SizedBox(height: 20),
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: ElevatedButton(
-            onPressed: isLoading ? null : _handleSubmit,
-            child: const Text('Crea account'),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPinInputField(TextEditingController controller) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _errorMessage != null ? Colors.red.shade300 : Colors.grey.shade300,
-          width: _errorMessage != null ? 2 : 1,
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              obscureText: !_showPin,
-              textAlign: TextAlign.center,
-              maxLength: 12,
-              style: const TextStyle(
-                fontSize: 24,
-                letterSpacing: 4,
-                fontWeight: FontWeight.bold,
-              ),
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-              ],
-              decoration: const InputDecoration(
-                counterText: "",
-                border: InputBorder.none,
-                hintText: "••••",
-                hintStyle: TextStyle(letterSpacing: 4),
-              ),
-              onChanged: (_) => setState(() {}),
-              onSubmitted: (_) => _handleSubmit(),
-            ),
-          ),
-          GestureDetector(
-            onTap: () => setState(() => _showPin = !_showPin),
-            child: Icon(
-              _showPin ? Icons.visibility : Icons.visibility_off,
-              color: Colors.grey,
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -686,5 +425,189 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildErrorMessage(String message) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.red.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// ══════════════════════════════════════════════════════════════════════════════
+/// HARD LOCK SCREEN - Schermata BLOCCANTE non chiudibile
+///
+/// Mostrata quando il dispositivo NON ha alcun blocco schermo configurato
+/// (niente PIN, niente pattern, niente password, niente biometria).
+///
+/// L'app NON può funzionare senza sicurezza del dispositivo attiva perché:
+/// - I dati degli studenti (minori) sono sensibili
+/// - La biometria nativa richiede un lockscreen di base (KeyguardManager)
+/// - Senza lockscreen, chiunque prenda il telefono accede a tutto
+///
+/// L'utente DEVE andare in Impostazioni → Sicurezza e attivare un blocco.
+/// Non c'è pulsante "Indietro", "Annulla", "Salta". Solo "Apri Impostazioni".
+/// ══════════════════════════════════════════════════════════════════════════════
+
+class HardLockScreen extends StatelessWidget {
+  const HardLockScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false, // IMPOSSIBILE chiudere con back button
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          // Ignora il back button - non fa nulla
+        }
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.red.shade200, width: 2),
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.security_rounded,
+                  size: 64,
+                  color: Colors.red.shade700,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Sicurezza Dispositivo Richiesta',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red.shade800,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'CatechHub gestisce dati sensibili di minori (anagrafica, allergie, '
+                  'contatti genitori, presenze). Per proteggerli, l\'app richiede che '
+                  'il tuo telefono abbia un blocco schermo attivo.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: Colors.red.shade700),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red.shade100),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Il tuo telefono NON ha attualmente:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.red.shade800,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildMissingItem('PIN numerico'),
+                      _buildMissingItem('Pattern (disegno)'),
+                      _buildMissingItem('Password'),
+                      _buildMissingItem('Impronta digitale / Riconoscimento facciale'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Attiva uno di questi metodi in:\n'
+                  'Impostazioni → Sicurezza e privacy → Blocco schermo',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.red.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade700,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 4,
+              ),
+              onPressed: () {
+                // Apre le impostazioni di sicurezza del sistema
+                // Nota: su Android serve intent specifico, qui usiamo url_launcher generico
+                _openSecuritySettings();
+              },
+              icon: const Icon(Icons.settings_rounded, size: 28),
+              label: const Text(
+                'Apri Impostazioni Sicurezza',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Dopo aver attivato il blocco schermo, torna qui e riprova.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMissingItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(Icons.close_rounded, size: 16, color: Colors.red.shade400),
+          const SizedBox(width: 8),
+          Text(text, style: TextStyle(fontSize: 13, color: Colors.red.shade700)),
+        ],
+      ),
+    );
+  }
+
+  void _openSecuritySettings() {
+    // Su Android, l'intent per aprire le impostazioni di sicurezza è:
+    // Intent(Settings.ACTION_SECURITY_SETTINGS)
+    // Per ora mostriamo un messaggio; l'integrazione nativa richiede
+    // un MethodChannel o url_launcher con intent Android specifico.
+    // Implementazione completa richiederebbe platform channel.
+    debugPrint('TODO: Aprire Impostazioni Sicurezza Android via MethodChannel');
   }
 }

@@ -11,6 +11,12 @@ import 'edit_student_page.dart';
 
 final studentsRepoProvider = Provider((ref) => StudentsRepository());
 
+/// Schermata principale dell'area ragazzi: elenco completo degli studenti
+/// con cards nominative, indicatori visivi di documenti mancanti (arancione)
+/// e menu contestuale (visualizza, modifica, elimina).
+/// Usa il modello [Student] tramite [StudentsRepository] (Box `students`).
+/// Punto di ingresso del flusso "Anagrafica": da qui si naviga verso
+/// [AddStudentPage], [EditStudentPage] e [StudentQuickViewPage].
 class StudentsPage extends ConsumerWidget {
   const StudentsPage({super.key});
 
@@ -121,14 +127,14 @@ class _StudentCard extends ConsumerWidget {
           gradient: LinearGradient(
             colors: [
               Colors.white,
-              Colors.blue.shade50.withOpacity(0.35),
+              Colors.blue.shade50.withValues(alpha: 0.35),
             ],
           ),
           borderRadius: BorderRadius.circular(22),
           border: Border.all(color: Colors.blue.shade100),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 14,
               offset: const Offset(0, 8),
             ),

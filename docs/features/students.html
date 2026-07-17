@@ -1,0 +1,118 @@
+﻿<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anagrafica Ragazzi — CatechHub</title>
+<meta name="description" content="Gestisci i profili dei ragazzi del catechismo con tutti i dati essenziali, ricerca immediata e visibilità su allergie e uscite autonome.">
+<link rel="icon" href="../logo.png" type="image/png">
+<link rel="stylesheet" href="../style.css">
+<script src="../js/version.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="../logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
+
+<section class="page-header">
+  <div class="container">
+    <h1>Anagrafica Ragazzi</h1>
+    <p>Il cuore di CatechHub: tieni traccia di tutti i ragazzi del catechismo in un unico posto sicuro</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+
+    <div class="breadcrumb"><a href="../index.html">Home</a> / <a href="students.html">Anagrafica</a> / Panoramica</div>
+
+    <h2>Che cos'è</h2>
+    <p>L'Anagrafica Ragazzi è il punto di partenza di ogni attività con CatechHub. Qui puoi registrare, cercare e gestire i profili di tutti i bambini e ragazzi iscritti al catechismo. Ogni profilo contiene le informazioni essenziali per la gestione quotidiana: dati anagrafici, contatti dei genitori, eventuali allergie e autorizzazioni alle uscite.</p>
+
+    <div class="alert alert-info">
+      I dati sono protetti con crittografia AES-256-GCM all'interno del dispositivo. Nessuna informazione lascia il tuo telefono o tablet senza un tuo esplicito consenso.
+    </div>
+
+    <h2>Cosa puoi fare</h2>
+
+    <h3>Registrare un nuovo ragazzo</h3>
+    <p>Inserisci nome, cognome, data di nascita, classe e gruppo di catechismo. Puoi aggiungere anche i contatti di mamma e papà, eventuali note e informazioni mediche. I nomi vengono automaticamente formattati in modo corretto (prime lettere maiuscole) per mantenere tutto ordinato senza sforzo.</p>
+
+    <h3>Vedere le informazioni al volo</h3>
+    <p>Dalla lista principale, un tap prolungato apre la <strong>Quick View</strong>: una scheda compatta con i dati essenziali del ragazzo. Da qui puoi vedere subito se ci sono allergie, uscite autorizzate o note importanti, senza aprire il profilo completo.</p>
+
+    <div class="screenshot-row">
+      <img src="../screen/Gestione_Ragazzo.jpg" alt="Schermata di gestione ragazzo" class="screenshot" style="max-width:300px;">
+      <img src="../screen/QuickView_Ragazzo.jpg" alt="Vista rapida del profilo ragazzo" class="screenshot" style="max-width:300px;">
+    </div>
+
+    <h3>Cercare rapidamente</h3>
+    <p>La barra di ricerca ti permette di trovare un ragazzo in tempo reale mentre digiti: funziona su nome, cognome, classe e note. I risultati compaiono istantaneamente, anche con dati accentati o maiuscole/minuscole diverse.</p>
+
+    <h2>Informazioni nel profilo</h2>
+    <table class="sec-table">
+      <thead><tr><th>Informazione</th><th>Utilità</th></tr></thead>
+      <tbody>
+        <tr><td>Nome e cognome</td><td>Identificazione del ragazzo</td></tr>
+        <tr><td>Data di nascita</td><td>Verifica età e requisiti</td></tr>
+        <tr><td>Classe / Gruppo</td><td>Organizzazione per gruppi di catechismo</td></tr>
+        <tr><td>Contatti genitori</td><td>Comunicazioni rapide con le famiglie</td></tr>
+        <tr><td>Allergie</td><td>Informazioni mediche critiche per la sicurezza</td></tr>
+        <tr><td>Uscita autonoma</td><td>Autorizzazione a uscire da solo dopo l'incontro</td></tr>
+        <tr><td>Note</td><td>Appunti del catechista, visibili solo a te</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Allergie e Uscite Autonome</h2>
+    <p>Le informazioni su allergie e autorizzazioni alle uscite sono sempre visibili in ogni schermata dell'app, con badge colorati e avvisi immediati. In questo modo non rischi mai di dimenticare una condizione medica importante o un'autorizzazione necessaria. Puoi approfondire nella sezione dedicata <a href="allergies-exits.html">Allergie e Uscite Autonome</a>.</p>
+
+    <div class="screenshot-row">
+      <img src="../screen/Allergie.jpg" alt="Pagina allergie" class="screenshot" style="max-width:300px;">
+      <img src="../screen/Uscite.jpg" alt="Pagina uscite autonome" class="screenshot" style="max-width:300px;">
+    </div>
+
+    <h2>Sicurezza e privacy</h2>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>Tutti i dati sono cifrati sul dispositivo</li>
+      <li>L'accesso all'app è protetto da impronta digitale o riconoscimento facciale</li>
+      <li>I dati non vengono mai inviati a server esterni</li>
+      <li>La condivisione avviene solo con tuo esplicito consenso (via QR o Bluetooth)</li>
+      <li>Le informazioni mediche hanno protezione aggiuntiva secondo le norme GDPR</li>
+    </ul>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div>
+      <strong>CatechHub</strong> <span class="version-tag"></span> — Registro Elettronico di Catechismo<br>
+      <small>Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.</small>
+    </div>
+    <div>
+      <small>
+        &#128231; <a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a> &middot;
+        &#128247; Instagram (prossimamente) &middot;
+        &#9992; Telegram (prossimamente)
+      </small><br>
+      <a href="../privacy.html">Privacy</a> &middot;
+      <a href="../terms.html">Termini</a> &middot;
+      <a href="../infos/index.html">GDPR</a> &middot;
+      <a href="../developer.html">Sviluppatore</a> &middot;
+      <a href="https://github.com/delelimed/CatechHub" class="release-url">GitHub</a><br>
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/nav.js"></script></body>
+</html>

@@ -1,3 +1,22 @@
+// ══════════════════════════════════════════════════════════════════════════════
+// back_button_handler.dart — CatechHub (gestione tasto indietro Android)
+//
+// Widget che intercetta il tasto indietro Android e implementa:
+//   - Navigazione alla dashboard se non si è sulla home
+//   - Doppio tap "Premi ancora per uscire" per chiudere l'app
+//
+// CONTESTO PROGETTO:
+//   Poiché CatechHub usa GoRouter con navigazione dichiarativa (non uno
+//   stack di route), il comportamento predefinito di PopScope (pop della
+//   route) non è desiderato. Al suo posto, il back button:
+//   1. Se non siamo su '/' → naviga a '/' (dashboard)
+//   2. Se siamo su '/' → mostra snackbar "Premi ancora per uscire"
+//   3. Secondo tap entro 2s → SystemNavigator.pop() (esce dall'app)
+//
+//   Questo evita che l'utente si "impalli" in route annidiate senza un
+//   modo chiaro per tornare alla home, e previene chiusure accidentali.
+// ══════════════════════════════════════════════════════════════════════════════
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -37,32 +56,35 @@ class _BackButtonHandlerState extends State<BackButtonHandler> {
     );
   }
 
+  /// Non permettere il pop automatico in nessun caso.
+  /// Gestiamo tutto manualmente in _handleBackPressed.
   bool _canPop(BuildContext context) {
-    // Non permettere il pop automatico in nessun caso
-    // Gestiamo tutto manualmente in _handleBackPressed
     return false;
   }
 
   void _handleBackPressed(BuildContext context) {
-    // Ottieni la posizione corrente dal router
-    final location = widget.router.routeInformationProvider.value.uri.path;
-    
-    // Se non siamo sulla dashboard, naviga alla dashboard
-    if (location != '/') {
-      widget.router.push('/');
+    // Prova prima a fare pop (funziona per route arrivate via context.push)
+    if (widget.router.canPop()) {
+      widget.router.pop();
       return;
     }
 
-    // Sulla dashboard: gestisci doppio tap per uscire
+    final location = widget.router.routeInformationProvider.value.uri.path;
+
+    // Se non siamo sulla dashboard, torna alla dashboard
+    if (location != '/') {
+      widget.router.go('/');
+      return;
+    }
+
+    // Sulla dashboard: doppio tap per uscire (intervallo 2 secondi)
     final now = DateTime.now();
-    
-    if (_lastBackPressed == null || 
+
+    if (_lastBackPressed == null ||
         now.difference(_lastBackPressed!) > const Duration(seconds: _backPressInterval)) {
-      // Prima pressione o intervallo trascorso: mostra messaggio
       _lastBackPressed = now;
       _showExitSnackBar(context);
     } else {
-      // Seconda pressione entro l'intervallo: chiude l'app
       _exitApp();
     }
   }
@@ -83,7 +105,6 @@ class _BackButtonHandlerState extends State<BackButtonHandler> {
   }
 
   void _exitApp() {
-    // Chiude l'app
     SystemNavigator.pop();
   }
 }

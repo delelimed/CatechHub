@@ -1,17 +1,34 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../../core/security/privacy_settings.dart';
 import '../../shared/models/planning_meeting.dart';
 import '../../shared/widgets/app_scaffold.dart';
+import '../auth/bible_quote.dart';
 import '../classes/classes_provider.dart';
 import '../documents/documents_repository.dart';
 import '../meetings/attendance_repository.dart';
 import '../planning/planning_provider.dart';
 import '../students/students_repository.dart';
 
+/// Pagina principale della dashboard di CateREG.
+///
+/// Mostra una panoramica completa delle attività del catechista:
+/// - Versetto biblico casuale come spunto di riflessione
+/// - Carta del prossimo incontro programmato
+/// - Percentuale media di presenze del gruppo
+/// - Studenti con molte assenze (soglia configurabile)
+/// - Documenti consegnati ma non ancora riconsegnati
+/// - Griglia di azioni rapide (verifica numero, allergie, uscite autonome, registro contatto)
+///
+/// Funge da punto di ingresso principale dell'app: tutti i dati vengono aggregati
+/// dai vari repository (pianificazione, presenze, studenti, documenti) e presentati
+/// in schede interattive che permettono al catechista di monitorare lo stato del gruppo.
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
 
@@ -20,6 +37,11 @@ class DashboardPage extends ConsumerWidget {
     String classId,
   ) {
     return attendance.where((record) => record['classId'] == classId).toList();
+  }
+
+  BibleQuote _randomQuote() {
+    final index = Random().nextInt(bibleQuotes.length);
+    return bibleQuotes[index];
   }
 
   double _calculatePresenceRate(List<Map<String, dynamic>> attendanceRecords) {
@@ -43,8 +65,9 @@ class DashboardPage extends ConsumerWidget {
 
   List<_HighAbsenceStudent> _fetchHighAbsenceStudents(
     List<Map<String, dynamic>> attendanceRecords,
-    Map<String, String> studentNames,
-  ) {
+    Map<String, String> studentNames, {
+    int threshold = 6,
+  }) {
     final absenceCounts = <String, int>{};
 
     for (final record in attendanceRecords) {
@@ -60,7 +83,7 @@ class DashboardPage extends ConsumerWidget {
 
     final result =
         absenceCounts.entries
-            .where((entry) => entry.value >= 6)
+            .where((entry) => entry.value >= threshold)
             .map((entry) {
               final name = studentNames[entry.key];
               if (name == null || name.isEmpty) return null;
@@ -119,6 +142,7 @@ class DashboardPage extends ConsumerWidget {
     final attendanceRepo = AttendanceRepository();
     final studentsRepo = StudentsRepository();
     final documentsRepo = DocumentsRepository();
+    final privacySettings = ref.watch(privacySettingsProvider);
 
     return AppScaffold(
       title: 'Dashboard',
@@ -158,6 +182,7 @@ class DashboardPage extends ConsumerWidget {
           final highAbsences = _fetchHighAbsenceStudents(
             classAttendance,
             studentNames,
+            threshold: privacySettings.absenceThreshold,
           );
           final pendingDocuments = _fetchPendingDocuments(
             currentClass.studentIds,
@@ -192,6 +217,8 @@ class DashboardPage extends ConsumerWidget {
                       child: ListView(
                         padding: EdgeInsets.all(padding),
                         children: [
+                          _QuoteSnippet(quote: _randomQuote()),
+                          const SizedBox(height: 10),
                           _SectionTitle('Il tuo prossimo impegno'),
                           const SizedBox(height: 10),
                           _NextMeetingCard(
@@ -205,6 +232,7 @@ class DashboardPage extends ConsumerWidget {
                             presenceRate: presenceRate,
                             highAbsences: highAbsences,
                             compact: !isWide,
+                            absenceThreshold: privacySettings.absenceThreshold,
                           ),
                           const SizedBox(height: 24),
                           _SectionTitle('Documenti in attesa'),
@@ -335,13 +363,6 @@ class _NextMeetingCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  DateFormat('dd MMMM yyyy', 'it_IT').format(meeting!.date),
-                  style: const TextStyle(
-                    color: Color(0xFF174A7E),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
                 const SizedBox(height: 8),
                 Text(
                   meeting!.title,
@@ -375,15 +396,49 @@ class _NextMeetingCard extends StatelessWidget {
   }
 }
 
+class _QuoteSnippet extends StatelessWidget {
+  final BibleQuote quote;
+
+  const _QuoteSnippet({required this.quote});
+
+  @override
+  Widget build(BuildContext context) {
+    return _Panel(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '“${quote.text}”',
+            style: TextStyle(
+              fontSize: 13,
+              fontStyle: FontStyle.italic,
+              color: Colors.grey.shade800,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            quote.reference,
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _OverviewCard extends StatelessWidget {
   final double presenceRate;
   final List<_HighAbsenceStudent> highAbsences;
   final bool compact;
+  final int absenceThreshold;
 
   const _OverviewCard({
     required this.presenceRate,
     required this.highAbsences,
     required this.compact,
+    required this.absenceThreshold,
   });
 
   @override
@@ -395,7 +450,10 @@ class _OverviewCard extends StatelessWidget {
       color: Colors.green,
     );
 
-    final absencesPanel = _HighAbsencePanel(students: highAbsences);
+    final absencesPanel = _HighAbsencePanel(
+      students: highAbsences,
+      threshold: absenceThreshold,
+    );
 
     return compact
         ? Column(
@@ -438,7 +496,7 @@ class _MetricPanel extends StatelessWidget {
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(icon, color: color),
@@ -468,8 +526,12 @@ class _MetricPanel extends StatelessWidget {
 
 class _HighAbsencePanel extends StatelessWidget {
   final List<_HighAbsenceStudent> students;
+  final int threshold;
 
-  const _HighAbsencePanel({required this.students});
+  const _HighAbsencePanel({
+    required this.students,
+    required this.threshold,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -483,7 +545,7 @@ class _HighAbsencePanel extends StatelessWidget {
                 width: 46,
                 height: 46,
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.08),
+                  color: Colors.red.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
@@ -502,9 +564,9 @@ class _HighAbsencePanel extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           if (students.isEmpty)
-            const Text(
-              'Nessuno studente con 6 o piu assenze.',
-              style: TextStyle(color: Colors.black54),
+            Text(
+              'Nessun ragazzo con $threshold o pi\u00f9 assenze.',
+              style: const TextStyle(color: Colors.black54),
             )
           else
             ...students.map(
@@ -546,7 +608,7 @@ class _PendingDocumentsCard extends StatelessWidget {
                 width: 46,
                 height: 46,
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
+                  color: Colors.orange.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
@@ -731,7 +793,7 @@ class _Panel extends StatelessWidget {
         border: Border.all(color: Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),

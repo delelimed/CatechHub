@@ -1,3 +1,12 @@
+/// Pagina di appello per un singolo incontro.
+///
+/// In CateREG, questa schermata consente al catechista di selezionare una data
+/// di incontro e registrare la presenza di ogni ragazzo della propria classe.
+/// Ogni studente viene visualizzato con nome, cognome e un indicatore cromatico:
+/// - sfondo rosso se ha 2+ assenze consecutive consecutive
+/// - pulsanti "Presente" (verde) e "Assente" (rosso) per ogni studente
+/// - supporto a futuri swipe gesture per cambiare stato rapidamente
+/// Le presenze vengono salvate su Hive tramite [AttendanceRepository].
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -211,7 +220,7 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
                           : null,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: Colors.black.withValues(alpha: 0.04),
                           blurRadius: 12,
                           offset: const Offset(0, 6),
                         )
@@ -312,10 +321,10 @@ class _PresenceButton extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? color : color.withOpacity(0.08),
+          color: selected ? color : color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? color : color.withOpacity(0.2),
+            color: selected ? color : color.withValues(alpha: 0.2),
           ),
         ),
         child: Text(

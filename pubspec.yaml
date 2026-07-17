@@ -1,62 +1,90 @@
 name: CatechHub
 description: "Il tuo registro di catechismo"
 publish_to: 'none'
+license: MIT
 
-version: 1.2.1+3
+version: 1.0.3+3
 
 environment:
   sdk: '>=3.12.0 <4.0.0'
 
+# ══════════════════════════════════════════════════════════════════════════════
+# DIPENDENZE DELL'APPLICAZIONE
+#
+# NOTA SULLA COERENZA DEI PLUGIN NATIVI:
+# Le versioni qui dichiarate devono essere coerenti con:
+#   - Kotlin 2.2.20 (android/settings.gradle.kts)
+#   - Android Gradle Plugin 8.11.1 (android/settings.gradle.kts)
+#   - compileSdk 36 (android/app/build.gradle.kts)
+#   - minSdk 30 (Android 10+)
+#   - JVM target 17
+#
+# Un plugin con dipendenze native incompatibili puo causare un crash
+# istantaneo all'avvio (ClassNotFoundException o NoClassDefFoundError)
+# SENZA errori di compilazione Gradle, perche ilRegistration fallisce
+# a runtime nel motore nativo Flutter.
+# ══════════════════════════════════════════════════════════════════════════════
 dependencies:
   flutter:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
 
-  # Gestione Stato e Navigazione
-  flutter_riverpod: ^2.6.1       # Aggiornato alla patch più stabile della v2
-  go_router: ^17.2.3             # Massima compatibile con il tuo SDK
-  local_auth: ^3.0.1             # Aggiornato (Risolvibile indica stabilità nativa Android/iOS)
+  # 🏗️ Gestione Stato e Navigazione 🏗️
+  flutter_riverpod: ^3.3.2
+  go_router: ^17.2.3
+  local_auth: ^3.0.1
 
-  # Database Locale e Crittografia
-  hive_flutter: ^1.1.0
-  flutter_secure_storage: ^10.3.1 # Aggiornato alla massima build stabile per la tua toolchain
-  crypto: ^3.0.3
-  encrypt: ^5.0.3
-
-  # Scambio Dati (backup futuro)
-  file_picker: ^12.0.0-beta.4            # Aggiornato all'ultima release stabile nativa
-  archive: ^4.0.9                # Lasciato a 3.6.1 per evitare i breaking changes della v4.0 (richiede SDK Dart più alto)
   
-  # QR Code e Scansione Offline
-  qr_flutter: ^4.1.0
-  mobile_scanner: ^7.2.0         # Aggiornato all'ultima build stabile compatibile
 
-  # UI e Utility
-  intl: ^0.20.2                 
+  # ── Database Locale e Crittografia ────────────────────────────────────────
+  hive_flutter: ^1.1.0
+  flutter_secure_storage: ^10.3.1
+  shared_preferences: ^2.3.0
+  crypto: ^3.0.3
+  pointycastle: ^4.0.0
+  cryptography: ^2.7.0
+  freerasp: ^8.0.0
+
+  # ── Scambio Dati (backup futuro) ──────────────────────────────────────────
+  file_picker: ^12.0.0-beta.7
+  archive: ^4.0.9
+
+  # ── QR Code e Scansione ──────────────────────────────────────────────────
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^7.0.0
+
+  # ── Nearby Connections P2P (sostituisce Bluetooth RFCOMM) ───────────────
+  nearby_connections: ^4.3.0
+
+  # ── UI e Utility ──────────────────────────────────────────────────────────
+  intl: ^0.20.2
   url_launcher: ^6.3.0
   http: ^1.2.0
-  package_info_plus: ^10.1.0      # Aggiornato
-  device_info_plus: ^13.1.0      # Aggiornato
-  permission_handler: ^12.0.1    # Aggiornato
-  flutter_local_notifications: ^21.0.0 # Aggiornato (importante per Android 14)
+  package_info_plus: ^10.0.0
+  device_info_plus: ^13.0.0
+  permission_handler: ^12.0.0
+  flutter_local_notifications: ^22.0.0
   pdf: ^3.10.8
-  printing: ^5.11.0
+  printing: ^5.15.0
   cupertino_icons: ^1.0.8
   collection: ^1.18.0
   wiredash: ^2.6.1
-  image_picker: ^1.1.0
+  flutter_dotenv: ^5.1.0
+  image_picker: ^1.2.2
   path_provider: ^2.1.0
-  image: ^4.3.0                  # Aggiornato
+  image: ^4.9.0
   open_filex: ^4.5.0
+  share_plus: ^13.2.0
+  license_checker: 1.6.2
+  state_notifier: ^1.0.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_launcher_icons: ^0.14.4
-  flutter_lints: ^6.0.0          
-  hive_generator: ^2.0.1
-  build_runner: ^2.4.13          
+  flutter_lints: ^6.0.0
+  mocktail: ^1.0.4
 
 flutter_icons:
   android: "launcher_icon"
@@ -68,3 +96,4 @@ flutter:
 
   assets:
     - assets/images/logo.png
+    - .env

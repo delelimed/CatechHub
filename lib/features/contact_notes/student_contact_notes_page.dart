@@ -8,6 +8,9 @@ import '../../shared/models/contact_note_model.dart';
 import '../../shared/models/student_model.dart';
 import 'contact_notes_repository.dart';
 
+/// Provider che espone in tempo reale le [ContactNote] di uno specifico
+/// studente, identificate dal suo [studentId]. Viene usato da
+/// [StudentContactNotesPage] per aggiornare la UI a ogni modifica.
 final _studentNotesProvider =
     StreamProvider.autoDispose.family<List<ContactNote>, String>(
   (ref, studentId) {
@@ -16,6 +19,13 @@ final _studentNotesProvider =
   },
 );
 
+/// Pagina dettaglio contatti per un singolo studente di CateREG.
+///
+/// Mostra l'elenco cronologico (dal più recente) delle note di contatto
+/// dello studente sotto forma di card. Ogni card mostra il mezzo usato
+/// (de visu/WhatsApp/cellulare), data/ora e il testo della nota.
+/// Permette di aggiungere una nuova nota o modificare/eliminare una
+/// esistente tramite bottom sheet modali.
 class StudentContactNotesPage extends ConsumerWidget {
   final Student student;
 
@@ -152,6 +162,11 @@ class StudentContactNotesPage extends ConsumerWidget {
   }
 }
 
+/// Card che visualizza una singola nota di contatto.
+///
+/// Mostra il mezzo di comunicazione con icona e colore dedicati,
+/// la data/ora formattata e il testo integrale della nota. Fornisce
+/// pulsanti per modificare o eliminare la nota.
 class _ContactNoteCard extends StatelessWidget {
   final ContactNote note;
   final VoidCallback onDelete;
@@ -198,7 +213,7 @@ class _ContactNoteCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -211,7 +226,7 @@ class _ContactNoteCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: mediumColor.withOpacity(0.06),
+              color: mediumColor.withValues(alpha: 0.06),
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(16)),
             ),
@@ -268,6 +283,10 @@ class _ContactNoteCard extends StatelessWidget {
   }
 }
 
+/// Bottom sheet per la creazione di una nuova nota di contatto.
+///
+/// Permette di selezionare data/ora, mezzo di comunicazione
+/// (de visu, WhatsApp, cellulare) e inserire il testo della nota.
 class _AddContactNoteSheet extends StatefulWidget {
   final String studentId;
   final Future<void> Function(ContactNote) onSave;
@@ -529,6 +548,11 @@ class _AddContactNoteSheetState extends State<_AddContactNoteSheet> {
   }
 }
 
+/// Bottom sheet per la modifica di una nota di contatto esistente.
+///
+/// Pre-carica i valori correnti (data, ora, mezzo, testo) e consente
+/// di aggiornarli. La nota mantiene lo stesso ID in modo che venga
+/// sovrascritta nel database.
 class _EditContactNoteSheet extends StatefulWidget {
   final ContactNote note;
   final Future<void> Function(ContactNote) onSave;
@@ -792,6 +816,11 @@ class _EditContactNoteSheetState extends State<_EditContactNoteSheet> {
   }
 }
 
+/// Chip selezionabile per il mezzo di comunicazione.
+///
+/// Usato sia in [_AddContactNoteSheet] che in [_EditContactNoteSheet]
+/// per scegliere tra "De visu", "WhatsApp" e "Cellulare".
+/// Quando selezionato, si illumina con il colore primario di CateREG.
 class _MediumChip extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -817,7 +846,7 @@ class _MediumChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
             color: selected
-                ? const Color(0xFF174A7E).withOpacity(0.1)
+                ? const Color(0xFF174A7E).withValues(alpha: 0.1)
                 : Colors.grey.shade100,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(

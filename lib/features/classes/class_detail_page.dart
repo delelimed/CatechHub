@@ -1,3 +1,16 @@
+/// Pagina di dettaglio di una singola classe in CateREG.
+///
+/// Mostra le informazioni principali del gruppo (nome, ragazzi assegnati,
+/// catechisti assegnati) e permette di modificare le assegnazioni tramite
+/// un pannello modale (bottom sheet) con ricerca testuale dei ragazzi.
+///
+/// Utilizza [classesStreamProvider] per il stream delle classi e un provider
+/// locale [studentsStreamProvider] per i ragazzi. I provider temporanei
+/// [catechistsProvider] attendono l'implementazione della repository dedicata.
+///
+/// Flusso CateREG: l'utente arriva qui da [ClassesPage] cliccando su una
+/// scheda classe; le modifiche alle assegnazioni vengono salvate su Hive
+/// tramite [classesRepoProvider].
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -261,7 +274,7 @@ class _HeaderCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, 4))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))],
       ),
       child: Text(name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF174A7E))),
     );
@@ -281,7 +294,7 @@ class _SectionTitle extends StatelessWidget {
         const SizedBox(width: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(color: const Color(0xFF174A7E).withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(color: const Color(0xFF174A7E).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
           child: Text('$count', style: const TextStyle(color: Color(0xFF174A7E), fontWeight: FontWeight.bold, fontSize: 12)),
         ),
       ],
@@ -324,7 +337,7 @@ class _PersonCard extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: const Color(0xFF174A7E).withOpacity(0.1),
+          backgroundColor: const Color(0xFF174A7E).withValues(alpha: 0.1),
           child: Icon(icon, color: const Color(0xFF174A7E), size: 20),
         ),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),

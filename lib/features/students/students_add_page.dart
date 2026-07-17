@@ -14,6 +14,13 @@ import '../classes/classes_repository.dart';
 final studentsRepoProvider = Provider((ref) => StudentsRepository());
 final classesRepoProvider = Provider((ref) => ClassesRepository());
 
+/// Pagina di creazione di un nuovo studente: form con campi per nome,
+/// cognome, data di nascita, dati genitori (madre/padre con nome, cognome,
+/// telefono), telefono ragazzo, allergie, autorizzazioni uscita (autonomo,
+/// genitori, altro) e sezione allegati.
+/// Usa il modello [Student] e salva tramite [StudentsRepository] (Box `students`).
+/// Alla creazione assegna automaticamente lo studente alla classe del
+/// catechista corrente. Flusso: accessibile dal FAB di [StudentsPage].
 class AddStudentPage extends ConsumerStatefulWidget {
   const AddStudentPage({super.key});
 
@@ -64,8 +71,6 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
 
   @override
   Widget build(BuildContext context) {
-    final repo = ref.read(studentsRepoProvider);
-
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
 
@@ -161,7 +166,7 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
             _Section(
               title: 'Contatti ragazzo',
               children: [
-                _Field(studentPhone, 'Cellulare ragazzo'),
+                _Field(studentPhone, 'Cellulare ragazzo', keyboardType: TextInputType.phone),
               ],
             ),
 
@@ -315,13 +320,13 @@ class _HeaderCard extends StatelessWidget {
         gradient: LinearGradient(
           colors: [
             Colors.white,
-            Colors.blue.shade50.withOpacity(0.5),
+            Colors.blue.shade50.withValues(alpha: 0.5),
           ],
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 16,
             offset: const Offset(0, 10),
           )
@@ -367,7 +372,7 @@ class _Section extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 6),
           )
@@ -429,7 +434,7 @@ class _ParentCard extends StatelessWidget {
           const SizedBox(height: 8),
           _Field(name, 'Nome', capitalizeWords: true),
           _Field(surname, 'Cognome', capitalizeWords: true),
-          _Field(phone, 'Telefono'),
+          _Field(phone, 'Telefono', keyboardType: TextInputType.phone),
         ],
       ),
     );
@@ -444,12 +449,14 @@ class _Field extends StatelessWidget {
   final String label;
   final int maxLines;
   final bool capitalizeWords;
+  final TextInputType? keyboardType;
 
   const _Field(
     this.controller,
     this.label, {
     this.maxLines = 1,
     this.capitalizeWords = false,
+    this.keyboardType,
   });
 
   @override
@@ -462,6 +469,7 @@ class _Field extends StatelessWidget {
         textCapitalization: capitalizeWords
             ? TextCapitalization.words
             : TextCapitalization.none,
+        keyboardType: keyboardType,
         decoration: InputDecoration(
           labelText: label,
           filled: true,

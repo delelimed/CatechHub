@@ -1,0 +1,107 @@
+﻿<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF e Stampa — CatechHub</title>
+<meta name="description" content="Genera report in PDF da condividere o stampare: presenze, elenchi gruppi, statistiche e molto altro.">
+<link rel="icon" href="../logo.png" type="image/png">
+<link rel="stylesheet" href="../style.css">
+<script src="../js/version.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="../logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
+
+<section class="page-header">
+  <div class="container">
+    <h1>PDF e Stampa</h1>
+    <p>Trasforma i tuoi dati in report professionali da stampare, condividere o conservare</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+
+    <div class="breadcrumb"><a href="../index.html">Home</a> / <a href="pdf-printing.html">PDF e Stampa</a> / Panoramica</div>
+
+    <h2>Che cos'è</h2>
+    <p>CatechHub può generare documenti PDF professionali con tutti i tuoi dati: elenchi di gruppo, presenze, statistiche, stato delle consegne e report allergie. Puoi stamparli direttamente dall'app, condividerli via email o WhatsApp, o salvarli sul dispositivo.</p>
+
+    <h2>Report disponibili</h2>
+    <table class="sec-table">
+      <thead><tr><th>Report</th><th>A cosa serve</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Elenco gruppo</strong></td><td>Lista completa dei ragazzi con nome, cognome, data di nascita e contatti genitori</td></tr>
+        <tr><td><strong>Presenze per giornata</strong></td><td>Tabella delle presenze di uno specifico incontro</td></tr>
+        <tr><td><strong>Griglia presenze completa</strong></td><td>Matrice studenti × giornate con riepilogo statistico</td></tr>
+        <tr><td><strong>Statistiche individuali</strong></td><td>Andamento presenze di un singolo ragazzo per i colloqui con i genitori</td></tr>
+        <tr><td><strong>Stato consegne documenti</strong></td><td>Elenco dei documenti distribuiti, con scadenze e ritardatari</td></tr>
+        <tr><td><strong>Report allergie</strong></td><td>Elenco di tutte le allergie registrate, utile per emergenze e personale di supporto</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Come usare i PDF</h2>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li><strong>Stampa:</strong> invia direttamente a una stampante WiFi, Bluetooth o USB</li>
+      <li><strong>Condividi:</strong> invia via email, WhatsApp, Google Drive o qualsiasi altra app</li>
+      <li><strong>Salva:</strong> conserva il file nella memoria del dispositivo per consultazione futura</li>
+    </ul>
+
+    <h2>Accesso rapido</h2>
+    <p>Puoi generare un PDF da diversi punti dell'app:</p>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>Dal menu di ogni gruppo: "Esporta elenco" o "Esporta presenze"</li>
+      <li>Dalla scheda di un ragazzo: "Report individuale"</li>
+      <li>Dalla sezione Documenti: "Esporta stato consegne"</li>
+      <li>Dalla sezione Allergie: "Report allergie"</li>
+    </ul>
+
+    <h2>Formattazione chiara e professionale</h2>
+    <p>I PDF generati da CatechHub includono intestazione con logo, titolo del report, data di generazione, tabelle ben leggibili e numerazione delle pagine. Il tutto formattato in modo pulito e professionale.</p>
+
+    <h2>Sicurezza e privacy</h2>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>I PDF non contengono mai dati sensibili non necessari per la finalità del report</li>
+      <li>Il report "Elenco gruppo" include i contatti genitori solo se richiesto esplicitamente</li>
+      <li>I report destinati ai genitori contengono solo i dati del proprio figlio</li>
+      <li>La generazione avviene interamente sul dispositivo, senza inviare dati a server esterni</li>
+    </ul>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div>
+      <strong>CatechHub</strong> <span class="version-tag"></span> — Registro Elettronico di Catechismo<br>
+      <small>Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.</small>
+    </div>
+    <div>
+      <small>
+        &#128231; <a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a> &middot;
+        &#128247; Instagram (prossimamente) &middot;
+        &#9992; Telegram (prossimamente)
+      </small><br>
+      <a href="../privacy.html">Privacy</a> &middot;
+      <a href="../terms.html">Termini</a> &middot;
+      <a href="../infos/index.html">GDPR</a> &middot;
+      <a href="../developer.html">Sviluppatore</a> &middot;
+      <a href="https://github.com/delelimed/CatechHub" class="release-url">GitHub</a><br>
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/nav.js"></script></body>
+</html>

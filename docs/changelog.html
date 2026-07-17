@@ -1,0 +1,59 @@
+﻿<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cronologia Versioni — CatechHub</title>
+<link rel="icon" href="logo.png" type="image/png">
+<link rel="stylesheet" href="style.css">
+<script src="js/changelog.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
+
+<section class="page-header">
+  <div class="container">
+    <h1>Cronologia Versioni</h1>
+    <p>Tutte le release di CatechHub, direttamente da GitHub</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <div class="breadcrumb"><a href="index.html">Home</a> / Cronologia versioni</div>
+    <div id="changelog-list">
+      <p style="text-align:center;padding:2rem;color:#888;">Caricamento...</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div>
+      <strong>CatechHub</strong> — Registro Elettronico di Catechismo<br>
+      <small>Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.</small>
+    </div>
+    <div>
+      <a href="privacy.html">Privacy</a> &middot;
+      <a href="terms.html">Termini</a> &middot;
+      <a href="gdpr/index.html">GDPR</a> &middot;
+      <a href="developer.html">Sviluppatore</a> &middot;
+      <a href="https://github.com/delelimed/CatechHub">GitHub</a><br>
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
+
+<script src="js/nav.js"></script></body>
+</html>

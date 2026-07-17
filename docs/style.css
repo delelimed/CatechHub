@@ -1,0 +1,258 @@
+/* ───── RESET & BASE ───── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  line-height: 1.6; color: #1a1a2e; background: #f8f9fe; min-height: 100vh;
+}
+img { max-width: 100%; height: auto; display: block; }
+a { color: #174A7E; text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ───── TYPOGRAPHY ───── */
+h1, h2, h3, h4 { line-height: 1.25; color: #0d2b4a; }
+h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); }
+h2 { font-size: clamp(1.25rem, 3vw, 1.75rem); margin-top: 2rem; }
+h3 { font-size: clamp(1.05rem, 2.5vw, 1.35rem); margin-top: 1.5rem; }
+p { margin-bottom: 0.75rem; }
+small { font-size: 0.85rem; color: #666; }
+
+/* ───── LAYOUT ───── */
+.container { max-width: 960px; margin: 0 auto; padding: 0 1rem; }
+
+/* ───── HEADER ───── */
+header {
+  background: linear-gradient(135deg, #0d2b4a 0%, #174A7E 50%, #1a5fa0 100%);
+  color: #fff; padding: 1rem 0; position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 12px rgba(0,0,0,.15);
+}
+header .container { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+header .logo { display: flex; align-items: center; gap: 0.6rem; }
+header .logo img { width: 36px; height: 36px; border-radius: 8px; }
+header .logo span { font-size: 1.1rem; font-weight: 700; white-space: nowrap; }
+/* Hamburger */
+.menu-toggle {
+  display: none; background: none; border: none; color: #fff;
+  font-size: 1.5rem; cursor: pointer; padding: 0.25rem;
+}
+nav ul { display: flex; list-style: none; gap: 0.25rem; flex-wrap: wrap; }
+nav ul li a {
+  color: rgba(255,255,255,.85); padding: 0.4rem 0.6rem; border-radius: 6px;
+  font-size: 0.85rem; transition: .2s; white-space: nowrap;
+}
+nav ul li a:hover, nav ul li a.active { background: rgba(255,255,255,.15); color: #fff; text-decoration: none; }
+
+/* ───── HERO ───── */
+.hero {
+  background: linear-gradient(135deg, #0d2b4a 0%, #174A7E 60%, #1a5fa0 100%);
+  color: #fff; padding: 3rem 1rem; text-align: center;
+}
+.hero h1 { color: #fff; font-size: clamp(1.8rem, 5vw, 2.8rem); margin-bottom: 0.75rem; }
+.hero p { font-size: clamp(1rem, 2.5vw, 1.2rem); opacity: .9; max-width: 640px; margin: 0 auto 1.5rem; }
+.hero .badges { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-bottom: 1.5rem; }
+.hero .badge {
+  background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.25);
+  padding: 0.3rem 0.75rem; border-radius: 20px; font-size: 0.8rem;
+}
+
+/* ───── CARDS ───── */
+.card {
+  background: #fff; border-radius: 12px; padding: 1.25rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06); transition: .2s;
+}
+.card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); transform: translateY(-2px); }
+.card-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem; margin: 1.5rem 0;
+}
+.card-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+.card h3 { margin-top: 0; margin-bottom: 0.25rem; }
+
+/* ───── SECTIONS ───── */
+section { padding: 2rem 0; }
+.section-alt { background: #eef1f8; }
+
+/* ───── FEATURE LIST (home) ───── */
+.feature-list { list-style: none; display: grid; gap: 0.6rem; }
+.feature-list li {
+  background: #fff; padding: 0.75rem 1rem; border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.05); display: flex; align-items: center; gap: 0.6rem;
+}
+.feature-list li::before { content: "✓"; color: #2e7d32; font-weight: 700; }
+
+/* ───── SECURITY TABLE ───── */
+.sec-table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.sec-table th, .sec-table td {
+  padding: 0.6rem 0.75rem; text-align: left; border-bottom: 1px solid #e0e0e0;
+  font-size: 0.9rem;
+}
+.sec-table th { background: #0d2b4a; color: #fff; font-weight: 600; }
+.sec-table tr:nth-child(even) { background: #f5f7fb; }
+
+/* ───── BUTTONS ───── */
+.btn {
+  display: inline-block; padding: 0.55rem 1.2rem; border-radius: 8px;
+  font-weight: 600; font-size: 0.9rem; border: none; cursor: pointer;
+  transition: .2s; text-decoration: none;
+}
+.btn-primary { background: #174A7E; color: #fff; }
+.btn-primary:hover { background: #0d2b4a; text-decoration: none; }
+.btn-outline { background: transparent; color: #174A7E; border: 2px solid #174A7E; }
+.btn-outline:hover { background: #174A7E; color: #fff; text-decoration: none; }
+
+/* ───── FOOTER ───── */
+footer {
+  background: #0d2b4a; color: rgba(255,255,255,.7); padding: 2rem 0;
+  margin-top: 3rem; font-size: 0.85rem;
+}
+footer .container { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; }
+footer a { color: rgba(255,255,255,.8); }
+footer a:hover { color: #fff; }
+
+/* ───── BREADCRUMB ───── */
+.breadcrumb {
+  font-size: 0.8rem; color: #888; margin-bottom: 0.5rem; padding-top: 0.5rem;
+}
+.breadcrumb a { color: #174A7E; }
+
+/* ───── TOC ───── */
+.toc { background: #eef1f8; border-radius: 8px; padding: 1rem 1.25rem; margin: 1rem 0; }
+.toc h3 { margin-top: 0; }
+.toc ul { padding-left: 1.25rem; }
+.toc ul li { margin: 0.25rem 0; }
+
+/* ───── CODE ───── */
+code, pre {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 0.85rem;
+}
+code { background: #eef1f8; padding: 0.1rem 0.35rem; border-radius: 4px; }
+pre {
+  background: #1a1a2e; color: #e4e4e4; padding: 1rem; border-radius: 8px;
+  overflow-x: auto; margin: 0.75rem 0;
+}
+
+/* ───── ALERT ───── */
+.alert {
+  padding: 0.75rem 1rem; border-radius: 8px; margin: 0.75rem 0;
+  font-size: 0.9rem; display: flex; align-items: flex-start; gap: 0.5rem;
+}
+.alert-info { background: #e3f2fd; border-left: 4px solid #1976d2; }
+.alert-warning { background: #fff3e0; border-left: 4px solid #f57c00; }
+.alert-success { background: #e8f5e9; border-left: 4px solid #2e7d32; }
+.alert-danger { background: #fbe9e7; border-left: 4px solid #d32f2f; }
+
+/* ───── SUBPAGE HEADER ───── */
+.page-header {
+  background: linear-gradient(135deg, #0d2b4a, #174A7E);
+  color: #fff; padding: 1.5rem 0; text-align: center;
+}
+.page-header h1 { color: #fff; margin-bottom: 0.25rem; }
+.page-header p { opacity: .85; font-size: 0.95rem; }
+
+/* ───── SCREENSHOT ───── */
+.screenshot { border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,.12); margin: 1rem auto; }
+.screenshot-row { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; }
+.screenshot-row img { max-height: 500px; width: auto; }
+
+/* ───── TAG ───── */
+.tag {
+  display: inline-block; padding: 0.15rem 0.5rem; border-radius: 12px;
+  font-size: 0.75rem; font-weight: 600;
+}
+.tag-blue { background: #e3f2fd; color: #1565c0; }
+.tag-green { background: #e8f5e9; color: #2e7d32; }
+.tag-orange { background: #fff3e0; color: #e65100; }
+.tag-red { background: #fbe9e7; color: #c62828; }
+
+/* ───── DEV CARD ───── */
+.dev-card {
+  text-align: center; max-width: 480px; margin: 2rem auto;
+  background: #fff; border-radius: 16px; padding: 2rem;
+  box-shadow: 0 4px 24px rgba(0,0,0,.08);
+}
+.dev-avatar {
+  width: 100px; height: 100px; border-radius: 50%;
+  background: linear-gradient(135deg, #174A7E, #1a5fa0);
+  margin: 0 auto 1rem; display: flex; align-items: center;
+  justify-content: center; font-size: 2.5rem; color: #fff;
+}
+
+/* ───── GDPR ✔ / ✘ ───── */
+.icon-check { color: #2e7d32; }
+.icon-cross { color: #c62828; }
+
+/* ───── RESPONSIVE ───── */
+@media (max-width: 768px) {
+  .menu-toggle { display: block; }
+  nav ul {
+    display: none; flex-direction: column; width: 100%;
+    background: #0d2b4a; padding: 0.5rem; border-radius: 8px;
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 99;
+  }
+  nav ul.open { display: flex; }
+  header .container { flex-wrap: wrap; position: relative; }
+  nav ul li a { white-space: normal; }
+  .card-grid { grid-template-columns: 1fr; }
+  .screenshot-row img { max-height: 300px; }
+}
+@media (max-width: 480px) {
+  html { font-size: 15px; }
+  section { padding: 1.25rem 0; }
+  .container { padding: 0 0.75rem; }
+}
+/* ----- DROPDOWN ----- */
+.dropdown { position: relative; }
+.dropdown > a { cursor: pointer; }
+.dropdown-menu {
+  display: none; position: absolute; top: 100%; left: 0;
+  background: #0d2b4a; min-width: 200px; border-radius: 8px;
+  padding: 0.25rem 0; box-shadow: 0 8px 24px rgba(0,0,0,.3);
+  z-index: 200; list-style: none;
+}
+.dropdown-menu li a {
+  display: block; padding: 0.5rem 1rem; color: rgba(255,255,255,.85);
+  font-size: 0.85rem; white-space: nowrap;
+}
+.dropdown-menu li a:hover { background: rgba(255,255,255,.1); color: #fff; }
+.dropdown:hover .dropdown-menu { display: block; }
+@media (max-width: 768px) {
+  .dropdown-menu { position: static; display: none; box-shadow: none; padding-left: 1rem; }
+  .dropdown.open .dropdown-menu { display: block; }
+}
+
+/* ───── FAQ ───── */
+.faq-item { margin: 1.25rem 0; }
+.faq-item h3 { font-size: 1rem; margin-bottom: 0.4rem; cursor: pointer; color: #174A7E; }
+.faq-item p { font-size: 0.9rem; color: #444; }
+/* ----- RELEASE CARDS (changelog) ----- */
+.release-card {
+  background: #fff; border-radius: 12px; padding: 1.5rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 1.5rem;
+}
+.release-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); }
+.release-header {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.75rem;
+  margin-bottom: 1rem; padding-bottom: 0.75rem;
+  border-bottom: 1px solid #eef1f8;
+}
+.release-header h2 { margin: 0; font-size: 1.2rem; }
+.release-header h2 a { color: #174A7E; }
+.release-date { font-size: 0.85rem; color: #888; }
+.release-body { font-size: 0.9rem; color: #444; }
+.release-body h3, .release-body h4 { margin-top: 1rem; margin-bottom: 0.3rem; font-size: 1rem; }
+.release-body ul { padding-left: 1.25rem; margin: 0.5rem 0; }
+.release-body li { margin: 0.25rem 0; }
+.release-body p { margin-bottom: 0.5rem; }
+.release-assets { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid #eef1f8; }
+
+/* ----- FUTURE PAGE ----- */
+#future-content h2 { margin-top: 1.5rem; }
+#future-content h3 { margin-top: 1rem; font-size: 1.05rem; }
+#future-content ul { padding-left: 1.25rem; margin: 0.5rem 0 1rem; }
+#future-content li { margin: 0.4rem 0; font-size: 0.9rem; color: #444; }
+#future-content li strong { color: #1a1a2e; }
+#future-content blockquote {
+  border-left: 4px solid #174A7E; padding: 0.5rem 1rem; margin: 1rem 0;
+  background: #eef1f8; border-radius: 0 8px 8px 0; font-style: italic; color: #555;
+}

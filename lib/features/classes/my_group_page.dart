@@ -1,3 +1,19 @@
+/// Pagina "Il mio gruppo" di CateREG: vista principale per il catechista
+/// con le statistiche di frequenza dei ragazzi della propria classe.
+///
+/// Si compone di:
+/// - Azioni rapide (desktop/mobile): "Gestione appelli" e "Stampa appelli".
+/// - Intestazione con il nome del gruppo.
+/// - Elenco degli studenti (`_StudentCard`) con conteggio presenze (verde),
+///   assenze (rosso) e alert visivo per >= 2 assenze consecutive.
+///
+/// Il provider [groupStudentsStatsProvider] calcola in tempo reale presenze,
+/// assenze e assenze consecutive per ogni studente, incrociando i dati dal
+/// [AttendanceRepository] e dal [studentsRepoProvider].
+///
+/// Navigazione CateREG: toccando uno studente si apre [StudentQuickViewPage];
+/// i pulsanti azione portano a gestione appelli (/attendance-meetings) e
+/// alla pagina di stampa [AttendancePrintPage].
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -321,7 +337,7 @@ class _ActionButton extends StatelessWidget {
           horizontal: 12,
         ),
         decoration: BoxDecoration(
-          color: isPrimary ? color : color.withOpacity(0.10),
+          color: isPrimary ? color : color.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
@@ -424,7 +440,7 @@ class _StudentCard extends StatelessWidget {
               : null,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),

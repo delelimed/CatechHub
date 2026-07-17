@@ -1,19 +1,49 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_service.dart';
 import '../../shared/widgets/app_scaffold.dart';
+import '../../shared/models/planning_meeting.dart';
 import '../classes/classes_provider.dart';
 import 'planning_provider.dart';
 import 'planning_edit_page.dart';
-import '../../shared/models/planning_meeting.dart';
 
-class PlanningPage extends ConsumerWidget {
+class PlanningPage extends ConsumerStatefulWidget {
   const PlanningPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PlanningPage> createState() => _PlanningPageState();
+}
+
+class _PlanningPageState extends ConsumerState<PlanningPage> {
+  bool _showPast = false;
+  final _scrollController = ScrollController();
+  final _monthKeys = <String, GlobalKey>{};
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToMonth(String monthKey) {
+    final globalKey = _monthKeys[monthKey];
+    if (globalKey?.currentContext == null) return;
+    final RenderBox? box = globalKey!.currentContext!.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final offset = box.localToGlobal(Offset.zero, ancestor: _scrollController.position.context.storageContext.findRenderObject());
+    final dy = offset.dy + _scrollController.position.pixels - 50;
+    _scrollController.animateTo(
+      dy.clamp(_scrollController.position.minScrollExtent, _scrollController.position.maxScrollExtent),
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final repo = ref.read(planningRepoProvider);
     final classesAsync = ref.watch(classesStreamProvider);
 
@@ -23,9 +53,6 @@ class PlanningPage extends ConsumerWidget {
     return AppScaffold(
       title: 'Programmazione',
 
-      ///
-      /// FLOATING BUTTON
-      ///
       floatingActionButton: FloatingActionButton.extended(
         elevation: 4,
         backgroundColor: const Color(0xFF174A7E),
@@ -38,9 +65,6 @@ class PlanningPage extends ConsumerWidget {
         onPressed: () => _showAddMenu(context),
       ),
 
-      ///
-      /// BODY
-      ///
       child: classesAsync.when(
         data: (classes) {
           final myClass = classes.where(
@@ -51,8 +75,7 @@ class PlanningPage extends ConsumerWidget {
             return _EmptyState(
               icon: Icons.groups_rounded,
               title: 'Nessuna classe assegnata',
-              subtitle:
-                  'Non risulti ancora assegnato ad un gruppo di catechismo.',
+              subtitle: 'Non risulti ancora assegnato ad un gruppo di catechismo.',
             );
           }
 
@@ -61,353 +84,262 @@ class PlanningPage extends ConsumerWidget {
           return StreamBuilder<List<PlanningMeeting>>(
             stream: repo.getMeetings(),
             builder: (context, snapshot) {
-              ///
-              /// LOADING
-              ///
               if (!snapshot.hasData) {
                 return const Center(
                   child: CircularProgressIndicator(),
                 );
               }
 
-              final meetings = snapshot.data!
-                  .where((m) => m.classId == classId)
-                  .toList()
-                ..sort((a, b) => b.date.compareTo(a.date));
+              final now = DateTime.now();
+              final today = DateTime(now.year, now.month, now.day);
 
-              ///
-              /// EMPTY
-              ///
-              if (meetings.isEmpty) {
-                return _EmptyState(
-                  icon: Icons.event_note_rounded,
-                  title: 'Nessuna programmazione',
-                  subtitle:
-                      'Inizia creando il primo incontro del percorso.',
-                );
+              var meetings = snapshot.data!
+                  .where((m) => m.classId == classId)
+                  .toList();
+
+              if (_showPast) {
+                meetings = meetings.where((m) => m.date.isBefore(today)).toList();
+                meetings.sort((a, b) => b.date.compareTo(a.date));
+              } else {
+                meetings = meetings.where((m) => !m.date.isBefore(today)).toList();
+                meetings.sort((a, b) => a.date.compareTo(b.date));
               }
 
-              ///
-              /// LISTA
-              ///
-              return ListView.separated(
+              final groupedMeetings = <String, List<PlanningMeeting>>{};
+              final monthKeys = <String>[];
+              for (final m in meetings) {
+                final key = DateFormat('MMMM yyyy', 'it_IT').format(m.date);
+                if (!groupedMeetings.containsKey(key)) {
+                  groupedMeetings[key] = [];
+                  monthKeys.add(key);
+                  _monthKeys[key] = GlobalKey();
+                }
+                groupedMeetings[key]!.add(m);
+              }
+
+              return ListView(
+                controller: _scrollController,
                 padding: const EdgeInsets.only(bottom: 100),
-                itemCount: meetings.length,
-                separatorBuilder: (_, __) =>
-                    const SizedBox(height: 14),
-                itemBuilder: (_, i) {
-                  final m = meetings[i];
-                  final isReunion = m.isReunion;
-                  final accentColor =
-                      isReunion ? Colors.deepPurple : const Color(0xFF174A7E);
-
-                  final formattedDate =
-                      DateFormat('dd MMMM yyyy', 'it_IT')
-                          .format(m.date);
-
-                  return InkWell(
-                    borderRadius: BorderRadius.circular(24),
-
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              PlanningEditPage(existing: m),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: _CatechesiBanner(
+                      onTap: () => context.push('/catechesi'),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 42,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      children: [
+                        _ToggleChip(
+                          label: _showPast ? 'Prossimi' : 'Passati',
+                          icon: _showPast ? Icons.upcoming_rounded : Icons.history_rounded,
+                          onTap: () {
+                            setState(() => _showPast = !_showPast);
+                          },
                         ),
-                      );
-                    },
-
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.all(20),
-
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.white,
-                            Colors.blue.shade50.withOpacity(0.35),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                        if (monthKeys.isNotEmpty)
+                          const SizedBox(width: 8),
+                        ...monthKeys.map((mk) => _MonthChip(
+                          label: mk[0].toUpperCase() + mk.substring(1),
+                          onTap: () => _scrollToMonth(mk),
+                        )),
+                      ],
+                    ),
+                  ),
+                  if (meetings.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 24),
+                      child: Center(
+                        child: Text(
+                          _showPast ? 'Nessun incontro passato' : 'Nessun prossimo incontro',
+                          style: TextStyle(color: Colors.grey.shade600, fontSize: 15),
                         ),
-
-                        borderRadius: BorderRadius.circular(24),
-
-                        border: Border.all(
-                          color: Colors.blue.shade100,
-                        ),
-
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
-                            blurRadius: 16,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
                       ),
-
-                      child: Row(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
-                        children: [
-                          ///
-                          /// DATA BOX
-                          ///
-                          Container(
-                            width: 74,
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 14,
-                            ),
-                            decoration: BoxDecoration(
-                              color: accentColor,
-                              borderRadius:
-                                  BorderRadius.circular(20),
-                            ),
-                            child: Column(
-                              children: [
-                                Text(
-                                  DateFormat('dd')
-                                      .format(m.date),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                    ),
+                  ...monthKeys.map((monthKey) {
+                    final monthMeetings = groupedMeetings[monthKey]!;
+                    return Column(
+                      key: _monthKeys[monthKey],
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                          child: Row(
+                            children: [
+                              Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF174A7E).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(20),
                                 ),
-
-                                Text(
-                                  DateFormat('MMM', 'it_IT')
-                                      .format(m.date)
-                                      .toUpperCase(),
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(width: 18),
-
-                          ///
-                          /// TESTI
-                          ///
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        m.title,
-                                        style: theme
-                                            .textTheme.titleMedium
-                                            ?.copyWith(
-                                          fontWeight:
-                                              FontWeight.bold,
-                                          color: accentColor,
-                                        ),
-                                      ),
-                                    ),
-                                    if (isReunion)
-                                      Container(
-                                        padding:
-                                            const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.deepPurple.shade50,
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                        ),
-                                        child: Text(
-                                          'Riunione',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.deepPurple.shade800,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 6),
-
-                                Text(
-                                  formattedDate,
-                                  style: TextStyle(
-                                    color: Colors.grey.shade700,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-
-                                const SizedBox(height: 10),
-
-                                ///
-                                /// ATTIVITA
-                                ///
-                                Row(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Icon(
-                                      Icons.menu_book_rounded,
-                                      size: 18,
-                                      color:
-                                          Colors.orange.shade700,
-                                    ),
-
-                                    const SizedBox(width: 8),
-
-                                    Expanded(
-                                      child: Text(
-                                        m.activity,
-                                        maxLines: 3,
-                                        overflow:
-                                            TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          height: 1.4,
-                                          fontSize: 15,
-                                          fontWeight:
-                                              FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-
-                                if (m.notes
-                                    .trim()
-                                    .isNotEmpty) ...[
-                                  const SizedBox(height: 14),
-
-                                  Container(
-                                    width: double.infinity,
-                                    padding:
-                                        const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          Colors.grey.shade100,
-                                      borderRadius:
-                                          BorderRadius.circular(
-                                        16,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment
-                                              .start,
-                                      children: [
-                                        Icon(
-                                          Icons.notes_rounded,
-                                          size: 18,
-                                          color: Colors
-                                              .grey.shade700,
-                                        ),
-
-                                        const SizedBox(
-                                            width: 8),
-
-                                        Expanded(
-                                          child: Text(
-                                            m.notes,
-                                            style:
-                                                TextStyle(
-                                              color: Colors
-                                                  .grey
-                                                  .shade800,
-                                              height: 1.35,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-
-                          ///
-                          /// MENU
-                          ///
-                          PopupMenuButton<String>(
-                            icon: const Icon(
-                              Icons.more_vert_rounded,
-                            ),
-
-                            shape: RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.circular(18),
-                            ),
-
-                            onSelected: (v) async {
-                              if (v == 'delete') {
-                                await repo.deleteMeeting(m.id);
-                              }
-
-                              if (v == 'edit') {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        PlanningEditPage(
-                                      existing: m,
-                                    ),
-                                  ),
-                                );
-                              }
-                            },
-
-                            itemBuilder: (_) => const [
-                              PopupMenuItem(
-                                value: 'edit',
                                 child: Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.edit_rounded),
-                                    SizedBox(width: 10),
-                                    Text('Modifica'),
-                                  ],
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'delete',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.delete_rounded),
-                                    SizedBox(width: 10),
-                                    Text('Elimina'),
+                                    Icon(Icons.calendar_month_rounded, size: 16, color: const Color(0xFF174A7E)),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      monthKey[0].toUpperCase() + monthKey.substring(1),
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF174A7E),
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
+                        ),
+                        ...monthMeetings.map((m) {
+                          final isReunion = m.isReunion;
+                          final accentColor =
+                              isReunion ? Colors.deepPurple : const Color(0xFF174A7E);
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(24),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => PlanningEditPage(existing: m),
+                                  ),
+                                );
+                              },
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.white,
+                                      Colors.blue.shade50.withValues(alpha: 0.35),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(24),
+                                  border: Border.all(
+                                    color: Colors.blue.shade100,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.04),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 8),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      width: 56,
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: accentColor,
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          Text(
+                                            DateFormat('dd').format(m.date),
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 17,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          Text(
+                                            DateFormat('MMM', 'it_IT').format(m.date).toUpperCase(),
+                                            style: const TextStyle(
+                                              color: Colors.white70,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            m.title,
+                                            style: theme.textTheme.titleMedium?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                              color: accentColor,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    PopupMenuButton<String>(
+                                      icon: const Icon(Icons.more_vert_rounded),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(18),
+                                      ),
+                                      onSelected: (v) async {
+                                        if (v == 'delete') {
+                                          await repo.deleteMeeting(m.id);
+                                        }
+                                        if (v == 'edit') {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => PlanningEditPage(existing: m),
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      itemBuilder: (_) => const [
+                                        PopupMenuItem(
+                                          value: 'edit',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.edit_rounded),
+                                              SizedBox(width: 10),
+                                              Text('Modifica'),
+                                            ],
+                                          ),
+                                        ),
+                                        PopupMenuItem(
+                                          value: 'delete',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.delete_rounded),
+                                              SizedBox(width: 10),
+                                              Text('Elimina'),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ],
+                    );
+                  }),
+                ],
               );
             },
           );
         },
-
-        ///
-        /// LOADING
-        ///
         loading: () => const Center(
           child: CircularProgressIndicator(),
         ),
-
-        ///
-        /// ERROR
-        ///
         error: (e, _) => Center(
           child: Container(
             padding: const EdgeInsets.all(20),
@@ -479,9 +411,175 @@ class PlanningPage extends ConsumerWidget {
   }
 }
 
-///
-/// EMPTY STATE
-///
+class _ToggleChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _ToggleChip({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF174A7E),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MonthChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _MonthChip({
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: Colors.grey.shade300,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CatechesiBanner extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _CatechesiBanner({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFF174A7E),
+              Color(0xFF2A6BB0),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.blue.withValues(alpha: 0.15),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.menu_book_rounded,
+                color: Colors.white,
+                size: 26,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Catechesi',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Gestisci le tue raccolte di catechesi',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.75),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'Apri',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _EmptyState extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -514,9 +612,7 @@ class _EmptyState extends StatelessWidget {
                 color: const Color(0xFF174A7E),
               ),
             ),
-
             const SizedBox(height: 24),
-
             Text(
               title,
               style: const TextStyle(
@@ -525,9 +621,7 @@ class _EmptyState extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-
             const SizedBox(height: 10),
-
             Text(
               subtitle,
               style: TextStyle(

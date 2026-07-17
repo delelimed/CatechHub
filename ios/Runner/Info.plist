@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>La fotocamera è necessaria per scansionare il codice QR di pairing e collegare i dispositivi.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Autenticati con Face ID per sbloccare il Registro in modo rapido e sicuro.</string>
 </dict>
 </plist>

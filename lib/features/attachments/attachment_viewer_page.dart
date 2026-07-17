@@ -1,3 +1,16 @@
+/// Schermata a tutto schermo per la visualizzazione di allegati (immagini e PDF).
+///
+/// Nel contesto di CateREG, questa pagina viene aperta da [AttachmentsSection]
+/// quando l'utente tocca un allegato. Supporta:
+/// - **Immagini** (JPEG/PNG/WEBP/GIF) visualizzate con [InteractiveViewer] per zoom
+/// - **PDF** renderizzati con [PdfPreview] (libreria `printing`)
+/// - **Stampa PDF** tramite il pulsante nell'AppBar (visibile solo per PDF)
+///
+/// I byte vengono letti al volo da [AttachmentsRepository.readBytes], che recupera
+/// i dati crittografati dal vault locale (vedi [EncryptedFileStorage]).
+///
+/// In caso di errore di lettura, mostra un messaggio in italiano
+/// ("Impossibile aprire il file") con il dettaglio dell'errore.
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';

@@ -9,6 +9,12 @@ import 'students_repository.dart';
 
 final studentsRepoProvider = Provider((ref) => StudentsRepository());
 
+/// Pagina di modifica di uno studente esistente: campi editabili per nome,
+/// cognome, genitori (con pulsanti azione telefono/WhatsApp), uscite
+/// autorizzate, allergie, note e sezione allegati.
+/// Usa il modello [Student] e persiste tramite [StudentsRepository] (Box `students`).
+/// La modifica è protetta da un lucchetto (toggle editMode) per evitare
+/// cambi accidentali. Flusso: accessibile dal menu contestuale di [StudentsPage].
 class EditStudentPage extends ConsumerStatefulWidget {
   final Student student;
 
@@ -492,6 +498,7 @@ class _PhoneRow extends StatelessWidget {
           child: TextField(
             controller: controller,
             enabled: enabled,
+            keyboardType: TextInputType.phone,
             decoration: const InputDecoration(labelText: 'Telefono'),
           ),
         ),
@@ -622,6 +629,7 @@ class _ParentCard extends StatelessWidget {
               child: TextField(
                 controller: phone,
                 enabled: editMode,
+                keyboardType: TextInputType.phone,
                 decoration:
                     const InputDecoration(labelText: 'Telefono'),
               ),

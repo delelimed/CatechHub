@@ -1,518 +1,298 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="it">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CatechHub - Il tuo registro di catechismo</title>
-    <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CatechHub &mdash; Il registro di catechismo facile e sicuro</title>
+<meta name="description" content="App mobile gratuita per catechisti. Gestisci anagrafica, presenze, documenti e comunicazioni. Offline, crittografata, senza account.">
+<link rel="icon" href="logo.png" type="image/png">
+<link rel="stylesheet" href="style.css">
+<script src="js/version.js" defer></script>
 </head>
 <body>
-    <!-- Navigation -->
-    <nav class="navbar">
-        <div class="container">
-            <div class="nav-brand">
-                <img src="logo.png" alt="CatechHub Logo" class="nav-logo">
-                <span>CatechHub</span>
-            </div>
-            <ul class="nav-menu">
-                <li><a href="#home" class="nav-link active">Home</a></li>
-                <li><a href="#features" class="nav-link">Funzionalità</a></li>
-                <li><a href="#guide" class="nav-link">Guida</a></li>
-                <li><a href="#download" class="nav-link">Download</a></li>
-                <li><a href="#info" class="nav-link">Info</a></li>
-            </ul>
-            <div class="hamburger">
-                <span></span>
-                <span></span>
-                <span></span>
-            </div>
-        </div>
-    </nav>
 
-    <!-- Hero Section -->
-    <section id="home" class="hero">
-        <div class="hero-overlay"></div>
-        <div class="container">
-            <div class="hero-content">
-                <img src="logo.png" alt="CatechHub Logo" class="hero-logo">
-                <h1 class="hero-title">
-                    <span class="gradient-text">CatechHub</span>
-                </h1>
-                <p class="hero-subtitle">Il tuo registro di catechismo, sempre con te!</p>
-                <p class="hero-description">
-                    Gestisci il tuo gruppo di catechismo in modo semplice, sicuro e completamente offline. 
-                    Niente più cartelle, post - it e fogli di carta, tutto sul tuo smartphone!
-                </p>
-                <div class="hero-buttons">
-                    <a href="#download" class="btn btn-primary">
-                        <i class="fab fa-google-play"></i>
-                        Scarica ora
-                    </a>
-                    <a href="#features" class="btn btn-secondary">
-                        <i class="fas fa-info-circle"></i>
-                        Scopri di più
-                    </a>
-                </div>
-                <div class="hero-features">
-                    <div class="hero-feature">
-                        <i class="fas fa-lock"></i>
-                        <span>100% Offline</span>
-                    </div>
-                    <div class="hero-feature">
-                        <i class="fas fa-shield-alt"></i>
-                        <span>Dati Sicuri</span>
-                    </div>
-                    <div class="hero-feature">
-                        <i class="fas fa-fingerprint"></i>
-                        <span>Biometria</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="scroll-indicator">
-            <i class="fas fa-chevron-down"></i>
-        </div>
-    </section>
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
 
-    <!-- Features Section -->
-    <section id="features" class="features">
-        <div class="container">
-            <div class="section-header">
-                <h2 class="section-title">Funzionalità <span class="highlight">Epiche</span></h2>
-                <p class="section-subtitle">Tutto ciò che serve per il tuo catechismo, a portata di tap</p>
-            </div>
+<section class="hero">
+  <div class="badges">
+    <span class="badge version-tag">v1.0.3</span>
+    <span class="badge">100% offline</span>
+    <span class="badge">Privacy by Design</span>
+    <span class="badge">Senza account</span>
+    <span class="badge">Gratuita</span>
+  </div>
+  <h1>CatechHub: Il Tuo registro di Catechismo - Completamente offline</h1>
+  <p>Niente più fogli volanti, elenchi persi o dati lasciati in giro. CatechHub è l'app creata da un catechista per altri catechisti: semplice, sicura, funziona sempre, anche senza internet.</p>
+  <p style="font-size:0.85rem;opacity:0.7;margin-top:0.5rem;">? Sviluppata in <strong>vibe coding</strong> con AI da un catechista studente di medicina, non da un programmatore</p>
+  <div style="margin-top:1.5rem;">
+    <span class="badge" style="font-size:0.9rem;padding:0.4rem 1rem;">Ultima versione: <strong class="version-tag">v1.0.3</strong> &middot; <span class="download-count">0 download</span></span>
+  </div>
+  <div style="margin-top:1rem;">
+    <a href="https://github.com/delelimed/CatechHub/releases" class="btn btn-outline release-url download-btn" style="border-color:#fff;color:#fff;margin:0.25rem;">Scarica l'APK gratis</a>
+  </div>
+</section>
 
-            <div class="features-grid">
-                <!-- Feature 1 -->
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <h3>Gestione Ragazzi</h3>
-                    <p>Registra anagrafica completa, allergie, autorizzazioni e contatti dei genitori. Visualizzazione rapida scheda personale.</p>
-                </div>
+<section>
+  <div class="container">
+    <h2>CatechHub in poche parole</h2>
+    <p>Ogni catechista conosce la sfida: tenere traccia di ragazzi, presenze, documenti, comunicazioni con le famiglie — il tutto rispettando la privacy. CatechHub ti mette a disposizione un registro digitale completo, direttamente sul tuo telefono. Senza abbonamenti, senza server, senza bisogno di internet.</p>
 
-                <!-- Feature 2 -->
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-calendar-alt"></i>
-                    </div>
-                    <h3>Programmazione</h3>
-                    <p>Pianifica gli incontri di catechismo, organizza riunioni e tiene traccia di tutte le attività.</p>
-                </div>
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-icon">&#128203;</div>
+        <h3>Anagrafica sempre in ordine</h3>
+        <p>Aggiungi i ragazzi, crea gruppi, cerca in un attimo. Tutti i contatti dei genitori a portata di dito.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#9989;</div>
+        <h3>Presenze senza stress</h3>
+        <p>Fai l'appello in pochi secondi, visualizza le statistiche, ricevi avvisi per assenze ripetute. Addio foglietti.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#128274;</div>
+        <h3>I tuoi dati, solo tuoi</h3>
+        <p>Niente cloud, niente server esterni. I dati restano sul tuo telefono, protetti da crittografia e blocco biometrico.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#128196;</div>
+        <h3>Documenti e moduli</h3>
+        <p>Tieni traccia di autorizzazioni, moduli consegnati e ricevuti. Non perdi più nessuna scadenza.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#128222;</div>
+        <h3>Comunicazioni con le famiglie</h3>
+        <p>Registra ogni contatto: colloqui, messaggi, telefonate. Tutta la storia in un colpo d'occhio.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#129309;</div>
+        <h3>Condividi con altri catechisti</h3>
+        <p>Sync peer-to-peer via Bluetooth, crittografato. Decidi tu con chi condividere i dati.</p>
+      </div>
+    </div>
+  </div>
+</section>
 
-                <!-- Feature 3 -->
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-clipboard-check"></i>
-                    </div>
-                    <h3>Registro Presenze</h3>
-                    <p>Fai l'appello velocemente, monitora le assenze consecutive e ricevi avvisi automatici.</p>
-                </div>
+<section class="section-alt">
+  <div class="container">
+    <h2>I tuoi dati sono al sicuro</h2>
+    <p>CatechHub è pensato per proteggere i dati sensibili dei minori. Nessuna informazione lascia il tuo telefono senza il tuo esplicito consenso.</p>
 
-                <!-- Feature 4 -->
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-folder-open"></i>
-                    </div>
-                    <h3>Documenti</h3>
-                    <p>Gestisci documenti, consegne materiali e tieni traccia di tutto ciò che viene distribuito.</p>
-                </div>
+    <table class="sec-table">
+      <thead>
+        <tr><th>Cosa protegge</th><th>Come lo fa</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Accesso all'app</strong></td><td>Impronta digitale, riconoscimento facciale o PIN del telefono</td></tr>
+        <tr><td><strong>Dati sul telefono</strong></td><td>Cifrati con AES-256-GCM — illeggibili anche se il file viene copiato</td></tr>
+        <tr><td><strong>Dati in sincronizzazione</strong></td><td>Crittografati end-to-end con scambio di chiavi via QR code</td></tr>
+        <tr><td><strong>Schermo</strong></td><td>Blocco screenshot e screen recording non autorizzati</td></tr>
+        <tr><td><strong>Protezione antifurto</strong></td><td>Rilevamento di root, emulatori e tentativi di manomissione</td></tr>
+        <tr><td><strong>Sessione in background</strong></td><td>Blocco automatico dopo 2 minuti di inattività</td></tr>
+        <tr><td><strong>Backup</strong></td><td>Protetto da password con crittografia avanzata</td></tr>
+      </tbody>
+    </table>
 
-                <!-- Feature 5 -->
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-paperclip"></i>
-                    </div>
-                    <h3>Allegati Smart</h3>
-                    <p>Allega foto e documenti ai ragazzi e alle giornate. Tutto organizzato e facilmente accessibile in modo sicuro.</p>
-                </div>
+    <div class="alert alert-info">
+      Nessun dato personale lascia il tuo telefono se non durante una sincronizzazione volontaria con un catechista di tua fiducia. Zero server, zero sorprese.
+    </div>
+  </div>
+</section>
 
-                <!-- Feature 6 -->
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-qrcode"></i>
-                    </div>
-                    <h3>Condivisione QR</h3>
-                    <p>Condividi i dati con altri catechisti tramite QR code animati. Semplice, sicuro e offline.</p>
-                </div>
+<section>
+  <div class="container">
+    <h2>Tutto quello che puoi fare</h2>
+    <div class="card-grid">
+      <a href="features/students.html" class="card" style="text-decoration:none;color:inherit;">
+        <h3>&#128100; Anagrafica ragazzi</h3>
+        <p>Aggiungi, modifica, cerca e organizza gli iscritti in gruppi. Gestisci contatti genitori, allergie e uscite autonome.</p>
+      </a>
+      <a href="features/attendance.html" class="card" style="text-decoration:none;color:inherit;">
+        <h3>&#9989; Presenze e appello</h3>
+        <p>Crea giornate, fai l'appello, visualizza statistiche e griglie riepilogative. Avvisi per assenze ripetute.</p>
+      </a>
+      <a href="features/planning.html" class="card" style="text-decoration:none;color:inherit;">
+        <h3>&#128197; Programmazione incontri</h3>
+        <p>Pianifica le tue lezioni e associa materiale catechetico. Rilevamento automatico dei conflitti di date.</p>
+      </a>
+      <a href="features/documents.html" class="card" style="text-decoration:none;color:inherit;">
+        <h3>&#128196; Documenti e moduli</h3>
+        <p>Gestisci il ciclo di vita: crea, consegna, attendi riconsegna, archivia. Ogni modulo sotto controllo.</p>
+      </a>
+      <a href="features/contact-notes.html" class="card" style="text-decoration:none;color:inherit;">
+        <h3>&#128222; Note contatto</h3>
+        <p>Tieni traccia delle comunicazioni con le famiglie: visivo, WhatsApp, telefonata. Sempre a portata di mano.</p>
+      </a>
+      <a href="features/catechesi.html" class="card" style="text-decoration:none;color:inherit;">
+        <h3>&#128214; Biblioteca catechetica</h3>
+        <p>Archivia contenuti, riferimenti biblici e materiali per le tue lezioni. Cerca per tag o citazioni.</p>
+      </a>
+      <a href="features/data-share.html" class="card" style="text-decoration:none;color:inherit;">
+        <h3>&#128228; Condivisione QR</h3>
+        <p>Esporta e importa moduli selezionati in modo sicuro tramite QR code cifrato.</p>
+      </a>
+      <a href="features/backup.html" class="card" style="text-decoration:none;color:inherit;">
+        <h3>&#128190; Backup crittografato</h3>
+        <p>Salva e ripristina tutto il database con un file .catechhub protetto da password.</p>
+      </a>
+      <a href="features/sync.html" class="card" style="text-decoration:none;color:inherit;">
+        <h3>&#128260; Sync P2P Bluetooth</h3>
+        <p>Sincronizza i dati con altri catechisti in modo sicuro e automatico, senza internet.</p>
+      </a>
+      <a href="features/allergies-exits.html" class="card" style="text-decoration:none;color:inherit;">
+        <h3>&#9888; Allergie e uscite</h3>
+        <p>Registra allergie, intolleranze e autorizzazioni alle uscite autonome. Informazioni sempre disponibili.</p>
+      </a>
+      <a href="features/pdf-printing.html" class="card" style="text-decoration:none;color:inherit;">
+        <h3>&#128424; PDF e stampa</h3>
+        <p>Genera report presenze, elenchi gruppi e statistiche in PDF. Stampa o condividi quando serve.</p>
+      </a>
+    </div>
+  </div>
+</section>
 
-                <!-- Feature 7 -->
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-lock"></i>
-                    </div>
-                    <h3>Sicurezza Totale</h3>
-                    <p>PIN personalizzabile, sblocco biometrico e crittografia dei dati. I TUOI dati rimangono solo sul TUO device.</p>
-                </div>
+<section class="section-alt">
+  <div class="container" style="text-align:center;">
+    <h2>Scarica CatechHub</h2>
+    <p>L'app è gratuita, open source e non richiede registrazione. Scarica l'APK, installalo sul tuo Android 10+ e inizia subito.</p>
+    <div style="margin:1.5rem 0;">
+      <span class="badge" style="background:#174A7E;color:#fff;padding:0.5rem 1.5rem;font-size:1.1rem;">
+        Versione <strong class="version-tag">v1.0.3</strong>
+      </span>
+      <span class="badge" style="background:#2e7d32;color:#fff;padding:0.5rem 1.5rem;font-size:1.1rem;margin-left:0.5rem;">
+        <span class="download-count">0 download</span>
+      </span>
+    </div>
+    <div style="margin-top:1rem;">
+      <a href="https://github.com/delelimed/CatechHub/releases" class="btn btn-primary release-url download-btn" style="font-size:1.1rem;padding:0.75rem 2rem;">Scarica l'APK</a>
+    </div>
+    <p style="margin-top:0.75rem;font-size:0.85rem;color:#888;">
+      <a href="https://github.com/delelimed/CatechHub" class="release-url">Vedi il codice su GitHub</a> &middot; MIT License
+    </p>
 
-                <!-- Feature 8 -->
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-print"></i>
-                    </div>
-                    <h3>Stampe</h3>
-                    <p>Genera PDF delle presenze e dei documenti. Perfetto per archiviazione e condivisione cartacea (per chi rimane "vecchio stampo").</p>
-                </div>
+    <div style="margin-top:2rem;text-align:left;max-width:600px;margin-left:auto;margin-right:auto;">
+      <h3 style="text-align:center;">Come installare</h3>
+      <ol style="font-size:0.9rem;color:#444;line-height:1.8;">
+        <li>Scarica il file <code>.apk</code> dalla sezione <strong>Assets</strong> dell'ultima release su GitHub</li>
+        <li>Apri il file scaricato — Android potrebbe chiederti di abilitare l'installazione <strong>"da fonti sconosciute"</strong> o <strong>"da questa origine"</strong></li>
+        <li>Vai in <strong>Impostazioni ? Sicurezza</strong> (o <strong>Impostazioni ? App ? Accesso speciale ? Installa app sconosciute</strong>) e concedi il permesso al file manager o al browser che hai usato</li>
+        <li>Torna al file <code>.apk</code> e toccalo per installare</li>
+        <li>Al primo avvio, CatechHub ti guiderà con un setup rapido: nome, cognome, gruppo</li>
+      </ol>
 
-                <!-- Feature 9 -->
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-wifi-slash"></i>
-                    </div>
-                    <h3>100% Offline</h3>
-                    <p>Funziona completamente senza internet. Usalo ovunque: in chiesa, a casa, ai ritiri.</p>
-                </div>
+      <h3 style="text-align:center;margin-top:1.5rem;">Come verificare che l'APK sia sicuro</h3>
+      <ul style="font-size:0.9rem;color:#444;line-height:1.8;padding-left:1.25rem;">
+        <li><strong>Codice aperto e verificabile</strong> — L'intero codice sorgente è pubblico su <a href="https://github.com/delelimed/CatechHub">GitHub</a>. Chiunque può esaminarlo, compilarlo e confrontare gli hash.</li>
+        <li><strong>Build riproducibile</strong> — Le release sono generate dai workflow ufficiali di GitHub Actions. Puoi vedere il log di build per ogni release.</li>
+        <li><strong>Nessun dato esce dal telefono</strong> — L'app non ha server, non raccoglie statistiche, non invia dati a terze parti. Tutto resta cifrato sul dispositivo.</li>
+        <li><strong>Scarica solo da GitHub</strong> — L'unica fonte ufficiale è la pagina <a href="https://github.com/delelimed/CatechHub/releases">Releases</a> di GitHub. Non scaricare APK da siti terzi.</li>
+        <li><strong>Protezione runtime</strong> — L'app include freeRASP che rileva manomissioni, root e tentativi di hacking.</li>
+      </ul>
+    </div>
 
-                <!-- Feature 10 -->
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-notes-medical"></i>
-                    </div>
-                    <h3>Registro Contatti</h3>
-                    <p>Registra le note di contatto con i genitori. Tieni traccia di comunicazioni importanti, problemi e progressi di ogni ragazzo.</p>
-                </div>
-            </div>
-        </div>
-    </section>
+    <div class="alert alert-info" style="display:block;margin-top:2rem;max-width:600px;margin-left:auto;margin-right:auto;">
+      <p style="margin-bottom:0.25rem;"><strong>Come &egrave; nato CatechHub</strong></p>
+      <p style="margin-bottom:0;">CatechHub &egrave; stato realizzato con l'ausilio di intelligenza artificiale e <em>vibe coding</em>. Non sono uno sviluppatore di professione: ho descritto all'IA cosa doveva fare l'app, e ho adattato il codice generato alle esigenze reali del catechismo. Il codice &egrave; aperto, verificabile e migliorabile da chiunque.</p>
+    </div>
+  </div>
+</section>
 
-    <!-- Guide Section -->
-    <section id="guide" class="guide">
-        <div class="container">
-            <div class="section-header">
-                <h2 class="section-title">Guida alle <span class="highlight">Funzioni</span></h2>
-                <p class="section-subtitle">Scopri come utilizzare al meglio tutte le funzionalità di CatechHub</p>
-            </div>
+<section class="section-alt">
+  <div class="container">
+    <h2>Tecnologie utilizzate</h2>
+    <table class="sec-table">
+      <thead><tr><th>Area</th><th>Strumento</th></tr></thead>
+      <tbody>
+        <tr><td>Framework</td><td>Flutter &amp; Dart</td></tr>
+        <tr><td>Gestione stato</td><td>Riverpod</td></tr>
+        <tr><td>Database locale</td><td>Hive (cifrato AES)</td></tr>
+        <tr><td>Crittografia</td><td>AES-256-GCM, PBKDF2, ECDH, HKDF</td></tr>
+        <tr><td>Sincronizzazione</td><td>Bluetooth RFCOMM + CRDT</td></tr>
+        <tr><td>Autenticazione</td><td>Biometria nativa Android</td></tr>
+        <tr><td>QR Code</td><td>mobile_scanner, qr_flutter</td></tr>
+        <tr><td>PDF</td><td>pdf, printing</td></tr>
+        <tr><td>Sicurezza runtime</td><td>freeRASP (Talsec)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
 
-            <div class="guide-container">
-                <!-- Guide Item 1 -->
-                <div class="guide-item">
-                    <div class="guide-number">01</div>
-                    <div class="guide-content">
-                        <h3>Configurazione Iniziale</h3>
-                        <p>Al primo avvio, configura il tuo PIN di sicurezza e imposta le preferenze di privacy. Puoi anche attivare l'autenticazione biometrica per un accesso ancora più rapido.</p>
-                        <div class="guide-tips">
-                            <span class="guide-tip"><i class="fas fa-lightbulb"></i> Scegli un PIN che ricordi ma che non sia ovvio</span>
-                        </div>
-                    </div>
-                </div>
+<section>
+  <div class="container">
+    <h2>Domande frequenti</h2>
 
-                <!-- Guide Item 2 -->
-                <div class="guide-item">
-                    <div class="guide-number">02</div>
-                    <div class="guide-content">
-                        <h3>Gestione Ragazzi</h3>
-                        <p>Aggiungi i ragazzi del tuo gruppo inserendo anagrafica completa, contatti dei genitori, allergie e autorizzazioni. Puoi anche aggiungere foto e documenti personali nella scheda di ogni ragazzo.</p>
-                        <div class="guide-tips">
-                            <span class="guide-tip"><i class="fas fa-lightbulb"></i> Usa la visualizzazione rapida per vedere le info essenziali a colpo d'occhio</span>
-                        </div>
-                    </div>
-                </div>
+    <div class="faq-item">
+      <h3>Perché CatechHub non è sul Play Store?</h3>
+      <p>Pubblicare un'app sul Play Store ha un costo. La distribuzione tramite APK è più semplice, diretta e mi permette di offrire l'app <strong>gratuitamente</strong> senza costi nascosti.</p>
+    </div>
 
-                <!-- Guide Item 3 -->
-                <div class="guide-item">
-                    <div class="guide-number">03</div>
-                    <div class="guide-content">
-                        <h3>Programmazione Incontri</h3>
-                        <p>Crea la programmazione annuale del catechismo aggiungendo incontri, argomenti e materiali. Puoi organizzare riunioni e tenere traccia di tutte le attività pianificate.</p>
-                        <div class="guide-tips">
-                            <span class="guide-tip"><i class="fas fa-lightbulb"></i> Allega documenti e materiali a ogni giornata per averli sempre a portata di mano</span>
-                        </div>
-                    </div>
-                </div>
+    <div class="faq-item">
+      <h3>I dati sono sicuri?</h3>
+      <p>Assolutamente sì. CatechHub è stato progettato con la privacy al centro. I dati non vengono mai caricati su cloud o server esterni: restano <strong>solo sul tuo telefono</strong>. Il database è crittografato con AES-256-GCM, l'accesso è protetto da impronta digitale o PIN, e la sincronizzazione con altri catechisti avviene con crittografia end-to-end. In più, l'app blocca screenshot non autorizzati e si blocca automaticamente dopo 2 minuti di inattività.</p>
+    </div>
 
-                <!-- Guide Item 4 -->
-                <div class="guide-item">
-                    <div class="guide-number">04</div>
-                    <div class="guide-content">
-                        <h3>Registro Presenze</h3>
-                        <p>Fai l'appello velocemente durante ogni incontro. L'app tiene traccia delle assenze consecutive e ti avvisa se un ragazzo supera il numero limite di assenze.</p>
-                        <div class="guide-tips">
-                            <span class="guide-tip"><i class="fas fa-lightbulb"></i> Esporta il registro in PDF per la archiviazione cartacea</span>
-                        </div>
-                    </div>
-                </div>
+    <div class="faq-item">
+      <h3>Posso usare l'app senza internet?</h3>
+      <p>Sì, CatechHub funziona <strong>completamente offline</strong>. Tutti i dati sono memorizzati sul telefono e non hai bisogno di connessione per nessuna operazione: aggiungere ragazzi, fare l'appello, gestire documenti, tutto funziona sempre. L'unica cosa che richiede una connessione è il download iniziale dell'APK e la sincronizzazione volontaria con altri catechisti (via Bluetooth, che non ha bisogno di internet).</p>
+    </div>
 
-                <!-- Guide Item 5 -->
-                <div class="guide-item">
-                    <div class="guide-number">05</div>
-                    <div class="guide-content">
-                        <h3>Condivisione Dati</h3>
-                        <p>Condividi tutti i tuoi dati con altri catechisti tramite QR code animati. Perfetto per il cambio catechista o per il backup tra dispositivi. Funziona completamente offline.</p>
-                        <div class="guide-tips">
-                            <span class="guide-tip"><i class="fas fa-lightbulb"></i> Assicurati di scansionare tutti i QR code generati per il trasferimento completo</span>
-                        </div>
-                    </div>
-                </div>
+    <div class="faq-item">
+      <h3>Come faccio a sincronizzare con altri catechisti?</h3>
+      <p>La sincronizzazione avviene <strong>peer-to-peer via Bluetooth</strong>. Un catechista genera un QR code con la chiave di sincronizzazione, l'altro lo inquadra con la propria app, e i dati vengono scambiati in modo sicuro e crittografato. Nessun server centrale, nessun account. Decidi tu con chi condividere e quali dati.</p>
+    </div>
 
-                <!-- Guide Item 6 -->
-                <div class="guide-item">
-                    <div class="guide-number">06</div>
-                    <div class="guide-content">
-                        <h3>Backup e Sicurezza</h3>
-                        <p>Esegui backup regolari dei tuoi dati esportandoli in formato JSON. I dati sono criptati localmente e protetti da PIN o biometria. Attiva le opzioni di privacy per il controllo dello schermo.</p>
-                        <div class="guide-tips">
-                            <span class="guide-tip"><i class="fas fa-lightbulb"></i> Fai backup prima di aggiornamenti o cambiamenti importanti, seguendo le eventuali indicazioni degli aggiornamenti</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
+    <div class="faq-item">
+      <h3>Posso recuperare i dati se cambio telefono?</h3>
+      <p>Certo! CatechHub ha una funzione di <strong>backup crittografato</strong> che crea un file .catechhub protetto da password. Puoi copiare questo file sul nuovo telefono e ripristinare tutto: ragazzi, gruppi, presenze, documenti. Puoi anche sincronizzare i dati con un altro catechista che ha già il tuo gruppo, se preferisci.</p>
+    </div>
 
-    <!-- Download Section -->
-    <section id="download" class="download">
-        <div class="download-overlay"></div>
-        <div class="container">
-            <div class="download-content">
-                <h2 class="download-title">Scarica <span class="gradient-text">CatechHub</span></h2>
-                <p class="download-subtitle">Disponibile su Android - Versione <span id="latest-version">1.2.0</span></p>
-                <p class="download-subtitle">Download totali: <strong id="download-count">—</strong></p>
-                
-                <div class="download-cards">
-                    <div class="download-card">
-                        <div class="download-icon">
-                            <i class="fab fa-github"></i>
-                        </div>
-                        <h3>GitHub</h3>
-                        <p>Code Source e Releases</p>
-                        <a href="https://github.com/CatechHub-dev/CatechHub/releases" class="btn-download">
-                            <i class="fas fa-download"></i>
-                            Scarica APK
-                        </a>
-                    </div>
-                </div>
+    <div class="faq-item">
+      <h3>Come posso segnalare un bug o un problema?</h3>
+      <p>Dall'app: vai in <strong>Impostazioni ? Feedback e suggerimenti</strong> e compila il modulo di segnalazione (include automaticamente versione app e informazioni sul dispositivo). In alternativa, apri una <a href="https://github.com/delelimed/CatechHub/issues">issue su GitHub</a>.</p>
+    </div>
 
-                <div class="installation-guide">
-                    <h4><i class="fas fa-info-circle"></i> Come installare da fonti sconosciute</h4>
-                    <p>Poiché CatechHub non è sul Play Store, devi abilitare l'installazione da fonti sconosciute sul tuo dispositivo Android:</p>
-                    <ol>
-                        <li><strong>Apri le Impostazioni</strong> del tuo telefono</li>
-                        <li>Vai su <strong>Sicurezza e privacy</strong> (o <strong>Applicazioni</strong> su alcuni dispositivi)</li>
-                        <li>Cerca l'opzione <strong>"Installa app da fonti sconosciute"</strong></li>
-                        <li>Abilita il permesso per il <strong>File Manager</strong> (o l'app che usi per gestire i file)</li>
-                        <li>Scarica il file APK da GitHub</li>
-                        <li>Apri il file APK scaricato e segui le istruzioni di installazione</li>
-                        <li>Al termine, <strong>disabilita pure</strong> l'opzione "Fonti sconosciute" se preferisci</li>
-                    </ol>
-                    <p><em>Nota: Ogni produttore di telefoni Android ha voci di menu leggermente diverse, ma il processo è sempre simile.</em></p>
-                </div>
+    <div class="faq-item">
+      <h3>L'app è davvero gratis?</h3>
+      <p>Sì, CatechHub è e resterà <strong>completamente gratuita</strong>. Non ci sono abbonamenti, acquisti in-app o versioni "pro". Il codice è open source (licenza MIT), chiunque può verificarlo, contribuire o creare una propria versione. La sviluppo nel mio tempo libero, per passione e per servizio alla comunità parrocchiale.</p>
+    </div>
 
-                <div class="download-requirements">
-                    <h4><i class="fas fa-mobile-alt"></i> Requisiti</h4>
-                    <ul>
-                        <li>Android 10.0 o superiore</li>
-                        <li>Spazio di archiviazione: ~100MB</li>
-                        <li>Camera per QR code e foto</li>
-                        <li>Biometria (opzionale)</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </section>
+    <div class="faq-item">
+      <h3>Serve una registrazione o un account?</h3>
+      <p>No, nessuna registrazione. Scarichi l'APK, installi, apri e inizi subito. <strong>Niente email, niente password, niente account</strong>. L'app è pronta all'uso dal primo avvio, con un semplice setup guidato.</p>
+    </div>
+  </div>
+</section>
 
-    <!-- Info Section -->
-    <section id="info" class="info">
-        <div class="container">
-            <div class="section-header">
-                <h2 class="section-title">Info & <span class="highlight">Supporto</span></h2>
-                <p class="section-subtitle">Tutto ciò che devi sapere su CatechHub</p>
-            </div>
+<footer>
+  <div class="container">
+    <div>
+      <strong>CatechHub</strong> <span class="version-tag"></span> — Registro Elettronico di Catechismo<br>
+      <small>Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.</small>
+    </div>
+    <div>
+      <small>
+        &#128231; <a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a> &middot;
+        &#128247; Instagram (prossimamente) &middot;
+        &#9992; Telegram (prossimamente)
+      </small><br>
+      <a href="privacy.html">Privacy</a> &middot;
+      <a href="terms.html">Termini</a> &middot;
+      <a href="infos/index.html">GDPR</a> &middot;
+      <a href="developer.html">Sviluppatore</a> &middot;
+      <a href="https://github.com/delelimed/CatechHub" class="release-url">GitHub</a><br>
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
 
-            <div class="info-grid">
-                <div class="info-card">
-                    <div class="info-icon">
-                        <i class="fas fa-code"></i>
-                    </div>
-                    <h3>Open Source</h3>
-                    <p>CatechHub è un progetto open source. Il codice è disponibile su GitHub per chi vuole contribuire o studiarlo.</p>
-                </div>
-
-                <div class="info-card">
-                    <div class="info-icon">
-                        <i class="fas fa-sync-alt"></i>
-                    </div>
-                    <h3>Aggiornamenti</h3>
-                    <p>L'app è in costante sviluppo. Nuove funzionalità e miglioramenti vengono aggiunti regolarmente. Puoi segnalare direttamente dall'app nuove funzioni che vorresti veder implementate.</p>
-                </div>
-
-                <div class="info-card">
-                    <div class="info-icon">
-                        <i class="fas fa-bug"></i>
-                    </div>
-                    <h3>Feedback & Bug</h3>
-                    <p>Trovato un bug? Hai un suggerimento? Usa il sistema di feedback integrato nell'app.</p>
-                </div>
-
-                <div class="info-card">
-                    <div class="info-icon">
-                        <i class="fas fa-shield-alt"></i>
-                    </div>
-                    <h3>Privacy</h3>
-                    <p>I tuoi dati rimangono sul tuo dispositivo. Niente cloud, niente tracking, niente condivisione non autorizzata.</p>
-                </div>
-
-                <div class="info-card">
-                    <div class="info-icon">
-                        <i class="fas fa-users-cog"></i>
-                    </div>
-                    <h3>Per Catechisti</h3>
-                    <p>Sviluppato da un catechista per i catechisti. Capisce le reali esigenze di chi gestisce gruppi di catechismo.</p>
-                </div>
-
-                <div class="info-card">
-                    <div class="info-icon">
-                        <i class="fas fa-heart"></i>
-                    </div>
-                    <h3>Gratuito</h3>
-                    <p>CatechHub è completamente gratuito, e lo rimarrà per sempre. Niente pubblicità, niente acquisti in-appo.</p>
-                </div>
-            </div>
-
-            <div class="faq-section">
-                <h3><i class="fas fa-question-circle"></i> Domande Frequenti</h3>
-                
-                <div class="faq-item">
-                    <div class="faq-question">
-                        <h4>I miei dati sono al sicuro?</h4>
-                        <i class="fas fa-chevron-down"></i>
-                    </div>
-                    <div class="faq-answer">
-                        <p>Assolutamente sì! Tutti i dati sono criptati e memorizzati localmente sul tuo dispositivo. L'app richiede PIN o biometria per l'accesso. I dati non vengono mai inviati a server esterni.</p>
-                    </div>
-                </div>
-
-                <div class="faq-item">
-                    <div class="faq-question">
-                        <h4>Funziona senza internet?</h4>
-                        <i class="fas fa-chevron-down"></i>
-                    </div>
-                    <div class="faq-answer">
-                        <p>Sì! CatechHub è stato progettato per funzionare completamente offline. Puoi usarlo in chiesa, a casa, ai ritiri - ovunque tu sia, senza bisogno di connessione internet.</p>
-                    </div>
-                </div>
-
-                <div class="faq-item">
-                    <div class="faq-question">
-                        <h4>Posso condividere i dati con altri catechisti?</h4>
-                        <i class="fas fa-chevron-down"></i>
-                    </div>
-                    <div class="faq-answer">
-                        <p>Certamente! Grazie alla funzione di condivisione QR code, puoi trasferire tutti i tuoi dati a un altro dispositivo in modo sicuro e offline. Perfetto per il cambio catechista.</p>
-                    </div>
-                </div>
-
-                <div class="faq-item">
-                    <div class="faq-question">
-                        <h4>Come faccio il backup dei miei dati?</h4>
-                        <i class="fas fa-chevron-down"></i>
-                    </div>
-                    <div class="faq-answer">
-                        <p>Puoi esportare tutti i dati in formato JSON tramite la funzione di backup integrata. Inoltre, la condivisione QR code funge anche da sistema di backup tra dispositivi.</p>
-                    </div>
-                </div>
-
-                <div class="faq-item">
-                    <div class="faq-question">
-                        <h4>È utile solo ai catechisti?</h4>
-                        <i class="fas fa-chevron-down"></i>
-                    </div>
-                    <div class="faq-answer">
-                        <p>No! CatechHub è perfetto anche per oratori, GREST, pastorale giovanile e qualsiasi associazione che gestisca gruppi di ragazzi. Tutte le funzionalità si adattano a diverse esigenze organizzative.</p>
-                    </div>
-                </div>
-
-                <div class="faq-item">
-                    <div class="faq-question">
-                        <h4>Perché l'app non è disponibile su Play Store?</h4>
-                        <i class="fas fa-chevron-down"></i>
-                    </div>
-                    <div class="faq-answer">
-                        <p>La pubblicazione su Play Store ha costi significativi che preferibilmente non vogliamo scaricare sugli utenti. CatechHub rimane completamente gratuito e disponibile direttamente da GitHub, mantenendo il controllo totale sul progetto open source.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-content">
-                <div class="footer-brand">
-                    <div class="nav-brand">
-                        <img src="logo.png" alt="CatechHub Logo" class="nav-logo">
-                        <span>CatechHub</span>
-                    </div>
-                    <p>Il tuo registro di catechismo sempre con te</p>
-                </div>
-
-                <div class="footer-links">
-                    <div class="footer-section">
-                        <h4>Link Utili</h4>
-                        <ul>
-                            <li><a href="#home">Home</a></li>
-                            <li><a href="#features">Funzionalità</a></li>
-                            <li><a href="#guide">Guida</a></li>
-                            <li><a href="#download">Download</a></li>
-                            <li><a href="#info">Info</a></li>
-                        </ul>
-                    </div>
-
-                    <div class="footer-section">
-                        <h4>Progetto</h4>
-                        <ul>
-                            <li><a href="https://github.com/CatechHub-dev/CatechHub">GitHub</a></li>
-                            <li><a href="https://github.com/CatechHub-dev/CatechHub/issues">Segnala Bug</a></li>
-                            <li><a href="https://github.com/CatechHub-dev/CatechHub/blob/main/README.md">Documentazione</a></li>
-                        </ul>
-                    </div>
-
-                    <div class="footer-section">
-                        <h4>Social</h4>
-                        <ul>
-                            <li><a href="https://github.com/CatechHub-dev"><i class="fab fa-github"></i> GitHub</a></li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            <div class="footer-bottom">
-                <p>&copy; 2026 CatechHub. Sviluppato con <i class="fas fa-heart"></i> da un catechista per i catechisti.</p>
-                <p>Versione <span id="footer-version">1.2.0</span> • Open Source • Gratuito</p>
-            </div>
-        </div>
-    </footer>
-
-    <script src="script.js"></script>
-    <script>
-        // Fetch latest version from GitHub
-        async function fetchLatestVersion() {
-            try {
-                const response = await fetch('https://api.github.com/repos/CatechHub-dev/CatechHub/releases/latest');
-                const data = await response.json();
-                const version = data.tag_name.replace('v', '');
-                
-                // Update download section
-                const versionElement = document.getElementById('latest-version');
-                if (versionElement) {
-                    versionElement.textContent = version;
-                }
-                
-                // Update footer
-                const footerVersionElement = document.getElementById('footer-version');
-                if (footerVersionElement) {
-                    footerVersionElement.textContent = version;
-                }
-            } catch (error) {
-                console.error('Error fetching latest version:', error);
-            }
-        }
-
-        // Fetch version on page load
-        document.addEventListener('DOMContentLoaded', fetchLatestVersion);
-    </script>
-</body>
+<script src="js/nav.js"></script></body>
 </html>

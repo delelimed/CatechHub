@@ -1,8 +1,22 @@
+/// Schermata principale dell'elenco classi in CateREG.
+///
+/// Mostra tutte le classi (gruppi) di cui l'utente è catechista sotto forma di
+/// schede (`_ClassCard`) con nome, numero di ragazzi e numero di catechisti.
+/// Dalla pagina è possibile:
+/// - Creare una nuova classe tramite il FAB "Nuova classe".
+/// - Navigare al dettaglio classe toccando una scheda.
+/// - Eliminare una classe (tramite menu a tre punti).
+/// - Modificare il nome della classe (solo per il primo utente in modalità
+///   "first user").
+///
+/// Integrazione CateREG: si aggancia a [classesStreamProvider] per ricevere
+/// in tempo reale l'elenco aggiornato delle classi e a [classesRepoProvider]
+/// per le operazioni di scrittura (add/delete/update).
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/auth_service.dart';
-import '../../core/storage/local_database.dart';
+//import '../../core/storage/local_database.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/models/class_model.dart';
 import 'classes_provider.dart';
@@ -216,7 +230,7 @@ class _ClassCard extends StatelessWidget {
           gradient: LinearGradient(
             colors: [
               Colors.white,
-              Colors.blue.shade50.withOpacity(0.35),
+              Colors.blue.shade50.withValues(alpha: 0.35),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -225,7 +239,7 @@ class _ClassCard extends StatelessWidget {
           border: Border.all(color: Colors.blue.shade100),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 16,
               offset: const Offset(0, 10),
             )

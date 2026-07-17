@@ -3,6 +3,12 @@ import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/models/student_model.dart';
 import './students_repository.dart';
 
+/// Schermata di consultazione allergie: elenca in ordine alfabetico
+/// tutti gli studenti che hanno almeno un'allergia registrata, mostrando
+/// nome, cognome e descrizione allergia.
+/// Legge i dati dal Box `students` via [StudentsRepository.getAllStudentsSync]
+/// e filtra sul campo [Student.allergies].
+/// Flusso: accessibile dalla navigazione globale come report rapido.
 class AllergiesPage extends StatelessWidget {
   const AllergiesPage({super.key});
 

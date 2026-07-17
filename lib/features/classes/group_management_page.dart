@@ -1,3 +1,16 @@
+/// Pagina di gestione del gruppo (classe) in CateREG.
+///
+/// Consente al catechista di:
+/// - Visualizzare e modificare il nome del proprio gruppo.
+/// - Elencare i ragazzi assegnati con opzioni modifica/elimina.
+/// - Aggiungere nuovi ragazzi tramite il FAB "Nuovo ragazzo".
+///
+/// Si basa su [classesStreamProvider] per ottenere la classe corrente
+/// (filtrata per [AuthService.localUserId]) e su [StudentsRepository] per
+/// leggere/scrivere i dati anagrafici dei ragazzi.
+///
+/// Navigazione CateREG: dalla scheda ragazzo si può andare a
+/// [EditStudentPage] (modifica) o eliminare lo studente con conferma.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,7 +22,7 @@ import '../students/students_repository.dart';
 import '../students/students_add_page.dart' hide classesRepoProvider;
 import '../students/edit_student_page.dart';
 import 'classes_provider.dart';
-import 'classes_repository.dart';
+//import 'classes_repository.dart';
 
 class GroupManagementPage extends ConsumerWidget {
   const GroupManagementPage({super.key});
@@ -57,6 +70,7 @@ class GroupManagementPage extends ConsumerWidget {
                   builder: (_) => const AddStudentPage(),
                 ),
               ).then((_) {
+                // ignore: unused_result
                 ref.refresh(classesStreamProvider);
               });
             },
@@ -67,6 +81,7 @@ class GroupManagementPage extends ConsumerWidget {
               _GroupHeader(
                 schoolClass: myClass,
                 onNameChanged: () {
+                  // ignore: unused_result
                   ref.refresh(classesStreamProvider);
                 },
               ),
@@ -101,7 +116,7 @@ class _GroupHeader extends ConsumerWidget {
 
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
@@ -114,7 +129,7 @@ class _GroupHeader extends ConsumerWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Annulla'),
           ),
           ElevatedButton(
@@ -130,13 +145,13 @@ class _GroupHeader extends ConsumerWidget {
                     schoolClass.id,
                     schoolClass.copyWith(name: controller.text),
                   );
-                  if (context.mounted) {
+                  if (dialogContext.mounted) {
+                    Navigator.of(dialogContext).pop();
                     onNameChanged();
-                    Navigator.pop(context);
                   }
                 } catch (e) {
-                  if (context.mounted) {
-                    Navigator.pop(context);
+                  if (dialogContext.mounted) {
+                    Navigator.of(dialogContext).pop();
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Errore: $e')),
                     );
@@ -159,14 +174,14 @@ class _GroupHeader extends ConsumerWidget {
         gradient: LinearGradient(
           colors: [
             Colors.white,
-            Colors.blue.shade50.withOpacity(0.3),
+            Colors.blue.shade50.withValues(alpha: 0.3),
           ],
         ),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.blue.shade100),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 16,
             offset: const Offset(0, 10),
           )
@@ -248,9 +263,9 @@ class _StudentsList extends StatelessWidget {
         }
 
         final allStudents = snapshot.data!;
-        final classStudents = allStudents
-            .where((s) => studentIds.contains(s.id))
-            .toList();
+        final classStudents = Student.sortedBySurname(
+          allStudents.where((s) => studentIds.contains(s.id)),
+        );
 
         if (classStudents.isEmpty) {
           return _EmptyState();
@@ -365,14 +380,14 @@ class _StudentCard extends StatelessWidget {
           gradient: LinearGradient(
             colors: [
               Colors.white,
-              Colors.blue.shade50.withOpacity(0.35),
+              Colors.blue.shade50.withValues(alpha: 0.35),
             ],
           ),
           borderRadius: BorderRadius.circular(22),
           border: Border.all(color: Colors.blue.shade100),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 14,
               offset: const Offset(0, 8),
             ),
@@ -403,21 +418,6 @@ class _StudentCard extends StatelessWidget {
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF174A7E),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Madre: ${student.motherName} ${student.motherSurname}',
-                    style: TextStyle(
-                      color: Colors.grey.shade700,
-                      fontSize: 13,
-                    ),
-                  ),
-                  Text(
-                    'Padre: ${student.fatherName} ${student.fatherSurname}',
-                    style: TextStyle(
-                      color: Colors.grey.shade700,
-                      fontSize: 13,
                     ),
                   ),
                 ],

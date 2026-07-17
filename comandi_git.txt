@@ -1,0 +1,52 @@
+# 1. Passa al ramo principale
+git checkout main
+
+# 2. Scarica gli ultimi aggiornamenti da GitHub
+git pull origin main
+
+# 3. Crea il tuo branch di sviluppo e passaci subito
+git checkout -b feature/nome-tua-funzione
+
+----------
+
+# 4. Verifica quali file hai modificato
+git status
+
+# 5. Prepara tutti i file modificati per il salvataggio
+git add .
+
+# 6. Salva le modifiche localmente con un messaggio descrittivo
+git commit -m "Aggiunto supporto al database offline"
+
+# 7. Invia il branch su GitHub (questo lancia l'analisi statica della Action)
+git push origin feature/nome-tua-funzione
+
+# 8. Passa al branch develop locale
+git checkout develop
+
+# 9. Assicurati che develop sia aggiornato con GitHub
+git pull origin develop
+
+# 10. Unisci le modifiche del tuo branch feature dentro develop
+git merge feature/nome-tua-funzione
+
+# 11. Invia su GitHub (questo avvia la build dell'APK firmato scaricabile)
+git push origin develop
+
+# 12. Elimina il branch sul tuo computer portatile
+git branch -d feature/nome-tua-funzione
+
+# 13. Elimina il branch anche sul server di GitHub
+git push origin --delete feature/nome-tua-funzione
+
+# 14. Passa al branch main
+git checkout main
+
+# 15. Assicurati che main locale sia sincronizzato con GitHub
+git pull origin main
+
+# 16. Unisci le modifiche stabili e verificate da develop
+git merge develop
+
+# 17. Invia su GitHub (questo lancia l'ultimo check rapido su main)
+git push origin main

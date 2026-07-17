@@ -1,0 +1,76 @@
+# =========================================================================
+# 1. PREVENZIONE CRASH FLUTTER CORE
+# =========================================================================
+-keep class io.flutter.app.** { *; }
+-keep class io.flutter.plugin.** { *; }
+-keep class io.flutter.util.** { *; }
+-keep class io.flutter.view.** { *; }
+-keep class io.flutter.embedding.** { *; }
+-keep class io.flutter.plugins.** { *; }
+-keep class com.google.crypto.tink.** { *; }
+
+# =========================================================================
+# 2. HIVE (Zona Franca - Nessuna minificazione)
+# =========================================================================
+-keep class TypeAdapter { *; }
+-keep class io.hybridshapes.hive.** { *; }
+-keep class io.isar.hive.** { *; }
+-keep class * extends io.isar.hive.HiveObject { *; }
+-keepclasseswithmembers class * {
+    @io.isar.hive.HiveType <fields>;
+    @io.isar.hive.HiveField <fields>;
+}
+-dontwarn io.hybridshapes.hive.**
+-dontwarn io.isar.hive.**
+
+# =========================================================================
+# 3. LOCAL AUTH (Biometria)
+# =========================================================================
+-keep class io.flutter.plugins.localauth.** { *; }
+-keep class androidx.biometric.BiometricPrompt { *; }
+-dontwarn androidx.biometric.**
+
+# =========================================================================
+# 4. FLUTTER SECURE STORAGE & TINK
+# =========================================================================
+-keep class com.it_nomads.fluttersecurestorage.** { *; }
+-dontwarn com.it_nomads.fluttersecurestorage.**
+
+# =========================================================================
+# 5. MOBILE SCANNER (ML Kit e Fotocamera)
+# =========================================================================
+-keep class com.google.mlkit.** { *; }
+-keep class com.google.android.gms.internal.mlkit_vision_barcode.** { *; }
+-keep class dev.nhancv.mlkit_camera_stream.** { *; }
+-dontwarn com.google.mlkit.**
+
+# =========================================================================
+# 6. PRINTING & PDF
+# =========================================================================
+-keep class net.nfet.flutter.printing.** { *; }
+
+# =========================================================================
+# 7. DEVICE & PACKAGE INFO PLUS
+# =========================================================================
+-keep class dev.fluttercommunity.plus.packageinfo.** { *; }
+-keep class dev.fluttercommunity.plus.deviceinfo.** { *; }
+
+# =========================================================================
+# 8. TUO CANALE BLUETOOTH NATIVO (RfcommServerPlugin)
+# =========================================================================
+# Visto che hai rimosso il plugin e gestisci il MethodChannel a mano in Kotlin, 
+# dobbiamo dire a R8 di non toccare il tuo pacchetto nativo personalizzato!
+-keep class ch.catechhub.app.** { *; }
+
+# =========================================================================
+# 9. FLUTTER DEFERRED COMPONENTS (Risolve il blocco di compilazione R8)
+# =========================================================================
+-dontwarn com.google.android.play.core.splitcompat.**
+-dontwarn com.google.android.play.core.splitinstall.**
+-dontwarn com.google.android.play.core.tasks.**
+
+# =========================================================================
+# 10. PROTEZIONE FREERASP (TALSEC)
+# =========================================================================
+-keep class com.talsec.RasterConfig { *; }
+-dontwarn com.talsec.**

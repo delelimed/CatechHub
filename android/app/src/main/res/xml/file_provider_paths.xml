@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FileProvider paths per CatechHub
+
+    Definisce le directory accessibili tramite FileProvider per condividere
+    file con altre app (es. installazione APK, condivisione file).
+
+    Le path definiscono:
+    - external-files: directory file esterni dell'app (getExternalFilesDir)
+    - external-cache: directory cache esterni (getExternalCacheDir)
+    - files: directory file interni (getFilesDir)
+    - cache: directory cache interna (getCacheDir)
+    - downloads: directory Download pubblici (richiede permesso)
+    - root: root storage (usato solo se requestLegacyExternalStorage=true)
+-->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- File interni dell'app (privati, accessibili solo all'app) -->
+    <files-path name="internal_files" path="." />
+    <cache-path name="internal_cache" path="." />
+
+    <!-- File esterni dell'app (shared storage, accessibili con FileProvider) -->
+    <external-files-path name="external_files" path="." />
+    <external-cache-path name="external_cache" path="." />
+
+    <!-- Directory Download pubblica (per APK scaricati) -->
+    <external-path name="downloads" path="Download/" />
+    
+    <!-- Directory Documents (fallback per Android 11+) -->
+    <external-path name="documents" path="Documents/" />
+    
+    <!-- Root storage legacy (solo se requestLegacyExternalStorage=true) -->
+    <root-path name="root" path="" />
+</paths>

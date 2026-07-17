@@ -3,20 +3,31 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/attachment_parent_type.dart';
 import '../../shared/models/student_model.dart';
+import '../../shared/utils/auth_utils.dart';
 import '../../shared/utils/name_formatting.dart';
 import '../attachments/attachments_repository.dart';
+import 'student_daily_notes_repository.dart';
 
 final studentsRepositoryProvider =
     Provider<StudentsRepository>((ref) {
   return StudentsRepository();
 });
 
+/// Repository per le operazioni CRUD sugli studenti nel Box `students`
+/// di Hive. Offre metodi asincroni (add, update, delete) e sincroni
+/// (getAllStudentsSync) per l'anagrafica ragazzi.
+/// La cancellazione ([deleteStudent]) esegue una cascade delete che
+/// rimuove allegati ([AttachmentsRepository]), annotazioni giornaliere
+/// ([StudentDailyNotesRepository]), riferimenti nelle classi, presenze
+/// e consegne documenti. I dati in ingresso vengono normalizzati
+/// (capitalizzazione nomi, pulizia spazi) tramite [_normalize].
 class StudentsRepository {
   final _box = LocalDatabase.students();
 
   Future<void> addStudent(Student student) async {
     final id = student.id.isEmpty ? LocalDatabase.newId('student') : student.id;
-    await _box.put(id, _normalize(student).toMap());
+    final catechistName = getCurrentCatechistName();
+    await _box.put(id, _normalize(student).copyWith(lastModifiedBy: catechistName).toMap());
   }
 
   Stream<List<Student>> getAllStudents() {
@@ -38,7 +49,8 @@ class StudentsRepository {
   }
 
   Future<void> updateStudent(String id, Student student) async {
-    await _box.put(id, _normalize(student).toMap());
+    final catechistName = getCurrentCatechistName();
+    await _box.put(id, _normalize(student).copyWith(lastModifiedBy: catechistName).toMap());
   }
 
   Student _normalize(Student student) {
@@ -68,6 +80,7 @@ class StudentsRepository {
       parentId: id,
       parentType: AttachmentParentType.student,
     );
+    await StudentDailyNotesRepository().deleteAllForStudent(id);
     await _box.delete(id);
 
     final classesBox = LocalDatabase.classes();

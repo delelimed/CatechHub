@@ -1,0 +1,100 @@
+﻿<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Note di Contatto — CatechHub</title>
+<meta name="description" content="Registra ogni comunicazione con le famiglie: colloqui, messaggi, telefonate. Tutto in ordine cronologico.">
+<link rel="icon" href="../logo.png" type="image/png">
+<link rel="stylesheet" href="../style.css">
+<script src="../js/version.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="../logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
+
+<section class="page-header">
+  <div class="container">
+    <h1>Note di Contatto</h1>
+    <p>Tieni traccia di ogni conversazione con le famiglie, per non dimenticare mai un accordo o una comunicazione importante</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+
+    <div class="breadcrumb"><a href="../index.html">Home</a> / <a href="contact-notes.html">Note Contatto</a> / Panoramica</div>
+
+    <h2>Che cos'è</h2>
+    <p>Le Note di Contatto sono un registro cronologico di tutte le comunicazioni che hai con le famiglie dei ragazzi. Che sia un colloquio a voce, un messaggio WhatsApp o una telefonata, puoi annotare data, oggetto ed esito. Così hai sempre uno storico consultabile di ciò che è stato detto e concordato.</p>
+
+    <h2>Tipi di contatto</h2>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li><strong>De visu</strong> — colloquio in presenza con il genitore</li>
+      <li><strong>WhatsApp</strong> — messaggio scritto tramite app di messaggistica</li>
+      <li><strong>Cellulare</strong> — telefonata al genitore</li>
+    </ul>
+
+    <h2>Creare una nota</h2>
+    <p>Apri la scheda del ragazzo, scegli il tipo di contatto, scrivi un breve riepilogo della comunicazione e l'esito. La data e l'ora vengono registrate automaticamente, ma puoi modificarle se necessario.</p>
+
+    <div class="screenshot-row">
+      <img src="../screen/Nuova_Nota_Contatto.jpg" alt="Nuova nota di contatto" class="screenshot" style="max-width:300px;">
+    </div>
+
+    <h2>Visualizzare lo storico</h2>
+    <p>Le note sono ordinate dalla più recente alla più vecchia. Puoi filtrare per tipo di contatto o per periodo. Ogni nota mostra un'icona che indica il tipo di contatto, la data, l'oggetto e un estratto del riepilogo.</p>
+
+    <div class="screenshot-row">
+      <img src="../screen/Note_Contatto_1.jpg" alt="Elenco note di contatto" class="screenshot" style="max-width:300px;">
+      <img src="../screen/Note_Contatto_2.jpg" alt="Dettaglio nota di contatto" class="screenshot" style="max-width:300px;">
+    </div>
+
+    <h2>Esportare un report</h2>
+    <p>Puoi generare un PDF con lo storico delle comunicazioni per un singolo ragazzo o per un intero gruppo. Utile per i colloqui annuali con i genitori o per la documentazione parrocchiale.</p>
+
+    <h2>Sicurezza e privacy</h2>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>Le note di contatto sono dati personali protetti dal GDPR</li>
+      <li>Se elimini definitivamente il profilo di un ragazzo, tutte le note di contatto vengono rimosse automaticamente (minimizzazione dei dati)</li>
+      <li>Se invece disattivi solo il profilo, le note restano conservate per finalità documentali</li>
+      <li>I dati non lasciano mai il tuo dispositivo senza un tuo esplicito consenso</li>
+    </ul>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div>
+      <strong>CatechHub</strong> <span class="version-tag"></span> — Registro Elettronico di Catechismo<br>
+      <small>Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.</small>
+    </div>
+    <div>
+      <small>
+        &#128231; <a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a> &middot;
+        &#128247; Instagram (prossimamente) &middot;
+        &#9992; Telegram (prossimamente)
+      </small><br>
+      <a href="../privacy.html">Privacy</a> &middot;
+      <a href="../terms.html">Termini</a> &middot;
+      <a href="../infos/index.html">GDPR</a> &middot;
+      <a href="../developer.html">Sviluppatore</a> &middot;
+      <a href="https://github.com/delelimed/CatechHub" class="release-url">GitHub</a><br>
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/nav.js"></script></body>
+</html>

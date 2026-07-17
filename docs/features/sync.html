@@ -1,0 +1,110 @@
+﻿<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sync P2P Bluetooth — CatechHub</title>
+<meta name="description" content="Sincronizza i tuoi dati con altri catechisti via Bluetooth, senza internet, in modo sicuro e automatico.">
+<link rel="icon" href="../logo.png" type="image/png">
+<link rel="stylesheet" href="../style.css">
+<script src="../js/version.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="../logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
+
+<section class="page-header">
+  <div class="container">
+    <h1>Sync P2P Bluetooth</h1>
+    <p>Sincronizza i dati tra catechisti senza bisogno di internet, server o cloud: solo Bluetooth e crittografia</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+
+    <div class="breadcrumb"><a href="../index.html">Home</a> / <a href="sync.html">Sync P2P</a> / Panoramica</div>
+
+    <h2>Che cos'è</h2>
+    <p>La sincronizzazione peer-to-peer è la funzione più innovativa di CatechHub. Permette a due catechisti di allineare i propri database tramite Bluetooth, senza alcuna connessione internet, senza server centrale, senza cloud. I dati scambiati sono protetti da crittografia end-to-end. Funziona anche in parrocchia dove il cellulare non prende.</p>
+
+    <div class="alert alert-info">
+      La sincronizzazione è completamente opzionale. CatechHub funziona perfettamente anche come app standalone per un singolo catechista.
+    </div>
+
+    <h2>Come funziona</h2>
+
+    <h3>1. Associazioni i dispositivi</h3>
+    <p>La prima volta che ti sincronizzi con un collega, scambiate un QR code. Il tuo telefono genera un QR che contiene la "chiave" per stabilire una connessione sicura. Lui inquadra il tuo QR col suo telefono e viceversa. Così i dispositivi si riconoscono come fidati.</p>
+
+    <h3>2. Avvia la sincronizzazione</h3>
+    <p>Una volta associati, puoi avviare la sincronizzazione quando vuoi. I due dispositivi si connettono via Bluetooth e scambiano i dati in modo automatico. L'app ti mostra il progresso dell'operazione.</p>
+
+    <h3>3. Conflitti? Nessun problema</h3>
+    <p>Se lo stesso ragazzo è stato modificato da entrambi i catechisti, CatechHub tiene automaticamente la versione più recente. Non si perdono mai dati: vince l'ultima modifica.</p>
+
+    <h2>Cosa si sincronizza</h2>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>Anagrafica ragazzi</li>
+      <li>Presenze e appello</li>
+      <li>Programmazione incontri</li>
+      <li>Documenti e consegne</li>
+      <li>Note di contatto</li>
+    </ul>
+
+    <h2>Cosa NON si sincronizza</h2>
+    <p>La <strong>Biblioteca Catechetica</strong> (testi, schede, materiale didattico) non viene sincronizzata per rispettare la privacy e il copyright. Ogni catechista ha la sua biblioteca personale. Se vuoi, puoi comunque condividere una risorsa specifica con la <a href="data-share.html">Condivisione QR</a>.</p>
+
+    <h2>Dispositivi fidati</h2>
+    <p>L'app tiene un elenco dei dispositivi con cui ti sei sincronizzato. Puoi vedere nome, data di prima associazione e data ultima sincronizzazione. Se non ti fidi più di un dispositivo, puoi rimuoverlo con un tap.</p>
+
+    <div class="screenshot-row">
+      <img src="../screen/Home.jpg" alt="Menu laterale Home" class="screenshot" style="max-width:300px;">
+    </div>
+
+    <h2>Sicurezza</h2>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li><strong>Crittografia end-to-end:</strong> i dati sono cifrati prima di essere trasmessi via Bluetooth</li>
+      <li><strong>Associazione tramite QR:</strong> solo i dispositivi che hanno scambiato il QR possono sincronizzarsi</li>
+      <li><strong>Niente internet:</strong> i dati non passano mai da server esterni</li>
+      <li><strong>Controllo totale:</strong> puoi decidere con chi e quando sincronizzarti</li>
+      <li>Puoi rimuovere un dispositivo fidato in qualsiasi momento</li>
+    </ul>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div>
+      <strong>CatechHub</strong> <span class="version-tag"></span> — Registro Elettronico di Catechismo<br>
+      <small>Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.</small>
+    </div>
+    <div>
+      <small>
+        &#128231; <a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a> &middot;
+        &#128247; Instagram (prossimamente) &middot;
+        &#9992; Telegram (prossimamente)
+      </small><br>
+      <a href="../privacy.html">Privacy</a> &middot;
+      <a href="../terms.html">Termini</a> &middot;
+      <a href="../infos/index.html">GDPR</a> &middot;
+      <a href="../developer.html">Sviluppatore</a> &middot;
+      <a href="https://github.com/delelimed/CatechHub" class="release-url">GitHub</a><br>
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/nav.js"></script></body>
+</html>

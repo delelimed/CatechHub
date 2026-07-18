@@ -1,0 +1,24 @@
+{
+  "name": "Flutter Android Development",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    // Questa feature installa Node.js e NPM in automatico sopra il tuo Dockerfile
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dart-code.flutter",
+        "dart-code.dart-code"
+      ]
+    }
+  },
+  "remoteUser": "vscode",
+  
+  // Installa OpenCode globalmente usando i privilegi di root del container
+  "postCreateCommand": "sudo npm install -g opencode"
+}

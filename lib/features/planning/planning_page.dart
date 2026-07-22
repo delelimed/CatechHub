@@ -22,6 +22,10 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
   final _scrollController = ScrollController();
   final _monthKeys = <String, GlobalKey>{};
 
+  GlobalKey _getMonthKey(String monthKey) {
+    return _monthKeys.putIfAbsent(monthKey, () => GlobalKey());
+  }
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -30,15 +34,13 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
 
   void _scrollToMonth(String monthKey) {
     final globalKey = _monthKeys[monthKey];
-    if (globalKey?.currentContext == null) return;
-    final RenderBox? box = globalKey!.currentContext!.findRenderObject() as RenderBox?;
-    if (box == null || !box.hasSize) return;
-    final offset = box.localToGlobal(Offset.zero, ancestor: _scrollController.position.context.storageContext.findRenderObject());
-    final dy = offset.dy + _scrollController.position.pixels - 50;
-    _scrollController.animateTo(
-      dy.clamp(_scrollController.position.minScrollExtent, _scrollController.position.maxScrollExtent),
+    final context = globalKey?.currentContext;
+    if (context == null) return;
+    Scrollable.ensureVisible(
+      context,
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeInOut,
+      alignment: 0.1,
     );
   }
 
@@ -112,7 +114,6 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                 if (!groupedMeetings.containsKey(key)) {
                   groupedMeetings[key] = [];
                   monthKeys.add(key);
-                  _monthKeys[key] = GlobalKey();
                 }
                 groupedMeetings[key]!.add(m);
               }
@@ -163,7 +164,7 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                   ...monthKeys.map((monthKey) {
                     final monthMeetings = groupedMeetings[monthKey]!;
                     return Column(
-                      key: _monthKeys[monthKey],
+                      key: _getMonthKey(monthKey),
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Padding(
@@ -264,6 +265,17 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                                               fontSize: 10,
                                             ),
                                           ),
+                                          if (isReunion && m.time != null && m.time!.isNotEmpty) ...[
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              m.time!,
+                                              style: const TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
                                         ],
                                       ),
                                     ),

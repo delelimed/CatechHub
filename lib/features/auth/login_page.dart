@@ -15,6 +15,7 @@
 
 import 'dart:async';
 import 'dart:math';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -22,6 +23,68 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'bible_quote.dart';
 import '../../core/auth/auth_provider.dart';
+
+/// Animated gradient background with flowing colors
+class _AnimatedGradientBackground extends StatefulWidget {
+  final Widget child;
+
+  const _AnimatedGradientBackground({required this.child});
+
+  @override
+  State<_AnimatedGradientBackground> createState() => _AnimatedGradientBackgroundState();
+}
+
+class _AnimatedGradientBackgroundState extends State<_AnimatedGradientBackground>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(seconds: 8),
+      vsync: this,
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final t = _controller.value;
+        final angle = lerpDouble(-0.3, 0.3, t)!;
+        final begin = Alignment(sin(angle * pi), -cos(angle * pi));
+        final end = Alignment(-sin(angle * pi), cos(angle * pi));
+
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: const [
+                Color(0xFF174A7E), // Dark blue
+                Color(0xFF2A6BB0), // Medium blue
+                Color(0xFF4A90D9), // Light blue
+                Color(0xFF7AB8F0), // Lighter blue
+                Color(0xFFA8D0E6), // Soft cyan
+              ],
+              stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
+              begin: begin,
+              end: end,
+              transform: GradientRotation(angle * pi / 2),
+            ),
+          ),
+          child: widget.child,
+        );
+      },
+    );
+  }
+}
 
 /// Schermata di accesso principale - SOLO autenticazione nativa dispositivo.
 class LoginPage extends ConsumerStatefulWidget {
@@ -130,14 +193,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFEAF4FF), Color(0xFFD5E8FF), Color(0xFFB9D7FF)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
+      body: _AnimatedGradientBackground(
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -214,14 +270,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   Widget _buildLoadingScreen() {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFEAF4FF), Color(0xFFD5E8FF), Color(0xFFB9D7FF)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
+      body: _AnimatedGradientBackground(
         child: SafeArea(
           child: Center(
             child: Column(
@@ -235,7 +284,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF174A7E),
+                    color: Colors.white,
                   ),
                 ),
               ],

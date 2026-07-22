@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analisi della Sicurezza — CatechHub</title>
+<link rel="icon" href="../logo.png" type="image/png">
+<link rel="stylesheet" href="../style.css">
+<script src="../js/version.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="../logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
+
+<section class="page-header">
+  <div class="container">
+    <h1>Analisi della Sicurezza</h1>
+    <p>Misure tecniche e organizzative ai sensi dell'Art. 32 GDPR</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <div class="breadcrumb"><a href="../index.html">Home</a> / <a href="index.html">GDPR</a> / Analisi della Sicurezza</div>
+
+    <div class="alert alert-warning" style="display:block;">
+      <p style="margin-bottom:0;"><strong>Nota:</strong> Questa pagina &egrave; stata generata con l'ausilio di intelligenza artificiale e non &egrave; stata scritta da un legale. Le informazioni hanno scopo puramente informativo e non costituiscono consulenza legale.</p>
+    </div>
+
+    <p>L'Art. 32 del GDPR richiede che il titolare del trattamento implementi misure tecniche e organizzative adeguate per garantire un livello di sicurezza proporzionato al rischio. CatechHub è stata progettata con un'architettura <strong>security-by-design</strong> che integra molteplici livelli di protezione.</p>
+
+    <h2>1. Standard di crittografia</h2>
+
+    <table class="sec-table">
+      <thead><tr><th>Ambito</th><th>Algoritmo</th><th>Parametri</th><th>Standard di riferimento</th></tr></thead>
+      <tbody>
+        <tr><td>Dati a riposo (Hive)</td><td>AES-256-GCM</td><td>Nonce 12B, tag 128bit, chiave 256bit</td><td>NIST SP 800-38D</td></tr>
+        <tr><td>Derivazione chiave (backup)</td><td>PBKDF2-HMAC-SHA256</td><td>210.000 iterazioni, salt 16B, key 32B</td><td>NIST SP 800-132</td></tr>
+        <tr><td>Derivazione chiave (share rapido)</td><td>PBKDF2-HMAC-SHA256</td><td>12.000 iterazioni</td><td>NIST SP 800-132</td></tr>
+        <tr><td>Scambio chiavi (sync)</td><td>ECDH P-256 (secp256r1)</td><td>Shared secret 32B</td><td>NIST SP 800-56A</td></tr>
+        <tr><td>Session key derivation</td><td>HKDF-SHA256</td><td>Info: "CatechHub_SessionKey_v2" + device IDs</td><td>RFC 5869</td></tr>
+        <tr><td>Cifratura sync P2P</td><td>AES-256-GCM</td><td>Chiave per dispositivo da TrustedDevices</td><td>NIST SP 800-38D</td></tr>
+        <tr><td>Hashing ID messaggio</td><td>SHA-256</td><td>Digest 32B</td><td>FIPS 180-4</td></tr>
+        <tr><td>Fallback legacy (v1)</td><td>AES-256-CBC + PKCS7</td><td>Solo per compatibilità pacchetti v1</td><td>NIST SP 800-38A</td></tr>
+      </tbody>
+    </table>
+
+    <h2>2. Controllo accessi</h2>
+    <p>L'accesso all'applicazione è protetto su tre livelli:</p>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li><strong>Autenticazione biometrica</strong>: impronta digitale o riconoscimento facciale tramite BiometricPrompt di Android. <code>biometricOnly=false</code>: se la biometria non è disponibile, fallback a PIN/Pattern/Password del dispositivo.</li>
+      <li><strong>Sessione in RAM</strong>: lo stato di autenticazione vive esclusivamente in memoria volatile. Nessun token persistito su disco.</li>
+      <li><strong>Timeout sessione</strong>: 120 secondi in background. Trascorso il timeout, la sessione viene invalidata e l'utente deve riautenticarsi.</li>
+    </ul>
+
+    <h2>3. Sicurezza del dispositivo</h2>
+
+    <h3>3.1 freeRASP (Talsec)</h3>
+    <p>La libreria freeRASP fornisce protezione runtime monitorando 8 categorie di minacce:</p>
+    <table class="sec-table">
+      <thead><tr><th>Minaccia</th><th>Azione</th></tr></thead>
+      <tbody>
+        <tr><td>Root / Magisk / KernelSU</td><td>Blocco con SecurityBlockScreen</td></tr>
+        <tr><td>Emulatore</td><td>Blocco con SecurityBlockScreen</td></tr>
+        <tr><td>Firma APK modificata</td><td>Blocco con SecurityBlockScreen</td></tr>
+        <tr><td>Frida / Xposed / hooking</td><td>Blocco con SecurityBlockScreen</td></tr>
+        <tr><td>Device binding (Play Integrity)</td><td>Verifica attestazione</td></tr>
+        <tr><td>ADB / USB debugging</td><td>Avviso all'utente</td></tr>
+        <tr><td>Debugger connesso</td><td>Blocco con SecurityBlockScreen</td></tr>
+        <tr><td>Opzioni sviluppatore</td><td>Avviso all'utente</td></tr>
+      </tbody>
+    </table>
+    <p><code>killOnBypass = false</code>: l'utente non viene forzato alla chiusura ma visualizza una schermata informativa di blocco (<code>SecurityBlockScreen</code>).</p>
+
+    <h3>3.2 FLAG_SECURE</h3>
+    <p>L'Activity principale imposta <code>WindowManager.LayoutParams.FLAG_SECURE</code>, che impedisce:</p>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>Screenshot non autorizzati</li>
+      <li>Screen recording</li>
+      <li>Visualizzazione dell'app nella schermata delle app recenti</li>
+    </ul>
+
+    <h2>4. Minimizzazione dei dati</h2>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li><strong>Offline-first</strong>: nessun dato trasmesso a server esterni. Tutto il processing è locale.</li>
+      <li><strong>Zero cloud</strong>: non esistono server, account remoti o storage cloud.</li>
+      <li><strong>Nessuna telemetria</strong>: l'app non raccoglie analytics, crash report, statistiche d'uso o dati diagnostici automatici.</li>
+      <li><strong>Nessuna pubblicità</strong>: assenza totale di SDK pubblicitari o di profilazione.</li>
+      <li><strong>Minimizzazione nativa</strong>: l'app raccoglie solo i dati strettamente necessari alla gestione del catechismo.</li>
+    </ul>
+
+    <h2>5. Piano di risposta agli incidenti</h2>
+    <p>In caso di incidente di sicurezza (perdita/ furto dispositivo, violazione dati), il catechista deve:</p>
+    <ol style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li><strong>Valutare l'incidente</strong>: determinare se c'è stata effettiva violazione dei dati personali</li>
+      <li><strong>Contenimento</strong>: se possibile, disattivare la sincronizzazione P2P e rimuovere il dispositivo dai trusted devices degli altri catechisti</li>
+      <li><strong>Notifica all'autorità</strong>: se sussiste un rischio per i diritti e le libertà delle persone fisiche, notificare al Garante Privacy entro 72 ore (Art. 33 GDPR)</li>
+      <li><strong>Comunicazione agli interessati</strong>: se il rischio è elevato, informare i genitori/tutori dei minori coinvolti (Art. 34 GDPR)</li>
+      <li><strong>Documentazione</strong>: registrare l'incidente, le azioni intraprese e le lezioni apprese</li>
+    </ol>
+
+    <div class="alert alert-info">
+      <strong>Nota:</strong> Poiché CatechHub non ha server remoti, l'unico vettore di violazione è il dispositivo fisico. Le misure di crittografia (AES-256-GCM + AndroidKeyStore) rendono i dati illeggibili anche in caso di furto del dispositivo.
+    </div>
+
+    <h2>6. Procedura di notifica data breach</h2>
+    <p>In caso di data breach che coinvolga dati trattati con CatechHub:</p>
+    <table class="sec-table">
+      <thead><tr><th>Passo</th><th>Responsabile</th><th>Termine</th></tr></thead>
+      <tbody>
+        <tr><td>1. Rilevamento e prima valutazione</td><td>Catechista (titolare)</td><td>Immediato</td></tr>
+        <tr><td>2. Notifica al Garante Privacy</td><td>Catechista / Parrocchia</td><td>Entro 72 ore</td></tr>
+        <tr><td>3. Comunicazione agli interessati</td><td>Catechista / Parrocchia</td><td>Senza ingiustificato ritardo</td></tr>
+        <tr><td>4. Documentazione incidente</td><td>Catechista / Parrocchia</td><td>Entro 30 giorni</td></tr>
+        <tr><td>5. Misure correttive</td><td>Catechista / Sviluppatore (via GitHub)</td><td>Appena possibile</td></tr>
+      </tbody>
+    </table>
+
+    <h2>7. Valutazione pseudonimizzazione e crittografia</h2>
+    <table class="sec-table">
+      <thead><tr><th>Misura</th><th>Implementata?</th><th>Dettaglio</th></tr></thead>
+      <tbody>
+        <tr><td>Pseudonimizzazione</td><td>Parziale</td><td>I dati non sono pseudonimizzati per default, ma l'utente può esportare dati senza identificativi diretti</td></tr>
+        <tr><td>Crittografia a riposo</td><td>Sì</td><td>AES-256-GCM su tutti i box Hive. Chiave in AndroidKeyStore (hardware-backed se disponibile)</td></tr>
+        <tr><td>Crittografia in transito</td><td>Sì</td><td>Sync P2P: ECDH + HKDF + AES-256-GCM. Backup: PBKDF2 + AES-256-GCM</td></tr>
+        <tr><td>Controllo accesso</td><td>Sì</td><td>Biometria + PIN/Pattern, sessione in RAM, timeout 120s</td></tr>
+        <tr><td>Registrazione accessi</td><td>No</td><td>Non implementata. L'app non tiene log degli accessi (coerente con principio di minimizzazione)</td></tr>
+      </tbody>
+    </table>
+
+    <div class="alert alert-success">
+      <strong>Conclusione:</strong> Le misure di sicurezza implementate in CatechHub sono conformi ai requisiti dell'Art. 32 GDPR e forniscono un livello di protezione adeguato al rischio del trattamento di dati di minori. La crittografia AES-256-GCM a riposo, la gestione delle chiavi tramite AndroidKeyStore e l'assenza di server remoti rappresentano i pilastri della strategia di sicurezza.
+    </div>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div>
+      <strong>CatechHub</strong> <span class="version-tag"></span> — Registro Elettronico di Catechismo<br>
+      <small>Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.</small>
+    </div>
+    <div>
+      <small>
+        &#128231; <a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a> &middot;
+        &#128247; Instagram (prossimamente) &middot;
+        &#9992; Telegram (prossimamente)
+      </small><br>
+      <a href="../privacy.html">Privacy</a> &middot;
+      <a href="../terms.html">Termini</a> &middot;
+      <a href="index.html">GDPR</a> &middot;
+      <a href="../developer.html">Sviluppatore</a> &middot;
+      <a href="https://github.com/delelimed/CatechHub" class="release-url">GitHub</a><br>
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/nav.js"></script></body>
+</html>

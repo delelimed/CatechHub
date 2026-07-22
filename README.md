@@ -1,6 +1,6 @@
 # CatechHub
 
-![CatechHub](assets/images/logo.png)
+![CatechHub](assets/images/logo_BG.png)
 
 ## Registro elettronico di catechismo — offline, sicuro, peer-to-peer
 

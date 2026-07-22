@@ -12,11 +12,9 @@
 ## Pianificate
 
 - **Template PDF personalizzabili** — Permettere ai catechisti di personalizzare intestazioni, loghi e layout dei PDF generati.
-- **Tema scuro** — Supporto per tema scuro (dark mode) su tutto il sistema.
 - **Export Completo** — Esportazione in PDF dell'intero database per archiviazione al termine dell'anno.
 - **Responsabile Catechistico** — Inserimento della modalità "Responsabile" per la gestione centralizzata delle classi.
 
 ## In valutazione
 
-- **Versione iOS** — Dipende dalla richiesta della comunità e dalla disponibilità di test su dispositivo Apple.
 - **Import da Excel / CSV** — Importazione massiva di elenchi ragazzi da fogli di calcolo.

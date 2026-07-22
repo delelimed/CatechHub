@@ -10,6 +10,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LicensesPage extends StatelessWidget {
   const LicensesPage({super.key});
@@ -187,14 +188,16 @@ SOFTWARE.
                       'comunicazioni con le famiglie.',
                       style: TextStyle(fontSize: 14, height: 1.5),
                     ),
-                  ],
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'Licenza dell\'app',
+],
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 24),
+        _buildActionButtons(context),
+        const SizedBox(height: 24),
+        const Text(
+          'Licenza dell\'app',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
@@ -285,6 +288,110 @@ SOFTWARE.
             style: TextStyle(fontSize: 14, height: 1.5),
           ),
         ],
+      ),
+    );
+  }
+}
+
+Widget _buildActionButtons(BuildContext context) {
+  return Column(
+    children: [
+      _ActionButton(
+        icon: Icons.history_rounded,
+        title: 'Changelog',
+        subtitle: 'Cronologia versioni e novità',
+        onTap: () => context.push('/changelog'),
+      ),
+      const SizedBox(height: 10),
+      _ActionButton(
+        icon: Icons.source_rounded,
+        title: 'Commits recenti',
+        subtitle: 'Ultime modifiche al codice sorgente',
+        onTap: () => context.push('/commits'),
+      ),
+      const SizedBox(height: 10),
+      _ActionButton(
+        icon: Icons.bug_report_rounded,
+        title: 'Segnala bug / Richiedi feature',
+        subtitle: 'Apri una issue su GitHub',
+        onTap: () async {
+          const url = 'https://github.com/delelimed/CatechHub/issues/new/choose';
+          if (await canLaunchUrl(Uri.parse(url))) {
+            await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+          }
+        },
+      ),
+    ],
+  );
+}
+
+class _ActionButton extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _ActionButton({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFF174A7E).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: const Color(0xFF174A7E), size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF174A7E),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
+          ],
+        ),
       ),
     );
   }

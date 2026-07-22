@@ -40,6 +40,7 @@ class _PlanningEditPageState extends ConsumerState<PlanningEditPage> {
   late final bool isReunion;
 
   DateTime? selectedDate;
+  TimeOfDay? selectedTime;
 
   final title = TextEditingController();
   final activity = TextEditingController();
@@ -58,6 +59,15 @@ class _PlanningEditPageState extends ConsumerState<PlanningEditPage> {
     final meeting = widget.existing;
     if (meeting != null) {
       selectedDate = meeting.date;
+      if (meeting.time != null && meeting.time!.isNotEmpty) {
+        final parts = meeting.time!.split(':');
+        if (parts.length == 2) {
+          selectedTime = TimeOfDay(
+            hour: int.tryParse(parts[0]) ?? 0,
+            minute: int.tryParse(parts[1]) ?? 0,
+          );
+        }
+      }
       title.text = meeting.title;
       activity.text = meeting.activity;
       notes.text = meeting.notes;
@@ -186,6 +196,33 @@ class _PlanningEditPageState extends ConsumerState<PlanningEditPage> {
                     });
                   },
                 ),
+                if (isReunion) ...[
+                  const SizedBox(height: 14),
+                  _TimePickerCard(
+                    selectedTime: selectedTime,
+                    onTap: () {
+                      if (_readOnly) return;
+                      showTimePicker(
+                        context: context,
+                        initialTime: selectedTime ?? TimeOfDay.now(),
+                        builder: (context, child) {
+                          return Theme(
+                            data: Theme.of(context).copyWith(
+                              colorScheme: const ColorScheme.light(
+                                primary: Color(0xFF174A7E),
+                              ),
+                            ),
+                            child: child!,
+                          );
+                        },
+                      ).then((time) {
+                        if (time != null) {
+                          setState(() => selectedTime = time);
+                        }
+                      });
+                    },
+                  ),
+                ],
                 if (!isReunion) ...[
                   const SizedBox(height: 14),
                   _MeetingNumberBadge(
@@ -294,6 +331,9 @@ class _PlanningEditPageState extends ConsumerState<PlanningEditPage> {
                         classId: classId,
                         createdBy: AuthService.localUserId,
                         date: selectedDate!,
+                        time: (isReunion && selectedTime != null)
+                            ? '${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}'
+                            : null,
                         title: title.text.trim(),
                         activity: activity.text.trim(),
                         notes: notes.text.trim(),
@@ -425,6 +465,106 @@ class _DatePickerCard extends StatelessWidget {
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: isSelected ? Colors.white : const Color(0xFF174A7E),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 16,
+              color: isSelected ? Colors.white70 : Colors.grey,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Card interattiva per la selezione dell'orario di una riunione.
+///
+/// Mostra l'orario correntemente selezionato (o un invito a selezionarne uno)
+/// e cambia stile (gradiente viola) quando un orario è stato scelto.
+class _TimePickerCard extends StatelessWidget {
+  final TimeOfDay? selectedTime;
+  final VoidCallback onTap;
+
+  const _TimePickerCard({
+    required this.selectedTime,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isSelected = selectedTime != null;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(24),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isSelected
+                ? [
+                    Colors.deepPurple.shade400,
+                    Colors.deepPurple.shade600,
+                  ]
+                : [
+                    Colors.white,
+                    Colors.deepPurple.shade50.withValues(alpha: 0.4),
+                  ],
+          ),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isSelected ? Colors.transparent : Colors.deepPurple.shade100,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 18,
+              offset: const Offset(0, 10),
+            )
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white.withValues(alpha: 0.15) : Colors.deepPurple.shade50,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(
+                Icons.access_time_rounded,
+                color: isSelected ? Colors.white : Colors.deepPurple.shade700,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Orario riunione',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? Colors.white70 : Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    isSelected
+                        ? selectedTime!.format(context)
+                        : 'Seleziona un orario',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? Colors.white : Colors.deepPurple.shade700,
                     ),
                   ),
                 ],

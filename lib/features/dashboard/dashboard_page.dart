@@ -9,6 +9,7 @@ import '../../core/auth/auth_service.dart';
 import '../../core/security/privacy_settings.dart';
 import '../../shared/models/planning_meeting.dart';
 import '../../shared/widgets/app_scaffold.dart';
+import '../planning/planning_edit_page.dart';
 import '../auth/bible_quote.dart';
 import '../classes/classes_provider.dart';
 import '../documents/documents_repository.dart';
@@ -329,7 +330,7 @@ class _NextMeetingCard extends StatelessWidget {
       width: compact ? 62 : 74,
       padding: EdgeInsets.symmetric(vertical: compact ? 10 : 14),
       decoration: BoxDecoration(
-        color: const Color(0xFF174A7E),
+        color: meeting!.isReunion ? Colors.deepPurple : const Color(0xFF174A7E),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
@@ -349,48 +350,73 @@ class _NextMeetingCard extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
+          if (meeting!.isReunion &&
+              meeting!.time != null &&
+              meeting!.time!.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              meeting!.time!,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ],
       ),
     );
 
-    return _Panel(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          dateBox,
-          SizedBox(width: compact ? 12 : 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 8),
-                Text(
-                  meeting!.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    height: 1.35,
-                  ),
-                ),
-                if (meeting!.activity.trim().isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    meeting!.activity,
-                    style: TextStyle(color: Colors.grey.shade700, height: 1.3),
-                  ),
-                ],
-                if (meeting!.notes.trim().isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    meeting!.notes,
-                    style: TextStyle(color: Colors.grey.shade700, height: 1.3),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ],
-            ),
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PlanningEditPage(existing: meeting!),
           ),
-        ],
+        );
+      },
+      child: _Panel(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            dateBox,
+            SizedBox(width: compact ? 12 : 18),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
+                  Text(
+                    meeting!.title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      height: 1.35,
+                    ),
+                  ),
+                  if (meeting!.activity.trim().isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      meeting!.activity,
+                      style: TextStyle(color: Colors.grey.shade700, height: 1.3),
+                    ),
+                  ],
+                  if (meeting!.notes.trim().isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      meeting!.notes,
+                      style: TextStyle(color: Colors.grey.shade700, height: 1.3),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+          ],
+        ),
       ),
     );
   }

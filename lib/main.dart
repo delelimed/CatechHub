@@ -15,6 +15,7 @@ import 'app/router.dart';
 import 'core/auth/auth_provider.dart';
 import 'core/auth/session_lifecycle_observer.dart';
 import 'core/navigation/back_button_handler.dart';
+import 'core/providers/theme_provider.dart';
 import 'core/security/developer_options_warning_screen.dart';
 import 'core/security/privacy_settings.dart';
 import 'core/security/security_block_screen.dart';
@@ -541,13 +542,15 @@ class MyApp extends ConsumerWidget {
             }
 
             // 3. APP NORMALE
+            final themeMode = ref.watch(themeModeProvider);
+            final lightTheme = ref.watch(lightThemeProvider);
+            final darkTheme = ref.watch(darkThemeProvider);
+
             Widget app = MaterialApp(
               debugShowCheckedModeBanner: false,
-              theme: ThemeData(
-                useMaterial3: true,
-                colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF174A7E)),
-                scaffoldBackgroundColor: const Color(0xFFF5F7FB),
-              ),
+              theme: lightTheme,
+              darkTheme: darkTheme,
+              themeMode: themeMode,
               navigatorKey: navigatorKey,
               home: authState.when(
                 data: (_) {

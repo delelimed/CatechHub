@@ -19,6 +19,8 @@ import '../features/settings/settings_page.dart';
 import '../features/contact_notes/contact_notes_page.dart';
 
 import '../features/settings/licenses_page.dart';
+import '../features/settings/changelog_page.dart';
+import '../features/settings/commits_page.dart';
 import '../features/settings/privacy.dart';
 import '../features/onboarding/presentation/screens/onboarding_page.dart';
 import '../core/storage/local_database.dart';
@@ -374,6 +376,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings/licenses',
         builder: (context, state) => const LicensesPage(),
+      ),
+
+      /// Changelog delle versioni rilasciate.
+      GoRoute(
+        path: '/changelog',
+        builder: (context, state) => const ChangelogPage(),
+      ),
+
+      /// Cronologia dei commit recenti dal repository GitHub.
+      GoRoute(
+        path: '/commits',
+        builder: (context, state) => const CommitsPage(),
       ),
 
       /// Impostazioni privacy e sicurezza:

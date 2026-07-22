@@ -55,7 +55,8 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-/docs/infos
+.env
+android/app/app_release_key.jks
 
 catechhub-saas
 

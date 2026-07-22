@@ -41,6 +41,9 @@ class PlanningMeeting {
   /// Data dell'incontro (formato ISO 8601).
   final DateTime date;
 
+  /// Orario dell'incontro (solo per riunioni). Formato "HH:mm".
+  final String? time;
+
   /// Titolo (es. "Incontro sulla Pasqua"). Se vuoto in fromMap,
   /// viene generato automaticamente "Giornata del <gg>/<mm>/<aaaa>".
   final String title;
@@ -64,6 +67,7 @@ class PlanningMeeting {
     required this.classId,
     required this.createdBy,
     required this.date,
+    this.time,
     required this.title,
     required this.activity,
     required this.notes,
@@ -76,6 +80,7 @@ class PlanningMeeting {
       'classId': classId,
       'createdBy': createdBy,
       'date': date.toIso8601String(),
+      'time': time,
       'title': title,
       'activity': activity,
       'notes': notes,
@@ -93,6 +98,7 @@ class PlanningMeeting {
       classId: data['classId'] ?? '',
       createdBy: data['createdBy'] ?? '',
       date: date,
+      time: data['time']?.toString(),
       title: legacyTitle == null || legacyTitle.isEmpty
           ? 'Giornata del ${date.day}/${date.month}/${date.year}'
           : legacyTitle,

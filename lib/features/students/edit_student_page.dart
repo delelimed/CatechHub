@@ -129,13 +129,16 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
   Widget build(BuildContext context) {
     final repo = ref.read(studentsRepoProvider);
     final isDesktop = MediaQuery.of(context).size.width > 900;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: isDark ? colorScheme.surface : Colors.grey.shade50,
 
       appBar: AppBar(
-        backgroundColor: const Color(0xFF174A7E),
-        foregroundColor: Colors.white,
+        backgroundColor: isDark ? colorScheme.primaryContainer : const Color(0xFF174A7E),
+        foregroundColor: isDark ? colorScheme.onPrimaryContainer : Colors.white,
         title: const Text('Modifica ragazzo'),
         actions: [
           IconButton(
@@ -152,28 +155,28 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
           children: [
             _HeaderCard(
               name: '${widget.student.name} ${widget.student.surname}',
+              isDark: isDark,
+              colorScheme: colorScheme,
             ),
 
             const SizedBox(height: 16),
 
-            /// =========================
-            /// DATI BASE
-            /// =========================
             _Section(
               title: 'Dati ragazzo',
+              isDark: isDark,
+              colorScheme: colorScheme,
               children: [
-                _Field(name, 'Nome', enabled: editMode, capitalizeWords: true),
-                _Field(surname, 'Cognome', enabled: editMode, capitalizeWords: true),
+                _Field(name, 'Nome', enabled: editMode, capitalizeWords: true, isDark: isDark, colorScheme: colorScheme),
+                _Field(surname, 'Cognome', enabled: editMode, capitalizeWords: true, isDark: isDark, colorScheme: colorScheme),
               ],
             ),
 
             const SizedBox(height: 16),
 
-            /// =========================
-            /// GENITORI (RESPONSIVE)
-            /// =========================
             _Section(
               title: 'Genitori',
+              isDark: isDark,
+              colorScheme: colorScheme,
               children: isDesktop
                   ? [
                       Row(
@@ -187,6 +190,8 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
                               surname: motherSurname,
                               phone: motherPhone,
                               editMode: editMode,
+                              isDark: isDark,
+                              colorScheme: colorScheme,
                               onCall: _call,
                               onWhatsapp: _whatsapp,
                             ),
@@ -199,6 +204,8 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
                               surname: fatherSurname,
                               phone: fatherPhone,
                               editMode: editMode,
+                              isDark: isDark,
+                              colorScheme: colorScheme,
                               onCall: _call,
                               onWhatsapp: _whatsapp,
                             ),
@@ -213,6 +220,8 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
                         surname: motherSurname,
                         phone: motherPhone,
                         editMode: editMode,
+                        isDark: isDark,
+                        colorScheme: colorScheme,
                         onCall: _call,
                         onWhatsapp: _whatsapp,
                       ),
@@ -223,6 +232,8 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
                         surname: fatherSurname,
                         phone: fatherPhone,
                         editMode: editMode,
+                        isDark: isDark,
+                        colorScheme: colorScheme,
                         onCall: _call,
                         onWhatsapp: _whatsapp,
                       ),
@@ -231,15 +242,16 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
 
             const SizedBox(height: 16),
 
-            /// =========================
-            /// CONTATTI
-            /// =========================
             _Section(
               title: 'Contatti ragazzo',
+              isDark: isDark,
+              colorScheme: colorScheme,
               children: [
                 _PhoneRow(
                   controller: studentPhone,
                   enabled: editMode,
+                  isDark: isDark,
+                  colorScheme: colorScheme,
                   onCall: _call,
                   onWhatsapp: _whatsapp,
                 ),
@@ -248,18 +260,19 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
 
             const SizedBox(height: 16),
 
-            /// =========================
-            /// ALLERGIE E USCITE
-            /// =========================
             _Section(
               title: 'Allergie e Uscite',
+              isDark: isDark,
+              colorScheme: colorScheme,
               children: [
-                _Field(allergies, 'Allergie', maxLines: 2, enabled: editMode),
+                _Field(allergies, 'Allergie', maxLines: 2, enabled: editMode, isDark: isDark, colorScheme: colorScheme),
                 const SizedBox(height: 16),
                 _EditExitsSelector(
                   selectedExits: selectedExits,
                   customExitName: customExitName,
                   editMode: editMode,
+                  isDark: isDark,
+                  colorScheme: colorScheme,
                   onSelectionChanged: (exits, custom) {
                     setState(() {
                       selectedExits = exits;
@@ -272,13 +285,12 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
 
             const SizedBox(height: 16),
 
-            /// =========================
-            /// NOTE
-            /// =========================
             _Section(
               title: 'Note',
+              isDark: isDark,
+              colorScheme: colorScheme,
               children: [
-                _NotesField(notes, enabled: editMode),
+                _NotesField(notes, enabled: editMode, isDark: isDark, colorScheme: colorScheme),
               ],
             ),
 
@@ -301,8 +313,8 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF174A7E),
-                  foregroundColor: Colors.white,
+                  backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                  foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
                   padding:
                       const EdgeInsets.symmetric(vertical: 14),
                 ),
@@ -359,8 +371,14 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
 /// =========================
 class _HeaderCard extends StatelessWidget {
   final String name;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
-  const _HeaderCard({required this.name});
+  const _HeaderCard({
+    required this.name,
+    required this.isDark,
+    required this.colorScheme,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -368,15 +386,22 @@ class _HeaderCard extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Colors.white,
-            Colors.blue.shade50.withValues(alpha: 0.5),
-          ],
+          colors: isDark
+              ? [
+                  colorScheme.surfaceContainer,
+                  colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                ]
+              : [
+                  Colors.white,
+                  Colors.blue.shade50.withValues(alpha: 0.5),
+                ],
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.05),
             blurRadius: 16,
             offset: const Offset(0, 10),
           )
@@ -384,15 +409,15 @@ class _HeaderCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.edit,
-              color: Color(0xFF174A7E), size: 30),
+          Icon(Icons.edit,
+              color: isDark ? colorScheme.primary : const Color(0xFF174A7E), size: 30),
           const SizedBox(width: 12),
           Text(
             'Modifica profilo ragazzo',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF174A7E),
+              color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
             ),
           ),
         ],
@@ -407,10 +432,14 @@ class _HeaderCard extends StatelessWidget {
 class _Section extends StatelessWidget {
   final String title;
   final List<Widget> children;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
   const _Section({
     required this.title,
     required this.children,
+    required this.isDark,
+    required this.colorScheme,
   });
 
   @override
@@ -418,11 +447,13 @@ class _Section extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? colorScheme.surfaceContainer : Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 6),
           )
@@ -433,9 +464,9 @@ class _Section extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: Color(0xFF174A7E),
+              color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
             ),
           ),
           const SizedBox(height: 10),
@@ -455,6 +486,8 @@ class _ParentCard extends StatelessWidget {
   final TextEditingController surname;
   final TextEditingController phone;
   final bool editMode;
+  final bool isDark;
+  final ColorScheme colorScheme;
   final Function(String) onCall;
   final Function(String) onWhatsapp;
 
@@ -464,6 +497,8 @@ class _ParentCard extends StatelessWidget {
     required this.surname,
     required this.phone,
     required this.editMode,
+    required this.isDark,
+    required this.colorScheme,
     required this.onCall,
     required this.onWhatsapp,
   });
@@ -473,27 +508,27 @@ class _ParentCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.grey.shade50,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: Color(0xFF174A7E),
+              color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
             ),
           ),
           const SizedBox(height: 8),
-          _Field(name, 'Nome', enabled: editMode, capitalizeWords: true),
-          _Field(surname, 'Cognome', enabled: editMode, capitalizeWords: true),
+          _Field(name, 'Nome', enabled: editMode, capitalizeWords: true, isDark: isDark, colorScheme: colorScheme),
+          _Field(surname, 'Cognome', enabled: editMode, capitalizeWords: true, isDark: isDark, colorScheme: colorScheme),
           Row(
             children: [
               Expanded(
-                child: _Field(phone, 'Telefono', enabled: editMode, keyboardType: TextInputType.phone),
+                child: _Field(phone, 'Telefono', enabled: editMode, keyboardType: TextInputType.phone, isDark: isDark, colorScheme: colorScheme),
               ),
               const SizedBox(width: 8),
               IconButton(
@@ -522,6 +557,8 @@ class _Field extends StatelessWidget {
   final bool capitalizeWords;
   final TextInputType? keyboardType;
   final bool enabled;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
   const _Field(
     this.controller,
@@ -530,6 +567,8 @@ class _Field extends StatelessWidget {
     this.capitalizeWords = false,
     this.keyboardType,
     this.enabled = true,
+    required this.isDark,
+    required this.colorScheme,
   });
 
   @override
@@ -547,7 +586,7 @@ class _Field extends StatelessWidget {
         decoration: InputDecoration(
           labelText: label,
           filled: true,
-          fillColor: Colors.grey.shade50,
+          fillColor: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.2) : Colors.grey.shade50,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
             borderSide: BorderSide.none,
@@ -564,8 +603,10 @@ class _Field extends StatelessWidget {
 class _NotesField extends StatelessWidget {
   final TextEditingController controller;
   final bool enabled;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
-  const _NotesField(this.controller, {this.enabled = true});
+  const _NotesField(this.controller, {this.enabled = true, required this.isDark, required this.colorScheme});
 
   @override
   Widget build(BuildContext context) {
@@ -577,7 +618,7 @@ class _NotesField extends StatelessWidget {
         labelText: 'Note',
         alignLabelWithHint: true,
         filled: true,
-        fillColor: Colors.grey.shade50,
+        fillColor: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.2) : Colors.grey.shade50,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
@@ -593,12 +634,16 @@ class _NotesField extends StatelessWidget {
 class _PhoneRow extends StatelessWidget {
   final TextEditingController controller;
   final bool enabled;
+  final bool isDark;
+  final ColorScheme colorScheme;
   final Function(String) onCall;
   final Function(String) onWhatsapp;
 
   const _PhoneRow({
     required this.controller,
     required this.enabled,
+    required this.isDark,
+    required this.colorScheme,
     required this.onCall,
     required this.onWhatsapp,
   });
@@ -613,6 +658,8 @@ class _PhoneRow extends StatelessWidget {
             'Cellulare ragazzo',
             enabled: enabled,
             keyboardType: TextInputType.phone,
+            isDark: isDark,
+            colorScheme: colorScheme,
           ),
         ),
         const SizedBox(width: 8),
@@ -636,12 +683,16 @@ class _EditExitsSelector extends StatefulWidget {
   final Set<String> selectedExits;
   final String? customExitName;
   final bool editMode;
+  final bool isDark;
+  final ColorScheme colorScheme;
   final Function(Set<String>, String?) onSelectionChanged;
 
   const _EditExitsSelector({
     required this.selectedExits,
     required this.customExitName,
     required this.editMode,
+    required this.isDark,
+    required this.colorScheme,
     required this.onSelectionChanged,
   });
 
@@ -677,16 +728,16 @@ class _EditExitsSelectorState extends State<_EditExitsSelector> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.editMode)
-          const Text(
+          Text(
             'Chi accompagna l\'uscita?',
-            style: TextStyle(fontWeight: FontWeight.w600),
+            style: TextStyle(fontWeight: FontWeight.w600, color: widget.isDark ? widget.colorScheme.onSurface : null),
           )
         else
           Text(
             'Chi accompagna l\'uscita: ${selected.isEmpty ? 'Non specificato' : selected.join(', ')}',
             style: TextStyle(
               fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
+              color: widget.isDark ? widget.colorScheme.onSurface : Colors.grey.shade700,
             ),
           ),
         const SizedBox(height: 12),
@@ -708,6 +759,8 @@ class _EditExitsSelectorState extends State<_EditExitsSelector> {
                     _updateSelection();
                   });
                 },
+                isDark: widget.isDark,
+                colorScheme: widget.colorScheme,
               ),
               _ExitChip(
                 label: 'Genitori',
@@ -722,6 +775,8 @@ class _EditExitsSelectorState extends State<_EditExitsSelector> {
                     _updateSelection();
                   });
                 },
+                isDark: widget.isDark,
+                colorScheme: widget.colorScheme,
               ),
               _ExitChip(
                 label: 'Altro',
@@ -737,6 +792,8 @@ class _EditExitsSelectorState extends State<_EditExitsSelector> {
                     _updateSelection();
                   });
                 },
+                isDark: widget.isDark,
+                colorScheme: widget.colorScheme,
               ),
             ],
           ),
@@ -747,7 +804,7 @@ class _EditExitsSelectorState extends State<_EditExitsSelector> {
             decoration: InputDecoration(
               labelText: 'Specifica chi accompagna',
               filled: true,
-              fillColor: Colors.grey.shade50,
+              fillColor: widget.isDark ? widget.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2) : Colors.grey.shade50,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide.none,
@@ -761,7 +818,7 @@ class _EditExitsSelectorState extends State<_EditExitsSelector> {
             padding: const EdgeInsets.only(top: 8),
             child: Text(
               'Altro: ${customController.text}',
-              style: TextStyle(color: Colors.grey.shade600),
+              style: TextStyle(color: widget.isDark ? Colors.grey.shade400 : Colors.grey.shade600),
             ),
           ),
       ],
@@ -775,11 +832,15 @@ class _EditExitsSelectorState extends State<_EditExitsSelector> {
 class _ExitChip extends StatelessWidget {
   final String label;
   final bool selected;
+  final bool isDark;
+  final ColorScheme colorScheme;
   final Function(bool) onChanged;
 
   const _ExitChip({
     required this.label,
     required this.selected,
+    required this.isDark,
+    required this.colorScheme,
     required this.onChanged,
   });
 
@@ -789,10 +850,10 @@ class _ExitChip extends StatelessWidget {
       label: Text(label),
       selected: selected,
       onSelected: onChanged,
-      backgroundColor: Colors.grey.shade100,
-      selectedColor: const Color(0xFF174A7E),
+      backgroundColor: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.grey.shade100,
+      selectedColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
       labelStyle: TextStyle(
-        color: selected ? Colors.white : Colors.black,
+        color: selected ? Colors.white : (isDark ? colorScheme.onSurface : Colors.black),
         fontWeight: FontWeight.w500,
       ),
     );

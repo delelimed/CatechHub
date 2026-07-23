@@ -22,6 +22,9 @@ class ContactNotesPage extends ConsumerWidget {
     final studentsRepo = StudentsRepository();
     final contactNotesRepo = ref.watch(contactNotesRepoProvider);
     final students = Student.sortedBySurname(studentsRepo.getAllStudentsSync());
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return AppScaffold(
       title: 'Registro di Contatto',
@@ -33,13 +36,13 @@ class ContactNotesPage extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.people_outline,
-                        size: 64, color: Colors.grey.shade400),
+                        size: 64, color: isDark ? Colors.grey.shade600 : Colors.grey.shade400),
                     const SizedBox(height: 16),
                     Text(
                       'Nessun ragazzo registrato',
                       style: TextStyle(
                         fontSize: 16,
-                        color: Colors.grey.shade600,
+                        color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                       ),
                     ),
                   ],
@@ -59,6 +62,8 @@ class ContactNotesPage extends ConsumerWidget {
                 return _StudentContactTile(
                   student: student,
                   lastNote: lastNote,
+                  isDark: isDark,
+                  colorScheme: colorScheme,
                   onTap: () {
                     Navigator.push(
                       context,
@@ -84,11 +89,15 @@ class ContactNotesPage extends ConsumerWidget {
 class _StudentContactTile extends StatelessWidget {
   final Student student;
   final dynamic lastNote;
+  final bool isDark;
+  final ColorScheme colorScheme;
   final VoidCallback onTap;
 
   const _StudentContactTile({
     required this.student,
     required this.lastNote,
+    required this.isDark,
+    required this.colorScheme,
     required this.onTap,
   });
 
@@ -102,11 +111,13 @@ class _StudentContactTile extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? colorScheme.surfaceContainer : Colors.white,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.3)
+                    : Colors.black.withValues(alpha: 0.04),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -116,13 +127,13 @@ class _StudentContactTile extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 22,
-                backgroundColor: const Color(0xFF174A7E).withValues(alpha: 0.1),
+                backgroundColor: isDark ? colorScheme.primaryContainer.withValues(alpha: 0.3) : const Color(0xFF174A7E).withValues(alpha: 0.1),
                 child: Text(
                   student.surname.isNotEmpty
                       ? student.surname[0].toUpperCase()
                       : '?',
-                  style: const TextStyle(
-                    color: Color(0xFF174A7E),
+                  style: TextStyle(
+                    color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
                   ),
@@ -135,10 +146,10 @@ class _StudentContactTile extends StatelessWidget {
                   children: [
                     Text(
                       '${student.surname} ${student.name}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF1A1A1A),
+                        color: isDark ? colorScheme.onSurface : const Color(0xFF1A1A1A),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -147,7 +158,7 @@ class _StudentContactTile extends StatelessWidget {
                         '${DateFormat('dd/MM/yy').format(lastNote.dateTime)} — ${lastNote.notes.length > 40 ? '${lastNote.notes.substring(0, 40)}...' : lastNote.notes}',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey.shade600,
+                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -157,14 +168,14 @@ class _StudentContactTile extends StatelessWidget {
                         'Nessun contatto registrato',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey.shade400,
+                          color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
                           fontStyle: FontStyle.italic,
                         ),
                       ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: Colors.grey.shade400),
+              Icon(Icons.chevron_right, color: isDark ? Colors.grey.shade600 : Colors.grey.shade400),
             ],
           ),
         ),

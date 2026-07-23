@@ -16,6 +16,9 @@ class AllergiesPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final repo = StudentsRepository();
     final allStudents = repo.getAllStudentsSync();
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     final studentsWithAllergies = Student.sortedBySurname(
       allStudents.where((s) => s.allergies != null && s.allergies!.isNotEmpty),
@@ -24,10 +27,10 @@ class AllergiesPage extends StatelessWidget {
     return AppScaffold(
       title: 'Allergie',
       child: studentsWithAllergies.isEmpty
-          ? const Center(
+          ? Center(
               child: Text(
                 'Nessun ragazzo con allergie segnate.',
-                style: TextStyle(color: Colors.grey),
+                style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey),
               ),
             )
           : ListView.builder(
@@ -39,25 +42,25 @@ class AllergiesPage extends StatelessWidget {
                   margin: const EdgeInsets.only(bottom: 12),
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: isDark ? colorScheme.surfaceContainer : Colors.white,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade200),
+                    border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade200),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         '${student.surname} ${student.name}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
-                          color: Color(0xFF174A7E),
+                          color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         student.allergies!,
-                        style: TextStyle(color: Colors.grey.shade700),
+                        style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade700),
                       ),
                     ],
                   ),

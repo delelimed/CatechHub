@@ -52,28 +52,34 @@ class _ChangelogPageState extends State<ChangelogPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Changelog'),
-        backgroundColor: const Color(0xFF174A7E),
-        foregroundColor: Colors.white,
+        backgroundColor: colorScheme.primaryContainer,
+        foregroundColor: colorScheme.onPrimaryContainer,
         elevation: 0,
       ),
-      body: _buildBody(),
+      body: _buildBody(theme, isDark),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(ThemeData theme, bool isDark) {
+    final colorScheme = theme.colorScheme;
+
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: CircularProgressIndicator(color: colorScheme.primary));
     }
 
     if (_error != null) {
-      return _buildError(_error!);
+      return _buildError(_error!, theme, isDark);
     }
 
     if (_releases.isEmpty) {
-      return _buildEmpty();
+      return _buildEmpty(theme, isDark);
     }
 
     return ListView.builder(
@@ -81,29 +87,34 @@ class _ChangelogPageState extends State<ChangelogPage> {
       itemCount: _releases.length,
       itemBuilder: (context, index) {
         final release = _releases[index] as Map<String, dynamic>;
-        return _ReleaseCard(release: release);
+        return _ReleaseCard(release: release, theme: theme, isDark: isDark);
       },
     );
   }
 
-  Widget _buildError(String message) {
+  Widget _buildError(String message, ThemeData theme, bool isDark) {
+    final colorScheme = theme.colorScheme;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline_rounded, size: 64, color: Colors.red.shade400),
+            Icon(Icons.error_outline_rounded, size: 64, color: colorScheme.error),
             const SizedBox(height: 16),
             Text(
               'Impossibile caricare',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade800),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade600),
+              style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
@@ -114,8 +125,8 @@ class _ChangelogPageState extends State<ChangelogPage> {
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('Riprova'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF174A7E),
-                foregroundColor: Colors.white,
+                backgroundColor: colorScheme.primary,
+                foregroundColor: colorScheme.onPrimary,
               ),
             ),
           ],
@@ -124,18 +135,21 @@ class _ChangelogPageState extends State<ChangelogPage> {
     );
   }
 
-  Widget _buildEmpty() {
+  Widget _buildEmpty(ThemeData theme, bool isDark) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.history_rounded, size: 64, color: Colors.grey.shade400),
+            Icon(Icons.history_rounded, size: 64, color: isDark ? Colors.grey.shade600 : Colors.grey.shade400),
             const SizedBox(height: 16),
             Text(
               'Nessun rilascio trovato',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
+              ),
             ),
           ],
         ),
@@ -146,11 +160,18 @@ class _ChangelogPageState extends State<ChangelogPage> {
 
 class _ReleaseCard extends StatelessWidget {
   final Map<String, dynamic> release;
+  final ThemeData theme;
+  final bool isDark;
 
-  const _ReleaseCard({required this.release});
+  const _ReleaseCard({
+    required this.release,
+    required this.theme,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = theme.colorScheme;
     final version = release['tag_name'] as String? ?? 'Sconosciuta';
     final name = release['name'] as String? ?? '';
     final body = release['body'] as String? ?? 'Nessuna descrizione disponibile.';
@@ -163,15 +184,23 @@ class _ReleaseCard extends StatelessWidget {
         ? DateFormat('dd MMMM yyyy', 'it_IT').format(DateTime.parse(publishedAt).toLocal())
         : 'Data sconosciuta';
 
+    final cardColor = isDark ? colorScheme.surfaceContainer : Colors.white;
+    final shadowColor = isDark
+        ? Colors.black.withValues(alpha: 0.3)
+        : Colors.black.withValues(alpha: 0.04);
+    final borderColor = isDark
+        ? colorScheme.outline.withValues(alpha: 0.2)
+        : Colors.grey.shade200;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: shadowColor,
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -188,7 +217,7 @@ class _ReleaseCard extends StatelessWidget {
                     ? [Colors.orange.shade400, Colors.deepOrange.shade500]
                     : draft
                         ? [Colors.grey.shade400, Colors.grey.shade600]
-                        : [const Color(0xFF174A7E), const Color(0xFF2A6BB0)],
+                        : [colorScheme.primary, colorScheme.secondary],
               ),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(18),
@@ -241,7 +270,7 @@ class _ReleaseCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildBody(body),
+                _buildBody(body, theme, isDark),
                 if (htmlUrl.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Align(
@@ -251,8 +280,8 @@ class _ReleaseCard extends StatelessWidget {
                       icon: const Icon(Icons.open_in_new_rounded, size: 18),
                       label: const Text('Visualizza su GitHub'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF174A7E),
-                        side: const BorderSide(color: Color(0xFF174A7E)),
+                        foregroundColor: colorScheme.primary,
+                        side: BorderSide(color: colorScheme.primary),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                     ),
@@ -266,9 +295,16 @@ class _ReleaseCard extends StatelessWidget {
     );
   }
 
-  Widget _buildBody(String markdown) {
+  Widget _buildBody(String markdown, ThemeData theme, bool isDark) {
+    final colorScheme = theme.colorScheme;
     final lines = markdown.split('\n');
     final widgets = <Widget>[];
+    final textColor = isDark ? Colors.grey.shade300 : Colors.grey.shade800;
+    final headingColor = isDark ? colorScheme.primary : const Color(0xFF174A7E);
+    final mutedColor = isDark ? Colors.grey.shade500 : Colors.grey.shade700;
+    final quoteBg = isDark ? colorScheme.primaryContainer.withValues(alpha: 0.3) : Colors.blue.shade50;
+    final quoteBorder = isDark ? colorScheme.primary.withValues(alpha: 0.3) : Colors.blue.shade100;
+    final quoteTextColor = isDark ? colorScheme.primary : Colors.blue.shade800;
 
     for (final line in lines) {
       final trimmed = line.trim();
@@ -282,10 +318,10 @@ class _ReleaseCard extends StatelessWidget {
           padding: const EdgeInsets.only(top: 12, bottom: 6),
           child: Text(
             trimmed.substring(4),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF174A7E),
+              color: headingColor,
             ),
           ),
         ));
@@ -294,10 +330,10 @@ class _ReleaseCard extends StatelessWidget {
           padding: const EdgeInsets.only(top: 16, bottom: 8),
           child: Text(
             trimmed.substring(3),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF174A7E),
+              color: headingColor,
             ),
           ),
         ));
@@ -306,10 +342,10 @@ class _ReleaseCard extends StatelessWidget {
           padding: const EdgeInsets.only(top: 16, bottom: 8),
           child: Text(
             trimmed.substring(2),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 19,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF174A7E),
+              color: headingColor,
             ),
           ),
         ));
@@ -319,11 +355,11 @@ class _ReleaseCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('• ', style: TextStyle(color: Colors.grey.shade700, fontSize: 14)),
+              Text('• ', style: TextStyle(color: mutedColor, fontSize: 14)),
               Expanded(
                 child: Text(
                   trimmed.substring(2),
-                  style: TextStyle(color: Colors.grey.shade800, fontSize: 14, height: 1.5),
+                  style: TextStyle(color: textColor, fontSize: 14, height: 1.5),
                 ),
               ),
             ],
@@ -334,13 +370,13 @@ class _ReleaseCard extends StatelessWidget {
           margin: const EdgeInsets.symmetric(vertical: 8),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.blue.shade50,
+            color: quoteBg,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.blue.shade100),
+            border: Border.all(color: quoteBorder),
           ),
           child: Text(
             trimmed.substring(2),
-            style: TextStyle(color: Colors.blue.shade800, fontSize: 13, fontStyle: FontStyle.italic),
+            style: TextStyle(color: quoteTextColor, fontSize: 13, fontStyle: FontStyle.italic),
           ),
         ));
       } else {
@@ -348,7 +384,7 @@ class _ReleaseCard extends StatelessWidget {
           padding: const EdgeInsets.only(top: 2, bottom: 2),
           child: Text(
             trimmed,
-            style: TextStyle(color: Colors.grey.shade800, fontSize: 14, height: 1.5),
+            style: TextStyle(color: textColor, fontSize: 14, height: 1.5),
           ),
         ));
       }

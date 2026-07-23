@@ -118,6 +118,12 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                 groupedMeetings[key]!.add(m);
               }
 
+              // Pre-registra tutte le GlobalKey per i mesi PRIMA di costruire i chip,
+              // così _scrollToMonth trova sempre il context anche per i mesi non ancora renderizzati.
+              for (final mk in monthKeys) {
+                _getMonthKey(mk);
+              }
+
               return ListView(
                 controller: _scrollController,
                 padding: const EdgeInsets.only(bottom: 100),

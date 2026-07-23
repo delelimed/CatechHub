@@ -1,8 +1,7 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:intl/intl.dart';
 
 class CommitsPage extends StatefulWidget {
@@ -16,10 +15,9 @@ class _CommitsPageState extends State<CommitsPage> {
   List<dynamic> _commits = [];
   bool _isLoading = true;
   String? _error;
-  int _page = 1;
-  final int _perPage = 30;
   bool _hasMore = true;
-  final ScrollController _scrollController = ScrollController();
+  String? _nextPageUrl;
+  final _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -44,37 +42,51 @@ class _CommitsPageState extends State<CommitsPage> {
   }
 
   Future<void> _fetchCommits({bool loadMore = false}) async {
-    if (loadMore) {
-      _page++;
+    if (loadMore && _isLoading) return;
+    if (loadMore && _nextPageUrl == null) return;
+
+    if (!loadMore) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
     } else {
-      _page = 1;
-      _commits = [];
+      setState(() => _isLoading = true);
     }
 
-    setState(() => _isLoading = true);
-
     try {
+      final url = _nextPageUrl ??
+          'https://api.github.com/repos/delelimed/CatechHub/commits?per_page=30';
       final response = await http.get(
-        Uri.parse(
-          'https://api.github.com/repos/delelimed/CatechHub/commits?per_page=$_perPage&page=$_page',
-        ),
+        Uri.parse(url),
         headers: {'Accept': 'application/vnd.github.v3+json'},
       ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as List<dynamic>;
+
+        final linkHeader = response.headers['link'];
+        String? nextUrl;
+        if (linkHeader != null) {
+          final matches = RegExp(r'<([^>]+)>;\s*rel="next"').allMatches(linkHeader);
+          if (matches.isNotEmpty) {
+            nextUrl = matches.first.group(1);
+          }
+        }
+
         setState(() {
           if (loadMore) {
             _commits.addAll(data);
           } else {
             _commits = data;
           }
-          _hasMore = data.length == _perPage;
+          _nextPageUrl = nextUrl;
+          _hasMore = nextUrl != null;
           _isLoading = false;
         });
       } else {
         setState(() {
-          _error = 'Errore nel recupero commits (${response.statusCode})';
+          _error = 'Errore nel recupero commit (${response.statusCode})';
           _isLoading = false;
         });
       }
@@ -88,11 +100,15 @@ class _CommitsPageState extends State<CommitsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Commits recenti'),
-        backgroundColor: const Color(0xFF174A7E),
-        foregroundColor: Colors.white,
+        backgroundColor: colorScheme.primaryContainer,
+        foregroundColor: colorScheme.onPrimaryContainer,
         elevation: 0,
         actions: [
           IconButton(
@@ -102,21 +118,23 @@ class _CommitsPageState extends State<CommitsPage> {
           ),
         ],
       ),
-      body: _buildBody(),
+      body: _buildBody(theme, isDark),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(ThemeData theme, bool isDark) {
+    final colorScheme = theme.colorScheme;
+
     if (_isLoading && _commits.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: CircularProgressIndicator(color: colorScheme.primary));
     }
 
     if (_error != null && _commits.isEmpty) {
-      return _buildError(_error!);
+      return _buildError(_error!, theme, isDark);
     }
 
     if (_commits.isEmpty) {
-      return _buildEmpty();
+      return _buildEmpty(theme, isDark);
     }
 
     return RefreshIndicator(
@@ -127,16 +145,78 @@ class _CommitsPageState extends State<CommitsPage> {
         itemCount: _commits.length + (_hasMore ? 1 : 0),
         itemBuilder: (context, index) {
           if (index >= _commits.length) {
-            return _buildLoadMore();
+            return _buildLoadMore(theme, isDark);
           }
           final commit = _commits[index] as Map<String, dynamic>;
-          return _CommitCard(commit: commit);
+          return _CommitCard(commit: commit, theme: theme, isDark: isDark);
         },
       ),
     );
   }
 
-  Widget _buildLoadMore() {
+  Widget _buildError(String message, ThemeData theme, bool isDark) {
+    final colorScheme = theme.colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline_rounded, size: 64, color: colorScheme.error),
+            const SizedBox(height: 16),
+            Text(
+              'Impossibile caricare',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () => _fetchCommits(),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Riprova'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: colorScheme.primary,
+                foregroundColor: colorScheme.onPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmpty(ThemeData theme, bool isDark) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.history_rounded, size: 64, color: isDark ? Colors.grey.shade600 : Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text(
+              'Nessun commit trovato',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadMore(ThemeData theme, bool isDark) {
     return _isLoading
         ? const Padding(
             padding: EdgeInsets.all(16),
@@ -149,112 +229,63 @@ class _CommitsPageState extends State<CommitsPage> {
               icon: const Icon(Icons.download_rounded),
               label: const Text('Carica altro'),
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF174A7E),
+                foregroundColor: theme.colorScheme.primary,
               ),
             ),
           );
-  }
-
-  Widget _buildError(String message) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline_rounded, size: 64, color: Colors.red.shade400),
-            const SizedBox(height: 16),
-            Text(
-              'Impossibile caricare',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade800),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade600),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: () => _fetchCommits(),
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Riprova'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF174A7E),
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmpty() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.source_rounded, size: 64, color: Colors.grey.shade400),
-            const SizedBox(height: 16),
-            Text(
-              'Nessun commit trovato',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 
 class _CommitCard extends StatelessWidget {
   final Map<String, dynamic> commit;
+  final ThemeData theme;
+  final bool isDark;
 
-  const _CommitCard({required this.commit});
+  const _CommitCard({
+    required this.commit,
+    required this.theme,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final commitData = commit['commit'] as Map<String, dynamic>;
-    final author = commitData['author'] as Map<String, dynamic>;
-    final committer = commitData['committer'] as Map<String, dynamic>;
-    final message = commitData['message'] as String? ?? 'Nessun messaggio';
-    final date = committer['date'] as String? ?? author['date'] as String?;
+    final colorScheme = theme.colorScheme;
     final sha = commit['sha'] as String? ?? '';
+    final message = commit['commit']?['message'] as String? ?? 'Nessun messaggio';
+    final author = commit['commit']?['author']?['name'] as String? ?? 'Sconosciuto';
+    final dateStr = commit['commit']?['author']?['date'] as String?;
     final htmlUrl = commit['html_url'] as String? ?? '';
-    final authorName = author['name'] as String? ?? 'Sconosciuto';
-    final authorLogin = commit['author']?['login'] as String? ?? '';
-    final authorAvatar = commit['author']?['avatar_url'] as String? ?? '';
 
     final shortSha = sha.length >= 7 ? sha.substring(0, 7) : sha;
-    final firstLine = message.split('\n').first;
-    final remainingLines = message.split('\n').skip(1).join('\n');
-
-    final formattedDate = date != null
-        ? DateFormat('dd MMM yyyy, HH:mm', 'it_IT').format(DateTime.parse(date).toLocal())
+    final date = dateStr != null
+        ? DateFormat('dd MMM yyyy HH:mm', 'it_IT').format(DateTime.parse(dateStr).toLocal())
         : 'Data sconosciuta';
+
+    final cardColor = isDark ? colorScheme.surfaceContainer : Colors.white;
+    final shadowColor = isDark
+        ? Colors.black.withValues(alpha: 0.3)
+        : Colors.black.withValues(alpha: 0.04);
+    final borderColor = isDark
+        ? colorScheme.outline.withValues(alpha: 0.2)
+        : Colors.grey.shade200;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        color: cardColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
+            color: shadowColor,
+            blurRadius: 8,
             offset: const Offset(0, 4),
           ),
         ],
       ),
       child: InkWell(
-        onTap: htmlUrl.isNotEmpty
-            ? () => context.push('/webview', extra: {'url': htmlUrl})
-            : null,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
+        onTap: htmlUrl.isNotEmpty ? () => context.push('/webview', extra: {'url': htmlUrl}) : null,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -262,95 +293,60 @@ class _CommitCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  if (authorAvatar.isNotEmpty)
-                    CircleAvatar(
-                      radius: 18,
-                      backgroundImage: NetworkImage(authorAvatar),
-                      backgroundColor: Colors.grey.shade200,
-                    )
-                  else
-                    CircleAvatar(
-                      radius: 18,
-                      backgroundColor: const Color(0xFF174A7E).withValues(alpha: 0.1),
-                      child: Text(
-                        authorName.isNotEmpty ? authorName[0].toUpperCase() : '?',
-                        style: const TextStyle(
-                          color: Color(0xFF174A7E),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          authorLogin.isNotEmpty ? '@$authorLogin' : authorName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                            color: Color(0xFF174A7E),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          formattedDate,
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                        ),
-                      ],
-                    ),
-                  ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
+                      color: colorScheme.primaryContainer,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       shortSha,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF174A7E),
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onPrimaryContainer,
                       ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      message.split('\n').first,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurface,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Text(
-                firstLine,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade800,
-                  height: 1.4,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              if (remainingLines.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Text(
-                    remainingLines,
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(Icons.person_outline_rounded, size: 14, color: isDark ? Colors.grey.shade500 : Colors.grey.shade600),
+                  const SizedBox(width: 6),
+                  Text(
+                    author,
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey.shade700,
-                      height: 1.5,
-                      fontFamily: 'monospace',
+                      color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 16),
+                  Icon(Icons.access_time_rounded, size: 14, color: isDark ? Colors.grey.shade500 : Colors.grey.shade600),
+                  const SizedBox(width: 6),
+                  Text(
+                    date,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
               if (htmlUrl.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Align(
@@ -358,12 +354,11 @@ class _CommitCard extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: () => context.push('/webview', extra: {'url': htmlUrl}),
                     icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                    label: const Text('Visualizza su GitHub'),
+                    label: const Text('Visualizza'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF174A7E),
-                      side: const BorderSide(color: Color(0xFF174A7E)),
+                      foregroundColor: colorScheme.primary,
+                      side: BorderSide(color: colorScheme.primary),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
                   ),
                 ),

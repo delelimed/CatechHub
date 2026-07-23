@@ -5,9 +5,11 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../shared/models/attachment_parent_type.dart';
 import '../../shared/models/student_model.dart';
 import '../attachments/widgets/attachments_section.dart';
+import '../classes/classes_repository.dart';
 import 'students_repository.dart';
 
 final studentsRepoProvider = Provider((ref) => StudentsRepository());
+final classesRepoProvider = Provider((ref) => ClassesRepository());
 
 /// Pagina di modifica di uno studente esistente: campi editabili per nome,
 /// cognome, genitori (con pulsanti azione telefono/WhatsApp), uscite
@@ -44,12 +46,14 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
   bool editMode = false;
   Set<String> selectedExits = {};
   String? customExitName;
+  String? tempStudentId;
 
   @override
   void initState() {
     super.initState();
 
     final s = widget.student;
+    tempStudentId = s.id;
 
     name = TextEditingController(text: s.name);
     surname = TextEditingController(text: s.surname);
@@ -75,6 +79,22 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
         selectedExits.addAll(s.autonomousExits!.split(','));
       }
     }
+  }
+
+  @override
+  void dispose() {
+    name.dispose();
+    surname.dispose();
+    motherName.dispose();
+    motherSurname.dispose();
+    fatherName.dispose();
+    fatherSurname.dispose();
+    motherPhone.dispose();
+    fatherPhone.dispose();
+    studentPhone.dispose();
+    allergies.dispose();
+    notes.dispose();
+    super.dispose();
   }
 
   // =========================
@@ -112,14 +132,16 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
+
       appBar: AppBar(
         backgroundColor: const Color(0xFF174A7E),
         foregroundColor: Colors.white,
-        title: const Text('Dettaglio ragazzo'),
+        title: const Text('Modifica ragazzo'),
         actions: [
           IconButton(
             icon: Icon(editMode ? Icons.lock_open : Icons.lock),
             onPressed: () => setState(() => editMode = !editMode),
+            tooltip: editMode ? 'Blocca modifiche' : 'Abilita modifiche',
           )
         ],
       ),
@@ -134,6 +156,9 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
 
             const SizedBox(height: 16),
 
+            /// =========================
+            /// DATI BASE
+            /// =========================
             _Section(
               title: 'Dati ragazzo',
               children: [
@@ -144,11 +169,16 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
 
             const SizedBox(height: 16),
 
+            /// =========================
+            /// GENITORI (RESPONSIVE)
+            /// =========================
             _Section(
               title: 'Genitori',
               children: isDesktop
                   ? [
                       Row(
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
                         children: [
                           Expanded(
                             child: _ParentCard(
@@ -201,6 +231,9 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
 
             const SizedBox(height: 16),
 
+            /// =========================
+            /// CONTATTI
+            /// =========================
             _Section(
               title: 'Contatti ragazzo',
               children: [
@@ -215,10 +248,13 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
 
             const SizedBox(height: 16),
 
+            /// =========================
+            /// ALLERGIE E USCITE
+            /// =========================
             _Section(
               title: 'Allergie e Uscite',
               children: [
-                _Field(allergies, 'Allergie', maxLines: 3, enabled: editMode),
+                _Field(allergies, 'Allergie', maxLines: 2, enabled: editMode),
                 const SizedBox(height: 16),
                 _EditExitsSelector(
                   selectedExits: selectedExits,
@@ -236,28 +272,39 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
 
             const SizedBox(height: 16),
 
+            /// =========================
+            /// NOTE
+            /// =========================
             _Section(
               title: 'Note',
               children: [
-                _Field(notes, 'Note', maxLines: 5, enabled: editMode),
+                _NotesField(notes, enabled: editMode),
               ],
             ),
 
             const SizedBox(height: 16),
 
+            /// =========================
+            /// ALLEGATI
+            /// =========================
             AttachmentsSection(
               parentId: widget.student.id,
               parentType: AttachmentParentType.student,
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 30),
 
+            /// =========================
+            /// SAVE
+            /// =========================
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF174A7E),
                   foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 14),
                 ),
                 onPressed: editMode
                     ? () async {
@@ -307,9 +354,284 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
   }
 }
 
-// =========================
-// EDIT EXITS SELECTOR
-// =========================
+/// =========================
+/// HEADER
+/// =========================
+class _HeaderCard extends StatelessWidget {
+  final String name;
+
+  const _HeaderCard({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.white,
+            Colors.blue.shade50.withValues(alpha: 0.5),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 10),
+          )
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.edit,
+              color: Color(0xFF174A7E), size: 30),
+          const SizedBox(width: 12),
+          Text(
+            'Modifica profilo ragazzo',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF174A7E),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// =========================
+/// SECTION
+/// =========================
+class _Section extends StatelessWidget {
+  final String title;
+  final List<Widget> children;
+
+  const _Section({
+    required this.title,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 6),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF174A7E),
+            ),
+          ),
+          const SizedBox(height: 10),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+/// =========================
+/// PARENT CARD
+/// =========================
+class _ParentCard extends StatelessWidget {
+  final String title;
+  final TextEditingController name;
+  final TextEditingController surname;
+  final TextEditingController phone;
+  final bool editMode;
+  final Function(String) onCall;
+  final Function(String) onWhatsapp;
+
+  const _ParentCard({
+    required this.title,
+    required this.name,
+    required this.surname,
+    required this.phone,
+    required this.editMode,
+    required this.onCall,
+    required this.onWhatsapp,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF174A7E),
+            ),
+          ),
+          const SizedBox(height: 8),
+          _Field(name, 'Nome', enabled: editMode, capitalizeWords: true),
+          _Field(surname, 'Cognome', enabled: editMode, capitalizeWords: true),
+          Row(
+            children: [
+              Expanded(
+                child: _Field(phone, 'Telefono', enabled: editMode, keyboardType: TextInputType.phone),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.call, color: Colors.green),
+                onPressed: () => onCall(phone.text),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chat, color: Colors.green),
+                onPressed: () => onWhatsapp(phone.text),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// =========================
+/// FIELD
+/// =========================
+class _Field extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final int maxLines;
+  final bool capitalizeWords;
+  final TextInputType? keyboardType;
+  final bool enabled;
+
+  const _Field(
+    this.controller,
+    this.label, {
+    this.maxLines = 1,
+    this.capitalizeWords = false,
+    this.keyboardType,
+    this.enabled = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: TextField(
+        controller: controller,
+        enabled: enabled,
+        maxLines: maxLines,
+        textCapitalization: capitalizeWords
+            ? TextCapitalization.words
+            : TextCapitalization.none,
+        keyboardType: keyboardType,
+        decoration: InputDecoration(
+          labelText: label,
+          filled: true,
+          fillColor: Colors.grey.shade50,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide.none,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// =========================
+/// NOTES FIELD
+/// =========================
+class _NotesField extends StatelessWidget {
+  final TextEditingController controller;
+  final bool enabled;
+
+  const _NotesField(this.controller, {this.enabled = true});
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      enabled: enabled,
+      maxLines: 5,
+      decoration: InputDecoration(
+        labelText: 'Note',
+        alignLabelWithHint: true,
+        filled: true,
+        fillColor: Colors.grey.shade50,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+}
+
+/// =========================
+/// PHONE ROW (STUDENTE)
+/// =========================
+class _PhoneRow extends StatelessWidget {
+  final TextEditingController controller;
+  final bool enabled;
+  final Function(String) onCall;
+  final Function(String) onWhatsapp;
+
+  const _PhoneRow({
+    required this.controller,
+    required this.enabled,
+    required this.onCall,
+    required this.onWhatsapp,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _Field(
+            controller,
+            'Cellulare ragazzo',
+            enabled: enabled,
+            keyboardType: TextInputType.phone,
+          ),
+        ),
+        const SizedBox(width: 8),
+        IconButton(
+          icon: const Icon(Icons.call, color: Colors.green),
+          onPressed: () => onCall(controller.text),
+        ),
+        IconButton(
+          icon: const Icon(Icons.chat, color: Colors.green),
+          onPressed: () => onWhatsapp(controller.text),
+        ),
+      ],
+    );
+  }
+}
+
+/// =========================
+/// EDIT EXITS SELECTOR
+/// =========================
 class _EditExitsSelector extends StatefulWidget {
   final Set<String> selectedExits;
   final String? customExitName;
@@ -424,8 +746,11 @@ class _EditExitsSelectorState extends State<_EditExitsSelector> {
             controller: customController,
             decoration: InputDecoration(
               labelText: 'Specifica chi accompagna',
+              filled: true,
+              fillColor: Colors.grey.shade50,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
               ),
             ),
             onChanged: (_) => _updateSelection(),
@@ -444,9 +769,9 @@ class _EditExitsSelectorState extends State<_EditExitsSelector> {
   }
 }
 
-// =========================
-// EXIT CHIP
-// =========================
+/// =========================
+/// EXIT CHIP
+/// =========================
 class _ExitChip extends StatelessWidget {
   final String label;
   final bool selected;
@@ -470,213 +795,6 @@ class _ExitChip extends StatelessWidget {
         color: selected ? Colors.white : Colors.black,
         fontWeight: FontWeight.w500,
       ),
-    );
-  }
-}
-
-// =========================
-// PHONE ROW (STUDENTE)
-// =========================
-class _PhoneRow extends StatelessWidget {
-  final TextEditingController controller;
-  final bool enabled;
-  final Function(String) onCall;
-  final Function(String) onWhatsapp;
-
-  const _PhoneRow({
-    required this.controller,
-    required this.enabled,
-    required this.onCall,
-    required this.onWhatsapp,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: TextField(
-            controller: controller,
-            enabled: enabled,
-            keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(labelText: 'Telefono'),
-          ),
-        ),
-        IconButton(
-          icon: const Icon(Icons.call),
-          onPressed: () => onCall(controller.text),
-        ),
-        IconButton(
-          icon: const Icon(Icons.chat),
-          onPressed: () => onWhatsapp(controller.text),
-        ),
-      ],
-    );
-  }
-}
-
-// =========================
-// HEADER
-// =========================
-class _HeaderCard extends StatelessWidget {
-  final String name;
-
-  const _HeaderCard({required this.name});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        name,
-        style: const TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-}
-
-// =========================
-// SECTION
-// =========================
-class _Section extends StatelessWidget {
-  final String title;
-  final List<Widget> children;
-
-  const _Section({
-    required this.title,
-    required this.children,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF174A7E),
-            ),
-          ),
-          const SizedBox(height: 10),
-          ...children,
-        ],
-      ),
-    );
-  }
-}
-
-// =========================
-// PARENT CARD
-// =========================
-class _ParentCard extends StatelessWidget {
-  final String title;
-  final TextEditingController name;
-  final TextEditingController surname;
-  final TextEditingController phone;
-  final bool editMode;
-  final Function(String) onCall;
-  final Function(String) onWhatsapp;
-
-  const _ParentCard({
-    required this.title,
-    required this.name,
-    required this.surname,
-    required this.phone,
-    required this.editMode,
-    required this.onCall,
-    required this.onWhatsapp,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title),
-
-        TextField(
-          controller: name,
-          enabled: editMode,
-          textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(labelText: 'Nome'),
-        ),
-
-        TextField(
-          controller: surname,
-          enabled: editMode,
-          textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(labelText: 'Cognome'),
-        ),
-
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: phone,
-                enabled: editMode,
-                keyboardType: TextInputType.phone,
-                decoration:
-                    const InputDecoration(labelText: 'Telefono'),
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.call),
-              onPressed: () => onCall(phone.text),
-            ),
-            IconButton(
-              icon: const Icon(Icons.chat),
-              onPressed: () => onWhatsapp(phone.text),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-// =========================
-// FIELD
-// =========================
-class _Field extends StatelessWidget {
-  final TextEditingController controller;
-  final String label;
-  final bool enabled;
-  final int maxLines;
-  final bool capitalizeWords;
-
-  const _Field(
-    this.controller,
-    this.label, {
-    this.enabled = true,
-    this.maxLines = 1,
-    this.capitalizeWords = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      enabled: enabled,
-      maxLines: maxLines,
-      textCapitalization: capitalizeWords
-          ? TextCapitalization.words
-          : TextCapitalization.none,
-      decoration: InputDecoration(labelText: label),
     );
   }
 }

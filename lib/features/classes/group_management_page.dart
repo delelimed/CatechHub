@@ -20,7 +20,7 @@ import '../../shared/models/class_model.dart';
 import '../../shared/models/student_model.dart';
 import '../students/students_repository.dart';
 import '../students/students_add_page.dart' hide classesRepoProvider;
-import '../students/edit_student_page.dart';
+import '../students/edit_student_page.dart' hide classesRepoProvider;
 import 'classes_provider.dart';
 //import 'classes_repository.dart';
 

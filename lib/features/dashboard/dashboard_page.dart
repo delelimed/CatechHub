@@ -429,6 +429,11 @@ class _QuoteSnippet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final textColor = isDark ? Colors.grey.shade300 : Colors.grey.shade800;
+    final refColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+
     return _Panel(
       padding: const EdgeInsets.all(14),
       child: Column(
@@ -439,14 +444,14 @@ class _QuoteSnippet extends StatelessWidget {
             style: TextStyle(
               fontSize: 13,
               fontStyle: FontStyle.italic,
-              color: Colors.grey.shade800,
+              color: textColor,
               height: 1.4,
             ),
           ),
           const SizedBox(height: 10),
           Text(
             quote.reference,
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            style: TextStyle(fontSize: 12, color: refColor),
           ),
         ],
       ),
@@ -515,6 +520,10 @@ class _MetricPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final labelColor = isDark ? Colors.grey.shade400 : Colors.black54;
+
     return _Panel(
       child: Row(
         children: [
@@ -522,7 +531,7 @@ class _MetricPanel extends StatelessWidget {
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
+              color: color.withValues(alpha: isDark ? 0.2 : 0.1),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(icon, color: color),
@@ -540,7 +549,7 @@ class _MetricPanel extends StatelessWidget {
                     color: color,
                   ),
                 ),
-                Text(label, style: const TextStyle(color: Colors.black54)),
+                Text(label, style: TextStyle(color: labelColor)),
               ],
             ),
           ),
@@ -561,6 +570,11 @@ class _HighAbsencePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
+    final emptyTextColor = isDark ? Colors.grey.shade400 : Colors.black54;
+
     return _Panel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -571,7 +585,7 @@ class _HighAbsencePanel extends StatelessWidget {
                 width: 46,
                 height: 46,
                 decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.08),
+                  color: Colors.red.withValues(alpha: isDark ? 0.2 : 0.08),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
@@ -580,10 +594,10 @@ class _HighAbsencePanel extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Assenze elevate',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textColor),
                 ),
               ),
             ],
@@ -592,7 +606,7 @@ class _HighAbsencePanel extends StatelessWidget {
           if (students.isEmpty)
             Text(
               'Nessun ragazzo con $threshold o pi\u00f9 assenze.',
-              style: const TextStyle(color: Colors.black54),
+              style: TextStyle(color: emptyTextColor),
             )
           else
             ...students.map(
@@ -603,7 +617,7 @@ class _HighAbsencePanel extends StatelessWidget {
                     Expanded(
                       child: Text(
                         student.name,
-                        style: const TextStyle(fontWeight: FontWeight.w500),
+                        style: TextStyle(fontWeight: FontWeight.w500, color: textColor),
                       ),
                     ),
                     _CountBadge(text: '${student.absences}', color: Colors.red),
@@ -624,6 +638,15 @@ class _PendingDocumentsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final titleColor = isDark ? const Color(0xFF4A90D9) : const Color(0xFF174A7E);
+    final textColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
+    final subTextColor = isDark ? Colors.grey.shade400 : Colors.black54;
+    final chipBg = isDark ? Colors.orange.withValues(alpha: 0.15) : Colors.orange.shade50;
+    final chipBorder = isDark ? Colors.orange.withValues(alpha: 0.3) : Colors.orange.shade100;
+    final chipTextColor = isDark ? Colors.orange.shade300 : Colors.orange.shade800;
+
     return _Panel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -634,7 +657,7 @@ class _PendingDocumentsCard extends StatelessWidget {
                 width: 46,
                 height: 46,
                 decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.1),
+                  color: Colors.orange.withValues(alpha: isDark ? 0.2 : 0.1),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
@@ -643,19 +666,19 @@ class _PendingDocumentsCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Da riconsegnare',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textColor),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 14),
           if (documents.isEmpty)
-            const Text(
+            Text(
               'Nessun documento consegnato risulta ancora da riconsegnare.',
-              style: TextStyle(color: Colors.black54),
+              style: TextStyle(color: subTextColor),
             )
           else
             ...documents.map(
@@ -669,16 +692,13 @@ class _PendingDocumentsCard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             document.title,
-                            style: const TextStyle(
-                              color: Color(0xFF174A7E),
+                            style: TextStyle(
+                              color: titleColor,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
-                        _CountBadge(
-                          text: '${document.students.length}',
-                          color: Colors.orange,
-                        ),
+                        _CountBadge(text: '${document.students.length}', color: Colors.orange),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -688,10 +708,10 @@ class _PendingDocumentsCard extends StatelessWidget {
                       children: document.students
                           .map(
                             (student) => Chip(
-                              label: Text(student),
+                              label: Text(student, style: TextStyle(color: chipTextColor, fontSize: 12)),
                               visualDensity: VisualDensity.compact,
-                              side: BorderSide(color: Colors.orange.shade100),
-                              backgroundColor: Colors.orange.shade50,
+                              side: BorderSide(color: chipBorder),
+                              backgroundColor: chipBg,
                             ),
                           )
                           .toList(),
@@ -709,6 +729,11 @@ class _PendingDocumentsCard extends StatelessWidget {
 class _QuickActionsGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final iconColor = isDark ? const Color(0xFF4A90D9) : const Color(0xFF174A7E);
+    final textColor = isDark ? const Color(0xFF4A90D9) : const Color(0xFF174A7E);
+
     final actions = [
       _ActionItem(
         title: 'Verifica Numero',
@@ -753,15 +778,15 @@ class _QuickActionsGrid extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   children: [
-                    Icon(item.icon, color: const Color(0xFF174A7E)),
+                    Icon(item.icon, color: iconColor),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         item.title,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF174A7E),
+                          color: textColor,
                         ),
                       ),
                     ),
@@ -811,15 +836,27 @@ class _Panel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    final cardColor = isDark ? colorScheme.surfaceContainer : Colors.white;
+    final borderColor = isDark
+        ? colorScheme.outline.withValues(alpha: 0.2)
+        : Colors.grey.shade200;
+    final shadowColor = isDark
+        ? Colors.black.withValues(alpha: 0.3)
+        : Colors.black.withValues(alpha: 0.03);
+
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: shadowColor,
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),

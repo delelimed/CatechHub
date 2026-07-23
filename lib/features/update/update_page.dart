@@ -331,7 +331,7 @@ class _LogoHeader extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: Image.asset(
-              'assets/images/logo_BG.png',
+              'assets/images/logo.png',
               height: 64,
               errorBuilder: (_, __, ___) => const Icon(
                 Icons.system_update_rounded,

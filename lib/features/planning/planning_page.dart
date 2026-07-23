@@ -99,18 +99,30 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                   .where((m) => m.classId == classId)
                   .toList();
 
+              // Normalizza le date a mezzanotte locale per evitare problemi di fuso orario/DST
+              // (es. incontri creati in ora legale vs ora solare)
+              DateTime _normalizeDate(DateTime dt) =>
+                  DateTime(dt.year, dt.month, dt.day);
+
               if (_showPast) {
-                meetings = meetings.where((m) => m.date.isBefore(today)).toList();
-                meetings.sort((a, b) => b.date.compareTo(a.date));
+                meetings = meetings
+                    .where((m) => _normalizeDate(m.date).isBefore(today))
+                    .toList();
+                meetings.sort((a, b) => _normalizeDate(b.date)
+                    .compareTo(_normalizeDate(a.date)));
               } else {
-                meetings = meetings.where((m) => !m.date.isBefore(today)).toList();
-                meetings.sort((a, b) => a.date.compareTo(b.date));
+                meetings = meetings
+                    .where((m) => !_normalizeDate(m.date).isBefore(today))
+                    .toList();
+                meetings.sort((a, b) => _normalizeDate(a.date)
+                    .compareTo(_normalizeDate(b.date)));
               }
 
               final groupedMeetings = <String, List<PlanningMeeting>>{};
               final monthKeys = <String>[];
               for (final m in meetings) {
-                final key = DateFormat('MMMM yyyy', 'it_IT').format(m.date);
+                final key =
+                    DateFormat('MMMM yyyy', 'it_IT').format(_normalizeDate(m.date));
                 if (!groupedMeetings.containsKey(key)) {
                   groupedMeetings[key] = [];
                   monthKeys.add(key);
@@ -256,7 +268,7 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                                       child: Column(
                                         children: [
                                           Text(
-                                            DateFormat('dd').format(m.date),
+                                            DateFormat('dd').format(_normalizeDate(m.date)),
                                             style: const TextStyle(
                                               color: Colors.white,
                                               fontSize: 17,
@@ -264,7 +276,9 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                                             ),
                                           ),
                                           Text(
-                                            DateFormat('MMM', 'it_IT').format(m.date).toUpperCase(),
+                                            DateFormat('MMM', 'it_IT')
+                                                .format(_normalizeDate(m.date))
+                                                .toUpperCase(),
                                             style: const TextStyle(
                                               color: Colors.white70,
                                               fontWeight: FontWeight.w600,

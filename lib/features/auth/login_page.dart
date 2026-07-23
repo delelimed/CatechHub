@@ -340,22 +340,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           const SizedBox(height: 12),
           _buildTextField(_groupController, 'Gruppo / Parrocchia', Icons.groups),
           const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: _handleSetupProfile,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF174A7E),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
+          ElevatedButton(
+            onPressed: _handleSetupProfile,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF174A7E),
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-              child: const Text(
-                'Crea profilo e accedi',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
+            ),
+            child: const Text(
+              'Crea profilo e accedi',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -398,24 +395,23 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           style: TextStyle(fontSize: 13, color: Colors.grey),
         ),
         const SizedBox(height: 24),
-        SizedBox(
-          width: double.infinity,
-          height: 64,
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF174A7E),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF174A7E),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
-            onPressed: isLoading ? null : _handleBiometricUnlock,
-            icon: const Icon(Icons.fingerprint, size: 28),
-            label: const Text(
-              'Accedi con impronta / volto / PIN telefono',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            minimumSize: const Size(double.infinity, 0),
+            maximumSize: const Size(double.infinity, 80),
+          ),
+          onPressed: isLoading ? null : _handleBiometricUnlock,
+          icon: const Icon(Icons.fingerprint, size: 28),
+          label: Text(
+            'Accedi con impronta / volto / PIN telefono',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
           ),
         ),
         if (isLoading) ...[

@@ -114,10 +114,25 @@ class _StudentCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final displayName = '${student.surname} ${student.name}';
-    
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
+
+    final gradientStart = isDark ? colorScheme.surfaceContainerLowest : Colors.white;
+    final gradientEnd = isDark
+        ? colorScheme.primaryContainer.withValues(alpha: 0.15)
+        : Colors.blue.shade50.withValues(alpha: 0.35);
+    final borderColor = isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.blue.shade100;
+    final shadowColor = isDark
+        ? Colors.black.withValues(alpha: 0.4)
+        : Colors.black.withValues(alpha: 0.04);
+    final titleColor = isDark ? colorScheme.onSurface : const Color(0xFF174A7E);
+    final subtitleColor = isDark ? Colors.grey.shade400 : Colors.grey.shade700;
+    final avatarColor = const Color(0xFF174A7E);
+
     // Controlla se ci sono documenti da consegnare
     final docsAsync = ref.watch(documentsStreamProvider);
-    
+
     return InkWell(
       borderRadius: BorderRadius.circular(22),
       onTap: onView,
@@ -125,16 +140,13 @@ class _StudentCard extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Colors.white,
-              Colors.blue.shade50.withValues(alpha: 0.35),
-            ],
+            colors: [gradientStart, gradientEnd],
           ),
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: Colors.blue.shade100),
+          border: Border.all(color: borderColor),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
+              color: shadowColor,
               blurRadius: 14,
               offset: const Offset(0, 8),
             ),
@@ -145,7 +157,7 @@ class _StudentCard extends ConsumerWidget {
             /// AVATAR
             CircleAvatar(
               radius: 26,
-              backgroundColor: const Color(0xFF174A7E),
+              backgroundColor: avatarColor,
               child: Text(
                 student.surname.isNotEmpty
                     ? student.surname[0]
@@ -170,10 +182,10 @@ class _StudentCard extends ConsumerWidget {
                       Expanded(
                         child: Text(
                           displayName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF174A7E),
+                            color: titleColor,
                           ),
                         ),
                       ),
@@ -183,7 +195,7 @@ class _StudentCard extends ConsumerWidget {
                         error: (_, __) => const SizedBox(),
                         data: (documents) {
                           if (documents.isEmpty) return const SizedBox();
-                          
+
                           // Controlla se questo studente ha documenti mancanti
                           return _DocumentWarningIndicator(studentId: student.id, documents: documents);
                         },
@@ -196,7 +208,7 @@ class _StudentCard extends ConsumerWidget {
                   Text(
                     'Madre: ${student.motherName} ${student.motherSurname}',
                     style: TextStyle(
-                      color: Colors.grey.shade700,
+                      color: subtitleColor,
                       fontSize: 13,
                     ),
                   ),
@@ -204,7 +216,7 @@ class _StudentCard extends ConsumerWidget {
                   Text(
                     'Padre: ${student.fatherName} ${student.fatherSurname}',
                     style: TextStyle(
-                      color: Colors.grey.shade700,
+                      color: subtitleColor,
                       fontSize: 13,
                     ),
                   ),
@@ -275,11 +287,11 @@ class _DocumentWarningIndicator extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     int missingDocs = 0;
-    
+
     for (final doc in documents) {
       final docId = doc['id'].toString();
       final deliveriesAsync = ref.watch(documentDeliveriesProvider(docId));
-      
+
       deliveriesAsync.when(
         loading: () {},
         error: (_, __) {},
@@ -291,13 +303,19 @@ class _DocumentWarningIndicator extends ConsumerWidget {
         },
       );
     }
-    
+
     if (missingDocs == 0) return const SizedBox();
-    
+
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final bgColor = isDark ? Colors.orange.shade900.withValues(alpha: 0.3) : Colors.orange.shade100;
+    final iconColor = isDark ? Colors.orange.shade300 : Colors.orange.shade800;
+    final textColor = isDark ? Colors.orange.shade300 : Colors.orange.shade800;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.orange.shade100,
+        color: bgColor,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -305,14 +323,14 @@ class _DocumentWarningIndicator extends ConsumerWidget {
         children: [
           Icon(
             Icons.warning_rounded,
-            color: Colors.orange.shade800,
+            color: iconColor,
             size: 16,
           ),
           const SizedBox(width: 4),
           Text(
             '$missingDocs ${missingDocs == 1 ? "doc" : "doc"}',
             style: TextStyle(
-              color: Colors.orange.shade800,
+              color: textColor,
               fontSize: 11,
               fontWeight: FontWeight.bold,
             ),
@@ -329,6 +347,11 @@ class _DocumentWarningIndicator extends ConsumerWidget {
 class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final iconColor = isDark ? Colors.grey.shade600 : Colors.grey.shade400;
+    final textColor = isDark ? Colors.grey.shade500 : Colors.grey.shade600;
+
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -336,13 +359,13 @@ class _EmptyState extends StatelessWidget {
           Icon(
             Icons.people_outline,
             size: 70,
-            color: Colors.grey.shade400,
+            color: iconColor,
           ),
           const SizedBox(height: 12),
           Text(
             'Nessun ragazzo presente',
             style: TextStyle(
-              color: Colors.grey.shade600,
+              color: textColor,
               fontSize: 16,
             ),
           ),

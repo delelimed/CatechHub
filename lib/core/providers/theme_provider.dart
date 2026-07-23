@@ -259,21 +259,21 @@ final darkThemeProvider = Provider<ThemeData>((ref) {
       primary: primaryColor,
       secondary: secondaryColor,
       tertiary: accentColor,
-      surface: const Color(0xFF1E2A38),
+      surface: const Color(0xFF121212),
       error: Colors.red.shade400,
       onPrimary: Colors.white,
       onSecondary: Colors.white,
       onSurface: const Color(0xFFE8EDF2),
       onError: Colors.white,
-      surfaceContainerHighest: const Color(0xFF253342),
-      surfaceContainerHigh: const Color(0xFF22303E),
-      surfaceContainer: const Color(0xFF1F2C3A),
-      surfaceContainerLow: const Color(0xFF1B2733),
-      surfaceContainerLowest: const Color(0xFF121A24),
+      surfaceContainerHighest: const Color(0xFF1E1E1E),
+      surfaceContainerHigh: const Color(0xFF1A1A1A),
+      surfaceContainer: const Color(0xFF171717),
+      surfaceContainerLow: const Color(0xFF121212),
+      surfaceContainerLowest: const Color(0xFF0A0A0A),
     ),
-    scaffoldBackgroundColor: const Color(0xFF121A24),
+    scaffoldBackgroundColor: const Color(0xFF000000),
     appBarTheme: const AppBarTheme(
-      backgroundColor: Color(0xFF1E2A38),
+      backgroundColor: Color(0xFF121212),
       foregroundColor: Colors.white,
       elevation: 0,
       centerTitle: false,
@@ -285,9 +285,9 @@ final darkThemeProvider = Provider<ThemeData>((ref) {
       ),
     ),
     cardTheme: CardThemeData(
-      color: const Color(0xFF1E2A38),
+      color: const Color(0xFF121212),
       elevation: 4,
-      shadowColor: Colors.black.withValues(alpha: 0.3),
+      shadowColor: Colors.black.withValues(alpha: 0.5),
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -331,15 +331,15 @@ final darkThemeProvider = Provider<ThemeData>((ref) {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: const Color(0xFF1E2A38),
+      fillColor: const Color(0xFF1E1E1E),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade700),
+        borderSide: BorderSide(color: Colors.grey.shade800),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade700),
+        borderSide: BorderSide(color: Colors.grey.shade800),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -353,7 +353,7 @@ final darkThemeProvider = Provider<ThemeData>((ref) {
       hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
     ),
     dividerTheme: DividerThemeData(
-      color: Colors.grey.shade800,
+      color: Colors.grey.shade900,
       thickness: 1,
       space: 1,
     ),
@@ -366,14 +366,14 @@ final darkThemeProvider = Provider<ThemeData>((ref) {
       side: BorderSide(color: primaryColor.withValues(alpha: 0.3)),
     ),
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-      backgroundColor: Color(0xFF1E2A38),
+      backgroundColor: Color(0xFF121212),
       selectedItemColor: primaryColor,
       unselectedItemColor: Colors.grey,
       type: BottomNavigationBarType.fixed,
       elevation: 8,
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: const Color(0xFF1E2A38),
+      backgroundColor: const Color(0xFF121212),
       indicatorColor: primaryColor.withValues(alpha: 0.16),
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) {
@@ -397,7 +397,7 @@ final darkThemeProvider = Provider<ThemeData>((ref) {
       }),
     ),
     dialogTheme: DialogThemeData(
-      backgroundColor: const Color(0xFF1E2A38),
+      backgroundColor: const Color(0xFF121212),
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       titleTextStyle: const TextStyle(
@@ -408,16 +408,16 @@ final darkThemeProvider = Provider<ThemeData>((ref) {
       contentTextStyle: TextStyle(fontSize: 14, color: Colors.grey.shade300),
     ),
     snackBarTheme: SnackBarThemeData(
-      backgroundColor: const Color(0xFFE8EDF2),
-      contentTextStyle: const TextStyle(color: Color(0xFF1A1A1A), fontSize: 14),
+      backgroundColor: const Color(0xFF1E1E1E),
+      contentTextStyle: const TextStyle(color: Color(0xFFE8EDF2), fontSize: 14),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       behavior: SnackBarBehavior.floating,
       elevation: 6,
     ),
     progressIndicatorTheme: const ProgressIndicatorThemeData(
       color: primaryColor,
-      linearTrackColor: Color(0xFF2A3A4A),
-      circularTrackColor: Color(0xFF2A3A4A),
+      linearTrackColor: Color(0xFF1E1E1E),
+      circularTrackColor: Color(0xFF1E1E1E),
     ),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith((states) {
@@ -430,7 +430,7 @@ final darkThemeProvider = Provider<ThemeData>((ref) {
         if (states.contains(WidgetState.selected)) {
           return primaryColor.withValues(alpha: 0.4);
         }
-        return Colors.grey.shade700;
+        return Colors.grey.shade800;
       }),
     ),
     checkboxTheme: CheckboxThemeData(
@@ -441,7 +441,7 @@ final darkThemeProvider = Provider<ThemeData>((ref) {
         return Colors.transparent;
       }),
       checkColor: WidgetStateProperty.all(Colors.white),
-      side: BorderSide(color: Colors.grey.shade600, width: 2),
+      side: BorderSide(color: Colors.grey.shade700, width: 2),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
     ),
     radioTheme: RadioThemeData(
@@ -468,7 +468,7 @@ final darkThemeProvider = Provider<ThemeData>((ref) {
       labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
       unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
     ),
-listTileTheme: ListTileThemeData(
+    listTileTheme: ListTileThemeData(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       titleTextStyle: const TextStyle(
         fontSize: 16,

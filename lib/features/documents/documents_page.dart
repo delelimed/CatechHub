@@ -160,6 +160,9 @@ class DocumentsPage extends ConsumerWidget {
                 padding: const EdgeInsets.all(12),
                 itemCount: documents.length,
                 itemBuilder: (context, index) {
+                  final theme = Theme.of(context);
+                  final isDark = theme.brightness == Brightness.dark;
+                  final colorScheme = theme.colorScheme;
                   final doc = documents[index];
                   final docId = doc['id'].toString();
                   final deliveriesAsync = ref.watch(documentDeliveriesProvider(docId));
@@ -186,11 +189,13 @@ class DocumentsPage extends ConsumerWidget {
                         padding: const EdgeInsets.only(bottom: 10),
                         child: Container(
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: isDark ? colorScheme.surfaceContainer : Colors.white,
                             borderRadius: BorderRadius.circular(14),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.04),
+                                color: isDark
+                                    ? Colors.black.withValues(alpha: 0.4)
+                                    : Colors.black.withValues(alpha: 0.04),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               )

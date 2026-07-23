@@ -87,13 +87,16 @@ class _CatechesiEditPageState extends ConsumerState<CatechesiEditPage> {
   @override
   Widget build(BuildContext context) {
     final repo = ref.read(catechesiRepositoryProvider);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: isDark ? colorScheme.surface : Colors.grey.shade50,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: const Color(0xFF174A7E),
-        foregroundColor: Colors.white,
+        backgroundColor: isDark ? colorScheme.primaryContainer : const Color(0xFF174A7E),
+        foregroundColor: isDark ? colorScheme.onPrimaryContainer : Colors.white,
         title: Text(
           widget.existing == null ? 'Nuova catechesi' : 'Modifica catechesi',
           style: const TextStyle(fontWeight: FontWeight.bold),
@@ -177,8 +180,8 @@ class _CatechesiEditPageState extends ConsumerState<CatechesiEditPage> {
               width: double.infinity,
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF174A7E),
-                  foregroundColor: Colors.white,
+                  backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                  foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(18),
@@ -252,15 +255,25 @@ class _ModernInputCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? colorScheme.surfaceContainer : Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        border: Border.all(
+          color: isDark
+              ? colorScheme.outline.withValues(alpha: 0.2)
+              : color.withValues(alpha: 0.2),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.04),
             blurRadius: 16,
             offset: const Offset(0, 8),
           )
@@ -269,7 +282,7 @@ class _ModernInputCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color),
+          Icon(icon, color: isDark ? colorScheme.primary : color),
           const SizedBox(height: 10),
           child,
         ],

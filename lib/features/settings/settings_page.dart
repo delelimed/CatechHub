@@ -19,6 +19,7 @@ import 'package:wiredash/wiredash.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/auth/auth_provider.dart';
+import '../../core/providers/theme_provider.dart';
 import '../../core/security/privacy_settings.dart';
 import '../../shared/widgets/app_scaffold.dart';
 
@@ -254,6 +255,10 @@ class SettingsPage extends ConsumerWidget {
 
               const SizedBox(height: 12),
 
+              const _ThemeSelectorItem(),
+
+              const SizedBox(height: 12),
+
               _SettingsItem(
                 icon: Icons.info_rounded,
                 title: 'Informazioni e licenze',
@@ -325,6 +330,140 @@ class SettingsPage extends ConsumerWidget {
   }
 }
 
+/// Widget per selezionare il tema dell'app (Automatico/Chiaro/Scuro)
+class _ThemeSelectorItem extends ConsumerWidget {
+  const _ThemeSelectorItem();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentTheme = ref.watch(themeNotifierProvider);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
+
+    final cardColor = isDark ? colorScheme.surfaceContainer : Colors.white;
+    final iconBgColor = isDark
+        ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+        : const Color(0xFFEAF2FF);
+    final iconColor = isDark ? colorScheme.primary : const Color(0xFF174A7E);
+    final titleColor = isDark ? colorScheme.onSurface : const Color(0xFF1A1A1A);
+    final subtitleColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+    final borderColor = isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.transparent;
+    final shadowColor = isDark
+        ? Colors.black.withValues(alpha: 0.4)
+        : Colors.black.withValues(alpha: 0.04);
+    final chevronColor = isDark ? Colors.grey.shade500 : Colors.grey.shade400;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(22),
+      onTap: () => _showThemeDialog(context, ref),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: borderColor),
+          boxShadow: [
+            BoxShadow(
+              color: shadowColor,
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: iconBgColor,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(Icons.brightness_6_rounded, color: iconColor),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Tema',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: titleColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    currentTheme.displayName,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: subtitleColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(Icons.chevron_right_rounded, color: chevronColor),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showThemeDialog(BuildContext context, WidgetRef ref) {
+    final currentTheme = ref.read(themeNotifierProvider);
+    final notifier = ref.read(themeNotifierProvider.notifier);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text(
+          'Scegli il tema',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
+        ),
+        content: RadioGroup<AppThemeMode>(
+          groupValue: currentTheme,
+          onChanged: (value) {
+            if (value != null) {
+              notifier.setThemeMode(value);
+              Navigator.pop(ctx);
+            }
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: AppThemeMode.values.map((mode) {
+              final isSelected = mode == currentTheme;
+              return RadioListTile<AppThemeMode>(
+                value: mode,
+                title: Text(
+                  mode.displayName,
+                  style: TextStyle(
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                    color: isSelected ? const Color(0xFF174A7E) : Colors.black87,
+                  ),
+                ),
+                activeColor: const Color(0xFF174A7E),
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annulla'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Etichetta in fondo alla pagina che mostra il nome dell'app e la versione
 /// ottenuta da [PackageInfo.fromPlatform].
 class _AppVersionLabel extends StatelessWidget {
@@ -363,14 +502,25 @@ class _ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
+
+    final cardColor = isDark ? colorScheme.surfaceContainer : Colors.white;
+    final shadowColor = isDark
+        ? Colors.black.withValues(alpha: 0.4)
+        : Colors.black.withValues(alpha: 0.04);
+    final nameColor = isDark ? colorScheme.onSurface : const Color(0xFF174A7E);
+    final roleColor = isDark ? colorScheme.primary : const Color(0xFF174A7E);
+
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(26),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: shadowColor,
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
@@ -397,19 +547,19 @@ class _ProfileCard extends StatelessWidget {
               children: [
                 Text(
                   name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF174A7E),
+                    color: nameColor,
                   ),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   role,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF174A7E),
+                    color: roleColor,
                   ),
                 ),
               ],
@@ -464,17 +614,34 @@ class _SettingsItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
+
+    final cardColor = isDark ? colorScheme.surfaceContainer : Colors.white;
+    final iconBgColor = isDestructive
+        ? Colors.red.withValues(alpha: isDark ? 0.2 : 0.08)
+        : color.withValues(alpha: isDark ? 0.2 : 0.10);
+    final titleColor = isDark ? colorScheme.onSurface : const Color(0xFF1A1A1A);
+    final subtitleColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+    final iconColor = isDestructive ? Colors.red : color;
+    final borderColor = isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.transparent;
+    final shadowColor = isDark
+        ? Colors.black.withValues(alpha: 0.4)
+        : Colors.black.withValues(alpha: 0.04);
+
     return InkWell(
       borderRadius: BorderRadius.circular(22),
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardColor,
           borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: borderColor),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
+              color: shadowColor,
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),
@@ -486,12 +653,10 @@ class _SettingsItem extends StatelessWidget {
               width: 46,
               height: 46,
               decoration: BoxDecoration(
-                color: isDestructive
-                    ? Colors.red.withValues(alpha: 0.08)
-                    : color.withValues(alpha: 0.10),
+                color: iconBgColor,
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(icon, color: isDestructive ? Colors.red : color),
+              child: Icon(icon, color: iconColor),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -500,10 +665,10 @@ class _SettingsItem extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A1A1A),
+                      color: titleColor,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -512,14 +677,14 @@ class _SettingsItem extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
-                      color: Colors.grey.shade600,
+                      color: subtitleColor,
                     ),
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 8),
-            Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
+            Icon(Icons.chevron_right_rounded, color: isDark ? Colors.grey.shade500 : Colors.grey.shade400),
           ],
         ),
       ),

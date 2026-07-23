@@ -34,16 +34,19 @@ class StudentContactNotesPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notesAsync = ref.watch(_studentNotesProvider(student.id));
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: isDark ? colorScheme.surface : Colors.grey.shade50,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF174A7E),
-        foregroundColor: Colors.white,
+        backgroundColor: isDark ? colorScheme.primaryContainer : const Color(0xFF174A7E),
+        foregroundColor: isDark ? colorScheme.onPrimaryContainer : Colors.white,
         title: Text('${student.surname} ${student.name}'),
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF174A7E),
+        backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
         onPressed: () => _showAddNoteDialog(context, ref),
         child: const Icon(Icons.add, color: Colors.white),
       ),
@@ -59,13 +62,13 @@ class StudentContactNotesPage extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.contact_phone_outlined,
-                        size: 64, color: Colors.grey.shade400),
+                        size: 64, color: isDark ? Colors.grey.shade600 : Colors.grey.shade400),
                     const SizedBox(height: 16),
                     Text(
                       'Nessuna nota di contatto',
                       style: TextStyle(
                         fontSize: 16,
-                        color: Colors.grey.shade600,
+                        color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -73,7 +76,7 @@ class StudentContactNotesPage extends ConsumerWidget {
                       'Premi + per aggiungere una nota',
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey.shade400,
+                        color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
                       ),
                     ),
                   ],
@@ -89,13 +92,17 @@ class StudentContactNotesPage extends ConsumerWidget {
               final note = notes[index];
               return _ContactNoteCard(
                 note: note,
+                isDark: isDark,
+                colorScheme: colorScheme,
                 onDelete: () async {
                   final confirm = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
-                      title: const Text('Elimina nota'),
-                      content: const Text(
-                          'Vuoi eliminare questa nota di contatto?'),
+                      backgroundColor: isDark ? colorScheme.surfaceContainer : null,
+                      title: Text('Elimina nota', style: TextStyle(color: isDark ? colorScheme.onSurface : null)),
+                      content: Text(
+                          'Vuoi eliminare questa nota di contatto?',
+                          style: TextStyle(color: isDark ? colorScheme.onSurface : null)),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(ctx, false),
@@ -125,14 +132,20 @@ class StudentContactNotesPage extends ConsumerWidget {
   }
 
   void _showAddNoteDialog(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      backgroundColor: isDark ? colorScheme.surface : null,
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) => _AddContactNoteSheet(
         studentId: student.id,
+        isDark: isDark,
+        colorScheme: colorScheme,
         onSave: (note) async {
           final repo = ref.read(contactNotesRepoProvider);
           await repo.addNote(note);
@@ -144,14 +157,20 @@ class StudentContactNotesPage extends ConsumerWidget {
 
   void _showEditNoteDialog(
       BuildContext context, WidgetRef ref, ContactNote note) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      backgroundColor: isDark ? colorScheme.surface : null,
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) => _EditContactNoteSheet(
         note: note,
+        isDark: isDark,
+        colorScheme: colorScheme,
         onSave: (updatedNote) async {
           final repo = ref.read(contactNotesRepoProvider);
           await repo.addNote(updatedNote);
@@ -169,11 +188,15 @@ class StudentContactNotesPage extends ConsumerWidget {
 /// pulsanti per modificare o eliminare la nota.
 class _ContactNoteCard extends StatelessWidget {
   final ContactNote note;
+  final bool isDark;
+  final ColorScheme colorScheme;
   final VoidCallback onDelete;
   final VoidCallback onEdit;
 
   const _ContactNoteCard({
     required this.note,
+    required this.isDark,
+    required this.colorScheme,
     required this.onDelete,
     required this.onEdit,
   });
@@ -209,11 +232,13 @@ class _ContactNoteCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? colorScheme.surfaceContainer : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -222,7 +247,6 @@ class _ContactNoteCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
@@ -243,13 +267,13 @@ class _ContactNoteCard extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
+                Icon(Icons.calendar_today, size: 14, color: isDark ? Colors.grey.shade500 : Colors.grey.shade600),
                 const SizedBox(width: 4),
                 Text(
                   DateFormat('dd/MM/yyyy  HH:mm').format(note.dateTime),
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey.shade600,
+                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -257,7 +281,7 @@ class _ContactNoteCard extends StatelessWidget {
                   onTap: onEdit,
                   borderRadius: BorderRadius.circular(8),
                   child: Icon(Icons.edit,
-                      size: 18, color: Colors.blue.shade300),
+                      size: 18, color: isDark ? Colors.blue.shade300 : Colors.blue.shade300),
                 ),
                 const SizedBox(width: 4),
                 InkWell(
@@ -269,12 +293,11 @@ class _ContactNoteCard extends StatelessWidget {
               ],
             ),
           ),
-          // Notes body
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text(
               note.notes,
-              style: const TextStyle(fontSize: 14, height: 1.4),
+              style: TextStyle(fontSize: 14, height: 1.4, color: isDark ? colorScheme.onSurface : null),
             ),
           ),
         ],
@@ -289,10 +312,14 @@ class _ContactNoteCard extends StatelessWidget {
 /// (de visu, WhatsApp, cellulare) e inserire il testo della nota.
 class _AddContactNoteSheet extends StatefulWidget {
   final String studentId;
+  final bool isDark;
+  final ColorScheme colorScheme;
   final Future<void> Function(ContactNote) onSave;
 
   const _AddContactNoteSheet({
     required this.studentId,
+    required this.isDark,
+    required this.colorScheme,
     required this.onSave,
   });
 
@@ -369,6 +396,9 @@ class _AddContactNoteSheetState extends State<_AddContactNoteSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    final colorScheme = widget.colorScheme;
+
     return Padding(
       padding: EdgeInsets.only(
         left: 20,
@@ -381,29 +411,27 @@ class _AddContactNoteSheetState extends State<_AddContactNoteSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Handle
             Center(
               child: Container(
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: isDark ? Colors.grey.shade600 : Colors.grey.shade300,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Nuova Nota di Contatto',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF174A7E),
+                color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
               ),
             ),
             const SizedBox(height: 20),
 
-            // Date & Time
             Row(
               children: [
                 Expanded(
@@ -414,17 +442,17 @@ class _AddContactNoteSheetState extends State<_AddContactNoteSheet> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 14),
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
+                        border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade300),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.calendar_today,
-                              size: 18, color: Color(0xFF174A7E)),
+                          Icon(Icons.calendar_today,
+                              size: 18, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
                           const SizedBox(width: 8),
                           Text(
                             DateFormat('dd/MM/yyyy').format(_selectedDate),
-                            style: const TextStyle(fontSize: 14),
+                            style: TextStyle(fontSize: 14, color: isDark ? colorScheme.onSurface : null),
                           ),
                         ],
                       ),
@@ -440,17 +468,17 @@ class _AddContactNoteSheetState extends State<_AddContactNoteSheet> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 14),
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
+                        border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade300),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.access_time,
-                              size: 18, color: Color(0xFF174A7E)),
+                          Icon(Icons.access_time,
+                              size: 18, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
                           const SizedBox(width: 8),
                           Text(
                             _selectedTime.format(context),
-                            style: const TextStyle(fontSize: 14),
+                            style: TextStyle(fontSize: 14, color: isDark ? colorScheme.onSurface : null),
                           ),
                         ],
                       ),
@@ -461,13 +489,12 @@ class _AddContactNoteSheetState extends State<_AddContactNoteSheet> {
             ),
             const SizedBox(height: 16),
 
-            // Medium selector
-            const Text(
+            Text(
               'Mezzo di comunicazione',
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
-                color: Color(0xFF174A7E),
+                color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
               ),
             ),
             const SizedBox(height: 8),
@@ -479,6 +506,8 @@ class _AddContactNoteSheetState extends State<_AddContactNoteSheet> {
                   value: 'de_visu',
                   selected: _selectedMedium == 'de_visu',
                   onTap: () => setState(() => _selectedMedium = 'de_visu'),
+                  isDark: isDark,
+                  colorScheme: colorScheme,
                 ),
                 const SizedBox(width: 8),
                 _MediumChip(
@@ -487,6 +516,8 @@ class _AddContactNoteSheetState extends State<_AddContactNoteSheet> {
                   value: 'whatsapp',
                   selected: _selectedMedium == 'whatsapp',
                   onTap: () => setState(() => _selectedMedium = 'whatsapp'),
+                  isDark: isDark,
+                  colorScheme: colorScheme,
                 ),
                 const SizedBox(width: 8),
                 _MediumChip(
@@ -495,12 +526,13 @@ class _AddContactNoteSheetState extends State<_AddContactNoteSheet> {
                   value: 'cellulare',
                   selected: _selectedMedium == 'cellulare',
                   onTap: () => setState(() => _selectedMedium = 'cellulare'),
+                  isDark: isDark,
+                  colorScheme: colorScheme,
                 ),
               ],
             ),
             const SizedBox(height: 16),
 
-            // Notes
             TextField(
               controller: _notesController,
               maxLines: 4,
@@ -515,12 +547,11 @@ class _AddContactNoteSheetState extends State<_AddContactNoteSheet> {
             ),
             const SizedBox(height: 20),
 
-            // Save button
             ElevatedButton(
               onPressed: _isSaving ? null : _save,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF174A7E),
-                foregroundColor: Colors.white,
+                backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -555,10 +586,14 @@ class _AddContactNoteSheetState extends State<_AddContactNoteSheet> {
 /// sovrascritta nel database.
 class _EditContactNoteSheet extends StatefulWidget {
   final ContactNote note;
+  final bool isDark;
+  final ColorScheme colorScheme;
   final Future<void> Function(ContactNote) onSave;
 
   const _EditContactNoteSheet({
     required this.note,
+    required this.isDark,
+    required this.colorScheme,
     required this.onSave,
   });
 
@@ -637,6 +672,9 @@ class _EditContactNoteSheetState extends State<_EditContactNoteSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    final colorScheme = widget.colorScheme;
+
     return Padding(
       padding: EdgeInsets.only(
         left: 20,
@@ -649,29 +687,27 @@ class _EditContactNoteSheetState extends State<_EditContactNoteSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Handle
             Center(
               child: Container(
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: isDark ? Colors.grey.shade600 : Colors.grey.shade300,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Modifica Nota di Contatto',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF174A7E),
+                color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
               ),
             ),
             const SizedBox(height: 20),
 
-            // Date & Time
             Row(
               children: [
                 Expanded(
@@ -682,17 +718,17 @@ class _EditContactNoteSheetState extends State<_EditContactNoteSheet> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 14),
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
+                        border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade300),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.calendar_today,
-                              size: 18, color: Color(0xFF174A7E)),
+                          Icon(Icons.calendar_today,
+                              size: 18, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
                           const SizedBox(width: 8),
                           Text(
                             DateFormat('dd/MM/yyyy').format(_selectedDate),
-                            style: const TextStyle(fontSize: 14),
+                            style: TextStyle(fontSize: 14, color: isDark ? colorScheme.onSurface : null),
                           ),
                         ],
                       ),
@@ -708,17 +744,17 @@ class _EditContactNoteSheetState extends State<_EditContactNoteSheet> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 14),
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
+                        border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade300),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.access_time,
-                              size: 18, color: Color(0xFF174A7E)),
+                          Icon(Icons.access_time,
+                              size: 18, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
                           const SizedBox(width: 8),
                           Text(
                             _selectedTime.format(context),
-                            style: const TextStyle(fontSize: 14),
+                            style: TextStyle(fontSize: 14, color: isDark ? colorScheme.onSurface : null),
                           ),
                         ],
                       ),
@@ -729,13 +765,12 @@ class _EditContactNoteSheetState extends State<_EditContactNoteSheet> {
             ),
             const SizedBox(height: 16),
 
-            // Medium selector
-            const Text(
+            Text(
               'Mezzo di comunicazione',
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
-                color: Color(0xFF174A7E),
+                color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
               ),
             ),
             const SizedBox(height: 8),
@@ -747,6 +782,8 @@ class _EditContactNoteSheetState extends State<_EditContactNoteSheet> {
                   value: 'de_visu',
                   selected: _selectedMedium == 'de_visu',
                   onTap: () => setState(() => _selectedMedium = 'de_visu'),
+                  isDark: isDark,
+                  colorScheme: colorScheme,
                 ),
                 const SizedBox(width: 8),
                 _MediumChip(
@@ -755,6 +792,8 @@ class _EditContactNoteSheetState extends State<_EditContactNoteSheet> {
                   value: 'whatsapp',
                   selected: _selectedMedium == 'whatsapp',
                   onTap: () => setState(() => _selectedMedium = 'whatsapp'),
+                  isDark: isDark,
+                  colorScheme: colorScheme,
                 ),
                 const SizedBox(width: 8),
                 _MediumChip(
@@ -763,12 +802,13 @@ class _EditContactNoteSheetState extends State<_EditContactNoteSheet> {
                   value: 'cellulare',
                   selected: _selectedMedium == 'cellulare',
                   onTap: () => setState(() => _selectedMedium = 'cellulare'),
+                  isDark: isDark,
+                  colorScheme: colorScheme,
                 ),
               ],
             ),
             const SizedBox(height: 16),
 
-            // Notes
             TextField(
               controller: _notesController,
               maxLines: 4,
@@ -783,12 +823,11 @@ class _EditContactNoteSheetState extends State<_EditContactNoteSheet> {
             ),
             const SizedBox(height: 20),
 
-            // Save button
             ElevatedButton(
               onPressed: _isSaving ? null : _save,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF174A7E),
-                foregroundColor: Colors.white,
+                backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -826,6 +865,8 @@ class _MediumChip extends StatelessWidget {
   final IconData icon;
   final String value;
   final bool selected;
+  final bool isDark;
+  final ColorScheme colorScheme;
   final VoidCallback onTap;
 
   const _MediumChip({
@@ -833,6 +874,8 @@ class _MediumChip extends StatelessWidget {
     required this.icon,
     required this.value,
     required this.selected,
+    required this.isDark,
+    required this.colorScheme,
     required this.onTap,
   });
 
@@ -846,11 +889,11 @@ class _MediumChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
             color: selected
-                ? const Color(0xFF174A7E).withValues(alpha: 0.1)
-                : Colors.grey.shade100,
+                ? (isDark ? colorScheme.primary.withValues(alpha: 0.2) : const Color(0xFF174A7E).withValues(alpha: 0.1))
+                : (isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.grey.shade100),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: selected ? const Color(0xFF174A7E) : Colors.grey.shade300,
+              color: selected ? (isDark ? colorScheme.primary : const Color(0xFF174A7E)) : (isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade300),
               width: selected ? 2 : 1,
             ),
           ),
@@ -859,8 +902,9 @@ class _MediumChip extends StatelessWidget {
               Icon(
                 icon,
                 size: 20,
-                color:
-                    selected ? const Color(0xFF174A7E) : Colors.grey.shade600,
+                color: selected
+                    ? (isDark ? colorScheme.primary : const Color(0xFF174A7E))
+                    : (isDark ? Colors.grey.shade400 : Colors.grey.shade600),
               ),
               const SizedBox(height: 4),
               Text(
@@ -868,8 +912,9 @@ class _MediumChip extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                  color:
-                      selected ? const Color(0xFF174A7E) : Colors.grey.shade600,
+                  color: selected
+                      ? (isDark ? colorScheme.primary : const Color(0xFF174A7E))
+                      : (isDark ? Colors.grey.shade400 : Colors.grey.shade600),
                 ),
               ),
             ],

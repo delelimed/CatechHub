@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════════════════════
 // login_page.dart — CatechHub (Login SOLO biometrico nativo / profilo iniziale)
-// 
+//
 // FLUSSO:
 // 1. App avviata → controlla isProfileConfigured
 // 2. Se NON configurato → Form profilo (nome, cognome, gruppo) → setupInitialProfile → sblocca
@@ -15,6 +15,7 @@
 
 import 'dart:async';
 import 'dart:math';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -22,6 +23,68 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'bible_quote.dart';
 import '../../core/auth/auth_provider.dart';
+
+/// Animated gradient background with flowing colors
+class _AnimatedGradientBackground extends StatefulWidget {
+  final Widget child;
+
+  const _AnimatedGradientBackground({required this.child});
+
+  @override
+  State<_AnimatedGradientBackground> createState() => _AnimatedGradientBackgroundState();
+}
+
+class _AnimatedGradientBackgroundState extends State<_AnimatedGradientBackground>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(seconds: 8),
+      vsync: this,
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final t = _controller.value;
+        final angle = lerpDouble(-0.3, 0.3, t)!;
+        final begin = Alignment(sin(angle * pi), -cos(angle * pi));
+        final end = Alignment(-sin(angle * pi), cos(angle * pi));
+
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: const [
+                Color(0xFF174A7E), // Dark blue
+                Color(0xFF2A6BB0), // Medium blue
+                Color(0xFF4A90D9), // Light blue
+                Color(0xFF7AB8F0), // Lighter blue
+                Color(0xFFA8D0E6), // Soft cyan
+              ],
+              stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
+              begin: begin,
+              end: end,
+              transform: GradientRotation(angle * pi / 2),
+            ),
+          ),
+          child: widget.child,
+        );
+      },
+    );
+  }
+}
 
 /// Schermata di accesso principale - SOLO autenticazione nativa dispositivo.
 class LoginPage extends ConsumerStatefulWidget {
@@ -130,14 +193,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFEAF4FF), Color(0xFFD5E8FF), Color(0xFFB9D7FF)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
+      body: _AnimatedGradientBackground(
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -214,14 +270,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   Widget _buildLoadingScreen() {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFEAF4FF), Color(0xFFD5E8FF), Color(0xFFB9D7FF)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
+      body: _AnimatedGradientBackground(
         child: SafeArea(
           child: Center(
             child: Column(
@@ -235,7 +284,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF174A7E),
+                    color: Colors.white,
                   ),
                 ),
               ],
@@ -272,9 +321,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         Text(
           'Crea il tuo profilo',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: const Color(0xFF174A7E),
-          ),
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF174A7E),
+              ),
         ),
         const SizedBox(height: 8),
         const Text(
@@ -291,42 +340,21 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           const SizedBox(height: 12),
           _buildTextField(_groupController, 'Gruppo / Parrocchia', Icons.groups),
           const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: _handleSetupProfile,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF174A7E),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              child: const Text(
-                'Crea profilo e accedi',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ElevatedButton(
+            onPressed: _handleSetupProfile,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF174A7E),
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
             ),
-          ),
-        ] else ...[
-          const SizedBox(
-            height: 150,
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 12),
-                  Text('Creazione profilo in corso...'),
-                ],
-              ),
+            child: const Text(
+              'Crea profilo e accedi',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
           ),
-        ],
-        if (_errorMessage != null) ...[
-          const SizedBox(height: 12),
-          _buildErrorMessage(_errorMessage!),
         ],
       ],
     );
@@ -336,278 +364,147 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text(
-          'Sblocca Registro',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF174A7E),
+        if (_errorMessage != null) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.red.shade200),
+            ),
+            child: Text(
+              _errorMessage!,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.red.shade700, fontSize: 14),
+            ),
           ),
+          const SizedBox(height: 16),
+        ],
+        Text(
+          'Sblocca con il tuo dispositivo',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF174A7E),
+              ),
         ),
         const SizedBox(height: 8),
-        Text(
-          'Usa l\'impronta digitale, il riconoscimento facciale '
-          'o il PIN/Pattern del tuo telefono.',
+        const Text(
+          'Usa l\'impronta digitale, il riconoscimento facciale o il PIN del telefono.',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+          style: TextStyle(fontSize: 13, color: Colors.grey),
         ),
         const SizedBox(height: 24),
-        SizedBox(
-          width: double.infinity,
-          height: 56,
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF174A7E),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF174A7E),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
-            onPressed: isLoading ? null : _handleBiometricUnlock,
-            icon: const Icon(Icons.fingerprint, size: 28),
-            label: const Text(
-              'Accedi con impronta / volto / PIN telefono',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            minimumSize: const Size(double.infinity, 0),
+            maximumSize: const Size(double.infinity, 80),
+          ),
+          onPressed: isLoading ? null : _handleBiometricUnlock,
+          icon: const Icon(Icons.fingerprint, size: 28),
+          label: Text(
+            'Accedi con impronta / volto / PIN telefono',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
           ),
         ),
-        const SizedBox(height: 16),
-        if (isLoading)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: SizedBox(
-              height: 48,
-              child: Center(
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Colors.grey.shade600,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        if (_errorMessage != null) ...[
-          const SizedBox(height: 12),
-          _buildErrorMessage(_errorMessage!),
+        if (isLoading) ...[
+          const SizedBox(height: 16),
+          const CircularProgressIndicator(strokeWidth: 3),
         ],
       ],
     );
   }
 
-  Widget _buildTextField(
-    TextEditingController controller,
-    String label,
-    IconData icon,
-  ) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: TextField(
-        controller: controller,
-        textCapitalization: TextCapitalization.words,
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: Icon(icon, color: const Color(0xFF174A7E)),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.all(16),
+  Widget _buildTextField(TextEditingController controller, String label, IconData icon) {
+    return TextField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: const Color(0xFF174A7E)),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
         ),
-      ),
-    );
-  }
-
-  Widget _buildErrorMessage(String message) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.red.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.red.shade200),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(color: Colors.red.shade700, fontSize: 13),
-            ),
-          ),
-        ],
+        filled: true,
+        fillColor: const Color(0xFF174A7E).withValues(alpha: 0.05),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       ),
     );
   }
 }
 
-/// ══════════════════════════════════════════════════════════════════════════════
-/// HARD LOCK SCREEN - Schermata BLOCCANTE non chiudibile
-///
-/// Mostrata quando il dispositivo NON ha alcun blocco schermo configurato
-/// (niente PIN, niente pattern, niente password, niente biometria).
-///
-/// L'app NON può funzionare senza sicurezza del dispositivo attiva perché:
-/// - I dati degli studenti (minori) sono sensibili
-/// - La biometria nativa richiede un lockscreen di base (KeyguardManager)
-/// - Senza lockscreen, chiunque prenda il telefono accede a tutto
-///
-/// L'utente DEVE andare in Impostazioni → Sicurezza e attivare un blocco.
-/// Non c'è pulsante "Indietro", "Annulla", "Salta". Solo "Apri Impostazioni".
-/// ══════════════════════════════════════════════════════════════════════════════
-
+/// Schermata di blocco totale - NON chiudibile, NON bypassabile
+/// Appare se il dispositivo NON ha un lockscreen sicuro attivo.
 class HardLockScreen extends StatelessWidget {
   const HardLockScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false, // IMPOSSIBILE chiudere con back button
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) {
-          // Ignora il back button - non fa nulla
-        }
-      },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.red.shade50,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.red.shade200, width: 2),
-            ),
-            child: Column(
-              children: [
-                Icon(
-                  Icons.security_rounded,
-                  size: 64,
-                  color: Colors.red.shade700,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Sicurezza Dispositivo Richiesta',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.red.shade800,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'CatechHub gestisce dati sensibili di minori (anagrafica, allergie, '
-                  'contatti genitori, presenze). Per proteggerli, l\'app richiede che '
-                  'il tuo telefono abbia un blocco schermo attivo.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: Colors.red.shade700),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.shade100),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Il tuo telefono NON ha attualmente:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: Colors.red.shade800,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      _buildMissingItem('PIN numerico'),
-                      _buildMissingItem('Pattern (disegno)'),
-                      _buildMissingItem('Password'),
-                      _buildMissingItem('Impronta digitale / Riconoscimento facciale'),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'Attiva uno di questi metodi in:\n'
-                  'Impostazioni → Sicurezza e privacy → Blocco schermo',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.red.shade700,
-                  ),
-                ),
-              ],
-            ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.red.shade50,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.red.shade200, width: 2),
           ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.shade700,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+          child: Column(
+            children: [
+              Icon(Icons.security, size: 48, color: Colors.red.shade700),
+              const SizedBox(height: 16),
+              Text(
+                'Sicurezza Dispositivo Richiesta',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red.shade800,
                 ),
-                elevation: 4,
               ),
-              onPressed: () {
-                // Apre le impostazioni di sicurezza del sistema
-                // Nota: su Android serve intent specifico, qui usiamo url_launcher generico
-                _openSecuritySettings();
-              },
-              icon: const Icon(Icons.settings_rounded, size: 28),
-              label: const Text(
-                'Apri Impostazioni Sicurezza',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              const SizedBox(height: 12),
+              Text(
+                'Per usare CatechHub devi attivare un blocco schermo sicuro '
+                '(PIN, impronta, volto) nelle impostazioni del telefono.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.red.shade700),
               ),
-            ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: () {},
+                icon: const Icon(Icons.settings, color: Colors.white),
+                label: const Text(
+                  'Apri Impostazioni Sicurezza',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red.shade700,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'L\'app non può funzionare senza blocco schermo attivo.\n'
+                'Questa misura protegge i dati dei catechisti e dei ragazzi.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Colors.red.shade500),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            'Dopo aver attivato il blocco schermo, torna qui e riprova.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
-  }
-
-  Widget _buildMissingItem(String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Icon(Icons.close_rounded, size: 16, color: Colors.red.shade400),
-          const SizedBox(width: 8),
-          Text(text, style: TextStyle(fontSize: 13, color: Colors.red.shade700)),
-        ],
-      ),
-    );
-  }
-
-  void _openSecuritySettings() {
-    // Su Android, l'intent per aprire le impostazioni di sicurezza è:
-    // Intent(Settings.ACTION_SECURITY_SETTINGS)
-    // Per ora mostriamo un messaggio; l'integrazione nativa richiede
-    // un MethodChannel o url_launcher con intent Android specifico.
-    // Implementazione completa richiederebbe platform channel.
-    debugPrint('TODO: Aprire Impostazioni Sicurezza Android via MethodChannel');
   }
 }

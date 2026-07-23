@@ -5,7 +5,7 @@
 // dell'app fornendo:
 //   - Sidebar desktop persistente (SideMenu)
 //   - Top bar con titolo contestuale e back-to-home
-//   - Body content container con sfondo bianco e ombreggiatura
+//   - Body content container con sfondo adattivo al tema
 //   - Bottom navigation bar mobile (5 voci: Home, Gruppo, Programma,
 //     Documenti, Impostazioni)
 //
@@ -99,6 +99,8 @@ class AppScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     // Breakpoint desktop: oltre 900px mostra la sidebar anziché la
     // bottom navigation. Questo breakpoint è allineato con le
@@ -114,10 +116,43 @@ class AppScaffold extends StatelessWidget {
         !['/', '/my-group', '/planning', '/documents', '/settings']
             .contains(location);
 
+    // Colori adattivi per il tema
+    final scaffoldBg = isDark
+        ? colorScheme.surfaceContainerLowest // #121A24 per AMOLED
+        : const Color(0xFFF5F8FC);
+    final topBarBg = isDark
+        ? colorScheme.surfaceContainer
+        : Colors.white;
+    final pageBodyBg = isDark
+        ? colorScheme.surfaceContainer
+        : Colors.white;
+    final navBarBg = isDark
+        ? colorScheme.surfaceContainer
+        : Colors.white;
+    final churchIconBg = isDark
+        ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+        : const Color(0xFFEAF2FF);
+    final churchIconColor = isDark
+        ? colorScheme.primary
+        : const Color(0xFF174A7E);
+    final titleColor = isDark
+        ? colorScheme.onSurface
+        : const Color(0xFF174A7E);
+    final backIconColor = isDark
+        ? colorScheme.onSurface
+        : const Color(0xFF174A7E);
+    final sidebarShadow = isDark
+        ? Colors.black.withValues(alpha: 0.4)
+        : Colors.blue.withValues(alpha: 0.15);
+    final contentShadow = isDark
+        ? Colors.black.withValues(alpha: 0.3)
+        : Colors.black.withValues(alpha: 0.04);
+    final dividerColor = isDark
+        ? colorScheme.outline.withValues(alpha: 0.2)
+        : Colors.grey.shade200;
+
     return Scaffold(
-      // Sfondo grigio chiaro: colore di base dell'intera app.
-      // Tutti i container white si stagliano su questo sfondo.
-      backgroundColor: const Color(0xFFF5F8FC),
+      backgroundColor: scaffoldBg,
       floatingActionButton: floatingActionButton,
 
       // ─── BODY: Sidebar (desktop) + Content ───────────────────────────
@@ -144,7 +179,7 @@ class AppScaffold extends StatelessWidget {
                   borderRadius: BorderRadius.circular(28),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.blue.withValues(alpha: 0.15),
+                      color: sidebarShadow,
                       blurRadius: 25,
                       offset: const Offset(0, 12),
                     ),
@@ -174,15 +209,18 @@ class AppScaffold extends StatelessWidget {
                       height: 78,
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: topBarBg,
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
+                            color: contentShadow,
                             blurRadius: 18,
                             offset: const Offset(0, 6),
                           ),
                         ],
+                        border: isDark
+                            ? Border.all(color: dividerColor, width: 1)
+                            : null,
                       ),
                       child: Row(
                         children: [
@@ -191,7 +229,7 @@ class AppScaffold extends StatelessWidget {
                               message: 'Torna alla Home',
                               child: IconButton(
                                 icon: const Icon(Icons.arrow_back_rounded),
-                                color: const Color(0xFF174A7E),
+                                color: backIconColor,
                                 onPressed: () {
                                   if (context.canPop()) {
                                     context.pop();
@@ -206,10 +244,9 @@ class AppScaffold extends StatelessWidget {
                           Expanded(
                             child: Text(
                               title,
-                              style:
-                                  theme.textTheme.headlineSmall?.copyWith(
+                              style: theme.textTheme.headlineSmall?.copyWith(
                                 fontWeight: FontWeight.bold,
-                                color: const Color(0xFF174A7E),
+                                color: titleColor,
                               ),
                             ),
                           ),
@@ -219,12 +256,12 @@ class AppScaffold extends StatelessWidget {
                             width: 44,
                             height: 44,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFEAF2FF),
+                              color: churchIconBg,
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.church_rounded,
-                              color: Color(0xFF174A7E),
+                              color: churchIconColor,
                             ),
                           ),
                         ],
@@ -234,10 +271,11 @@ class AppScaffold extends StatelessWidget {
                     const SizedBox(height: 18),
 
                     // ─── PAGE BODY ───────────────────────────────────
-                    // Contenitore bianco con bordi arrotondati e ombra
-                    // leggera. Ogni pagina dell'app viene renderizzata
-                    // qui come child. Questo contenitore garantisce:
-                    // - Sfondo bianco uniforme per tutti i contenuti
+                    // Contenitore adattivo al tema con bordi arrotondati
+                    // e ombra leggera. Ogni pagina dell'app viene
+                    // renderizzata qui come child. Questo contenitore
+                    // garantisce:
+                    // - Sfondo uniforme per tutti i contenuti
                     // - Spaziatura interna (20px) su tutti i lati
                     // - Scroll gestito dalla pagina child (ListView,
                     //   SingleChildScrollView, ecc.)
@@ -246,15 +284,18 @@ class AppScaffold extends StatelessWidget {
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: pageBodyBg,
                           borderRadius: BorderRadius.circular(28),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.04),
+                              color: contentShadow,
                               blurRadius: 20,
                               offset: const Offset(0, 8),
                             ),
                           ],
+                          border: isDark
+                              ? Border.all(color: dividerColor, width: 1)
+                              : null,
                         ),
                         child: child,
                       ),
@@ -284,15 +325,13 @@ class AppScaffold extends StatelessWidget {
                 borderRadius: BorderRadius.circular(26),
                 child: NavigationBar(
                   height: 72,
-                  backgroundColor: Colors.white,
+                  backgroundColor: navBarBg,
                   selectedIndex: currentIndex,
                   indicatorColor:
-                      const Color(0xFF174A7E).withValues(alpha: 0.15),
-
+                      theme.colorScheme.primary.withValues(alpha: 0.15),
                   onDestinationSelected: (index) {
                     context.go(_routeFromIndex(index));
                   },
-
                   destinations: const [
                     NavigationDestination(
                       icon: Icon(Icons.dashboard_rounded),

@@ -54,27 +54,36 @@ android {
     // ─────────────────────────────────────────────────────────────────────────
     // CONFIGURAZIONE FIRMA (SIGNING) - OTTIMIZZATA PER PC LOCALE & GITHUB ACTIONS
     // ─────────────────────────────────────────────────────────────────────────
-    signingConfigs {
-        create("sharedConfig") {
-            // 1. Controlla prima se siamo su GitHub Actions (leggendo le variabili d'ambiente)
-            val envKeystorePath = System.getenv("SIGNING_KEYSTORE_PATH")
+signingConfigs {
+    create("sharedConfig") {
+        val isCodespace = System.getenv("CODESPACES") == "true"
+        val envKeystorePath = System.getenv("SIGNING_KEYSTORE_PATH")
+        
+        if (isCodespace) {
+            // 1. Configurazione specifica per GitHub Codespaces
+            // Il file viene creato dal postStartCommand in questo percorso esatto
+            storeFile = file("app_release_key.jks") 
+            storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+            keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
             
-            if (envKeystorePath != null) {
-                // Configurazione per GitHub Actions
-                storeFile = file(envKeystorePath)
-                storePassword = System.getenv("SIGNING_KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
-                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
-            } else {
-                // Configurazione locale (dal tuo file local.properties)
-                val keyFile = localProperties.getProperty("keystore.file")
-                storeFile = if (keyFile != null) file(keyFile) else null
-                storePassword = localProperties.getProperty("keystore.password")
-                keyAlias = localProperties.getProperty("keystore.alias")
-                keyPassword = localProperties.getProperty("keystore.alias.password")
-            }
+        } else if (envKeystorePath != null) {
+            // 2. Configurazione per GitHub Actions
+            storeFile = file(envKeystorePath)
+            storePassword = System.getenv("SIGNING_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("SIGNING_KEY_ALIAS")
+            keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+            
+        } else {
+            // 3. Configurazione locale Windows (dal tuo file local.properties)
+            val keyFile = localProperties.getProperty("keystore.file")
+            storeFile = if (keyFile != null) file(keyFile) else null
+            storePassword = localProperties.getProperty("keystore.password")
+            keyAlias = localProperties.getProperty("keystore.alias")
+            keyPassword = localProperties.getProperty("keystore.alias.password")
         }
     }
+}
 
     buildTypes {
         debug {

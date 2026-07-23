@@ -159,6 +159,10 @@ class _VerifyNumberPageState extends ConsumerState<VerifyNumberPage> {
   /// con [_MatchCard], altrimenti mostra un messaggio di nessun risultato.
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return AppScaffold(
       title: 'Verifica Numero',
       child: SingleChildScrollView(
@@ -170,15 +174,17 @@ class _VerifyNumberPageState extends ConsumerState<VerifyNumberPage> {
               controller: _phoneController,
               isSearching: _isSearching,
               onSearch: _searchNumber,
+              isDark: isDark,
+              colorScheme: colorScheme,
             ),
             const SizedBox(height: 20),
             if (_matches.isNotEmpty) ...[
               Text(
                 'Risultati (${_matches.length})',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF174A7E),
+                  color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
                 ),
               ),
               const SizedBox(height: 12),
@@ -186,9 +192,11 @@ class _VerifyNumberPageState extends ConsumerState<VerifyNumberPage> {
                 match: match,
                 onCall: () => _callNumber(match.phone),
                 onWhatsapp: () => _whatsappNumber(match.phone),
+                isDark: isDark,
+                colorScheme: colorScheme,
               )),
             ] else if (!_isSearching && _phoneController.text.isNotEmpty)
-              _EmptyResult(),
+              _EmptyResult(isDark: isDark, colorScheme: colorScheme),
           ],
         ),
       ),
@@ -201,30 +209,31 @@ class _VerifyNumberPageState extends ConsumerState<VerifyNumberPage> {
 /// Contiene un [TextField] con tastiera telefonica e un pulsante "Cerca".
 /// Mostra un indicatore di caricamento quando la ricerca è in corso.
 class _SearchCard extends StatelessWidget {
-  /// Controller per il campo di inserimento del numero.
   final TextEditingController controller;
-
-  /// Indica se la ricerca è in corso (mostra spinner e disabilita il pulsante).
   final bool isSearching;
-
-  /// Callback invocata quando l'utente preme "Cerca".
   final VoidCallback onSearch;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
   const _SearchCard({
     required this.controller,
     required this.isSearching,
     required this.onSearch,
+    required this.isDark,
+    required this.colorScheme,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? colorScheme.surfaceContainer : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -234,12 +243,12 @@ class _SearchCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Inserisci numero di telefono',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF174A7E),
+              color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
             ),
           ),
           const SizedBox(height: 12),
@@ -258,11 +267,11 @@ class _SearchCard extends StatelessWidget {
                   : null,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey.shade300),
+                borderSide: BorderSide(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade300),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF174A7E)),
+                borderSide: BorderSide(color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
               ),
             ),
           ),
@@ -272,8 +281,8 @@ class _SearchCard extends StatelessWidget {
             child: ElevatedButton(
               onPressed: isSearching ? null : onSearch,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF174A7E),
-                foregroundColor: Colors.white,
+                backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -294,19 +303,18 @@ class _SearchCard extends StatelessWidget {
 /// di un genitore, lo studente associato. Offre due pulsanti di azione:
 /// chiamata telefonica e apertura chat WhatsApp.
 class _MatchCard extends StatelessWidget {
-  /// Dati dell'abbinamento da visualizzare.
   final PhoneMatch match;
-
-  /// Callback per avviare una chiamata al numero trovato.
   final VoidCallback onCall;
-
-  /// Callback per aprire WhatsApp con il numero trovato.
   final VoidCallback onWhatsapp;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
   const _MatchCard({
     required this.match,
     required this.onCall,
     required this.onWhatsapp,
+    required this.isDark,
+    required this.colorScheme,
   });
 
   @override
@@ -314,11 +322,13 @@ class _MatchCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? colorScheme.surfaceContainer : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -335,9 +345,9 @@ class _MatchCard extends StatelessWidget {
         ),
         title: Text(
           match.name,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.bold,
-            color: Color(0xFF174A7E),
+            color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
           ),
         ),
         subtitle: Column(
@@ -345,14 +355,14 @@ class _MatchCard extends StatelessWidget {
           children: [
             Text(
               match.phone,
-              style: const TextStyle(color: Colors.grey),
+              style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey),
             ),
             if (match.studentName != null) ...[
               const SizedBox(height: 4),
               Text(
                 'Genitore di: ${match.studentName}',
                 style: TextStyle(
-                  color: Colors.grey.shade600,
+                  color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
                   fontSize: 12,
                 ),
               ),
@@ -410,12 +420,17 @@ class _MatchCard extends StatelessWidget {
 /// Esibisce un'icona di ricerca vuota e un messaggio che invita
 /// l'operatore a provare con un numero diverso.
 class _EmptyResult extends StatelessWidget {
+  final bool isDark;
+  final ColorScheme colorScheme;
+
+  const _EmptyResult({required this.isDark, required this.colorScheme});
+
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: isDark ? colorScheme.surfaceContainer : Colors.grey.shade50,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -423,14 +438,14 @@ class _EmptyResult extends StatelessWidget {
           Icon(
             Icons.search_off_rounded,
             size: 64,
-            color: Colors.grey.shade400,
+            color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
           ),
           const SizedBox(height: 16),
           Text(
             'Nessun risultato trovato',
             style: TextStyle(
               fontSize: 16,
-              color: Colors.grey.shade700,
+              color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -439,7 +454,7 @@ class _EmptyResult extends StatelessWidget {
             'Prova con un altro numero di telefono',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey.shade500,
+              color: isDark ? Colors.grey.shade500 : Colors.grey.shade500,
             ),
           ),
         ],

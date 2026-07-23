@@ -152,10 +152,12 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Row(
       children: [
         if (icon != null) ...[
-          Icon(icon, size: 16, color: Colors.grey.shade600),
+          Icon(icon, size: 16, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
           const SizedBox(width: 6),
         ],
         Text(
@@ -164,7 +166,7 @@ class _SectionLabel extends StatelessWidget {
             fontSize: 12,
             fontWeight: FontWeight.bold,
             letterSpacing: 0.8,
-            color: Colors.grey.shade600,
+            color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
           ),
         ),
       ],
@@ -179,32 +181,43 @@ class _HeaderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.white, Colors.blue.shade50.withValues(alpha: 0.4)],
+          colors: isDark
+              ? [
+                  colorScheme.surfaceContainer,
+                  colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                ]
+              : [Colors.white, Colors.blue.shade50.withValues(alpha: 0.4)],
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.shield_rounded, color: Color(0xFF174A7E), size: 34),
-          SizedBox(width: 12),
+          Icon(Icons.shield_rounded, color: isDark ? colorScheme.primary : const Color(0xFF174A7E), size: 34),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               'I tuoi dati restano sul dispositivo',
               style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF174A7E),
+                color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
               ),
             ),
           ),
@@ -229,14 +242,20 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? colorScheme.surfaceContainer : Colors.white,
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -249,10 +268,12 @@ class _InfoCard extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: const Color(0xFF174A7E).withValues(alpha: 0.1),
+              color: isDark
+                  ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+                  : const Color(0xFF174A7E).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: const Color(0xFF174A7E), size: 22),
+            child: Icon(icon, color: isDark ? colorScheme.primary : const Color(0xFF174A7E), size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -261,9 +282,10 @@ class _InfoCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
+                    color: isDark ? colorScheme.onSurface : Colors.black87,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -271,7 +293,7 @@ class _InfoCard extends StatelessWidget {
                   content,
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.grey.shade700,
+                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
                     height: 1.45,
                   ),
                 ),
@@ -320,6 +342,8 @@ class _FreeRASPStatusCardState extends ConsumerState<_FreeRASPStatusCard>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
     final status = widget.securityStatus;
     Color statusColor;
     IconData statusIcon;
@@ -459,7 +483,7 @@ class _FreeRASPStatusCardState extends ConsumerState<_FreeRASPStatusCard>
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.7),
+              color: isDark ? colorScheme.surfaceContainer.withValues(alpha: 0.7) : Colors.white.withValues(alpha: 0.7),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: statusColor.withValues(alpha: 0.2),

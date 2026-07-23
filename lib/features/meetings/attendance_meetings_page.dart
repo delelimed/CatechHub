@@ -28,6 +28,8 @@ class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final classesAsync = ref.watch(classesStreamProvider);
     final planningRepo = ref.watch(planningRepoProvider);
 
@@ -130,16 +132,23 @@ class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage>
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
-                                colors: [
-                                  Colors.white,
-                                  Colors.blue.shade50.withValues(alpha: 0.35),
-                                ],
+                                colors: isDark
+                                    ? [
+                                        colorScheme.surfaceContainer,
+                                        colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                                      ]
+                                    : [
+                                        Colors.white,
+                                        Colors.blue.shade50.withValues(alpha: 0.35),
+                                      ],
                               ),
                               borderRadius: BorderRadius.circular(24),
-                              border: Border.all(color: Colors.blue.shade100),
+                              border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.blue.shade100),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.04),
+                                  color: isDark
+                                      ? Colors.black.withValues(alpha: 0.3)
+                                      : Colors.black.withValues(alpha: 0.04),
                                   blurRadius: 16,
                                   offset: const Offset(0, 8),
                                 ),
@@ -151,7 +160,7 @@ class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage>
                                   width: 56,
                                   padding: const EdgeInsets.symmetric(vertical: 8),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF174A7E),
+                                    color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
                                     borderRadius: BorderRadius.circular(14),
                                   ),
                                   child: Column(
@@ -187,7 +196,7 @@ class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage>
                                         m.title,
                                         style: theme.textTheme.titleMedium?.copyWith(
                                           fontWeight: FontWeight.bold,
-                                          color: const Color(0xFF174A7E),
+                                          color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
                                         ),
                                       ),
                                       if (exists) ...[
@@ -217,10 +226,10 @@ class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage>
                                     ],
                                   ),
                                 ),
-                                const Icon(
+                                Icon(
                                   Icons.arrow_forward_ios_rounded,
                                   size: 16,
-                                  color: Colors.grey,
+                                  color: isDark ? Colors.grey.shade500 : Colors.grey,
                                 ),
                               ],
                             ),
@@ -273,12 +282,15 @@ class _ToggleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFF174A7E),
+          color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
@@ -402,6 +414,9 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -412,22 +427,22 @@ class _EmptyState extends StatelessWidget {
               width: 90,
               height: 90,
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: isDark ? colorScheme.primaryContainer.withValues(alpha: 0.3) : Colors.blue.shade50,
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 42, color: const Color(0xFF174A7E)),
+              child: Icon(icon, size: 42, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
             ),
             const SizedBox(height: 20),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? colorScheme.onSurface : null),
             ),
             const SizedBox(height: 8),
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
+              style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade700, fontSize: 14),
             ),
           ],
         ),

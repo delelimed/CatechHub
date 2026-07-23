@@ -22,6 +22,10 @@ class DataShareSelectionPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return AppScaffold(
       title: 'Condivisione e backup',
       child: ListView(
@@ -30,7 +34,7 @@ class DataShareSelectionPage extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: const Color(0xFF174A7E),
+              color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
               borderRadius: BorderRadius.circular(16),
             ),
             child: const Row(
@@ -54,6 +58,8 @@ class DataShareSelectionPage extends ConsumerWidget {
             title: 'Sincronizzazione nelle vicinanze',
             subtitle: 'Associa e sincronizza con altri catechisti',
             color: Colors.teal,
+            isDark: isDark,
+            colorScheme: colorScheme,
             onTap: () => context.push('/settings/association'),
           ),
           const SizedBox(height: 16),
@@ -61,7 +67,9 @@ class DataShareSelectionPage extends ConsumerWidget {
             icon: Icons.qr_code_2_rounded,
             title: 'Condividi via QR',
             subtitle: 'Invia o ricevi dati tramite codici QR',
-            color: const Color(0xFF174A7E),
+            color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+            isDark: isDark,
+            colorScheme: colorScheme,
             onTap: () => _showQrShareOptions(context, ref),
           ),
           const SizedBox(height: 16),
@@ -70,6 +78,8 @@ class DataShareSelectionPage extends ConsumerWidget {
             title: 'Backup cifrato',
             subtitle: 'Esporta o importa file di backup cifrati',
             color: Colors.teal,
+            isDark: isDark,
+            colorScheme: colorScheme,
             onTap: () => context.push('/backup'),
           ),
         ],
@@ -78,19 +88,23 @@ class DataShareSelectionPage extends ConsumerWidget {
   }
 
   void _showQrShareOptions(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
     showModalBottomSheet<void>(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      backgroundColor: isDark ? colorScheme.surface : null,
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.upload_rounded, color: Color(0xFF174A7E)),
-              title: const Text('Invia dati'),
-              subtitle: const Text('Mostra codici QR da scansionare'),
+              leading: Icon(Icons.upload_rounded, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+              title: Text('Invia dati', style: TextStyle(color: isDark ? colorScheme.onSurface : null)),
+              subtitle: Text('Mostra codici QR da scansionare', style: TextStyle(color: isDark ? Colors.grey.shade400 : null)),
               onTap: () {
                 Navigator.pop(ctx);
                 _showDataSelectionDialog(context, ref);
@@ -98,8 +112,8 @@ class DataShareSelectionPage extends ConsumerWidget {
             ),
             ListTile(
               leading: const Icon(Icons.download_rounded, color: Colors.green),
-              title: const Text('Ricevi dati'),
-              subtitle: const Text('Scansiona codici QR per importare'),
+              title: Text('Ricevi dati', style: TextStyle(color: isDark ? colorScheme.onSurface : null)),
+              subtitle: Text('Scansiona codici QR per importare', style: TextStyle(color: isDark ? Colors.grey.shade400 : null)),
               onTap: () {
                 Navigator.pop(ctx);
                 context.push('/data-share/receive');
@@ -112,6 +126,8 @@ class DataShareSelectionPage extends ConsumerWidget {
   }
 
   void _showDataSelectionDialog(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
     bool includeAnagrafica = true;
     bool includeAgenda = true;
     bool includeProgrammazione = true;
@@ -126,17 +142,18 @@ class DataShareSelectionPage extends ConsumerWidget {
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: isDark ? colorScheme.surfaceContainer : null,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.share_rounded, color: Color(0xFF174A7E)),
-              SizedBox(width: 8),
+              Icon(Icons.share_rounded, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Seleziona dati da inviare',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? colorScheme.onSurface : null),
                 ),
               ),
             ],
@@ -144,14 +161,14 @@ class DataShareSelectionPage extends ConsumerWidget {
           content: SizedBox(
             width: double.maxFinite,
             child: _isPreparing
-                ? const Padding(
-                    padding: EdgeInsets.all(32),
+                ? Padding(
+                    padding: const EdgeInsets.all(32),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        CircularProgressIndicator(color: Color(0xFF174A7E)),
-                        SizedBox(height: 16),
-                        Text('Preparazione dati in corso...'),
+                        CircularProgressIndicator(color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+                        const SizedBox(height: 16),
+                        Text('Preparazione dati in corso...', style: TextStyle(color: isDark ? colorScheme.onSurface : null)),
                       ],
                     ),
                   )
@@ -164,6 +181,8 @@ class DataShareSelectionPage extends ConsumerWidget {
                           subtitle: 'Nomi, cognomi, contatti genitori',
                           icon: Icons.people_rounded,
                           value: includeAnagrafica,
+                          isDark: isDark,
+                          colorScheme: colorScheme,
                           onChanged: (v) => setDialogState(
                             () => includeAnagrafica = v,
                           ),
@@ -173,6 +192,8 @@ class DataShareSelectionPage extends ConsumerWidget {
                           subtitle: 'Registro presenze e assenze',
                           icon: Icons.fact_check_rounded,
                           value: includeAgenda,
+                          isDark: isDark,
+                          colorScheme: colorScheme,
                           onChanged: (v) => setDialogState(
                             () => includeAgenda = v,
                           ),
@@ -182,6 +203,8 @@ class DataShareSelectionPage extends ConsumerWidget {
                           subtitle: 'Giornate e incontri programmati',
                           icon: Icons.calendar_month_rounded,
                           value: includeProgrammazione,
+                          isDark: isDark,
+                          colorScheme: colorScheme,
                           onChanged: (v) => setDialogState(
                             () => includeProgrammazione = v,
                           ),
@@ -191,6 +214,8 @@ class DataShareSelectionPage extends ConsumerWidget {
                           subtitle: 'Certificati, autorizzazioni, consegne',
                           icon: Icons.description_rounded,
                           value: includeDocumenti,
+                          isDark: isDark,
+                          colorScheme: colorScheme,
                           onChanged: (v) => setDialogState(
                             () => includeDocumenti = v,
                           ),
@@ -200,6 +225,8 @@ class DataShareSelectionPage extends ConsumerWidget {
                           subtitle: 'Comunicazioni con le famiglie',
                           icon: Icons.contact_mail_rounded,
                           value: includeContactNotes,
+                          isDark: isDark,
+                          colorScheme: colorScheme,
                           onChanged: (v) => setDialogState(
                             () => includeContactNotes = v,
                           ),
@@ -209,6 +236,8 @@ class DataShareSelectionPage extends ConsumerWidget {
                           subtitle: 'Argomenti e contenuti delle catechesi',
                           icon: Icons.menu_book_rounded,
                           value: includeCatechesi,
+                          isDark: isDark,
+                          colorScheme: colorScheme,
                           onChanged: (v) => setDialogState(
                             () => includeCatechesi = v,
                           ),
@@ -218,6 +247,8 @@ class DataShareSelectionPage extends ConsumerWidget {
                           subtitle: 'Note e osservazioni sui ragazzi',
                           icon: Icons.note_alt_rounded,
                           value: includeAnnotazioni,
+                          isDark: isDark,
+                          colorScheme: colorScheme,
                           onChanged: (v) => setDialogState(
                             () => includeAnnotazioni = v,
                           ),
@@ -231,12 +262,12 @@ class DataShareSelectionPage extends ConsumerWidget {
               : [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Annulla'),
+                    child: Text('Annulla', style: TextStyle(color: isDark ? colorScheme.primary : null)),
                   ),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF174A7E),
-                      foregroundColor: Colors.white,
+                      backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                      foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -302,6 +333,8 @@ class _ModuleCheckbox extends StatelessWidget {
   final String subtitle;
   final IconData icon;
   final bool value;
+  final bool isDark;
+  final ColorScheme colorScheme;
   final ValueChanged<bool> onChanged;
 
   const _ModuleCheckbox({
@@ -309,6 +342,8 @@ class _ModuleCheckbox extends StatelessWidget {
     required this.subtitle,
     required this.icon,
     required this.value,
+    required this.isDark,
+    required this.colorScheme,
     required this.onChanged,
   });
 
@@ -323,11 +358,11 @@ class _ModuleCheckbox extends StatelessWidget {
           children: [
             Checkbox(
               value: value,
-              activeColor: const Color(0xFF174A7E),
+              activeColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
               onChanged: (v) => onChanged(v ?? false),
             ),
             const SizedBox(width: 8),
-            Icon(icon, color: const Color(0xFF174A7E), size: 22),
+            Icon(icon, color: isDark ? colorScheme.primary : const Color(0xFF174A7E), size: 22),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -335,16 +370,17 @@ class _ModuleCheckbox extends StatelessWidget {
                 children: [
                   Text(
                     label,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
+                      color: isDark ? colorScheme.onSurface : null,
                     ),
                   ),
                   Text(
                     subtitle,
                     style: TextStyle(
                       fontSize: 11,
-                      color: Colors.grey.shade600,
+                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                     ),
                   ),
                 ],
@@ -362,6 +398,8 @@ class _ActionCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final Color color;
+  final bool isDark;
+  final ColorScheme colorScheme;
   final VoidCallback? onTap;
 
   const _ActionCard({
@@ -369,6 +407,8 @@ class _ActionCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.color,
+    required this.isDark,
+    required this.colorScheme,
     required this.onTap,
   });
 
@@ -380,11 +420,13 @@ class _ActionCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? colorScheme.surfaceContainer : Colors.white,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.3)
+                  : Colors.black.withValues(alpha: 0.04),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),
@@ -406,13 +448,13 @@ class _ActionCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: isDark ? colorScheme.onSurface : null)),
                   const SizedBox(height: 4),
-                  Text(subtitle, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                  Text(subtitle, style: TextStyle(fontSize: 13, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600)),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
+            Icon(Icons.chevron_right_rounded, color: isDark ? Colors.grey.shade600 : Colors.grey.shade400),
           ],
         ),
       ),

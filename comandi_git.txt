@@ -21,6 +21,8 @@ git commit -m "Aggiunto supporto al database offline"
 # 7. Invia il branch su GitHub (questo lancia l'analisi statica della Action)
 git push origin feature/nome-tua-funzione
 
+----------
+
 # 8. Passa al branch develop locale
 git checkout develop
 
@@ -38,6 +40,8 @@ git branch -d feature/nome-tua-funzione
 
 # 13. Elimina il branch anche sul server di GitHub
 git push origin --delete feature/nome-tua-funzione
+
+----------
 
 # 14. Passa al branch main
 git checkout main

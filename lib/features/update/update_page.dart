@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -12,27 +13,6 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../core/services/update_service.dart';
 
-/// Pagina di aggiornamento automatico dell'app CatechREG.
-///
-/// CONTESTO PROGETTO:
-/// CateREG è distribuita come APK su GitHub Releases
-/// (https://github.com/delelimed/CatechHub/releases).
-/// Questa pagina verifica la presenza di nuove versioni e gestisce
-/// il download e l'installazione dell'APK direttamente dall'app,
-/// senza passare dal Play Store (distribuzione sideload).
-///
-/// FLUSSO:
-/// 1. All'init, chiama l'API GitHub Releases per ottenere l'ultima release.
-/// 2. Confronta la versione locale (package_info_plus) con la remota.
-/// 3. Se più recente, mostra info (versione, changelog, data pubblicazione).
-/// 4. L'utente può avviare download + verifica SHA256 + installazione.
-/// 5. Il download usa la directory esterna (o documenti come fallback)
-///    per evitare problemi con Scoped Storage su Android 11+.
-///
-/// SICUREZZA:
-/// - Verifica checksum SHA256 dell'APK prima dell'installazione.
-/// - Richiede permesso REQUEST_INSTALL_PACKAGES su Android.
-/// - Usa canale nativo (FileProvider) per installazione sicura su Android 7+.
 class UpdatePage extends ConsumerStatefulWidget {
   const UpdatePage({super.key});
 
@@ -40,26 +20,31 @@ class UpdatePage extends ConsumerStatefulWidget {
   ConsumerState<UpdatePage> createState() => _UpdatePageState();
 }
 
-class _UpdatePageState extends ConsumerState<UpdatePage> {
-  /// Info della release GitHub correntemente visualizzata.
-  /// Contiene: version, currentVersion, name, body, html_url,
-  /// apk_url, apk_digest, published_at.
+class _UpdatePageState extends ConsumerState<UpdatePage>
+    with SingleTickerProviderStateMixin {
   Map<String, dynamic>? _releaseInfo;
   bool _isLoading = true;
   bool _isDownloading = false;
   double _downloadProgress = 0;
   String? _errorMessage;
+  late AnimationController _pulseController;
 
   @override
   void initState() {
     super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
     _checkForUpdates();
   }
 
-  /// Controlla su GitHub Releases se esiste una versione più recente.
-  /// Endpoint: GET /repos/delelimed/CatechHub/releases/latest
-  /// Confronta il tag_name (es. "v1.2.3") con la versione locale.
-  /// Se trova un APK nell'asset, ne estrae URL e digest SHA256.
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
   Future<void> _checkForUpdates() async {
     setState(() {
       _isLoading = true;
@@ -82,7 +67,6 @@ class _UpdatePageState extends ConsumerState<UpdatePage> {
         final latestVersion = (data['tag_name'] as String).replaceAll('v', '');
 
         if (UpdateService.isVersionNewerStatic(currentVersion, latestVersion)) {
-          // Ottieni l'URL dell'APK
           final assets = data['assets'] as List<dynamic>;
           String? apkUrl;
           String? apkDigest;
@@ -115,6 +99,9 @@ class _UpdatePageState extends ConsumerState<UpdatePage> {
                 content: Text('Nuova versione $latestVersion disponibile!'),
                 backgroundColor: const Color(0xFF174A7E),
                 behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
             );
           }
@@ -139,25 +126,13 @@ class _UpdatePageState extends ConsumerState<UpdatePage> {
     }
   }
 
-  /// Scarica l'APK, verifica l'integrità SHA256 e avvia l'installazione.
-  ///
-/// STEP:
-/// 1. Verifica che l'URL APK e il digest SHA256 siano presenti.
-/// 2. Richiede permesso REQUEST_INSTALL_PACKAGES (Android).
-/// 3. Sceglie la directory: external storage (preferito) o documents
-///    (fallback per Android 11+ Scoped Storage).
-/// 4. Download HTTP del file + verifica checksum SHA256.
-/// 5. Simulazione progresso (la barra è puramente UI).
-/// 6. Scrittura su disco come catechhub_update.apk.
-/// 7. Installazione nativa tramite FileProvider (evita errori parsing package).
-/// 8. Pulizia vecchi APK (UpdateService.cleanupOldApks).
   Future<void> _downloadAndInstall() async {
     final apkUrl = _releaseInfo?['apk_url'] as String?;
     final apkDigest = _releaseInfo?['apk_digest'] as String?;
     if (apkUrl == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('URL APK non disponibile')));
+      ).showSnackBar(SnackBar(content: const Text('URL APK non disponibile')));
       return;
     }
 
@@ -193,7 +168,6 @@ class _UpdatePageState extends ConsumerState<UpdatePage> {
         await file.delete();
       }
 
-      // Download con streaming diretto su file per evitare OOM
       final client = http.Client();
       try {
         final request = http.Request('GET', Uri.parse(apkUrl));
@@ -219,14 +193,12 @@ class _UpdatePageState extends ConsumerState<UpdatePage> {
         }
 
         await sink.close();
-
         client.close();
 
         if (!await file.exists() || await file.length() == 0) {
           throw Exception('File scaricato vuoto o non valido');
         }
 
-        // Verifica checksum SHA256 se disponibile
         if (apkDigest != null && apkDigest.startsWith('sha256:')) {
           final bytes = await file.readAsBytes();
           final expectedDigest = apkDigest.substring('sha256:'.length);
@@ -237,7 +209,6 @@ class _UpdatePageState extends ConsumerState<UpdatePage> {
           }
         }
 
-        // Valida magic number APK (PK zip header)
         final raf = await file.open(mode: FileMode.read);
         final header = await raf.read(4);
         await raf.close();
@@ -279,67 +250,289 @@ class _UpdatePageState extends ConsumerState<UpdatePage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return AppScaffold(
       title: 'Aggiornamenti',
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: _buildContent(),
+        padding: const EdgeInsets.all(20),
+        child: _buildContent(context, isDark, colorScheme),
       ),
     );
   }
 
-  Widget _buildContent() {
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF174A7E)),
-      );
-    }
+  Widget _buildContent(BuildContext context, bool isDark, ColorScheme colorScheme) {
+    if (_isLoading) return _LoadingSkeleton();
 
     if (_errorMessage != null) {
-      final isLatestVersion = _errorMessage!.startsWith("Hai già l'ultima versione");
-      return _ErrorCard(
+      final isLatest = _errorMessage!.startsWith("Hai già l'ultima versione");
+      return _StatusCard(
         message: _errorMessage!,
-        onRetry: isLatestVersion ? null : _checkForUpdates,
-        isInfo: isLatestVersion,
+        isLatest: isLatest,
+        onRetry: isLatest ? null : _checkForUpdates,
       );
     }
 
     if (_releaseInfo == null) {
-      return const _ErrorCard(message: 'Nessun aggiornamento disponibile');
+      return _StatusCard(
+        message: 'Nessun aggiornamento disponibile',
+        isLatest: true,
+      );
     }
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _UpdateInfoCard(
+        _LogoHeader(),
+        const SizedBox(height: 24),
+        _UpdateHeroCard(
           currentVersion: _releaseInfo!['currentVersion'],
           latestVersion: _releaseInfo!['version'],
           publishedAt: _releaseInfo!['published_at'],
         ),
-        const SizedBox(height: 16),
-        _ChangelogCard(
-          title: _releaseInfo!['name'],
-          body: _releaseInfo!['body'],
-        ),
         const SizedBox(height: 20),
+        _ChangelogCard(body: _releaseInfo!['body']),
+        const SizedBox(height: 24),
         if (_isDownloading)
-          _DownloadingCard(progress: _downloadProgress)
+          _DownloadProgressCard(progress: _downloadProgress)
         else
-          _DownloadButton(onTap: _downloadAndInstall),
+          _ActionButtons(
+            onDownload: _downloadAndInstall,
+            githubUrl: _releaseInfo!['html_url'],
+          ),
       ],
     );
   }
 }
 
-/// Card con le informazioni sulla nuova versione disponibile.
-/// Mostra versione attuale, nuova versione e data di pubblicazione
-/// con sfondo gradient blu (stile CatechREG).
-class _UpdateInfoCard extends StatelessWidget {
+// =========================
+// LOGO HEADER
+// =========================
+class _LogoHeader extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF174A7E), Color(0xFF2368B1)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF174A7E).withValues(alpha: 0.25),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Image.asset(
+              'assets/images/logo.png',
+              height: 64,
+              errorBuilder: (_, __, ___) => const Icon(
+                Icons.system_update_rounded,
+                color: Colors.white,
+                size: 48,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Aggiornamenti',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Mantieni CatechHub sempre aggiornato',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.75),
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =========================
+// LOADING SKELETON
+// =========================
+class _LoadingSkeleton extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _LogoHeader(),
+        const SizedBox(height: 24),
+        _ShimmerCard(height: 180),
+        const SizedBox(height: 16),
+        _ShimmerCard(height: 260),
+      ],
+    );
+  }
+}
+
+class _ShimmerCard extends StatelessWidget {
+  final double height;
+  const _ShimmerCard({required this.height});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      height: height,
+      decoration: BoxDecoration(
+        color: isDark ? colorScheme.surfaceContainer : Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Center(
+        child: CircularProgressIndicator(color: isDark ? colorScheme.onSurface : Colors.grey.shade400),
+      ),
+    );
+  }
+}
+
+// =========================
+// STATUS CARD (latest / error)
+// =========================
+class _StatusCard extends StatelessWidget {
+  final String message;
+  final bool isLatest;
+  final VoidCallback? onRetry;
+
+  const _StatusCard({
+    required this.message,
+    required this.isLatest,
+    this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Column(
+      children: [
+        _LogoHeader(),
+        const SizedBox(height: 24),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: isDark ? colorScheme.surfaceContainer : Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.3)
+                    : Colors.black.withValues(alpha: 0.05),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: isLatest
+                        ? [const Color(0xFF4CAF50), const Color(0xFF66BB6A)]
+                        : [Colors.red.shade400, Colors.red.shade300],
+                  ),
+                ),
+                child: Icon(
+                  isLatest ? Icons.check_rounded : Icons.error_outline_rounded,
+                  color: Colors.white,
+                  size: 40,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                isLatest ? 'Tutto a posto!' : 'Qualcosa è andato storto',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                  fontSize: 14,
+                  height: 1.4,
+                ),
+              ),
+              if (onRetry != null) ...[
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: onRetry,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                      foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text(
+                      'Riprova',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// =========================
+// UPDATE HERO CARD
+// =========================
+class _UpdateHeroCard extends StatelessWidget {
   final String currentVersion;
   final String latestVersion;
   final String publishedAt;
 
-  const _UpdateInfoCard({
+  const _UpdateHeroCard({
     required this.currentVersion,
     required this.latestVersion,
     required this.publishedAt,
@@ -349,37 +542,80 @@ class _UpdateInfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF174A7E), Color(0xFF2E5A8F)],
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF174A7E),
+            const Color(0xFF2E5A8F),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: const Color(0xFF174A7E).withValues(alpha: 0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.system_update_rounded,
-                color: Colors.white,
-                size: 32,
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Nuovo aggiornamento!',
-                style: TextStyle(
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.rocket_launch_rounded,
                   color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Text(
+                  'Nuova versione disponibile!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: _VersionBadge(
+                  label: 'Versione attuale',
+                  version: currentVersion,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.arrow_forward_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              Expanded(
+                child: _VersionBadge(
+                  label: 'Nuova versione',
+                  version: latestVersion,
+                  highlighted: true,
                 ),
               ),
             ],
@@ -387,26 +623,16 @@ class _UpdateInfoCard extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              Expanded(
-                child: _VersionInfo(
-                  label: 'Versione attuale',
-                  version: currentVersion,
-                ),
-              ),
-              Container(width: 1, height: 40, color: Colors.white30),
-              Expanded(
-                child: _VersionInfo(
-                  label: 'Nuova versione',
-                  version: latestVersion,
-                  isHighlighted: true,
+              Icon(Icons.calendar_today_rounded, size: 14, color: Colors.white.withValues(alpha: 0.6)),
+              const SizedBox(width: 6),
+              Text(
+                'Pubblicata il ${_formatDate(publishedAt)}',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  fontSize: 12,
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Pubblicata: ${_formatDate(publishedAt)}',
-            style: TextStyle(color: Colors.white70, fontSize: 12),
           ),
         ],
       ),
@@ -417,66 +643,84 @@ class _UpdateInfoCard extends StatelessWidget {
     try {
       final date = DateTime.parse(dateString);
       return '${date.day}/${date.month}/${date.year}';
-    } catch (e) {
+    } catch (_) {
       return dateString;
     }
   }
 }
 
-/// Widget helper per mostrare una versione con label nella card info.
-/// Usato due volte nella _UpdateInfoCard: versione attuale e nuova.
-class _VersionInfo extends StatelessWidget {
+class _VersionBadge extends StatelessWidget {
   final String label;
   final String version;
-  final bool isHighlighted;
+  final bool highlighted;
 
-  const _VersionInfo({
+  const _VersionBadge({
     required this.label,
     required this.version,
-    this.isHighlighted = false,
+    this.highlighted = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(label, style: TextStyle(color: Colors.white70, fontSize: 12)),
-        const SizedBox(height: 4),
-        Text(
-          version,
-          style: TextStyle(
-            color: isHighlighted ? Colors.white : Colors.white70,
-            fontSize: 18,
-            fontWeight: isHighlighted ? FontWeight.bold : FontWeight.normal,
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: BoxDecoration(
+        color: highlighted
+            ? Colors.white.withValues(alpha: 0.15)
+            : Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.6),
+              fontSize: 11,
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 4),
+          Text(
+            version,
+            style: TextStyle(
+              color: highlighted ? Colors.white : Colors.white.withValues(alpha: 0.7),
+              fontSize: 22,
+              fontWeight: highlighted ? FontWeight.bold : FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-/// Card con le note di rilascio (changelog) della nuova versione.
-/// Mostra il titolo della release e il body (markdown-like) presi
-/// direttamente dall'API GitHub Releases.
+// =========================
+// CHANGELOG CARD
+// =========================
 class _ChangelogCard extends StatelessWidget {
-  final String title;
   final String body;
 
-  const _ChangelogCard({required this.title, required this.body});
+  const _ChangelogCard({required this.body});
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+    final sections = _parseChangelog(body);
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: isDark ? colorScheme.surfaceContainer : Colors.white,
+        borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -485,180 +729,369 @@ class _ChangelogCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
-                Icons.description_rounded,
-                color: const Color(0xFF174A7E),
-                size: 24,
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+                      : const Color(0xFF174A7E).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.auto_awesome_rounded,
+                  color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               Text(
-                title.isNotEmpty ? title : 'Note di rilascio',
-                style: const TextStyle(
+                'Novità di questa versione',
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF174A7E),
+                  color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            body.isNotEmpty ? body : 'Nessuna descrizione disponibile.',
-            style: TextStyle(
-              color: Colors.grey.shade700,
-              fontSize: 14,
-              height: 1.5,
-            ),
-          ),
+          const SizedBox(height: 20),
+          if (sections.isEmpty)
+            Text(
+              body.isNotEmpty ? body : 'Nessuna descrizione disponibile.',
+              style: TextStyle(
+                color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                fontSize: 14,
+                height: 1.5,
+              ),
+            )
+          else
+            ...sections.map((section) => _ChangelogSection(section: section)),
         ],
       ),
     );
   }
+
+  List<_ChangelogSectionData> _parseChangelog(String text) {
+    if (text.isEmpty) return [];
+
+    final sections = <_ChangelogSectionData>[];
+    _ChangelogSectionData? currentSection;
+    final lines = text.split('\n');
+
+    for (final line in lines) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+
+      if (trimmed.startsWith('## ')) {
+        if (currentSection != null) {
+          sections.add(currentSection);
+        }
+        currentSection = _ChangelogSectionData(
+          title: trimmed.replaceFirst('## ', ''),
+          items: [],
+        );
+      } else if (trimmed.startsWith('### ')) {
+        if (currentSection != null) {
+          sections.add(currentSection);
+        }
+        currentSection = _ChangelogSectionData(
+          title: trimmed.replaceFirst('### ', ''),
+          items: [],
+          isSub: true,
+        );
+      } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        currentSection?.items.add(trimmed.substring(2));
+      } else {
+        currentSection?.items.add(trimmed);
+      }
+    }
+
+    if (currentSection != null) {
+      sections.add(currentSection);
+    }
+
+    return sections;
+  }
 }
 
-/// Card visualizzata durante il download dell'APK.
-/// Mostra una CircularProgressIndicator e una LinearProgressIndicator
-/// con la percentuale di avanzamento (simulata).
-class _DownloadingCard extends StatelessWidget {
-  final double progress;
+class _ChangelogSectionData {
+  final String title;
+  final List<String> items;
+  final bool isSub;
 
-  const _DownloadingCard({required this.progress});
+  _ChangelogSectionData({
+    required this.title,
+    required this.items,
+    this.isSub = false,
+  });
+}
+
+class _ChangelogSection extends StatelessWidget {
+  final _ChangelogSectionData section;
+
+  const _ChangelogSection({required this.section});
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                _iconForSection(section.title),
+                size: 16,
+                color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                section.title,
+                style: TextStyle(
+                  fontSize: section.isSub ? 14 : 15,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
+                ),
+              ),
+            ],
+          ),
+          if (section.items.isNotEmpty) ...[
+            const SizedBox(height: 8),
+              ...section.items.map(
+                (item) => Padding(
+                  padding: const EdgeInsets.only(left: 24, bottom: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '•',
+                        style: TextStyle(
+                          color: isDark
+                              ? colorScheme.primary.withValues(alpha: 0.5)
+                              : const Color(0xFF174A7E).withValues(alpha: 0.5),
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          item,
+                          style: TextStyle(
+                            color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
+                            fontSize: 13,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  IconData _iconForSection(String title) {
+    final t = title.toLowerCase();
+    if (t.contains('nuov') || t.contains('aggiunt')) return Icons.add_circle_rounded;
+    if (t.contains('miglior') || t.contains('ottimiz')) return Icons.trending_up_rounded;
+    if (t.contains('bug') || t.contains('fix') || t.contains('correz')) return Icons.bug_report_rounded;
+    if (t.contains('rimoss') || t.contains('elimin')) return Icons.remove_circle_rounded;
+    if (t.contains('sicur') || t.contains('security')) return Icons.shield_rounded;
+    return Icons.circle_rounded;
+  }
+}
+
+// =========================
+// DOWNLOAD PROGRESS CARD
+// =========================
+class _DownloadProgressCard extends StatelessWidget {
+  final double progress;
+
+  const _DownloadProgressCard({required this.progress});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.blue.shade200),
+        gradient: LinearGradient(
+          colors: isDark
+              ? [
+                  colorScheme.primaryContainer.withValues(alpha: 0.3),
+                  colorScheme.surfaceContainer,
+                ]
+              : [
+                  const Color(0xFF174A7E).withValues(alpha: 0.05),
+                  Colors.blue.shade50,
+                ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: isDark
+              ? colorScheme.outline.withValues(alpha: 0.2)
+              : const Color(0xFF174A7E).withValues(alpha: 0.1),
+        ),
       ),
       child: Column(
         children: [
           Row(
             children: [
               SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  value: progress,
-                  strokeWidth: 2,
-                  color: const Color(0xFF174A7E),
+                width: 44,
+                height: 44,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      value: progress,
+                      strokeWidth: 4,
+                      backgroundColor: isDark ? colorScheme.surfaceContainerHighest : Colors.grey.shade200,
+                      valueColor: AlwaysStoppedAnimation<Color>(isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+                    ),
+                    Text(
+                      '${(progress * 100).toInt()}%',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: LinearProgressIndicator(
-                  value: progress,
-                  color: const Color(0xFF174A7E),
-                  backgroundColor: Colors.blue.shade200,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Text(
-                '${(progress * 100).toInt()}%',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF174A7E),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Download in corso...',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 8,
+                        backgroundColor: isDark ? colorScheme.surfaceContainerHighest : Colors.grey.shade200,
+                        valueColor: AlwaysStoppedAnimation<Color>(isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'Download in corso...',
-            style: TextStyle(color: Colors.grey, fontSize: 12),
+          const SizedBox(height: 12),
+          Text(
+            _statusText,
+            style: TextStyle(
+              color: isDark ? Colors.grey.shade500 : Colors.grey.shade500,
+              fontSize: 12,
+            ),
           ),
         ],
       ),
     );
   }
-}
 
-/// Pulsante "Scarica e installa" che avvia il flusso di download.
-/// Stilizzato con il colore primario CatechREG (#174A7E).
-class _DownloadButton extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _DownloadButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF174A7E),
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        icon: const Icon(Icons.download_rounded),
-        label: const Text(
-          'Scarica e installa',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-      ),
-    );
+  String get _statusText {
+    if (progress < 0.3) return 'Connessione al server...';
+    if (progress < 0.7) return 'Scaricamento dati in corso...';
+    if (progress < 0.95) return 'Quasi finito...';
+    if (progress < 1.0) return 'Verifica integrità file...';
+    return 'Download completato!';
   }
 }
 
-/// Card per la visualizzazione di errori o messaggi informativi.
-/// Se [isInfo] è true, usa uno sfondo azzurro invece del rosso.
-class _ErrorCard extends StatelessWidget {
-  final String message;
-  final VoidCallback? onRetry;
-  final bool isInfo;
+// =========================
+// ACTION BUTTONS
+// =========================
+class _ActionButtons extends StatelessWidget {
+  final VoidCallback onDownload;
+  final String githubUrl;
 
-  const _ErrorCard({
-    required this.message,
-    this.onRetry,
-    this.isInfo = false,
+  const _ActionButtons({
+    required this.onDownload,
+    required this.githubUrl,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = isInfo ? Colors.blue : Colors.red;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: color.shade50,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.shade200),
-      ),
-      child: Column(
-        children: [
-          Icon(
-            isInfo ? Icons.check_circle_outline_rounded : Icons.error_outline_rounded,
-            size: 48,
-            color: color.shade400,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: TextStyle(color: color.shade800, fontSize: 14),
-          ),
-          if (onRetry != null) ...[
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Riprova'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: color.shade700,
-                foregroundColor: Colors.white,
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: onDownload,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+              foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              elevation: 4,
+              shadowColor: (isDark ? colorScheme.primary : const Color(0xFF174A7E)).withValues(alpha: 0.3),
+            ),
+            icon: const Icon(Icons.download_rounded, size: 22),
+            label: const Text(
+              'Scarica e installa',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
               ),
             ),
-          ],
-        ],
-      ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () async {
+              final uri = Uri.parse(githubUrl);
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            },
+            style: OutlinedButton.styleFrom(
+              foregroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+              side: BorderSide(color: isDark ? colorScheme.primary : const Color(0xFF174A7E), width: 1.5),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ),
+            icon: const Icon(Icons.open_in_new_rounded, size: 20),
+            label: const Text(
+              'Visualizza su GitHub',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

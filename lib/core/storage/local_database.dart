@@ -48,13 +48,13 @@ import 'package:hive_flutter/hive_flutter.dart';
 /// errore fatale. Tutti gli altri Box sono recuperabili con perdita dati
 /// limitata al singolo dominio.
 class LocalDatabase {
-  // ─────────────────────────────────────────────────────────────────────────
-  // NOMI BOX HIVE
-  // Ogni costante identifica un Box Hive su disco. I nomi sono versionati
-  // implicitamente: se si cambia struttura dati, si apre un NUOVO Box con
-  // nome diverso (es. students_box_v2) e si migrano i dati. Questo evita
-  // conflitti di TypeAdapter tra versioni dell'app.
-  // ─────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
+// NOMI BOX HIVE
+// Ogni costante identifica un Box Hive su disco. I nomi sono versionati
+// implicitamente: se si cambia struttura dati, si apre un NUOVO Box con
+// nome diverso (es. students_box_v2) e si migrano i dati. Questo evita
+// conflitti di TypeAdapter tra versioni dell'app.
+// ─────────────────────────────────────────────────────────────────────────
   static const authBox = 'registroBox';
   static const classesBox = 'classes_box';
   static const studentsBox = 'students_box';
@@ -69,9 +69,6 @@ class LocalDatabase {
   static const studentDailyNotesBox = 'student_daily_notes_box';
   static const trustedDevicesBox = 'trusted_devices_box';
 
-  static const _secureStorage = FlutterSecureStorage();
-  static const _encryptionKeyName = 'secure_database_key';
-
   static late final HiveAesCipher _cipher;
   static bool _initialized = false;
 
@@ -82,10 +79,14 @@ class LocalDatabase {
 
   /// Inizializza Hive e apre tutti i Box con cifratura AES.
   ///
+  /// ACCETTA OPZIONALMENTE un [cipher] pre-configurato (es. da SecurityManager).
+  /// Se non fornito, mantiene il comportamento legacy di generazione chiave
+  /// locale via FlutterSecureStorage (per compatibilità/test).
+  ///
   /// STRATEGIA DI RECOVERY:
   /// 1. Hive.initFlutter() viene chiamata SOLO se non e' gia' stata
   ///    invocata dal metodo main() (controlla _hiveAlreadyInitialized).
-  /// 2. La chiave di cifratura viene recuperata o generata dal SecureStorage.
+  /// 2. Se [cipher] non è fornito, recupera/genera chiave da SecureStorage.
   /// 3. Ciascuno dei 13 Box viene aperto individualmente in un try-catch.
   /// 4. Se un Box fallisce (corrotto/bloccato):
   ///    a. Il Box viene chiuso se aperto parzialmente.
@@ -96,7 +97,7 @@ class LocalDatabase {
   /// 6. L'unico Box NON opzionale e' 'authBox' (registroBox): se fallisce
   ///    dopo tutti i tentativi, l'eccezione viene propagata al chiamante
   ///    (main.dart) che mostrera' la schermata di errore fatale.
-  static Future<void> init() async {
+  static Future<void> init({HiveAesCipher? cipher}) async {
     if (_initialized) return;
 
     // ───────────────────────────────────────────────────────────────────────
@@ -115,42 +116,38 @@ class LocalDatabase {
     }
 
     // ───────────────────────────────────────────────────────────────────────
-    // STEP 2: Recupero o generazione della chiave di cifratura AES.
-    // La chiave e' memorizzata nel AndroidKeyStore (via FlutterSecureStorage).
-    // Se non esiste (primo avvio), viene generata e salvata.
-    // Se il SecureStorage e' corrotto, l'eccezione viene propagata.
+    // STEP 2: Configurazione cipher AES.
+    // Se [cipher] è fornito (es. da SecurityManager hardware-backed), lo usa.
+    // Altrimenti, fallback legacy: recupera/genera chiave da SecureStorage.
     // ───────────────────────────────────────────────────────────────────────
-    var encryptionKeyString = await _secureStorage.read(
-      key: _encryptionKeyName,
-    );
-    if (encryptionKeyString == null) {
-      final key = Hive.generateSecureKey();
-      encryptionKeyString = base64UrlEncode(key);
-      await _secureStorage.write(
-        key: _encryptionKeyName,
-        value: encryptionKeyString,
-      );
+    if (cipher != null) {
+      _cipher = cipher;
+    } else {
+      // LEGACY PATH: mantenuto per compatibilità e testing
+      const secureStorage = FlutterSecureStorage();
+      const encryptionKeyName = 'secure_database_key';
+
+      var encryptionKeyString = await secureStorage.read(key: encryptionKeyName);
+      if (encryptionKeyString == null) {
+        final key = Hive.generateSecureKey();
+        encryptionKeyString = base64UrlEncode(key);
+        await secureStorage.write(key: encryptionKeyName, value: encryptionKeyString);
+      }
+      _cipher = HiveAesCipher(base64Url.decode(encryptionKeyString));
     }
 
     // ───────────────────────────────────────────────────────────────────────
-    // STEP 3: Creazione dell'istanza cipher con la chiave recuperata.
-    // Se la chiave e' corrotta o non e' un Base64 valido, questo step
-    // lancera' un'eccezione che propaghera' fino a main.dart.
-    // ───────────────────────────────────────────────────────────────────────
-    _cipher = HiveAesCipher(base64Url.decode(encryptionKeyString));
-
-    // ───────────────────────────────────────────────────────────────────────
-    // STEP 4: Apertura ATOMICA INDIVIDUALE di ciascun Box.
+    // STEP 3: Apertura ATOMICA INDIVIDUALE di ciascun Box.
     //
     // PROBLEMA RISOLTO: il precedente Future.wait([13 box]) faceva fallire
     // TUTTI i box se UNO solo era corrotto. Ora ogni box e' indipendente.
     //
     // PROCEDURA PER OGNI BOX:
-    //   1. Tentativo di apertura con cifratura.
-    //   2. Se fallisce → chiusura tentativi parziali → eliminazione con
-    //      Hive.deleteBoxFromDisk() → riapertura vuota.
-    //   3. Se fallisce ancora → log dell'errore e continuazione.
-    //   4. Solo authBox (registroBox) propaghera' l'eccezione fatale.
+    ///   1. Tentativo di apertura con cifratura.
+    ///   2. Se fallisce → chiusura tentativi parziali → eliminazione con
+    ///      Hive.deleteBoxFromDisk() → riapertura vuota.
+    ///   3. Se fallisce ancora → log dell'errore e continuazione.
+    ///   4. Solo authBox (registroBox) propaghera' l'eccezione fatale.
     // ───────────────────────────────────────────────────────────────────────
     final boxDefinitions = <_BoxDefinition>[
       _BoxDefinition(name: authBox, isMap: false, isCritical: true),
@@ -173,7 +170,7 @@ class LocalDatabase {
     }
 
     // ───────────────────────────────────────────────────────────────────────
-    // STEP 5: Pulizia dati legacy.
+    // STEP 4: Pulizia dati legacy.
     // Rimuove il flag 'isLoggedIn' dalla sessione persistita.
     // La sessione non viene piu' memorizzata su disco per sicurezza.
     // ───────────────────────────────────────────────────────────────────────

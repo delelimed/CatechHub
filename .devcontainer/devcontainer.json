@@ -13,16 +13,12 @@
     "vscode": {
       "extensions": [
         "dart-code.flutter",
-        "dart-code.dart-code",
-        "redhat.vscode-yaml" // Aggiunta comoda per file pubspec e configurazioni
+        "dart-code.dart-code"
       ]
     }
   },
   "remoteUser": "vscode",
   
-  // Mantiene la tua installazione globale di OpenCode con permessi di root
-  "postCreateCommand": "sudo npm install -g opencode",
-
-  // Genera il .env e decodifica la chiave per la firma ad ogni avvio/riavvio del Codespace
-  "postStartCommand": "echo \"Configurazione ambiente in corso...\" && echo -e \"FREERASP_PACKAGE_NAME=$FREERASP_PACKAGE_NAME\nFREERASP_RELEASE_HASH=$FREERASP_RELEASE_HASH\nWIREDASH_API_SECRET=$WIREDASH_API_SECRET\nWIREDASH_PROJECT_ID=$WIREDASH_PROJECT_ID\" > .env && echo \"$ANDROID_KEYSTORE_BASE64\" | base64 --decode > android/app/app_release_key.jks && echo \"Tutto pronto per buildare in release!\""
+  // Installa OpenCode globalmente usando i privilegi di root del container
+  "postCreateCommand": "sudo npm install -g opencode"
 }

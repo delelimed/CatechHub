@@ -32,6 +32,9 @@ class GroupManagementPage extends ConsumerWidget {
     final classesAsync = ref.watch(classesStreamProvider);
     final studentsRepo = ref.watch(Provider((r) => StudentsRepository()));
     const uid = AuthService.localUserId;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return classesAsync.when(
       loading: () => const AppScaffold(
@@ -59,8 +62,8 @@ class GroupManagementPage extends ConsumerWidget {
         return AppScaffold(
           title: 'Gestione Gruppo',
           floatingActionButton: FloatingActionButton.extended(
-            backgroundColor: const Color(0xFF174A7E),
-            foregroundColor: Colors.white,
+            backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+            foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
             icon: const Icon(Icons.add),
             label: const Text('Nuovo ragazzo'),
             onPressed: () {
@@ -90,6 +93,8 @@ class GroupManagementPage extends ConsumerWidget {
                 classId: myClass.id,
                 studentIds: myClass.studentIds,
                 studentsRepo: studentsRepo,
+                isDark: isDark,
+                colorScheme: colorScheme,
               ),
             ],
           ),
@@ -112,15 +117,21 @@ class _GroupHeader extends ConsumerWidget {
   });
 
   void _showEditNameDialog(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
     final controller = TextEditingController(text: schoolClass.name);
 
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        backgroundColor: isDark ? colorScheme.surface : Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
-        title: const Text('Modifica nome gruppo'),
+        title: Text(
+          'Modifica nome gruppo',
+          style: TextStyle(color: isDark ? colorScheme.onSurface : Colors.black87),
+        ),
         content: TextField(
           controller: controller,
           decoration: const InputDecoration(
@@ -134,8 +145,8 @@ class _GroupHeader extends ConsumerWidget {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF174A7E),
-              foregroundColor: Colors.white,
+              backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+              foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
             ),
             onPressed: () async {
               if (controller.text.isNotEmpty) {
@@ -168,20 +179,32 @@ class _GroupHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Colors.white,
-            Colors.blue.shade50.withValues(alpha: 0.3),
-          ],
+          colors: isDark
+              ? [
+                  colorScheme.surfaceContainer,
+                  colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                ]
+              : [
+                  Colors.white,
+                  Colors.blue.shade50.withValues(alpha: 0.3),
+                ],
         ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.blue.shade100),
+        border: Border.all(
+          color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.blue.shade100,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.05),
             blurRadius: 16,
             offset: const Offset(0, 10),
           )
@@ -193,12 +216,12 @@ class _GroupHeader extends ConsumerWidget {
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              color: const Color(0xFF174A7E),
+              color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.groups_rounded,
-              color: Colors.white,
+              color: isDark ? colorScheme.onPrimary : Colors.white,
             ),
           ),
           const SizedBox(width: 16),
@@ -208,25 +231,25 @@ class _GroupHeader extends ConsumerWidget {
               children: [
                 Text(
                   schoolClass.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF174A7E),
+                    color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Tap per modificare il nome',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey,
+                    color: isDark ? Colors.grey.shade400 : Colors.grey,
                   ),
                 ),
               ],
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.edit, color: Color(0xFF174A7E)),
+            icon: Icon(Icons.edit, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
             onPressed: () => _showEditNameDialog(context, ref),
           ),
         ],
@@ -242,11 +265,15 @@ class _StudentsList extends StatelessWidget {
   final String classId;
   final List<String> studentIds;
   final StudentsRepository studentsRepo;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
   const _StudentsList({
     required this.classId,
     required this.studentIds,
     required this.studentsRepo,
+    required this.isDark,
+    required this.colorScheme,
   });
 
   @override
@@ -259,7 +286,7 @@ class _StudentsList extends StatelessWidget {
         }
 
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return _EmptyState();
+          return _EmptyState(isDark: isDark, colorScheme: colorScheme);
         }
 
         final allStudents = snapshot.data!;
@@ -268,7 +295,7 @@ class _StudentsList extends StatelessWidget {
         );
 
         if (classStudents.isEmpty) {
-          return _EmptyState();
+          return _EmptyState(isDark: isDark, colorScheme: colorScheme);
         }
 
         return Column(
@@ -282,7 +309,7 @@ class _StudentsList extends StatelessWidget {
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1,
-                  color: Colors.grey.shade600,
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                 ),
               ),
             ),
@@ -296,6 +323,8 @@ class _StudentsList extends StatelessWidget {
 
                 return _StudentCard(
                   student: student,
+                  isDark: isDark,
+                  colorScheme: colorScheme,
                   onEdit: () {
                     Navigator.push(
                       context,
@@ -321,13 +350,20 @@ class _StudentsList extends StatelessWidget {
     Student student,
     String classId,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
+        backgroundColor: isDark ? colorScheme.surface : Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
-        title: const Text('Eliminare ragazzo?'),
+        title: Text(
+          'Eliminare ragazzo?',
+          style: TextStyle(color: isDark ? colorScheme.onSurface : Colors.black87),
+        ),
         content: Text(
           'Sei sicuro di voler eliminare ${student.name} ${student.surname}?',
         ),
@@ -360,11 +396,15 @@ class _StudentCard extends StatelessWidget {
   final Student student;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
   const _StudentCard({
     required this.student,
     required this.onEdit,
     required this.onDelete,
+    required this.isDark,
+    required this.colorScheme,
   });
 
   @override
@@ -378,16 +418,25 @@ class _StudentCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Colors.white,
-              Colors.blue.shade50.withValues(alpha: 0.35),
-            ],
+            colors: isDark
+                ? [
+                    colorScheme.surfaceContainer,
+                    colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                  ]
+                : [
+                    Colors.white,
+                    Colors.blue.shade50.withValues(alpha: 0.35),
+                  ],
           ),
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: Colors.blue.shade100),
+          border: Border.all(
+            color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.blue.shade100,
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.3)
+                  : Colors.black.withValues(alpha: 0.04),
               blurRadius: 14,
               offset: const Offset(0, 8),
             ),
@@ -397,7 +446,7 @@ class _StudentCard extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 26,
-              backgroundColor: const Color(0xFF174A7E),
+              backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
               child: Text(
                 student.name.isNotEmpty ? student.name[0] : '?',
                 style: const TextStyle(
@@ -414,10 +463,10 @@ class _StudentCard extends StatelessWidget {
                 children: [
                   Text(
                     name,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF174A7E),
+                      color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
                     ),
                   ),
                 ],
@@ -466,6 +515,14 @@ class _StudentCard extends StatelessWidget {
 /// EMPTY STATE
 /// =========================
 class _EmptyState extends StatelessWidget {
+  final bool isDark;
+  final ColorScheme colorScheme;
+
+  const _EmptyState({
+    required this.isDark,
+    required this.colorScheme,
+  });
+
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -475,13 +532,13 @@ class _EmptyState extends StatelessWidget {
           Icon(
             Icons.people_outline,
             size: 70,
-            color: Colors.grey.shade400,
+            color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
           ),
           const SizedBox(height: 12),
           Text(
             'Nessun ragazzo presente',
             style: TextStyle(
-              color: Colors.grey.shade600,
+              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
               fontSize: 16,
             ),
           ),

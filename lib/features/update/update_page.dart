@@ -250,16 +250,19 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return AppScaffold(
       title: 'Aggiornamenti',
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
-        child: _buildContent(),
+        child: _buildContent(context, isDark, colorScheme),
       ),
     );
   }
 
-  Widget _buildContent() {
+  Widget _buildContent(BuildContext context, bool isDark, ColorScheme colorScheme) {
     if (_isLoading) return _LoadingSkeleton();
 
     if (_errorMessage != null) {
@@ -394,15 +397,18 @@ class _ShimmerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       width: double.infinity,
       height: height,
       decoration: BoxDecoration(
-        color: Colors.grey.shade200,
+        color: isDark ? colorScheme.surfaceContainer : Colors.grey.shade200,
         borderRadius: BorderRadius.circular(24),
       ),
       child: Center(
-        child: CircularProgressIndicator(color: Colors.grey.shade400),
+        child: CircularProgressIndicator(color: isDark ? colorScheme.onSurface : Colors.grey.shade400),
       ),
     );
   }
@@ -424,6 +430,9 @@ class _StatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Column(
       children: [
         _LogoHeader(),
@@ -432,11 +441,13 @@ class _StatusCard extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(32),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? colorScheme.surfaceContainer : Colors.white,
             borderRadius: BorderRadius.circular(28),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.3)
+                    : Colors.black.withValues(alpha: 0.05),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               ),
@@ -464,10 +475,10 @@ class _StatusCard extends StatelessWidget {
               const SizedBox(height: 20),
               Text(
                 isLatest ? 'Tutto a posto!' : 'Qualcosa è andato storto',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF174A7E),
+                  color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
                 ),
               ),
               const SizedBox(height: 8),
@@ -475,7 +486,7 @@ class _StatusCard extends StatelessWidget {
                 message,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Colors.grey.shade600,
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                   fontSize: 14,
                   height: 1.4,
                 ),
@@ -487,8 +498,8 @@ class _StatusCard extends StatelessWidget {
                   child: ElevatedButton.icon(
                     onPressed: onRetry,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF174A7E),
-                      foregroundColor: Colors.white,
+                      backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                      foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
@@ -693,17 +704,21 @@ class _ChangelogCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
     final sections = _parseChangelog(body);
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? colorScheme.surfaceContainer : Colors.white,
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.04),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -717,22 +732,24 @@ class _ChangelogCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF174A7E).withValues(alpha: 0.1),
+                  color: isDark
+                      ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+                      : const Color(0xFF174A7E).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.auto_awesome_rounded,
-                  color: Color(0xFF174A7E),
+                  color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
                   size: 20,
                 ),
               ),
               const SizedBox(width: 12),
-              const Text(
+              Text(
                 'Novità di questa versione',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF174A7E),
+                  color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
                 ),
               ),
             ],
@@ -742,7 +759,7 @@ class _ChangelogCard extends StatelessWidget {
             Text(
               body.isNotEmpty ? body : 'Nessuna descrizione disponibile.',
               style: TextStyle(
-                color: Colors.grey.shade600,
+                color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                 fontSize: 14,
                 height: 1.5,
               ),
@@ -816,6 +833,9 @@ class _ChangelogSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
@@ -826,7 +846,7 @@ class _ChangelogSection extends StatelessWidget {
               Icon(
                 _iconForSection(section.title),
                 size: 16,
-                color: const Color(0xFF174A7E),
+                color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
               ),
               const SizedBox(width: 8),
               Text(
@@ -834,41 +854,43 @@ class _ChangelogSection extends StatelessWidget {
                 style: TextStyle(
                   fontSize: section.isSub ? 14 : 15,
                   fontWeight: FontWeight.bold,
-                  color: const Color(0xFF174A7E),
+                  color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
                 ),
               ),
             ],
           ),
           if (section.items.isNotEmpty) ...[
             const SizedBox(height: 8),
-            ...section.items.map(
-              (item) => Padding(
-                padding: const EdgeInsets.only(left: 24, bottom: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '•',
-                      style: TextStyle(
-                        color: const Color(0xFF174A7E).withValues(alpha: 0.5),
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        item,
+              ...section.items.map(
+                (item) => Padding(
+                  padding: const EdgeInsets.only(left: 24, bottom: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '•',
                         style: TextStyle(
-                          color: Colors.grey.shade700,
-                          fontSize: 13,
-                          height: 1.4,
+                          color: isDark
+                              ? colorScheme.primary.withValues(alpha: 0.5)
+                              : const Color(0xFF174A7E).withValues(alpha: 0.5),
+                          fontSize: 14,
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          item,
+                          style: TextStyle(
+                            color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
+                            fontSize: 13,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
           ],
         ],
       ),
@@ -896,21 +918,31 @@ class _DownloadProgressCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            const Color(0xFF174A7E).withValues(alpha: 0.05),
-            Colors.blue.shade50,
-          ],
+          colors: isDark
+              ? [
+                  colorScheme.primaryContainer.withValues(alpha: 0.3),
+                  colorScheme.surfaceContainer,
+                ]
+              : [
+                  const Color(0xFF174A7E).withValues(alpha: 0.05),
+                  Colors.blue.shade50,
+                ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(28),
         border: Border.all(
-          color: const Color(0xFF174A7E).withValues(alpha: 0.1),
+          color: isDark
+              ? colorScheme.outline.withValues(alpha: 0.2)
+              : const Color(0xFF174A7E).withValues(alpha: 0.1),
         ),
       ),
       child: Column(
@@ -926,15 +958,15 @@ class _DownloadProgressCard extends StatelessWidget {
                     CircularProgressIndicator(
                       value: progress,
                       strokeWidth: 4,
-                      backgroundColor: Colors.grey.shade200,
-                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF174A7E)),
+                      backgroundColor: isDark ? colorScheme.surfaceContainerHighest : Colors.grey.shade200,
+                      valueColor: AlwaysStoppedAnimation<Color>(isDark ? colorScheme.primary : const Color(0xFF174A7E)),
                     ),
                     Text(
                       '${(progress * 100).toInt()}%',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF174A7E),
+                        color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
                       ),
                     ),
                   ],
@@ -945,11 +977,11 @@ class _DownloadProgressCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Download in corso...',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF174A7E),
+                        color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
                         fontSize: 15,
                       ),
                     ),
@@ -959,8 +991,8 @@ class _DownloadProgressCard extends StatelessWidget {
                       child: LinearProgressIndicator(
                         value: progress,
                         minHeight: 8,
-                        backgroundColor: Colors.grey.shade200,
-                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF174A7E)),
+                        backgroundColor: isDark ? colorScheme.surfaceContainerHighest : Colors.grey.shade200,
+                        valueColor: AlwaysStoppedAnimation<Color>(isDark ? colorScheme.primary : const Color(0xFF174A7E)),
                       ),
                     ),
                   ],
@@ -972,7 +1004,7 @@ class _DownloadProgressCard extends StatelessWidget {
           Text(
             _statusText,
             style: TextStyle(
-              color: Colors.grey.shade500,
+              color: isDark ? Colors.grey.shade500 : Colors.grey.shade500,
               fontSize: 12,
             ),
           ),
@@ -1004,6 +1036,9 @@ class _ActionButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Column(
       children: [
         SizedBox(
@@ -1011,14 +1046,14 @@ class _ActionButtons extends StatelessWidget {
           child: ElevatedButton.icon(
             onPressed: onDownload,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF174A7E),
-              foregroundColor: Colors.white,
+              backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+              foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 18),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(18),
               ),
               elevation: 4,
-              shadowColor: const Color(0xFF174A7E).withValues(alpha: 0.3),
+              shadowColor: (isDark ? colorScheme.primary : const Color(0xFF174A7E)).withValues(alpha: 0.3),
             ),
             icon: const Icon(Icons.download_rounded, size: 22),
             label: const Text(
@@ -1039,8 +1074,8 @@ class _ActionButtons extends StatelessWidget {
               await launchUrl(uri, mode: LaunchMode.externalApplication);
             },
             style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF174A7E),
-              side: const BorderSide(color: Color(0xFF174A7E), width: 1.5),
+              foregroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+              side: BorderSide(color: isDark ? colorScheme.primary : const Color(0xFF174A7E), width: 1.5),
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(18),

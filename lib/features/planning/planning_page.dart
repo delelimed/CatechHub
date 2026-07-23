@@ -51,14 +51,16 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
 
     const uid = AuthService.localUserId;
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return AppScaffold(
       title: 'Programmazione',
 
       floatingActionButton: FloatingActionButton.extended(
         elevation: 4,
-        backgroundColor: const Color(0xFF174A7E),
-        foregroundColor: Colors.white,
+        backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+        foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
         icon: const Icon(Icons.add_rounded),
         label: const Text(
           'Aggiungi',
@@ -175,7 +177,7 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                       child: Center(
                         child: Text(
                           _showPast ? 'Nessun incontro passato' : 'Nessun prossimo incontro',
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 15),
+                          style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, fontSize: 15),
                         ),
                       ),
                     ),
@@ -192,20 +194,22 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                               Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF174A7E).withValues(alpha: 0.1),
+                                  color: isDark
+                                      ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+                                      : const Color(0xFF174A7E).withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.calendar_month_rounded, size: 16, color: const Color(0xFF174A7E)),
+                                    Icon(Icons.calendar_month_rounded, size: 16, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
                                     const SizedBox(width: 6),
                                     Text(
                                       monthKey[0].toUpperCase() + monthKey.substring(1),
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.bold,
-                                        color: Color(0xFF174A7E),
+                                        color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
                                       ),
                                     ),
                                   ],
@@ -236,20 +240,29 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                                 padding: const EdgeInsets.all(14),
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
-                                    colors: [
-                                      Colors.white,
-                                      Colors.blue.shade50.withValues(alpha: 0.35),
-                                    ],
+                                    colors: isDark
+                                        ? [
+                                            colorScheme.surfaceContainer,
+                                            colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                                          ]
+                                        : [
+                                            Colors.white,
+                                            Colors.blue.shade50.withValues(alpha: 0.35),
+                                          ],
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
                                   ),
                                   borderRadius: BorderRadius.circular(24),
                                   border: Border.all(
-                                    color: Colors.blue.shade100,
+                                    color: isDark
+                                        ? colorScheme.outline.withValues(alpha: 0.2)
+                                        : Colors.blue.shade100,
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.04),
+                                      color: isDark
+                                          ? Colors.black.withValues(alpha: 0.3)
+                                          : Colors.black.withValues(alpha: 0.04),
                                       blurRadius: 16,
                                       offset: const Offset(0, 8),
                                     ),
@@ -376,13 +389,13 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
           child: Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.red.shade50,
+              color: isDark ? colorScheme.errorContainer.withValues(alpha: 0.3) : Colors.red.shade50,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
               'Errore: $e',
               style: TextStyle(
-                color: Colors.red.shade700,
+                color: isDark ? colorScheme.error : Colors.red.shade700,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -393,22 +406,32 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
   }
 
   void _showAddMenu(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
     showModalBottomSheet<void>(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      backgroundColor: isDark ? colorScheme.surface : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.event_rounded,
-                color: Color(0xFF174A7E),
+                color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
               ),
-              title: const Text('Nuova giornata'),
-              subtitle: const Text('Con appello presenze dei ragazzi'),
+              title: Text(
+                'Nuova giornata',
+                style: TextStyle(color: isDark ? colorScheme.onSurface : Colors.black87),
+              ),
+              subtitle: Text(
+                'Con appello presenze dei ragazzi',
+                style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+              ),
               onTap: () {
                 Navigator.pop(ctx);
                 Navigator.push(
@@ -422,10 +445,16 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
             ListTile(
               leading: Icon(
                 Icons.groups_rounded,
-                color: Colors.deepPurple.shade700,
+                color: isDark ? colorScheme.primary : Colors.deepPurple.shade700,
               ),
-              title: const Text('Nuova riunione'),
-              subtitle: const Text('Solo programmazione, senza appello'),
+              title: Text(
+                'Nuova riunione',
+                style: TextStyle(color: isDark ? colorScheme.onSurface : Colors.black87),
+              ),
+              subtitle: Text(
+                'Solo programmazione, senza appello',
+                style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+              ),
               onTap: () {
                 Navigator.pop(ctx);
                 Navigator.push(
@@ -456,13 +485,16 @@ class _ToggleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFF174A7E),
+          color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
@@ -496,16 +528,19 @@ class _MonthChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.grey.shade100,
+          color: isDark ? colorScheme.surfaceContainer : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: Colors.grey.shade300,
+            color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade300,
           ),
         ),
         child: Text(
@@ -513,7 +548,7 @@ class _MonthChip extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: Colors.grey.shade700,
+            color: isDark ? colorScheme.onSurface : Colors.grey.shade700,
           ),
         ),
       ),
@@ -625,6 +660,9 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -635,21 +673,22 @@ class _EmptyState extends StatelessWidget {
               width: 95,
               height: 95,
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: isDark ? colorScheme.primaryContainer.withValues(alpha: 0.3) : Colors.blue.shade50,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
                 size: 46,
-                color: const Color(0xFF174A7E),
+                color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
               ),
             ),
             const SizedBox(height: 24),
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
+                color: isDark ? colorScheme.onSurface : Colors.black87,
               ),
               textAlign: TextAlign.center,
             ),
@@ -657,7 +696,7 @@ class _EmptyState extends StatelessWidget {
             Text(
               subtitle,
               style: TextStyle(
-                color: Colors.grey.shade700,
+                color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
                 height: 1.5,
               ),
               textAlign: TextAlign.center,

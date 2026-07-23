@@ -104,13 +104,20 @@ class _PlanningEditPageState extends ConsumerState<PlanningEditPage> {
   Widget build(BuildContext context) {
     final repo = ref.read(planningRepoProvider);
     final classesAsync = ref.watch(classesStreamProvider);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    final scaffoldBgColor = isDark ? colorScheme.surface : Colors.grey.shade50;
+    final appBarBgColor = isDark ? colorScheme.primaryContainer : const Color(0xFF174A7E);
+    final appBarFgColor = isDark ? colorScheme.onPrimaryContainer : Colors.white;
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: scaffoldBgColor,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: const Color(0xFF174A7E),
-        foregroundColor: Colors.white,
+        backgroundColor: appBarBgColor,
+        foregroundColor: appBarFgColor,
         title: Text(
           _pageTitle(),
           style: const TextStyle(fontWeight: FontWeight.bold),
@@ -148,22 +155,28 @@ class _PlanningEditPageState extends ConsumerState<PlanningEditPage> {
                     margin: const EdgeInsets.only(bottom: 16),
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: Colors.deepPurple.shade50,
+                      color: isDark
+                          ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+                          : Colors.deepPurple.shade50,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.deepPurple.shade100),
+                      border: Border.all(
+                        color: isDark
+                            ? colorScheme.outline.withValues(alpha: 0.2)
+                            : Colors.deepPurple.shade100,
+                      ),
                     ),
                     child: Row(
                       children: [
                         Icon(
                           Icons.groups_rounded,
-                          color: Colors.deepPurple.shade700,
+                          color: isDark ? colorScheme.primary : Colors.deepPurple.shade700,
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             'Riunione: non compare nell\'appello presenze.',
                             style: TextStyle(
-                              color: Colors.deepPurple.shade900,
+                              color: isDark ? colorScheme.onSurface : Colors.deepPurple.shade900,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -381,11 +394,6 @@ class _PlanningEditPageState extends ConsumerState<PlanningEditPage> {
   }
 }
 
-/// Card interattiva per la selezione della data di un incontro.
-///
-/// Mostra la data correntemente selezionata (o un invito a selezionarne una)
-/// e cambia stile (gradiente blu scuro) quando una data è stata scelta,
-/// coerente con il design delle schede di input del modulo.
 class _DatePickerCard extends StatelessWidget {
   final DateTime? selectedDate;
   final VoidCallback onTap;
@@ -397,6 +405,9 @@ class _DatePickerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final isSelected = selectedDate != null;
 
     return InkWell(
@@ -413,17 +424,19 @@ class _DatePickerCard extends StatelessWidget {
                     const Color(0xFF2A6BB0),
                   ]
                 : [
-                    Colors.white,
-                    Colors.blue.shade50.withValues(alpha: 0.4),
+                    isDark ? colorScheme.surfaceContainer : Colors.white,
+                    isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.blue.shade50.withValues(alpha: 0.4),
                   ],
           ),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: isSelected ? Colors.transparent : Colors.blue.shade100,
+            color: isSelected ? Colors.transparent : (isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.blue.shade100),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.3)
+                  : Colors.black.withValues(alpha: 0.05),
               blurRadius: 18,
               offset: const Offset(0, 10),
             )
@@ -435,12 +448,14 @@ class _DatePickerCard extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: isSelected ? Colors.white.withValues(alpha: 0.15) : Colors.blue.shade50,
+                color: isSelected
+                    ? Colors.white.withValues(alpha: 0.15)
+                    : (isDark ? colorScheme.primaryContainer.withValues(alpha: 0.3) : Colors.blue.shade50),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
                 Icons.calendar_month_rounded,
-                color: isSelected ? Colors.white : const Color(0xFF174A7E),
+                color: isSelected ? Colors.white : (isDark ? colorScheme.primary : const Color(0xFF174A7E)),
               ),
             ),
             const SizedBox(width: 14),
@@ -453,7 +468,7 @@ class _DatePickerCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: isSelected ? Colors.white70 : Colors.grey.shade600,
+                      color: isSelected ? Colors.white70 : (isDark ? Colors.grey.shade400 : Colors.grey.shade600),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -464,7 +479,7 @@ class _DatePickerCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: isSelected ? Colors.white : const Color(0xFF174A7E),
+                      color: isSelected ? Colors.white : (isDark ? colorScheme.onSurface : const Color(0xFF174A7E)),
                     ),
                   ),
                 ],
@@ -473,7 +488,7 @@ class _DatePickerCard extends StatelessWidget {
             Icon(
               Icons.arrow_forward_ios_rounded,
               size: 16,
-              color: isSelected ? Colors.white70 : Colors.grey,
+              color: isSelected ? Colors.white70 : (isDark ? Colors.grey.shade500 : Colors.grey),
             ),
           ],
         ),
@@ -497,6 +512,9 @@ class _TimePickerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final isSelected = selectedTime != null;
 
     return InkWell(
@@ -513,17 +531,19 @@ class _TimePickerCard extends StatelessWidget {
                     Colors.deepPurple.shade600,
                   ]
                 : [
-                    Colors.white,
-                    Colors.deepPurple.shade50.withValues(alpha: 0.4),
+                    isDark ? colorScheme.surfaceContainer : Colors.white,
+                    isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.deepPurple.shade50.withValues(alpha: 0.4),
                   ],
           ),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: isSelected ? Colors.transparent : Colors.deepPurple.shade100,
+            color: isSelected ? Colors.transparent : (isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.deepPurple.shade100),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.3)
+                  : Colors.black.withValues(alpha: 0.05),
               blurRadius: 18,
               offset: const Offset(0, 10),
             )
@@ -535,12 +555,14 @@ class _TimePickerCard extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: isSelected ? Colors.white.withValues(alpha: 0.15) : Colors.deepPurple.shade50,
+                color: isSelected
+                    ? Colors.white.withValues(alpha: 0.15)
+                    : (isDark ? colorScheme.primaryContainer.withValues(alpha: 0.3) : Colors.deepPurple.shade50),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
                 Icons.access_time_rounded,
-                color: isSelected ? Colors.white : Colors.deepPurple.shade700,
+                color: isSelected ? Colors.white : (isDark ? colorScheme.primary : Colors.deepPurple.shade700),
               ),
             ),
             const SizedBox(width: 14),
@@ -553,7 +575,7 @@ class _TimePickerCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: isSelected ? Colors.white70 : Colors.grey.shade600,
+                      color: isSelected ? Colors.white70 : (isDark ? Colors.grey.shade400 : Colors.grey.shade600),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -564,7 +586,7 @@ class _TimePickerCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: isSelected ? Colors.white : Colors.deepPurple.shade700,
+                      color: isSelected ? Colors.white : (isDark ? colorScheme.onSurface : Colors.deepPurple.shade700),
                     ),
                   ),
                 ],
@@ -573,7 +595,7 @@ class _TimePickerCard extends StatelessWidget {
             Icon(
               Icons.arrow_forward_ios_rounded,
               size: 16,
-              color: isSelected ? Colors.white70 : Colors.grey,
+              color: isSelected ? Colors.white70 : (isDark ? Colors.grey.shade500 : Colors.grey),
             ),
           ],
         ),
@@ -600,15 +622,25 @@ class _ModernInputCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? colorScheme.surfaceContainer : Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        border: Border.all(
+          color: isDark
+              ? colorScheme.outline.withValues(alpha: 0.2)
+              : color.withValues(alpha: 0.2),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.04),
             blurRadius: 16,
             offset: const Offset(0, 8),
           )
@@ -617,7 +649,7 @@ class _ModernInputCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color),
+          Icon(icon, color: isDark ? colorScheme.primary : color),
           const SizedBox(height: 10),
           child,
         ],
@@ -659,6 +691,10 @@ class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSecti
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     final all = _allCatechesi();
     final selected = all.where((c) => _selectedIds.contains(c.id)).toList();
 
@@ -666,12 +702,16 @@ class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSecti
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? colorScheme.surfaceContainer : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(
+          color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade200,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.03),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -682,15 +722,15 @@ class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSecti
         children: [
           Row(
             children: [
-              Icon(Icons.menu_book_rounded, color: Colors.deepPurple.shade700),
+              Icon(Icons.menu_book_rounded, color: isDark ? colorScheme.primary : Colors.deepPurple.shade700),
               const SizedBox(width: 8),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Catechesi associate',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF174A7E),
+                    color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
                   ),
                 ),
               ),
@@ -703,7 +743,7 @@ class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSecti
                 Expanded(
                   child: Text(
                     'Nessuna catechesi associata',
-                    style: TextStyle(color: Colors.grey.shade600),
+                    style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
                   ),
                 ),
                 if (!widget.readOnly)
@@ -732,22 +772,30 @@ class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSecti
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       decoration: BoxDecoration(
-                        color: Colors.deepPurple.shade50,
+                        color: isDark
+                            ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+                            : Colors.deepPurple.shade50,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.deepPurple.shade100),
+                        border: Border.all(
+                          color: isDark
+                              ? colorScheme.outline.withValues(alpha: 0.2)
+                              : Colors.deepPurple.shade100,
+                        ),
                       ),
                       child: Row(
                         children: [
                           Expanded(
                             child: Text(
                               c.title,
-                              style: TextStyle(color: Colors.deepPurple.shade900),
+                              style: TextStyle(
+                                color: isDark ? colorScheme.onSurface : Colors.deepPurple.shade900,
+                              ),
                             ),
                           ),
                           if (!widget.readOnly)
                             IconButton(
                               icon: const Icon(Icons.close_rounded, size: 18),
-                              color: Colors.deepPurple.shade700,
+                              color: isDark ? colorScheme.primary : Colors.deepPurple.shade700,
                               onPressed: () {
                                 setState(() {
                                   _selectedIds.remove(c.id);
@@ -778,6 +826,10 @@ class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSecti
   }
 
   Future<void> _showPicker(BuildContext context) async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     final repo = CatechesiRepository();
     final all = repo.getCatechesiSync();
     final candidates = all.where((c) => !_selectedIds.contains(c.id)).toList();
@@ -792,15 +844,19 @@ class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSecti
         expand: false,
         builder: (context, scrollController) => Container(
           padding: const EdgeInsets.all(20),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            color: isDark ? colorScheme.surface : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
             children: [
-              const Text(
+              Text(
                 'Seleziona catechesi',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? colorScheme.onSurface : Colors.black87,
+                ),
               ),
               const SizedBox(height: 12),
               Expanded(
@@ -810,7 +866,10 @@ class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSecti
                   itemBuilder: (context, i) {
                     final c = candidates[i];
                     return ListTile(
-                      title: Text(c.title),
+                      title: Text(
+                        c.title,
+                        style: TextStyle(color: isDark ? colorScheme.onSurface : Colors.black87),
+                      ),
                       subtitle: c.tags.isEmpty
                           ? null
                           : Wrap(
@@ -821,8 +880,14 @@ class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSecti
                                   .map((t) => Chip(
                                         label: Text(t, style: const TextStyle(fontSize: 11)),
                                         visualDensity: VisualDensity.compact,
-                                        backgroundColor: Colors.blue.shade50,
-                                        side: BorderSide(color: Colors.blue.shade100),
+                                        backgroundColor: isDark
+                                            ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+                                            : Colors.blue.shade50,
+                                        side: BorderSide(
+                                          color: isDark
+                                              ? colorScheme.outline.withValues(alpha: 0.2)
+                                              : Colors.blue.shade100,
+                                        ),
                                       ))
                                   .toList(),
                             ),
@@ -859,6 +924,10 @@ class _MeetingNumberBadge extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     final meetings = ref.read(planningRepoProvider).getMeetingsSync();
     final filtered = meetings
         .where((m) => m.classId == classId && !m.isReunion)
@@ -875,20 +944,26 @@ class _MeetingNumberBadge extends ConsumerWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF174A7E).withValues(alpha: 0.08),
+        color: isDark
+            ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+            : const Color(0xFF174A7E).withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF174A7E).withValues(alpha: 0.15)),
+        border: Border.all(
+          color: isDark
+              ? colorScheme.outline.withValues(alpha: 0.2)
+              : const Color(0xFF174A7E).withValues(alpha: 0.15),
+        ),
       ),
       child: Row(
         children: [
-          Icon(Icons.tag_rounded, size: 18, color: const Color(0xFF174A7E)),
+          Icon(Icons.tag_rounded, size: 18, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
           const SizedBox(width: 8),
           Text(
             'Incontro $numero di $totale',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF174A7E),
+              color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
             ),
           ),
         ],

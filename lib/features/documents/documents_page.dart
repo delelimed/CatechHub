@@ -23,15 +23,19 @@ class DocumentsPage extends ConsumerWidget {
   /// Al salvataggio, il documento viene persistito su Hive tramite il
   /// [DocumentsRepository].
   void _showCreateDocumentDialog(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
     final titleController = TextEditingController();
 
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text(
+        backgroundColor: isDark ? colorScheme.surface : Colors.white,
+        title: Text(
           'Nuovo Documento',
-          style: TextStyle(color: Color(0xFF174A7E), fontWeight: FontWeight.bold),
+          style: TextStyle(color: isDark ? colorScheme.primary : const Color(0xFF174A7E), fontWeight: FontWeight.bold),
         ),
         content: TextField(
           controller: titleController,
@@ -78,15 +82,19 @@ class DocumentsPage extends ConsumerWidget {
     String docId,
     String currentTitle,
   ) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
     final titleController = TextEditingController(text: currentTitle);
 
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text(
+        backgroundColor: isDark ? colorScheme.surface : Colors.white,
+        title: Text(
           'Modifica Documento',
-          style: TextStyle(color: Color(0xFF174A7E), fontWeight: FontWeight.bold),
+          style: TextStyle(color: isDark ? colorScheme.primary : const Color(0xFF174A7E), fontWeight: FontWeight.bold),
         ),
         content: TextField(
           controller: titleController,
@@ -130,14 +138,17 @@ class DocumentsPage extends ConsumerWidget {
   /// tutti i ragazzi hanno riconsegnato il documento.
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final docsAsync = ref.watch(documentsStreamProvider);
     final studentsAsync = ref.watch(myGroupStudentsProvider);
 
     return AppScaffold(
       title: 'Documenti',
       floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF174A7E),
-        foregroundColor: Colors.white,
+        backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+        foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         onPressed: () => _showCreateDocumentDialog(context, ref),
         child: const Icon(Icons.add),
@@ -232,34 +243,39 @@ class DocumentsPage extends ConsumerWidget {
                                 } else if (value == 'delete') {
                                   final confirmed = await showDialog<bool>(
                                     context: context,
-                                    builder: (ctx) => AlertDialog(
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                                      title: const Text(
-                                        'Elimina Documento',
-                                        style: TextStyle(color: Color(0xFF174A7E), fontWeight: FontWeight.bold),
-                                      ),
-                                      content: Text(
-                                        'Eliminare "${doc['title']?.toString() ?? 'Documento'}"?\n'
-                                        'Tutte le consegne associate verranno rimosse.',
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.of(ctx).pop(false),
-                                          child: const Text('Annulla'),
+                                    builder: (ctx) {
+                                      final isDark = Theme.of(ctx).brightness == Brightness.dark;
+                                      final colorScheme = Theme.of(ctx).colorScheme;
+                                      return AlertDialog(
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                        backgroundColor: isDark ? colorScheme.surface : Colors.white,
+                                        title: Text(
+                                          'Elimina Documento',
+                                          style: TextStyle(color: isDark ? colorScheme.primary : const Color(0xFF174A7E), fontWeight: FontWeight.bold),
                                         ),
-                                        ElevatedButton(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.red,
-                                            foregroundColor: Colors.white,
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                        content: Text(
+                                          'Eliminare "${doc['title']?.toString() ?? 'Documento'}"?\n'
+                                          'Tutte le consegne associate verranno rimosse.',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.of(ctx).pop(false),
+                                            child: const Text('Annulla'),
                                           ),
-                                          onPressed: () => Navigator.of(ctx).pop(true),
-                                          child: const Text('Elimina'),
-                                        ),
+                                          ElevatedButton(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.red,
+                                              foregroundColor: Colors.white,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                            ),
+                                            onPressed: () => Navigator.of(ctx).pop(true),
+                                            child: const Text('Elimina'),
+                                          ),
                                       ],
-                                    ),
-                                  );
-                                  if (confirmed == true) {
+                                    );
+                                  },
+                                );
+                                if (confirmed == true) {
                                     await ref
                                         .read(documentsRepoProvider)
                                         .deleteDocument(docId);

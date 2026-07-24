@@ -6,7 +6,6 @@
 ## In sviluppo
 
 - **Nearby Connections API** — Integrazione della sincronizzazione peer-to-peer tramite Nearby Connections di Google, attualmente presente ma non funzionante.
-- **Notifiche al Catechista pre - incontro** - introduzione di reminders il giorno prima dell'incontro.
 
 
 ## Pianificate

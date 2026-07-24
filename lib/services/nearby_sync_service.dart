@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-
 import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 import 'package:nearby_connections/nearby_connections.dart';
@@ -100,14 +99,18 @@ class NearbySyncService {
   bool _initialized = false;
   bool _isSyncing = false;
   String? _pendingEndpointId;
+  bool _daemonActive = false;
 
   Completer<void>? _pairingCompleter;
 
-  static const Duration _backgroundInterval = Duration(minutes: 5);
+  static const Duration _daemonInterval = Duration(seconds: 120);
   static const Duration _pairingTimeout = Duration(seconds: 120);
+  static const Duration _backgroundInterval = Duration(seconds: 120);
   static const String _serviceId = 'ch.catechhub.app';
 
   void _emitState() => _stateController.add(_state);
+
+  bool get isDaemonActive => _daemonActive;
 
   Future<void> init() async {
     if (_initialized) return;
@@ -117,6 +120,150 @@ class NearbySyncService {
   void _updateState(NearbySyncState newState) {
     _state = newState;
     _emitState();
+  }
+
+  Future<void> startDaemon() async {
+    if (_daemonActive) return;
+    if (!_initialized) await init();
+
+    final associations = await _security.getAllAssociations();
+    if (associations.isEmpty) {
+      _updateState(_state.copyWith(
+        isBackgroundSyncActive: false,
+        errorMessage: 'Nessun dispositivo associato',
+      ));
+      return;
+    }
+
+    final permResult = await BluetoothPermissionService.checkAndRequestPermissions();
+    if (!permResult.allGranted) {
+      _updateState(_state.copyWith(
+        isBackgroundSyncActive: false,
+        errorMessage: permResult.errorMessage ?? 'Permessi insufficienti',
+      ));
+      return;
+    }
+
+    _daemonActive = true;
+    _backgroundTimer?.cancel();
+    _backgroundTimer = Timer.periodic(_daemonInterval, (_) {
+      _daemonSyncCycle();
+    });
+
+    _daemonSyncCycle();
+
+    _updateState(_state.copyWith(
+      isBackgroundSyncActive: true,
+      clearError: true,
+    ));
+  }
+
+  void stopDaemon() {
+    if (!_daemonActive) return;
+    _daemonActive = false;
+    _backgroundTimer?.cancel();
+    _backgroundTimer = null;
+    _updateState(_state.copyWith(isBackgroundSyncActive: false));
+  }
+
+  Future<void> triggerManualSync() async {
+    if (_isSyncing) return;
+    if (!_initialized) await init();
+
+    final associations = await _security.getAllAssociations();
+    if (associations.isEmpty) {
+      _updateState(_state.copyWith(
+        status: NearbySyncStatus.error,
+        errorMessage: 'Nessun dispositivo associato',
+      ));
+      return;
+    }
+
+    final permResult = await BluetoothPermissionService.checkAndRequestPermissions();
+    if (!permResult.allGranted) {
+      _updateState(_state.copyWith(
+        status: NearbySyncStatus.error,
+        errorMessage: permResult.errorMessage ?? 'Permessi insufficienti per la sincronizzazione.',
+      ));
+      return;
+    }
+
+    await _daemonSyncCycle();
+  }
+
+  Future<void> _daemonSyncCycle() async {
+    if (_isSyncing || !_daemonActive) return;
+    
+    final associations = await _security.getAllAssociations();
+    if (associations.isEmpty) return;
+
+    final permResult = await BluetoothPermissionService.checkAndRequestPermissions();
+    if (!permResult.allGranted) return;
+
+    _isSyncing = true;
+    _updateState(_state.copyWith(status: NearbySyncStatus.scanning));
+
+    try {
+      final syncName = 'CatechHub_Sync_${DateTime.now().millisecondsSinceEpoch}';
+      final completer = Completer<void>();
+
+      await _nearby.startAdvertising(
+        syncName,
+        Strategy.P2P_CLUSTER,
+        onConnectionInitiated: _onConnectionInitiated,
+        onConnectionResult: _onConnectionResult,
+        onDisconnected: _onDisconnected,
+        serviceId: _serviceId,
+      );
+
+      await _nearby.startDiscovery(
+        syncName,
+        Strategy.P2P_CLUSTER,
+        onEndpointFound: (endpointId, name, serviceId) {
+          if (!name.startsWith('CatechHub_')) return;
+          final deviceId = _extractDeviceId(name);
+          if (deviceId == null) return;
+          Future(() async {
+            final assoc = await _security.getAssociation(deviceId);
+            if (assoc != null && assoc.isValid) {
+              if (!completer.isCompleted) completer.complete();
+              _nearby.requestConnection(
+                syncName,
+                endpointId,
+                onConnectionInitiated: _onConnectionInitiated,
+                onConnectionResult: _onConnectionResult,
+                onDisconnected: _onDisconnected,
+              );
+            }
+          });
+        },
+        onEndpointLost: (_) {},
+        serviceId: _serviceId,
+      );
+
+      await completer.future.timeout(const Duration(seconds: 15), onTimeout: () {});
+      await _nearby.stopDiscovery();
+
+      if (_state.role == SyncRole.altroCatechista && _state.awaitingConfirmation == false) {
+        _updateState(_state.copyWith(
+          awaitingConfirmation: true,
+          pendingConfirmationDeviceName: 'Catechista',
+          status: NearbySyncStatus.idle,
+        ));
+        _isSyncing = false;
+        return;
+      }
+
+      if (_state.role == SyncRole.mioDispositivo && _state.connectedDeviceId != null) {
+        await sendLocalIndex(_state.connectedDeviceId!);
+      }
+    } catch (_) {
+    } finally {
+      await _nearby.stopAdvertising();
+      await _nearby.stopAllEndpoints();
+      _isSyncing = false;
+      _updateState(_state.copyWith(status: NearbySyncStatus.idle));
+    }
   }
 
   Future<void> startPairingMode() async {
@@ -709,7 +856,7 @@ class NearbySyncService {
     _pairingTimeoutTimer?.cancel();
     _backgroundTimer?.cancel();
     stopPairingMode();
-    stopBackgroundSync();
+    stopDaemon();
     _stateController.close();
     _syncRequestController.close();
   }

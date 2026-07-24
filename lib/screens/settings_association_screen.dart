@@ -1,26 +1,27 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../core/providers/nearby_sync_provider.dart';
 import '../core/storage/local_database.dart';
 import '../models/association_models.dart';
 import '../services/security_service.dart';
 import '../services/nearby_sync_service.dart';
 
-class SettingsAssociationScreen extends StatefulWidget {
+class SettingsAssociationScreen extends ConsumerStatefulWidget {
   const SettingsAssociationScreen({super.key});
 
   @override
-  State<SettingsAssociationScreen> createState() =>
+  ConsumerState<SettingsAssociationScreen> createState() =>
       _SettingsAssociationScreenState();
 }
 
 class _SettingsAssociationScreenState
-    extends State<SettingsAssociationScreen> {
+    extends ConsumerState<SettingsAssociationScreen> {
   final AssociationSecurityService _security = AssociationSecurityService();
-  final NearbySyncService _syncService = NearbySyncService();
 
   SyncRole _selectedRole = SyncRole.mioDispositivo;
   List<DeviceAssociation> _associations = [];
@@ -30,19 +31,21 @@ class _SettingsAssociationScreenState
   String? _qrData;
   String? _errorMessage;
   MobileScannerController? _scannerController;
-  StreamSubscription<NearbySyncState>? _syncStateSub;
 
   @override
   void initState() {
     super.initState();
     _initData();
-    _syncStateSub = _syncService.onStateChanged.listen(_onSyncStateChanged);
     _startPairingMode();
+
+    // Listen to sync state changes from the provider
+    ref.listen<AsyncValue<NearbySyncState>>(nearbySyncStateProvider, (previous, next) {
+      next.whenData(_onSyncStateChanged);
+    });
   }
 
   @override
   void dispose() {
-    _syncStateSub?.cancel();
     _stopPairingMode();
     _stopScanner();
     super.dispose();
@@ -51,7 +54,8 @@ class _SettingsAssociationScreenState
   Future<void> _initData() async {
     setState(() => _isLoading = true);
     try {
-      await _syncService.init();
+      final syncService = ref.read(nearbySyncServiceProvider);
+      await syncService.init();
       final assocs = await _security.getAllAssociations();
       final qrData = await _generateQrData();
 
@@ -59,7 +63,7 @@ class _SettingsAssociationScreenState
         setState(() {
           _associations = assocs;
           _qrData = qrData;
-          _selectedRole = _syncService.currentState.role;
+          _selectedRole = syncService.currentState.role;
           _isLoading = false;
         });
       }
@@ -118,12 +122,14 @@ class _SettingsAssociationScreenState
       _isPairingMode = true;
       _errorMessage = null;
     });
-    await _syncService.startPairingMode();
+    final syncService = ref.read(nearbySyncServiceProvider);
+    await syncService.startPairingMode();
   }
 
   Future<void> _stopPairingMode() async {
     if (_isPairingMode) {
-      await _syncService.stopPairingMode();
+      final syncService = ref.read(nearbySyncServiceProvider);
+      await syncService.stopPairingMode();
     }
   }
 
@@ -296,7 +302,7 @@ class _SettingsAssociationScreenState
               onChanged: (role) {
                 if (role == null) return;
                 setState(() => _selectedRole = role);
-                _syncService.setRole(role);
+                ref.read(nearbySyncServiceProvider).setRole(role);
               },
               child: Column(
                 children: [
@@ -420,10 +426,229 @@ class _SettingsAssociationScreenState
                 ],
               ),
             ],
+            const SizedBox(height: 12),
+            _buildSyncStatusSection(theme, colorScheme),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildSyncStatusSection(ThemeData theme, ColorScheme colorScheme) {
+    final syncState = ref.watch(nearbySyncStateProvider);
+    final daemonController = ref.read(nearbySyncDaemonProvider.notifier);
+    final isDaemonActive = ref.watch(nearbySyncDaemonProvider);
+    final isSyncing = syncState.when(
+      data: (state) => state.status == NearbySyncStatus.scanning || state.status == NearbySyncStatus.connecting || state.status == NearbySyncStatus.syncing,
+      loading: () => false,
+      error: (_, _) => false,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDaemonActive ? Colors.green.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isDaemonActive ? Colors.green.withValues(alpha: 0.3) : Colors.orange.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.sync,
+                color: isDaemonActive ? Colors.green : Colors.orange,
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Sincronizzazione automatica',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      isDaemonActive ? 'Attiva - Scansione ogni 120 secondi' : 'Inattiva - Tocca "Avvia auto" per attivare',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDaemonActive ? Colors.green[700] : Colors.orange[700],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        syncState.when(
+          data: (state) {
+            if (state.isBackgroundSyncActive) {
+              return Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        state.status == NearbySyncStatus.scanning
+                            ? 'Scansione dispositivi vicini...'
+                            : state.status == NearbySyncStatus.connecting
+                                ? 'Connessione in corso...'
+                                : state.status == NearbySyncStatus.syncing
+                                    ? 'Sincronizzazione dati in corso...'
+                                    : 'Sincronizzazione completata',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            if (state.status == NearbySyncStatus.error && state.errorMessage != null) {
+              return Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red[700], size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Errore: ${state.errorMessage}',
+                        style: TextStyle(fontSize: 13, color: Colors.red[700]),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            if (state.lastSyncAt != null) {
+              return Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.history, color: Colors.blue[700], size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Ultima sincronizzazione: ${_formatLastSync(state.lastSyncAt!)}',
+                      style: TextStyle(fontSize: 13, color: Colors.blue[700]),
+                    ),
+                  ],
+                ),
+              );
+            }
+            return const SizedBox.shrink();
+          },
+          loading: () => const SizedBox.shrink(),
+          error: (_, _) => const SizedBox.shrink(),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: isSyncing
+                    ? null
+                    : () async {
+                        await daemonController.triggerManualSync();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Sincronizzazione manuale avviata'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
+                icon: isSyncing
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.sync, size: 22),
+                label: Text(isSyncing ? 'Sincronizzazione in corso...' : 'Sincronizza ora'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: isDaemonActive
+                    ? () {
+                        daemonController.setAppForeground(false);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Sincronizzazione automatica disattivata'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    : () {
+                        daemonController.setAppForeground(true);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Sincronizzazione automatica attivata (ogni 120s)'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                icon: Icon(isDaemonActive ? Icons.pause_circle : Icons.play_circle, size: 22),
+                label: Text(isDaemonActive ? 'Pausa auto' : 'Avvia auto'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: isDaemonActive ? Colors.orange : Colors.green,
+                  side: BorderSide(
+                    color: isDaemonActive ? Colors.orange : Colors.green,
+                    width: 2,
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  String _formatLastSync(DateTime dateTime) {
+    final now = DateTime.now();
+    final diff = now.difference(dateTime);
+    if (diff.inMinutes < 1) return 'Ora';
+    if (diff.inHours < 1) return '${diff.inMinutes}min fa';
+    if (diff.inDays < 1) return '${diff.inHours}h fa';
+    return '${diff.inDays}g fa';
   }
 
   Widget _buildScannerSection(ThemeData theme) {

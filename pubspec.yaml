@@ -3,7 +3,11 @@ description: "Il tuo registro di catechismo"
 publish_to: 'none'
 license: MIT
 
+<<<<<<< HEAD
 version: 1.0.4+4
+=======
+version: 1.0.4+1
+>>>>>>> 09754a16f1d9f2dee750598d91c183d63e47948e
 
 environment:
   sdk: '>=3.12.0 <4.0.0'

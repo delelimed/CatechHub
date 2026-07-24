@@ -25,10 +25,14 @@ class _ChangelogPageState extends State<ChangelogPage> {
 
   Future<void> _fetchReleases() async {
     try {
-      final response = await http.get(
-        Uri.parse('https://api.github.com/repos/delelimed/CatechHub/releases'),
-        headers: {'Accept': 'application/vnd.github.v3+json'},
-      ).timeout(const Duration(seconds: 15));
+      final response = await http
+          .get(
+            Uri.parse(
+              'https://api.github.com/repos/delelimed/CatechHub/releases',
+            ),
+            headers: {'Accept': 'application/vnd.github.v3+json'},
+          )
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as List<dynamic>;
@@ -71,7 +75,9 @@ class _ChangelogPageState extends State<ChangelogPage> {
     final colorScheme = theme.colorScheme;
 
     if (_isLoading) {
-      return Center(child: CircularProgressIndicator(color: colorScheme.primary));
+      return Center(
+        child: CircularProgressIndicator(color: colorScheme.primary),
+      );
     }
 
     if (_error != null) {
@@ -101,7 +107,11 @@ class _ChangelogPageState extends State<ChangelogPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline_rounded, size: 64, color: colorScheme.error),
+            Icon(
+              Icons.error_outline_rounded,
+              size: 64,
+              color: colorScheme.error,
+            ),
             const SizedBox(height: 16),
             Text(
               'Impossibile caricare',
@@ -114,7 +124,9 @@ class _ChangelogPageState extends State<ChangelogPage> {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+              style: TextStyle(
+                color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+              ),
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
@@ -142,7 +154,11 @@ class _ChangelogPageState extends State<ChangelogPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.history_rounded, size: 64, color: isDark ? Colors.grey.shade600 : Colors.grey.shade400),
+            Icon(
+              Icons.history_rounded,
+              size: 64,
+              color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+            ),
             const SizedBox(height: 16),
             Text(
               'Nessun rilascio trovato',
@@ -174,14 +190,18 @@ class _ReleaseCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final version = release['tag_name'] as String? ?? 'Sconosciuta';
     final name = release['name'] as String? ?? '';
-    final body = release['body'] as String? ?? 'Nessuna descrizione disponibile.';
+    final body =
+        release['body'] as String? ?? 'Nessuna descrizione disponibile.';
     final publishedAt = release['published_at'] as String?;
     final prerelease = release['prerelease'] as bool? ?? false;
     final draft = release['draft'] as bool? ?? false;
     final htmlUrl = release['html_url'] as String? ?? '';
 
     final date = publishedAt != null
-        ? DateFormat('dd MMMM yyyy', 'it_IT').format(DateTime.parse(publishedAt).toLocal())
+        ? DateFormat(
+            'dd MMMM yyyy',
+            'it_IT',
+          ).format(DateTime.parse(publishedAt).toLocal())
         : 'Data sconosciuta';
 
     final cardColor = isDark ? colorScheme.surfaceContainer : Colors.white;
@@ -206,91 +226,105 @@ class _ReleaseCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: prerelease
-                    ? [Colors.orange.shade400, Colors.deepOrange.shade500]
-                    : draft
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => context.push('/release-detail', extra: release),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: prerelease
+                        ? [Colors.orange.shade400, Colors.deepOrange.shade500]
+                        : draft
                         ? [Colors.grey.shade400, Colors.grey.shade600]
                         : [colorScheme.primary, colorScheme.secondary],
-              ),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(18),
-                topRight: Radius.circular(18),
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(
-                    version.replaceFirst('v', ''),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(18),
+                    topRight: Radius.circular(18),
                   ),
                 ),
-                const SizedBox(width: 10),
-                if (name.isNotEmpty)
-                  Expanded(
-                    child: Text(
-                      name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
                       ),
-                      overflow: TextOverflow.ellipsis,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        version.replaceFirst('v', ''),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
                     ),
-                  ),
-                const SizedBox(width: 10),
-                Text(
-                  date,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.8),
-                    fontSize: 12,
-                  ),
+                    const SizedBox(width: 10),
+                    if (name.isNotEmpty)
+                      Expanded(
+                        child: Text(
+                          name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    const SizedBox(width: 10),
+                    Text(
+                      date,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.8),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildBody(body, theme, isDark),
-                if (htmlUrl.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: OutlinedButton.icon(
-                      onPressed: () => context.push('/webview', extra: {'url': htmlUrl}),
-                      icon: const Icon(Icons.open_in_new_rounded, size: 18),
-                      label: const Text('Visualizza su GitHub'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: colorScheme.primary,
-                        side: BorderSide(color: colorScheme.primary),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildBody(body, theme, isDark),
+                    if (htmlUrl.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: OutlinedButton.icon(
+                          onPressed: () =>
+                              context.push('/release-detail', extra: release),
+                          icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                          label: const Text('Dettaglio versione'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: colorScheme.primary,
+                            side: BorderSide(color: colorScheme.primary),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -302,8 +336,12 @@ class _ReleaseCard extends StatelessWidget {
     final textColor = isDark ? Colors.grey.shade300 : Colors.grey.shade800;
     final headingColor = isDark ? colorScheme.primary : const Color(0xFF174A7E);
     final mutedColor = isDark ? Colors.grey.shade500 : Colors.grey.shade700;
-    final quoteBg = isDark ? colorScheme.primaryContainer.withValues(alpha: 0.3) : Colors.blue.shade50;
-    final quoteBorder = isDark ? colorScheme.primary.withValues(alpha: 0.3) : Colors.blue.shade100;
+    final quoteBg = isDark
+        ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+        : Colors.blue.shade50;
+    final quoteBorder = isDark
+        ? colorScheme.primary.withValues(alpha: 0.3)
+        : Colors.blue.shade100;
     final quoteTextColor = isDark ? colorScheme.primary : Colors.blue.shade800;
 
     for (final line in lines) {
@@ -314,82 +352,105 @@ class _ReleaseCard extends StatelessWidget {
       }
 
       if (trimmed.startsWith('### ')) {
-        widgets.add(Padding(
-          padding: const EdgeInsets.only(top: 12, bottom: 6),
-          child: Text(
-            trimmed.substring(4),
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: headingColor,
-            ),
-          ),
-        ));
-      } else if (trimmed.startsWith('## ')) {
-        widgets.add(Padding(
-          padding: const EdgeInsets.only(top: 16, bottom: 8),
-          child: Text(
-            trimmed.substring(3),
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
-              color: headingColor,
-            ),
-          ),
-        ));
-      } else if (trimmed.startsWith('# ')) {
-        widgets.add(Padding(
-          padding: const EdgeInsets.only(top: 16, bottom: 8),
-          child: Text(
-            trimmed.substring(2),
-            style: TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.bold,
-              color: headingColor,
-            ),
-          ),
-        ));
-      } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-        widgets.add(Padding(
-          padding: const EdgeInsets.only(left: 16, top: 2, bottom: 2),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('• ', style: TextStyle(color: mutedColor, fontSize: 14)),
-              Expanded(
-                child: Text(
-                  trimmed.substring(2),
-                  style: TextStyle(color: textColor, fontSize: 14, height: 1.5),
-                ),
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 12, bottom: 6),
+            child: Text(
+              trimmed.substring(4),
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: headingColor,
               ),
-            ],
+            ),
           ),
-        ));
+        );
+      } else if (trimmed.startsWith('## ')) {
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 16, bottom: 8),
+            child: Text(
+              trimmed.substring(3),
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: headingColor,
+              ),
+            ),
+          ),
+        );
+      } else if (trimmed.startsWith('# ')) {
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 16, bottom: 8),
+            child: Text(
+              trimmed.substring(2),
+              style: TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.bold,
+                color: headingColor,
+              ),
+            ),
+          ),
+        );
+      } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(left: 16, top: 2, bottom: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('• ', style: TextStyle(color: mutedColor, fontSize: 14)),
+                Expanded(
+                  child: Text(
+                    trimmed.substring(2),
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 14,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
       } else if (trimmed.startsWith('> ')) {
-        widgets.add(Container(
-          margin: const EdgeInsets.symmetric(vertical: 8),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: quoteBg,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: quoteBorder),
+        widgets.add(
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: quoteBg,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: quoteBorder),
+            ),
+            child: Text(
+              trimmed.substring(2),
+              style: TextStyle(
+                color: quoteTextColor,
+                fontSize: 13,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
           ),
-          child: Text(
-            trimmed.substring(2),
-            style: TextStyle(color: quoteTextColor, fontSize: 13, fontStyle: FontStyle.italic),
-          ),
-        ));
+        );
       } else {
-        widgets.add(Padding(
-          padding: const EdgeInsets.only(top: 2, bottom: 2),
-          child: Text(
-            trimmed,
-            style: TextStyle(color: textColor, fontSize: 14, height: 1.5),
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 2, bottom: 2),
+            child: Text(
+              trimmed,
+              style: TextStyle(color: textColor, fontSize: 14, height: 1.5),
+            ),
           ),
-        ));
+        );
       }
     }
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: widgets);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: widgets,
+    );
   }
 }

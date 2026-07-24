@@ -323,6 +323,10 @@ class _ScanningCard extends StatefulWidget {
 class _ScanningCardState extends State<_ScanningCard> {
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Column(
       children: [
         Container(
@@ -331,8 +335,8 @@ class _ScanningCardState extends State<_ScanningCard> {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: widget.isScanning
-                  ? const Color(0xFF174A7E)
-                  : Colors.grey.shade400,
+                  ? (isDark ? colorScheme.primary : const Color(0xFF174A7E))
+                  : (isDark ? Colors.grey.shade600 : Colors.grey.shade400),
               width: 2,
             ),
           ),
@@ -341,7 +345,7 @@ class _ScanningCardState extends State<_ScanningCard> {
             child: widget.isScanning
                 ? MobileScanner(onDetect: widget.onQRCodeDetected)
                 : Container(
-                    color: Colors.grey.shade200,
+                    color: isDark ? colorScheme.surfaceContainer : Colors.grey.shade200,
                     child: Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -349,14 +353,14 @@ class _ScanningCardState extends State<_ScanningCard> {
                           Icon(
                             Icons.qr_code_scanner_rounded,
                             size: 64,
-                            color: Colors.grey.shade400,
+                            color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
                           ),
                           const SizedBox(height: 16),
                           Text(
                             'Scansione in pausa',
                             style: TextStyle(
                               fontSize: 16,
-                              color: Colors.grey.shade600,
+                              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                             ),
                           ),
                         ],
@@ -371,6 +375,8 @@ class _ScanningCardState extends State<_ScanningCard> {
           receivedCount: widget.receivedCount,
           totalChunks: widget.totalChunks,
           missingChunkIndices: widget.missingChunkIndices,
+          isDark: isDark,
+          colorScheme: colorScheme,
         ),
         const SizedBox(height: 16),
 
@@ -409,7 +415,7 @@ class _ScanningCardState extends State<_ScanningCard> {
         ),
         const SizedBox(height: 16),
 
-        _InstructionsCard(),
+        _InstructionsCard(isDark: isDark, colorScheme: colorScheme),
       ],
     );
   }
@@ -430,12 +436,16 @@ class _PinVerificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Column(
       children: [
         Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: Colors.green.withValues(alpha: 0.1),
+            color: isDark ? Colors.green.withValues(alpha: 0.15) : Colors.green.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
           ),
@@ -447,19 +457,19 @@ class _PinVerificationCard extends StatelessWidget {
                 size: 48,
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Tutti i chunk ricevuti!',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF174A7E),
+                  color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Inserisci il PIN di 8 cifre fornito dal mittente per completare l\'importazione',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade700),
               ),
             ],
           ),
@@ -490,8 +500,8 @@ class _PinVerificationCard extends StatelessWidget {
           icon: const Icon(Icons.verified_rounded),
           label: const Text('Verifica e Importa'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF174A7E),
-            foregroundColor: Colors.white,
+            backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+            foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
             minimumSize: const Size(double.infinity, 56),
           ),
@@ -515,15 +525,19 @@ class _ImportingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(32),
       child: Column(
         children: [
-          const CircularProgressIndicator(color: Color(0xFF174A7E)),
+          CircularProgressIndicator(color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
           const SizedBox(height: 24),
-          const Text(
+          Text(
             'Importazione in corso...',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? colorScheme.onSurface : null),
           ),
           if (phaseMessage != null) ...[
             const SizedBox(height: 12),
@@ -532,7 +546,7 @@ class _ImportingCard extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: const Color(0xFF174A7E).withValues(alpha: 0.8),
+                color: isDark ? colorScheme.primary : const Color(0xFF174A7E).withValues(alpha: 0.8),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -541,7 +555,7 @@ class _ImportingCard extends StatelessWidget {
           Text(
             'I dati vengono salvati. Non chiudere l\'app.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+            style: TextStyle(fontSize: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
           ),
         ],
       ),
@@ -553,11 +567,15 @@ class _ProgressInfo extends StatelessWidget {
   final int receivedCount;
   final int totalChunks;
   final List<int> missingChunkIndices;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
   const _ProgressInfo({
     required this.receivedCount,
     required this.totalChunks,
     required this.missingChunkIndices,
+    required this.isDark,
+    required this.colorScheme,
   });
 
   @override
@@ -730,27 +748,32 @@ class _ErrorMessage extends StatelessWidget {
 }
 
 class _InstructionsCard extends StatelessWidget {
+  final bool isDark;
+  final ColorScheme colorScheme;
+
+  const _InstructionsCard({required this.isDark, required this.colorScheme});
+
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
+        color: isDark ? colorScheme.surfaceContainer : Colors.blue.shade50,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.shade200),
+        border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.blue.shade200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.info_rounded, color: Colors.blue.shade700),
+              Icon(Icons.info_rounded, color: isDark ? colorScheme.primary : Colors.blue.shade700),
               const SizedBox(width: 8),
               Text(
                 'Istruzioni',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: Colors.blue.shade700,
+                  color: isDark ? colorScheme.primary : Colors.blue.shade700,
                 ),
               ),
             ],
@@ -759,20 +782,28 @@ class _InstructionsCard extends StatelessWidget {
           _InstructionStep(
             number: 1,
             text: 'Inquadra i QR code mostrati dal dispositivo mittente',
+            isDark: isDark,
+            colorScheme: colorScheme,
           ),
           _InstructionStep(
             number: 2,
             text:
                 'I QR code vengono mostrati ciclicamente, puoi riprovare se ne perdi uno',
+            isDark: isDark,
+            colorScheme: colorScheme,
           ),
           _InstructionStep(
             number: 3,
             text:
                 'Quando tutti i chunk sono ricevuti, inserisci il PIN fornito',
+            isDark: isDark,
+            colorScheme: colorScheme,
           ),
           _InstructionStep(
             number: 4,
             text: 'I dati verranno importati sostituendo quelli esistenti',
+            isDark: isDark,
+            colorScheme: colorScheme,
           ),
         ],
       ),
@@ -783,8 +814,15 @@ class _InstructionsCard extends StatelessWidget {
 class _InstructionStep extends StatelessWidget {
   final int number;
   final String text;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
-  const _InstructionStep({required this.number, required this.text});
+  const _InstructionStep({
+    required this.number,
+    required this.text,
+    required this.isDark,
+    required this.colorScheme,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -797,7 +835,7 @@ class _InstructionStep extends StatelessWidget {
             width: 24,
             height: 24,
             decoration: BoxDecoration(
-              color: Colors.blue.shade700,
+              color: isDark ? colorScheme.primary : Colors.blue.shade700,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Center(
@@ -812,7 +850,12 @@ class _InstructionStep extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 13, color: isDark ? colorScheme.onSurface : null),
+            ),
+          ),
         ],
       ),
     );

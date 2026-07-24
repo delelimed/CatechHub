@@ -49,9 +49,13 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
     }
 
     final labels = _selected.map(_labelFor).join(', ');
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? colorScheme.surface : Colors.white,
         title: const Text('Conferma cancellazione'),
         content: Text(
           'Eliminare definitivamente:\n\n$labels\n\n'
@@ -158,6 +162,10 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return AppScaffold(
       title: 'Cancella dati',
       child: _isDeleting
@@ -168,21 +176,21 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.red.shade50,
+                    color: isDark ? colorScheme.errorContainer.withValues(alpha: 0.3) : Colors.red.shade50,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.red.shade100),
+                    border: Border.all(color: isDark ? colorScheme.error.withValues(alpha: 0.3) : Colors.red.shade100),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.warning_amber_rounded, color: Colors.red.shade700),
+                      Icon(Icons.warning_amber_rounded, color: isDark ? colorScheme.error : Colors.red.shade700),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'Scegli cosa eliminare. I dati non vengono inviati online: '
                           'la cancellazione è definitiva sul dispositivo.',
                           style: TextStyle(
-                            color: Colors.red.shade900,
+                            color: isDark ? colorScheme.onErrorContainer : Colors.red.shade900,
                             height: 1.4,
                           ),
                         ),
@@ -191,7 +199,7 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                ...DataDeletionCategory.values.map(_buildOption),
+                ...DataDeletionCategory.values.map((c) => _buildOption(c, isDark, colorScheme)),
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
@@ -219,14 +227,14 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
     );
   }
 
-  Widget _buildOption(DataDeletionCategory category) {
+  Widget _buildOption(DataDeletionCategory category, bool isDark, ColorScheme colorScheme) {
     final count = _countFor(category);
     final isSelected = _selected.contains(category);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Material(
-        color: Colors.white,
+        color: isDark ? colorScheme.surfaceContainer : Colors.white,
         borderRadius: BorderRadius.circular(18),
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
@@ -244,7 +252,7 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
-                color: isSelected ? Colors.red : Colors.grey.shade200,
+                color: isSelected ? Colors.red : (isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade200),
                 width: isSelected ? 2 : 1,
               ),
             ),
@@ -264,16 +272,20 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
                     },
               title: Text(
                 _labelFor(category),
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? colorScheme.onSurface : Colors.black87,
+                ),
               ),
               subtitle: Text(
                 count == 0
                     ? '${_subtitleFor(category)} — nessun dato'
                     : '${_subtitleFor(category)} — $count elementi',
+                style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
               ),
               secondary: Icon(
                 _iconFor(category),
-                color: count == 0 ? Colors.grey : const Color(0xFF174A7E),
+                color: count == 0 ? Colors.grey : (isDark ? colorScheme.primary : const Color(0xFF174A7E)),
               ),
             ),
           ),

@@ -125,6 +125,9 @@ class DocumentDetailPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final docId = document['id']?.toString() ?? '';
     final deliveriesAsync = ref.watch(documentDeliveriesProvider(docId));
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return AppScaffold(
       title: document['title']?.toString() ?? 'Dettaglio Documento',
@@ -156,6 +159,8 @@ class DocumentDetailPage extends ConsumerWidget {
                 return Column(
                   children: [
                     _TodayDeliverButton(
+                      isDark: isDark,
+                      colorScheme: colorScheme,
                       onTap: () async {
                         final updated = await _setDeliveredForToday();
                         if (context.mounted) {
@@ -171,64 +176,68 @@ class DocumentDetailPage extends ConsumerWidget {
                         }
                       },
                     ),
-                    if (exoneratedCount > 0) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(Icons.info_outline_rounded, size: 14, color: Colors.grey.shade600),
-                          const SizedBox(width: 6),
-                          Text(
-                            '$exoneratedCount ${exoneratedCount == 1 ? 'ragazzo esonerato' : 'ragazzi esonerati'}',
-                            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-                          ),
-                        ],
-                      ),
+                      if (exoneratedCount > 0) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(Icons.info_outline_rounded, size: 14, color: isDark ? Colors.grey.shade500 : Colors.grey.shade600),
+                            const SizedBox(width: 6),
+                            Text(
+                              '$exoneratedCount ${exoneratedCount == 1 ? 'ragazzo esonerato' : 'ragazzi esonerati'}',
+                              style: TextStyle(fontSize: 13, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
-                  ],
-                );
-              }
-              final student = students[index - 1];
-              final studentId = student.id;
+                  );
+                }
+                final student = students[index - 1];
+                final studentId = student.id;
 
-              final deliveryData = deliveries[studentId];
-              final bool isExonerated = deliveryData?['exoneratedAt'] != null;
+                final deliveryData = deliveries[studentId];
+                final bool isExonerated = deliveryData?['exoneratedAt'] != null;
 
-              final dynamic givenOutTimestamp = deliveryData?['givenOutAt'];
-              final dynamic receivedTimestamp = deliveryData?['receivedAt'];
+                final dynamic givenOutTimestamp = deliveryData?['givenOutAt'];
+                final dynamic receivedTimestamp = deliveryData?['receivedAt'];
 
-              final bool isGivenOut = givenOutTimestamp != null;
-              final bool isReceived = receivedTimestamp != null;
+                final bool isGivenOut = givenOutTimestamp != null;
+                final bool isReceived = receivedTimestamp != null;
 
-              final String dateGivenStr = _formatTimestamp(givenOutTimestamp);
-              final String dateReceivedStr = _formatTimestamp(receivedTimestamp);
+                final String dateGivenStr = _formatTimestamp(givenOutTimestamp);
+                final String dateReceivedStr = _formatTimestamp(receivedTimestamp);
 
-              String statusText = 'Da consegnare';
-              Color statusColor = Colors.grey.shade600;
-              if (isExonerated) {
-                statusText = 'Esonerato';
-                statusColor = Colors.grey;
-              } else if (isGivenOut && !isReceived) {
-                statusText = 'Consegnato (In attesa di riconsegna)';
-                statusColor = Colors.orange.shade800;
-              } else if (isReceived) {
-                statusText = 'Ritirato e Completato';
-                statusColor = Colors.green;
-              }
+                String statusText = 'Da consegnare';
+                Color statusColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+                if (isExonerated) {
+                  statusText = 'Esonerato';
+                  statusColor = isDark ? Colors.grey.shade500 : Colors.grey;
+                } else if (isGivenOut && !isReceived) {
+                  statusText = 'Consegnato (In attesa di riconsegna)';
+                  statusColor = isDark ? Colors.orange.shade300 : Colors.orange.shade800;
+                } else if (isReceived) {
+                  statusText = 'Ritirato e Completato';
+                  statusColor = Colors.green;
+                }
 
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isExonerated ? Colors.grey.shade100 : Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      )
-                    ],
-                  ),
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isExonerated
+                          ? (isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.grey.shade100)
+                          : (isDark ? colorScheme.surfaceContainer : Colors.white),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: isDark
+                              ? Colors.black.withValues(alpha: 0.3)
+                              : Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        )
+                      ],
+                    ),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     child: Column(
@@ -238,12 +247,12 @@ class DocumentDetailPage extends ConsumerWidget {
                           children: [
                             CircleAvatar(
                               backgroundColor: isExonerated
-                                  ? Colors.grey.shade300
-                                  : const Color(0xFF174A7E).withValues(alpha: 0.1),
+                                  ? (isDark ? Colors.grey.shade700 : Colors.grey.shade300)
+                                  : (isDark ? colorScheme.primaryContainer.withValues(alpha: 0.3) : const Color(0xFF174A7E).withValues(alpha: 0.1)),
                               child: Text(
                                 student.name.isNotEmpty ? student.name[0].toUpperCase() : 'R',
                                 style: TextStyle(
-                                  color: isExonerated ? Colors.grey.shade500 : const Color(0xFF174A7E),
+                                  color: isExonerated ? (isDark ? Colors.grey.shade500 : Colors.grey.shade500) : (isDark ? colorScheme.primary : const Color(0xFF174A7E)),
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -258,7 +267,7 @@ class DocumentDetailPage extends ConsumerWidget {
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
-                                      color: isExonerated ? Colors.grey.shade500 : const Color(0xFF174A7E),
+                                      color: isExonerated ? (isDark ? Colors.grey.shade500 : Colors.grey.shade500) : (isDark ? colorScheme.primary : const Color(0xFF174A7E)),
                                     ),
                                   ),
                                   Text(
@@ -275,7 +284,7 @@ class DocumentDetailPage extends ConsumerWidget {
                             PopupMenuButton<String>(
                               icon: Icon(
                                 Icons.more_vert_rounded,
-                                color: isExonerated ? Colors.grey.shade400 : Colors.grey.shade600,
+                                color: isExonerated ? (isDark ? Colors.grey.shade600 : Colors.grey.shade400) : (isDark ? Colors.grey.shade500 : Colors.grey.shade600),
                               ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(18),
@@ -313,27 +322,27 @@ class DocumentDetailPage extends ConsumerWidget {
                             margin: const EdgeInsets.only(top: 12),
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
+                              color: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.grey.shade200,
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.block_rounded, size: 16, color: Colors.grey.shade600),
+                                Icon(Icons.block_rounded, size: 16, color: isDark ? Colors.grey.shade500 : Colors.grey.shade600),
                                 const SizedBox(width: 6),
                                 Text(
                                   'Esonerato',
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.grey.shade600,
+                                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                                   ),
                                 ),
                               ],
                             ),
                           )
                         else ...[
-                          const Divider(height: 20, thickness: 0.5),
+                          Divider(height: 20, thickness: 0.5, color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : null),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             crossAxisAlignment: CrossAxisAlignment.center,
@@ -346,6 +355,8 @@ class DocumentDetailPage extends ConsumerWidget {
                                     icon: Icons.outbox,
                                     isActive: isGivenOut,
                                     activeColor: Colors.orange.shade700,
+                                    isDark: isDark,
+                                    colorScheme: colorScheme,
                                     onTap: () => _toggleGivenOut(
                                       docId: docId,
                                       studentId: studentId,
@@ -359,7 +370,7 @@ class DocumentDetailPage extends ConsumerWidget {
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w500,
-                                        color: Colors.grey.shade600,
+                                        color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                                       ),
                                     ),
                                   ]
@@ -374,6 +385,8 @@ class DocumentDetailPage extends ConsumerWidget {
                                     icon: Icons.assignment_turned_in,
                                     isActive: isReceived,
                                     activeColor: Colors.green,
+                                    isDark: isDark,
+                                    colorScheme: colorScheme,
                                     onTap: !isGivenOut
                                         ? null
                                         : () => _toggleReceived(
@@ -389,7 +402,7 @@ class DocumentDetailPage extends ConsumerWidget {
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w500,
-                                        color: Colors.grey.shade600,
+                                        color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                                       ),
                                     ),
                                   ]
@@ -416,6 +429,8 @@ class _ActionButton extends StatelessWidget {
   final IconData icon;
   final bool isActive;
   final Color activeColor;
+  final bool isDark;
+  final ColorScheme colorScheme;
   final VoidCallback? onTap;
 
   const _ActionButton({
@@ -423,6 +438,8 @@ class _ActionButton extends StatelessWidget {
     required this.icon,
     required this.isActive,
     required this.activeColor,
+    required this.isDark,
+    required this.colorScheme,
     required this.onTap,
   });
 
@@ -438,17 +455,17 @@ class _ActionButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isButtonDisabled
-              ? Colors.grey.shade100
+              ? (isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.grey.shade100)
               : isActive
                   ? activeColor.withValues(alpha: 0.12)
                   : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isButtonDisabled
-                ? Colors.grey.shade300
+                ? (isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade300)
                 : isActive
                     ? activeColor
-                    : Colors.grey.shade300,
+                    : (isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade300),
             width: 1,
           ),
         ),
@@ -459,10 +476,10 @@ class _ActionButton extends StatelessWidget {
               icon,
               size: 16,
               color: isButtonDisabled
-                  ? Colors.grey.shade400
+                  ? (isDark ? Colors.grey.shade500 : Colors.grey.shade400)
                   : isActive
                       ? activeColor
-                      : Colors.grey.shade600,
+                      : (isDark ? Colors.grey.shade400 : Colors.grey.shade600),
             ),
             const SizedBox(width: 6),
             Text(
@@ -471,10 +488,10 @@ class _ActionButton extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: isButtonDisabled
-                    ? Colors.grey.shade400
+                    ? (isDark ? Colors.grey.shade500 : Colors.grey.shade400)
                     : isActive
                         ? activeColor
-                        : Colors.grey.shade700,
+                        : (isDark ? Colors.grey.shade400 : Colors.grey.shade700),
               ),
             ),
           ],
@@ -485,9 +502,15 @@ class _ActionButton extends StatelessWidget {
 }
 
 class _TodayDeliverButton extends StatelessWidget {
+  final bool isDark;
+  final ColorScheme colorScheme;
   final VoidCallback onTap;
 
-  const _TodayDeliverButton({required this.onTap});
+  const _TodayDeliverButton({
+    required this.isDark,
+    required this.colorScheme,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {

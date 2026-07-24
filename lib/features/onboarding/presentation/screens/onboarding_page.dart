@@ -30,7 +30,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
 
   String? _errorMessage;
 
-  static const _totalPages = 7;
+  static const _totalPages = 8;
 
   @override
   void dispose() {
@@ -175,6 +175,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                   _buildCameraPermissionPage(),
                   _buildBluetoothPermissionPage(),
                   _buildReadyPage(),
+                  _buildLegalDisclaimerPage(),
                 ],
               ),
             ),
@@ -735,6 +736,87 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           const SizedBox(height: 20),
         ],
       ),
+    );
+  }
+
+  // ─── PAGE 8: LEGAL DISCLAIMER ──────────────────────────────────────────
+
+  Widget _buildLegalDisclaimerPage() {
+    return _buildPageContainer(
+      Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const SizedBox(height: 40),
+          const Icon(Icons.gavel_rounded, size: 64, color: Color(0xFF174A7E)),
+          const SizedBox(height: 24),
+          const Text(
+            'Disclaimer legale',
+            style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
+          ),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.blue.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Con l\'utilizzo di CatechHub, dichiari e confermi:',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF174A7E)),
+                ),
+                const SizedBox(height: 16),
+                _buildDisclaimerPoint(
+                  Icons.shield_rounded,
+                  'CatechHub non invia dati personali a server esterni. Tutti i dati rimangono esclusivamente sul tuo dispositivo, cifrati con AES-256-GCM.',
+                ),
+                const SizedBox(height: 12),
+                _buildDisclaimerPoint(
+                  Icons.person_outline_rounded,
+                  'Il titolare del trattamento dei dati dei minori seguiti sei TU (catechista/parroco). CatechHub è solo lo strumento tecnico che ti mette a disposizione.',
+                ),
+                const SizedBox(height: 12),
+                _buildDisclaimerPoint(
+                  Icons.shield_moon_rounded,
+                  'Ti assumi la piena responsabilità di proteggere il tuo dispositivo (PIN, impronta, volto, aggiornamenti OS, blocco schermo). La sicurezza dei dati dipende dalla custodia del tuo cellulare.',
+                ),
+                const SizedBox(height: 12),
+                _buildDisclaimerPoint(
+                  Icons.backup_rounded,
+                  'Sei responsabile di eseguito a effettuare backup cifrati periodici e a custodirne le password in luogo sicuro. La perdita del dispositivo senza backup comporta la perdita irreversibile dei dati.',
+                ),
+                const SizedBox(height: 12),
+                _buildDisclaimerPoint(
+                  Icons.gavel_rounded,
+                  'L\'uso di CatechHub non solleva da obblighi GDPR, normativa canonica e normative locali sulla tutela dei minori. Sei tenuto a rispettare ogni adempimento di legge.',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
+          _buildNextButton('Accetto e inizio'),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDisclaimerPoint(IconData icon, String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 22, color: const Color(0xFF174A7E)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.5),
+          ),
+        ),
+      ],
     );
   }
 

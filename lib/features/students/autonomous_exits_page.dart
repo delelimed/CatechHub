@@ -17,6 +17,9 @@ class AutonomousExitsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final repo = StudentsRepository();
     final allStudents = repo.getAllStudentsSync();
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     final autonomousStudents = Student.sortedBySurname(
       allStudents.where(
@@ -56,6 +59,8 @@ class AutonomousExitsPage extends StatelessWidget {
               students: autonomousStudents,
               color: Colors.green,
               showExitDetails: false,
+              isDark: isDark,
+              colorScheme: colorScheme,
             ),
             const SizedBox(height: 24),
             _Section(
@@ -63,6 +68,8 @@ class AutonomousExitsPage extends StatelessWidget {
               students: accompaniedByParentsStudents,
               color: Colors.blue,
               showExitDetails: true,
+              isDark: isDark,
+              colorScheme: colorScheme,
             ),
             const SizedBox(height: 24),
             _Section(
@@ -70,6 +77,8 @@ class AutonomousExitsPage extends StatelessWidget {
               students: accompaniedByOthersStudents,
               color: Colors.orange,
               showExitDetails: true,
+              isDark: isDark,
+              colorScheme: colorScheme,
             ),
           ],
         ),
@@ -83,12 +92,16 @@ class _Section extends StatelessWidget {
   final List<Student> students;
   final Color color;
   final bool showExitDetails;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
   const _Section({
     required this.title,
     required this.students,
     required this.color,
     required this.showExitDetails,
+    required this.isDark,
+    required this.colorScheme,
   });
 
   String? _extractExitDetail(String autonomousExits) {
@@ -155,12 +168,12 @@ class _Section extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.grey.shade50,
+              color: isDark ? colorScheme.surfaceContainer : Colors.grey.shade50,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
               'Nessun ragazzo in questa categoria.',
-              style: TextStyle(color: Colors.grey.shade600),
+              style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
             ),
           )
         else
@@ -169,19 +182,19 @@ class _Section extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? colorScheme.surfaceContainer : Colors.white,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade200),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     '${student.surname} ${student.name}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 15,
-                      color: Color(0xFF174A7E),
+                      color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
                     ),
                   ),
                   if (showExitDetails &&
@@ -195,7 +208,7 @@ class _Section extends StatelessWidget {
                           Icon(
                             Icons.info_rounded,
                             size: 14,
-                            color: Colors.grey.shade500,
+                            color: isDark ? Colors.grey.shade500 : Colors.grey.shade500,
                           ),
                           const SizedBox(width: 6),
                           Expanded(
@@ -203,7 +216,7 @@ class _Section extends StatelessWidget {
                               _extractExitDetail(student.autonomousExits!) ??
                                   student.autonomousExits!,
                               style: TextStyle(
-                                color: Colors.grey.shade700,
+                                color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
                                 fontSize: 13,
                               ),
                             ),

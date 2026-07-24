@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Responsabilità e Limitazioni — CatechHub</title>
+<link rel="icon" href="../logo.png" type="image/png">
+<link rel="stylesheet" href="../style.css">
+<script src="../js/version.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="../logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
+
+<section class="page-header">
+  <div class="container">
+    <h1>Responsabilità e Limitazioni</h1>
+    <p>Ruoli GDPR, disclaimer dell'autore e raccomandazioni per l'uso conforme</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <div class="breadcrumb"><a href="../index.html">Home</a> / <a href="index.html">GDPR</a> / Responsabilità e Limitazioni</div>
+
+    <div class="alert alert-warning" style="display:block;">
+      <p style="margin-bottom:0;"><strong>Nota:</strong> Questa pagina &egrave; stata generata con l'ausilio di intelligenza artificiale e non &egrave; stata scritta da un legale. Le informazioni hanno scopo puramente informativo e non costituiscono consulenza legale.</p>
+    </div>
+
+    <div class="alert alert-warning">
+      <strong>Documento informativo.</strong> Questa pagina non costituisce consulenza legale. Si raccomanda di consultare un professionista per la corretta interpretazione degli obblighi GDPR.
+    </div>
+
+    <h2>1. Lo sviluppatore NON è il titolare del trattamento</h2>
+    <p>CatechHub è un'applicazione software distribuita come strumento. Lo sviluppatore (la persona fisica che ha scritto il codice) <strong>non è il titolare del trattamento</strong> ai sensi dell'Art. 4(7) GDPR. Non raccoglie, memorizza, elabora o accede ai dati personali inseriti nell'app.</p>
+    <p>Il <strong>titolare del trattamento</strong> è il catechista o la parrocchia che installa CatechHub e utilizza l'app per gestire i propri dati. È il titolare che determina le finalità e i mezzi del trattamento.</p>
+
+    <h2>2. L'utente è il data controller</h2>
+    <p>Installando e utilizzando CatechHub, l'utente (catechista / parrocchia) diventa il titolare del trattamento e si assume la piena responsabilità di:</p>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>Garantire una base giuridica valida per il trattamento dei dati (es. consenso dei genitori)</li>
+      <li>Informare gli interessati (genitori/tutori) circa il trattamento dei dati</li>
+      <li>Ottenere il consenso esplicito per eventuali dati sensibili (allergie, informazioni sanitarie)</li>
+      <li>Garantire la sicurezza fisica del dispositivo su cui è installata l'app</li>
+      <li>Gestire le richieste di esercizio dei diritti degli interessati (accesso, cancellazione, rettifica, portabilità)</li>
+      <li>Condurre una Data Protection Impact Assessment (DPIA) se necessario</li>
+      <li>Notificare eventuali data breach all'autorità di controllo competente</li>
+    </ul>
+
+    <h2>3. Lo strumento, non il servizio</h2>
+    <p>CatechHub è distribuito come <strong>software</strong>, non come servizio (SaaS). Non esiste:</p>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>Un server centrale che elabora dati</li>
+      <li>Un account o registrazione obbligatoria</li>
+      <li>Un contratto di trattamento dati (DPA) tra sviluppatore e utente</li>
+      <li>Un'infrastruttura cloud che memorizza dati</li>
+      <li>Un accesso remoto dello sviluppatore ai dati dell'utente</li>
+    </ul>
+    <p>Pertanto, non sussiste un rapporto di contitolarità o di responsabile del trattamento ai sensi degli Artt. 26 e 28 GDPR.</p>
+
+    <h2>4. Disclaimer licenza MIT</h2>
+    <div class="alert alert-danger">
+      <strong>IL SOFTWARE È FORNITO "COSÌ COM'È", SENZA GARANZIA DI ALCUN TIPO.</strong>
+    </div>
+    <p>Secondo i termini della licenza MIT, lo sviluppatore non fornisce alcuna garanzia, esplicita o implicita, inclusa ma non limitata a garanzie di merchantabilità, idoneità per uno scopo particolare e non violazione. In nessun caso lo sviluppatore sarà responsabile per rivendicazioni, danni o altre responsabilità, sia in un'azione contrattuale, extracontrattuale o altro, derivanti da o in connessione con il software o l'uso o altre transazioni nel software.</p>
+
+    <h2>5. Raccomandazioni per l'uso conforme al GDPR</h2>
+    <p>Per utilizzare CatechHub in conformità con il GDPR, si raccomanda di:</p>
+    <ol style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li><strong>Informare i genitori</strong> circa i dati raccolti e le finalità del trattamento (vedi template consenso nella sezione 8)</li>
+      <li><strong>Ottenere il consenso</strong> per il trattamento dei dati dei minori e per eventuali dati sensibili</li>
+      <li><strong>Proteggere il dispositivo</strong> con PIN/Pattern/Biometria a livello di sistema operativo</li>
+      <li><strong>Abilitare la crittografia</strong> del dispositivo Android (crittografia a livello filesystem)</li>
+      <li><strong>Limitare la sincronizzazione</strong> P2P ai soli catechisti di fiducia e autorizzati</li>
+      <li><strong>Eseguire backup regolari</strong> del database tramite la funzione "Backup" dell'app</li>
+      <li><strong>Eliminare i dati</strong> non più necessari utilizzando la funzione "Elimina dati"</li>
+      <li><strong>Disinstallare l'app</strong> dai dispositivi non più in uso, cancellando tutti i dati</li>
+      <li><strong>Tenere un registro</strong> delle attività di trattamento (vedi <a href="registro-trattamento.html">Registro Trattamento</a>)</li>
+    </ol>
+
+    <h2>6. Di cosa lo sviluppatore NON è responsabile</h2>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>Della conformità GDPR dell'utente</li>
+      <li>Della mancata ottenuta del consenso dei genitori</li>
+      <li>Della perdita o furto del dispositivo</li>
+      <li>Dell'accesso non autorizzato a dati a causa di dispositivi rooted o compromessi</li>
+      <li>Dell'intercettazione di dati durante sincronizzazione Bluetooth in ambienti non sicuri</li>
+      <li>Di errori umani nell'inserimento, modifica o cancellazione dei dati</li>
+      <li>Di backup non eseguiti o backup danneggiati</li>
+      <li>Di danni derivanti da uso improprio dell'applicazione</li>
+    </ul>
+
+
+    <h2>7. Contatti per questioni di sicurezza</h2>
+    <p>Per segnalare vulnerabilità di sicurezza o problemi relativi alla protezione dei dati, aprire una issue su <a href="https://github.com/delelimed/CatechHub/issues">GitHub Issues</a>. Le segnalazioni vengono gestite pubblicamente per garantire trasparenza. Per vulnerabilità critiche, contattare tramite GitHub Security Advisory.</p>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div>
+      <strong>CatechHub</strong> <span class="version-tag"></span> — Registro Elettronico di Catechismo<br>
+      <small>Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.</small>
+    </div>
+    <div>
+      <small>
+        &#128231; <a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a> &middot;
+        &#128247; Instagram (prossimamente) &middot;
+        &#9992; Telegram (prossimamente)
+      </small><br>
+      <a href="../privacy.html">Privacy</a> &middot;
+      <a href="../terms.html">Termini</a> &middot;
+      <a href="index.html">GDPR</a> &middot;
+      <a href="../developer.html">Sviluppatore</a> &middot;
+      <a href="https://github.com/delelimed/CatechHub" class="release-url">GitHub</a><br>
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/nav.js"></script></body>
+</html>

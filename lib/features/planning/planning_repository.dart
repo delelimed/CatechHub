@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/services/meeting_notification_service.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/attachment_parent_type.dart';
 import '../../shared/models/planning_meeting.dart';
@@ -61,6 +62,10 @@ class PlanningRepository {
     final data = m.toMap();
     data['lastModifiedBy'] = getCurrentCatechistName();
     await _box.put(id, data);
+
+    // Sincronizza con le notifiche
+    final meetingWithId = m.copyWith(id: id);
+    await MeetingNotificationService.addOrUpdateMeeting(meetingWithId);
   }
 
   /// Aggiorna un meeting esistente identificato da [id].
@@ -76,6 +81,9 @@ class PlanningRepository {
     final data = m.toMap();
     data['lastModifiedBy'] = getCurrentCatechistName();
     await _box.put(id, data);
+
+    // Sincronizza con le notifiche
+    await MeetingNotificationService.addOrUpdateMeeting(m.copyWith(id: id));
 
     if (m.isReunion) {
       await LocalDatabase.attendance().delete(id);
@@ -102,6 +110,9 @@ class PlanningRepository {
     await LocalDatabase.meetingCatechesi().delete(id);
     await _box.delete(id);
     await LocalDatabase.attendance().delete(id);
+
+    // Rimuovi la notifica programmata
+    await MeetingNotificationService.removeMeeting(id);
   }
 
   /// Restituisce il messaggio di errore localizzato per conflitto di data,

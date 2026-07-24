@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analisi secondo CNIL e ANSSI — CatechHub</title>
+<link rel="icon" href="../logo.png" type="image/png">
+<link rel="stylesheet" href="../style.css">
+<script src="../js/version.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="../logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
+
+<section class="page-header">
+  <div class="container">
+    <h1>Analisi secondo CNIL e ANSSI</h1>
+    <p>Metodologia PIA francese, analisi EBIOS e conformità Loi Informatique et Libertés</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <div class="breadcrumb"><a href="../index.html">Home</a> / <a href="index.html">GDPR</a> / Analisi CNIL / ANSSI</div>
+
+    <div class="alert alert-warning" style="display:block;">
+      <p style="margin-bottom:0;"><strong>Nota:</strong> Questa pagina &egrave; stata generata con l'ausilio di intelligenza artificiale e non &egrave; stata scritta da un legale. Le informazioni hanno scopo puramente informativo e non costituiscono consulenza legale.</p>
+    </div>
+
+    <div class="alert alert-info">
+      <strong>Metodologia:</strong> Questa analisi è ispirata alla metodologia PIA (Privacy Impact Assessment) della CNIL (Commission Nationale de l'Informatique et des Libertés) e alle raccomandazioni di sicurezza dell'ANSSI (Agence Nationale de la Sécurité des Systèmes d'Information), incluso il Référentiel Général de Sécurité (RGS).
+    </div>
+
+    <h2>1. Identificazione dei beni</h2>
+    <table class="sec-table">
+      <thead><tr><th>Bene</th><th>Tipo</th><th>Classificazione</th><th>Supporto</th></tr></thead>
+      <tbody>
+        <tr><td>Database Hive (13 box)</td><td>Dati strutturati</td><td>Critico / Riservato</td><td>Filesystem interno (cifrato AES-256-GCM)</td></tr>
+        <tr><td>Allegati (PDF, immagini)</td><td>Dati binari</td><td>Riservato</td><td>Filesystem interno (cifrato AES-256-GCM)</td></tr>
+        <tr><td>Chiavi crittografiche</td><td>Materiale crittografico</td><td>Critico</td><td>AndroidKeyStore (hardware-backed)</td></tr>
+        <tr><td>Dispositivo Android</td><td>Hardware</td><td>Critico</td><td>Protezione fisica + FLAG_SECURE</td></tr>
+        <tr><td>Backup .catechhub</td><td>Archivio cifrato</td><td>Riservato</td><td>Filesystem esterno / cloud (a scelta utente)</td></tr>
+        <tr><td>Trusted Devices</td><td>Chiavi pubbliche ECDH</td><td>Sensibile</td><td>Box Hive cifrato</td></tr>
+      </tbody>
+    </table>
+
+    <h2>2. Analisi delle minacce (metodo EBIOS)</h2>
+    <p>Utilizzando la metodologia EBIOS (Expression des Besoins et Identification des Objectifs de Sécurité) sviluppata dall'ANSSI, identifichiamo le seguenti fonti di minaccia:</p>
+
+    <table class="sec-table">
+      <thead><tr><th>Fonte di minaccia</th><th>Evento temuto</th><th>Gravità</th><th>Probabilità</th><th>Rischio residuo</th></tr></thead>
+      <tbody>
+        <tr><td>Attaccante esterno (ladro)</td><td>Furto dispositivo, tentativo accesso dati</td><td>Alta</td><td>Bassa</td><td>Medio</td></tr>
+        <tr><td>Attaccante esterno (hacker)</td><td>Accesso remoto, intercettazione Bluetooth</td><td>Alta</td><td>Molto bassa</td><td>Basso</td></tr>
+        <tr><td>Utente malintenzionato (interno parrocchia)</td><td>Accesso non autorizzato, modifica dati</td><td>Media</td><td>Bassa</td><td>Basso</td></tr>
+        <tr><td>Ambiente ostile (root, malware)</td><td>Compromissione OS, estrazione chiavi</td><td>Alta</td><td>Bassa</td><td>Medio</td></tr>
+        <tr><td>Errore umano (catechista)</td><td>Cancellazione accidentale, errato inserimento</td><td>Media</td><td>Media</td><td>Medio</td></tr>
+        <tr><td>Guasto tecnico</td><td>Corruzione database, crash app</td><td>Media</td><td>Bassa</td><td>Basso</td></tr>
+        <tr><td>Forza maggiore</td><td>Distruzione dispositivo, disastro naturale</td><td>Alta</td><td>Molto bassa</td><td>Medio</td></tr>
+      </tbody>
+    </table>
+
+    <h2>3. Misure di sicurezza mappate alle raccomandazioni ANSSI RGS</h2>
+    <table class="sec-table">
+      <thead><tr><th>Raccomandazione ANSSI / RGS</th><th>Misura implementata in CatechHub</th><th>Livello di conformità</th></tr></thead>
+      <tbody>
+        <tr><td>RGS A1 — Authentification</td><td>BiometricPrompt con fallback PIN/Pattern. Sessione in RAM.</td><td>&#9989; Conforme</td></tr>
+        <tr><td>RGS A2 — Intégrité</td><td>Tag GCM 128bit su tutti i dati. Checksum SHA-256 su backup.</td><td>&#9989; Conforme</td></tr>
+        <tr><td>RGS A3 — Confidentialité</td><td>AES-256-GCM a riposo e in transito. ECDH + HKDF per sync.</td><td>&#9989; Conforme</td></tr>
+        <tr><td>RGS A4 — Traçabilité</td><td>Non implementata (scelta di design per minimizzazione).</td><td>&#10060; Non conforme (consapevole)</td></tr>
+        <tr><td>ANSSI — Chiffrement fort</td><td>AES-256-GCM, PBKDF2 210k iterazioni, ECDH P-256, HKDF-SHA256.</td><td>&#9989; Conforme</td></tr>
+        <tr><td>ANSSI — Gestion des clés</td><td>AndroidKeyStore (isolamento hardware). Chiavi mai esposte al livello Dart.</td><td>&#9989; Conforme</td></tr>
+        <tr><td>ANSSI — Sécurité runtime</td><td>freeRASP: anti-root, anti-hooking, anti-emulator, app integrity.</td><td>&#9989; Conforme</td></tr>
+        <tr><td>ANSSI — Chiffrement de sessions</td><td>Session key derivata con HKDF per ogni coppia di dispositivi.</td><td>&#9989; Conforme</td></tr>
+        <tr><td>ANSSI — Effacement sécurisé</td><td>Eliminazione box Hive con deleteBoxFromDisk. Disinstallazione rimuove tutti i dati.</td><td>&#9989; Conforme</td></tr>
+      </tbody>
+    </table>
+
+    <h2>4. PIA (Privacy Impact Assessment) — Tabella riassuntiva</h2>
+    <table class="sec-table">
+      <thead><tr><th>Componente PIA</th><th>Valutazione</th></tr></thead>
+      <tbody>
+        <tr><td>Natura dei dati trattati</td><td>Dati personali comuni (nome, cognome, data nascita) + categorie particolari (allergie, salute) solo con consenso esplicito</td></tr>
+        <tr><td>Ambito del trattamento</td><td>Locale (singolo dispositivo), nessun trasferimento internazionale</td></tr>
+        <tr><td>Contesto del trattamento</td><td>Gestione del catechismo parrocchiale. Dati di minori.</td></tr>
+        <tr><td>Finalità del trattamento</td><td>Anagrafica, presenze, documenti, comunicazioni, pianificazione</td></tr>
+        <tr><td>Rischi per i diritti e le libertà</td><td>Medi. Rischio principale: accesso non autorizzato a dati di minori</td></tr>
+        <tr><td>Misure previste</td><td>Crittografia, controllo accessi, minimizzazione, trasparenza (open source)</td></tr>
+        <tr><td>Necessità di consultazione CNIL/DPO</td><td>Non richiesta obbligatoriamente ma raccomandata per parrocchie con più catechisti</td></tr>
+      </tbody>
+    </table>
+
+    <h2>5. Conformità con la Loi Informatique et Libertés (Francia)</h2>
+    <p>La legge francese n. 78-17 del 6 gennaio 1978 (modificata) — Loi Informatique et Libertés — si applica al trattamento di dati personali effettuato sul territorio francese. Pur non essendo l'app sviluppata in Francia, l'analisi di conformità è rilevante per gli utenti francesi.</p>
+
+    <table class="sec-table">
+      <thead><tr><th>Articolo LIL</th><th>Obbligo</th><th>Stato</th></tr></thead>
+      <tbody>
+        <tr><td>Art. 4</td><td>Consenso per dati sensibili</td><td>? Supportato (consenso esplicito richiesto)</td></tr>
+        <tr><td>Art. 22</td><td>Diritto di opposizione</td><td>? L'utente può cessare il trattamento disinstallando l'app</td></tr>
+        <tr><td>Art. 32</td><td>Obbligo di sicurezza</td><td>&#9989; Crittografia, auth, anti-tamper</td></tr>
+        <tr><td>Art. 48</td><td>Registro delle attività</td><td>&#9989; Documentato (vedi <a href="registro-trattamento.html">Registro Trattamento</a>)</td></tr>
+        <tr><td>Art. 69</td><td>Designazione DPO</td><td>&#10060; Non applicabile (nessuna struttura organizzativa)</td></tr>
+        <tr><td>Art. 82</td><td>Sanzioni</td><td>&#10060; L'utente è responsabile della conformità</td></tr>
+      </tbody>
+    </table>
+
+    <h2>6. Conclusioni</h2>
+    <div class="alert alert-success">
+      <p>CatechHub implementa misure di sicurezza allineate alle raccomandazioni ANSSI e ai principi PIA della CNIL. L'assenza di server centrali, la crittografia end-to-end e il controllo degli accessi biometrico costituiscono i punti di forza principali.</p>
+    </div>
+    <div class="alert alert-warning">
+      <p>Punti di attenzione: (1) assenza di logging di audit (traçabilité), scelta consapevole per minimizzare la superficie dati; (2) l'utente finale (catechista/parrocchia) rimane il responsabile della conformità; (3) si raccomanda una DPIA formale per parrocchie con trattamento su larga scala.</p>
+    </div>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div>
+      <strong>CatechHub</strong> <span class="version-tag"></span> — Registro Elettronico di Catechismo<br>
+      <small>Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.</small>
+    </div>
+    <div>
+      <small>
+        &#128231; <a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a> &middot;
+        &#128247; Instagram (prossimamente) &middot;
+        &#9992; Telegram (prossimamente)
+      </small><br>
+      <a href="../privacy.html">Privacy</a> &middot;
+      <a href="../terms.html">Termini</a> &middot;
+      <a href="index.html">GDPR</a> &middot;
+      <a href="../developer.html">Sviluppatore</a> &middot;
+      <a href="https://github.com/delelimed/CatechHub" class="release-url">GitHub</a><br>
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/nav.js"></script></body>
+</html>

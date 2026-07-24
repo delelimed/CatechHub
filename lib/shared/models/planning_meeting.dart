@@ -41,6 +41,9 @@ class PlanningMeeting {
   /// Data dell'incontro (formato ISO 8601).
   final DateTime date;
 
+  /// Orario dell'incontro (solo per riunioni). Formato "HH:mm".
+  final String? time;
+
   /// Titolo (es. "Incontro sulla Pasqua"). Se vuoto in fromMap,
   /// viene generato automaticamente "Giornata del <gg>/<mm>/<aaaa>".
   final String title;
@@ -64,6 +67,7 @@ class PlanningMeeting {
     required this.classId,
     required this.createdBy,
     required this.date,
+    this.time,
     required this.title,
     required this.activity,
     required this.notes,
@@ -71,11 +75,38 @@ class PlanningMeeting {
     this.lastModifiedBy = '',
   });
 
+  PlanningMeeting copyWith({
+    String? id,
+    String? classId,
+    String? createdBy,
+    DateTime? date,
+    String? time,
+    String? title,
+    String? activity,
+    String? notes,
+    bool? isReunion,
+    String? lastModifiedBy,
+  }) {
+    return PlanningMeeting(
+      id: id ?? this.id,
+      classId: classId ?? this.classId,
+      createdBy: createdBy ?? this.createdBy,
+      date: date ?? this.date,
+      time: time ?? this.time,
+      title: title ?? this.title,
+      activity: activity ?? this.activity,
+      notes: notes ?? this.notes,
+      isReunion: isReunion ?? this.isReunion,
+      lastModifiedBy: lastModifiedBy ?? this.lastModifiedBy,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'classId': classId,
       'createdBy': createdBy,
       'date': date.toIso8601String(),
+      'time': time,
       'title': title,
       'activity': activity,
       'notes': notes,
@@ -93,6 +124,7 @@ class PlanningMeeting {
       classId: data['classId'] ?? '',
       createdBy: data['createdBy'] ?? '',
       date: date,
+      time: data['time']?.toString(),
       title: legacyTitle == null || legacyTitle.isEmpty
           ? 'Giornata del ${date.day}/${date.month}/${date.year}'
           : legacyTitle,

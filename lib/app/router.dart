@@ -19,6 +19,10 @@ import '../features/settings/settings_page.dart';
 import '../features/contact_notes/contact_notes_page.dart';
 
 import '../features/settings/licenses_page.dart';
+import '../features/settings/changelog_page.dart';
+import '../features/settings/commits_page.dart';
+import '../features/settings/commit_detail_page.dart';
+import '../features/settings/release_detail_page.dart';
 import '../features/settings/privacy.dart';
 import '../features/onboarding/presentation/screens/onboarding_page.dart';
 import '../core/storage/local_database.dart';
@@ -73,10 +77,10 @@ import '../shared/models/catechesi_model.dart';
 //   - /documents: gestione documenti
 //   - /document-detail: dettaglio documento
 //   - /settings: impostazioni generali
-      //   - /privacy-security: impostazioni privacy e sicurezza
-      //   - /delete-data: cancellazione dati
-      //   - /backup: backup e ripristino dati
-      //   - /contact-notes: note di contatto genitori
+//   - /privacy-security: impostazioni privacy e sicurezza
+//   - /delete-data: cancellazione dati
+//   - /backup: backup e ripristino dati
+//   - /contact-notes: note di contatto genitori
 //   - /my-group: gruppo del catechista
 //   - /group-management: gestione gruppi
 //   - /allergies: vista allergie studenti
@@ -201,8 +205,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // ─────────────────────────────────────────────────────────────────────
       if (location != '/onboarding') {
         try {
-          final onboardingDone = LocalDatabase.auth()
-              .get('onboarding_completed', defaultValue: false) as bool;
+          final onboardingDone =
+              LocalDatabase.auth().get(
+                    'onboarding_completed',
+                    defaultValue: false,
+                  )
+                  as bool;
           if (!onboardingDone) return '/onboarding';
         } catch (_) {
           return '/onboarding';
@@ -267,7 +275,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // ═══════════════════════════════════════════════════════════════════
       // ONBOARDING - Prima configurazione (solo al primo avvio)
       // ═══════════════════════════════════════════════════════════════════
-      GoRoute(path: '/onboarding', builder: (context, state) => const OnboardingPage()),
+      GoRoute(
+        path: '/onboarding',
+        builder: (context, state) => const OnboardingPage(),
+      ),
 
       // ═══════════════════════════════════════════════════════════════════
       // AUTH - Schermata di sblocco (PIN/biometrico)
@@ -351,7 +362,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/document-detail',
         builder: (context, state) {
-          final extraData = state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : const <String, dynamic>{};
+          final extraData = state.extra is Map<String, dynamic>
+              ? state.extra as Map<String, dynamic>
+              : const <String, dynamic>{};
 
           return DocumentDetailPage(
             document: extraData['document'] as Map<String, dynamic>? ?? {},
@@ -376,6 +389,36 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LicensesPage(),
       ),
 
+      /// Changelog delle versioni rilasciate.
+      GoRoute(
+        path: '/changelog',
+        builder: (context, state) => const ChangelogPage(),
+      ),
+
+      /// Cronologia dei commit recenti dal repository GitHub.
+      GoRoute(
+        path: '/commits',
+        builder: (context, state) => const CommitsPage(),
+      ),
+
+      /// Dettaglio di un singolo commit.
+      GoRoute(
+        path: '/commit-detail',
+        builder: (context, state) {
+          final commit = state.extra as Map<String, dynamic>? ?? {};
+          return CommitDetailPage(commit: commit);
+        },
+      ),
+
+      /// Dettaglio di una singola versione (release).
+      GoRoute(
+        path: '/release-detail',
+        builder: (context, state) {
+          final release = state.extra as Map<String, dynamic>? ?? {};
+          return ReleaseDetailPage(release: release);
+        },
+      ),
+
       /// Impostazioni privacy e sicurezza:
       /// - FLAG_SECURE (screenshot)
       /// - Timeout sessione
@@ -394,10 +437,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
 
       /// Pagina di backup e ripristino dati: esporta/importa backup cifrati.
-      GoRoute(
-        path: '/backup',
-        builder: (context, state) => const BackupPage(),
-      ),
+      GoRoute(path: '/backup', builder: (context, state) => const BackupPage()),
 
       // ═══════════════════════════════════════════════════════════════════
       // CONTACT NOTES - Note di contatto genitori
@@ -472,7 +512,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // ═══════════════════════════════════════════════════════════════════
 
       /// Selezione modalità condivisione: invio o ricezione dati.
-      /// Supporta QR code e Bluetooth RFCOMM.
+      /// Supporta QR code e Nearby Connections.
       GoRoute(
         path: '/data-share',
         builder: (context, state) => const DataShareSelectionPage(),
@@ -507,7 +547,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       /// Lista dei contenuti catechetici con tag, riferimenti biblici e link.
       GoRoute(
-
         path: '/catechesi',
         builder: (context, state) => const CatechesiPage(),
       ),
@@ -518,7 +557,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/catechesi/edit',
         builder: (context, state) {
-          final extra = state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : const <String, dynamic>{};
+          final extra = state.extra is Map<String, dynamic>
+              ? state.extra as Map<String, dynamic>
+              : const <String, dynamic>{};
           final catechesi = extra['catechesi'] as Catechesi?;
           return CatechesiEditPage(existing: catechesi);
         },
@@ -529,7 +570,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/catechesi/detail',
         builder: (context, state) {
-          final extra = state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : const <String, dynamic>{};
+          final extra = state.extra is Map<String, dynamic>
+              ? state.extra as Map<String, dynamic>
+              : const <String, dynamic>{};
           final catechesi = extra['catechesi'] as Catechesi?;
           return CatechesiDetailPage(catechesi: catechesi!);
         },

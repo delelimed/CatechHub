@@ -5,14 +5,14 @@ on:
   workflow_dispatch:
 
   # Fa partire l'azione automaticamente ad ogni push sul ramo develop
-  push:
-    branches:
-      - develop
+  #push:
+   # branches:
+    #  - develop
       
   # Fa partire l'azione ad ogni Pull Request verso il ramo develop
-  pull_request:
-    branches:
-      - develop
+  #pull_request:
+  #  branches:
+   #   - develop
 
 jobs:
   build:

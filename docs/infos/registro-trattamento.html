@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registro delle Attività di Trattamento — CatechHub</title>
+<link rel="icon" href="../logo.png" type="image/png">
+<link rel="stylesheet" href="../style.css">
+<script src="../js/version.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="../logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
+
+<section class="page-header">
+  <div class="container">
+    <h1>Registro delle Attività di Trattamento</h1>
+    <p>Documentazione ai sensi dell'Art. 30 del GDPR</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <div class="breadcrumb"><a href="../index.html">Home</a> / <a href="index.html">GDPR</a> / Registro Trattamento</div>
+
+    <div class="alert alert-warning" style="display:block;">
+      <p style="margin-bottom:0;"><strong>Nota:</strong> Questa pagina &egrave; stata generata con l'ausilio di intelligenza artificiale e non &egrave; stata scritta da un legale. Le informazioni hanno scopo puramente informativo e non costituiscono consulenza legale.</p>
+    </div>
+
+    <div class="alert alert-info">
+      <strong>Art. 30 GDPR:</strong> Ogni titolare del trattamento e, ove applicabile, il suo rappresentante tengono un registro delle attività di trattamento svolte sotto la propria responsabilità. Il presente registro è redatto per assistere il catechista / parrocchia nell'adempimento di tale obbligo.
+    </div>
+
+    <p><strong>Titolare del trattamento:</strong> Il catechista o la parrocchia che utilizza CatechHub.<br>
+    <strong>Strumento utilizzato:</strong> CatechHub v1.0.3 (app mobile Android)<br>
+    <strong>Responsabile del trattamento:</strong> Non designato (nessun trattamento per conto del titolare)<br>
+    <strong>DPO:</strong> Da designare se obbligatorio secondo Art. 37 GDPR</p>
+
+    <h2>Attività di trattamento</h2>
+
+    <table class="sec-table">
+      <thead>
+        <tr>
+          <th>N.</th>
+          <th>Finalità del trattamento</th>
+          <th>Categorie di dati</th>
+          <th>Interessati</th>
+          <th>Periodo conservazione</th>
+          <th>Misure di sicurezza</th>
+          <th>Base giuridica</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><strong>Registrazione studenti</strong><br>Gestione anagrafica dei partecipanti al catechismo. Iscrizione, modifica, ricerca e organizzazione in gruppi/classi.</td>
+          <td>Nome, cognome, data di nascita, classe/gruppo, nome genitori, numeri di telefono, indirizzo (opzionale)</td>
+          <td>Minori partecipanti al catechismo, genitori/tutori</td>
+          <td>Durata anno catechistico + 1 anno fiscale, salvo richiesta cancellazione</td>
+          <td>Crittografia AES-256-GCM, auth biometrica, FLAG_SECURE, freeRASP</td>
+          <td>Art. 6.1.a (consenso), Art. 6.1.e (compito interesse pubblico — educazione catechistica)</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><strong>Registrazione presenze</strong><br>Rilevazione delle presenze/assenze agli incontri di catechismo. Generazione statistiche e griglie riepilogative.</td>
+          <td>Data incontro, presenza/assenza/giustificato, note su assenze</td>
+          <td>Minori partecipanti al catechismo</td>
+          <td>Durata anno catechistico + 1 anno fiscale</td>
+          <td>Crittografia AES-256-GCM, auth biometrica, FLAG_SECURE</td>
+          <td>Art. 6.1.a (consenso), Art. 6.1.e (compito interesse pubblico)</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><strong>Gestione documenti</strong><br>Creazione, consegna, monitoraggio riconsegna e archiviazione di moduli, autorizzazioni e circolari.</td>
+          <td>Nome documento, stato (consegnato/riconsegnato), date consegna/riconsegna, note</td>
+          <td>Minori partecipanti, genitori/tutori</td>
+          <td>Durata anno catechistico + 2 anni (per esigenze amministrative)</td>
+          <td>Crittografia AES-256-GCM, auth biometrica, allegati cifrati</td>
+          <td>Art. 6.1.a (consenso)</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><strong>Note di contatto</strong><br>Registro delle comunicazioni con le famiglie: tipo contatto (visivo, WhatsApp, telefonata), esito, promemoria.</td>
+          <td>Tipo contatto, data, esito, promemoria, note testuali</td>
+          <td>Genitori/tutori</td>
+          <td>Durata anno catechistico</td>
+          <td>Crittografia AES-256-GCM, auth biometrica</td>
+          <td>Art. 6.1.a (consenso)</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><strong>Pianificazione incontri</strong><br>Pianificazione del calendario degli incontri con associazione di materiale catechetico.</td>
+          <td>Data incontro, orario, argomento, materiale associato, riferimenti biblici</td>
+          <td>Catechisti, minori (indirettamente)</td>
+          <td>Durata anno catechistico + 2 anni</td>
+          <td>Crittografia AES-256-GCM, auth biometrica</td>
+          <td>Art. 6.1.a (consenso)</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td><strong>Biblioteca catechetica</strong><br>Archiviazione di contenuti didattici, riferimenti biblici e materiale per le lezioni.</td>
+          <td>Titolo, contenuto, riferimenti biblici, tag, note personali</td>
+          <td>Catechista (non contiene dati personali di terzi)</td>
+          <td>Illimitato (a discrezione del catechista)</td>
+          <td>Crittografia AES-256-GCM</td>
+          <td>Legittimo interesse del titolare (Art. 6.1.f)</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td><strong>Backup / Esportazione</strong><br>Creazione di backup crittografati del database (file .catechhub) ed esportazione selettiva di dati.</td>
+          <td>Tutti i dati presenti nel database al momento del backup</td>
+          <td>Tutti gli interessati (minori, genitori)</td>
+          <td>Fino alla cancellazione del file da parte dell'utente</td>
+          <td>PBKDF2 210k iterazioni + AES-256-GCM, password scelta dall'utente</td>
+          <td>Obbligo di sicurezza (Art. 32 GDPR) — adempimento</td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td><strong>Sincronizzazione P2P</strong><br>Condivisione dati tra dispositivi di catechisti autorizzati tramite Bluetooth con crittografia end-to-end.</td>
+          <td>Box sincronizzabili: classi, studenti, presenze, documenti, delivery, allegati, note contatto, pianificazione</td>
+          <td>Minori, genitori (dati condivisi tra catechisti autorizzati)</td>
+          <td>N/A (dati sincronizzati, non conservati centralmente)</td>
+          <td>ECDH P-256 + HKDF + AES-256-GCM per pacchetto, trusted devices list, 30s timeout</td>
+          <td>Consenso interessati + autorizzazione parrocchia (Art. 6.1.a + 6.1.e)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Categorie di dati particolari (Art. 9 GDPR)</h2>
+    <table class="sec-table">
+      <thead><tr><th>Dato</th><th>Attività di trattamento</th><th>Consenso esplicito</th><th>Misure aggiuntive</th></tr></thead>
+      <tbody>
+        <tr><td>Allergie</td><td>Registrazione studenti (campo opzionale)</td><td>Richiesto (Art. 9.2.a)</td><td>Campo marcato come sensibile, cifratura aggiuntiva</td></tr>
+        <tr><td>Autorizzazioni uscite autonome</td><td>Registrazione studenti (campo opzionale)</td><td>Richiesto (Art. 9.2.a)</td><td>Campo marcato come sensibile</td></tr>
+        <tr><td>Note sanitarie generiche</td><td>Note di contatto / note studente</td><td>Richiesto (Art. 9.2.a)</td><td>Avviso all'inserimento: "Inserendo dati sanitari, confermi di avere il consenso esplicito"</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Trasferimenti internazionali</h2>
+    <p>CatechHub non effettua trasferimenti di dati verso paesi terzi o organizzazioni internazionali. Tutti i dati risiedono esclusivamente sul dispositivo dell'utente. Non vengono utilizzati servizi cloud, server remoti o infrastrutture di elaborazione esterna.</p>
+
+    <h2>Misure tecniche e organizzative (riepilogo)</h2>
+    <table class="sec-table">
+      <thead><tr><th>Categoria</th><th>Misure implementate</th></tr></thead>
+      <tbody>
+        <tr><td>Controllo accessi</td><td>Biometria / PIN, sessione in RAM, timeout 120s background</td></tr>
+        <tr><td>Crittografia</td><td>AES-256-GCM, PBKDF2 (210k), ECDH P-256, HKDF-SHA256</td></tr>
+        <tr><td>Integrità</td><td>Tag GCM 128bit, checksum SHA-256 su backup, message ID SHA-256</td></tr>
+        <tr><td>Disponibilità</td><td>Auto-recovery corruzione Hive (2 livelli), retry apertura box</td></tr>
+        <tr><td>Riservatezza</td><td>FLAG_SECURE, AndroidKeyStore, freeRASP anti-tamper</td></tr>
+        <tr><td>Minimizzazione</td><td>Zero cloud, nessuna telemetria, nessun analytics, offline-first</td></tr>
+        <tr><td>Portabilità</td><td>Export .catechhub, export selettivo, merge import con LWW</td></tr>
+        <tr><td>Trasparenza</td><td>Codice open source (MIT), documentazione tecnica, informativa privacy integrata</td></tr>
+      </tbody>
+    </table>
+
+    <div class="alert alert-warning">
+      <strong>Nota:</strong> Il presente registro è uno strumento messo a disposizione dalla documentazione di CatechHub. Spetta al titolare del trattamento (catechista / parrocchia) verificare la completezza e aggiornare il registro in base alle proprie specifiche attività di trattamento.
+    </div>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div>
+      <strong>CatechHub</strong> <span class="version-tag"></span> — Registro Elettronico di Catechismo<br>
+      <small>Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.</small>
+    </div>
+    <div>
+      <small>
+        &#128231; <a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a> &middot;
+        &#128247; Instagram (prossimamente) &middot;
+        &#9992; Telegram (prossimamente)
+      </small><br>
+      <a href="../privacy.html">Privacy</a> &middot;
+      <a href="../terms.html">Termini</a> &middot;
+      <a href="index.html">GDPR</a> &middot;
+      <a href="../developer.html">Sviluppatore</a> &middot;
+      <a href="https://github.com/delelimed/CatechHub" class="release-url">GitHub</a><br>
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/nav.js"></script></body>
+</html>

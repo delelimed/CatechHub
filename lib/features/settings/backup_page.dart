@@ -598,17 +598,33 @@ class _ActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
+
+    final cardColor = isDark ? colorScheme.surfaceContainer : Colors.white;
+    final iconBgColor = isDark
+        ? color.withValues(alpha: 0.2)
+        : color.withValues(alpha: 0.10);
+    final titleColor = isDark ? colorScheme.onSurface : const Color(0xFF1A1A1A);
+    final subtitleColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+    final borderColor = isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.transparent;
+    final shadowColor = isDark
+        ? Colors.black.withValues(alpha: 0.4)
+        : Colors.black.withValues(alpha: 0.04);
+
     return InkWell(
       borderRadius: BorderRadius.circular(22),
       onTap: isLoading ? null : onTap,
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardColor,
           borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: borderColor),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
+              color: shadowColor,
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),
@@ -620,7 +636,7 @@ class _ActionCard extends StatelessWidget {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.10),
+                color: iconBgColor,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: isLoading
@@ -640,10 +656,10 @@ class _ActionCard extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A1A1A),
+                      color: titleColor,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -652,14 +668,14 @@ class _ActionCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
-                      color: Colors.grey.shade600,
+                      color: subtitleColor,
                     ),
                   ),
                 ],
               ),
             ),
             if (!isLoading)
-              Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
+              Icon(Icons.chevron_right_rounded, color: isDark ? Colors.grey.shade500 : Colors.grey.shade400),
           ],
         ),
       ),

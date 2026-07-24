@@ -125,6 +125,10 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     final meeting = widget.meeting;
     if (meeting is PlanningMeeting && meeting.isReunion) {
       return AppScaffold(
@@ -136,7 +140,7 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
               'Le riunioni non prevedono l\'appello dei ragazzi.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.grey.shade700,
+                color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
               ),
@@ -154,8 +158,8 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
     return AppScaffold(
       title: 'Appello presenze',
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color(0xFF174A7E),
-        foregroundColor: Colors.white,
+        backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+        foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
         icon: const Icon(Icons.save_rounded),
         label: const Text('Salva'),
         onPressed: _save,
@@ -212,15 +216,17 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: s.hasTwoConsecutiveAbsences
-                          ? Colors.red.shade50
-                          : Colors.white,
+                          ? (isDark ? Colors.red.shade900.withValues(alpha: 0.2) : Colors.red.shade50)
+                          : (isDark ? colorScheme.surfaceContainer : Colors.white),
                       borderRadius: BorderRadius.circular(20),
                       border: s.hasTwoConsecutiveAbsences
-                          ? Border.all(color: Colors.red.shade200, width: 1)
+                          ? Border.all(color: isDark ? Colors.red.shade700.withValues(alpha: 0.4) : Colors.red.shade200, width: 1)
                           : null,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
+                          color: isDark
+                              ? Colors.black.withValues(alpha: 0.3)
+                              : Colors.black.withValues(alpha: 0.04),
                           blurRadius: 12,
                           offset: const Offset(0, 6),
                         )
@@ -230,13 +236,13 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
                       children: [
                         CircleAvatar(
                           backgroundColor: s.hasTwoConsecutiveAbsences
-                              ? Colors.red.shade100
-                              : Colors.blue.shade50,
+                              ? (isDark ? Colors.red.shade800.withValues(alpha: 0.3) : Colors.red.shade100)
+                              : (isDark ? colorScheme.primaryContainer.withValues(alpha: 0.3) : Colors.blue.shade50),
                           child: Icon(
                             Icons.person,
                             color: s.hasTwoConsecutiveAbsences
-                                ? Colors.red.shade900
-                                : const Color(0xFF174A7E),
+                                ? (isDark ? Colors.red.shade300 : Colors.red.shade900)
+                                : (isDark ? colorScheme.primary : const Color(0xFF174A7E)),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -250,8 +256,8 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
                                   color: s.hasTwoConsecutiveAbsences
-                                      ? Colors.red.shade900
-                                      : Colors.black87,
+                                      ? (isDark ? Colors.red.shade300 : Colors.red.shade900)
+                                      : (isDark ? colorScheme.onSurface : Colors.black87),
                                 ),
                               ),
                               if (s.hasTwoConsecutiveAbsences)
@@ -261,7 +267,7 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
                                     '2+ assenze consecutive!',
                                     style: TextStyle(
                                       fontSize: 11,
-                                      color: Colors.red.shade700,
+                                      color: isDark ? Colors.red.shade400 : Colors.red.shade700,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conformità GDPR — CatechHub</title>
+<link rel="icon" href="../logo.png" type="image/png">
+<link rel="stylesheet" href="../style.css">
+<script src="../js/version.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="../logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
+
+<section class="page-header">
+  <div class="container">
+    <h1>Conformità GDPR</h1>
+    <p>Analisi della protezione dei dati personali</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+    <div class="breadcrumb"><a href="../index.html">Home</a> / GDPR</div>
+
+    <div class="alert alert-warning" style="display:block;">
+      <p style="margin-bottom:0;"><strong>Nota:</strong> Questa pagina &egrave; stata generata con l'ausilio di intelligenza artificiale e non &egrave; stata scritta da un legale. Le informazioni hanno scopo puramente informativo e non costituiscono consulenza legale.</p>
+    </div>
+
+    <p>CatechHub è un'applicazione progettata per gestire i dati di bambini e ragazzi che frequentano il catechismo parrocchiale. In quanto tale, tratta dati personali, incluse potenziali categorie particolari (Art. 9 GDPR) come allergie e informazioni sanitarie. Questa pagina analizza la conformità dell'applicazione al Regolamento Generale sulla Protezione dei Dati (Regolamento UE 2016/679).</p>
+
+    <div class="alert alert-warning" style="display:block;">
+      <p style="margin-bottom:0.25rem;"><strong>Avviso importante:</strong></p>
+      <p style="margin-bottom:0;">CatechHub &egrave; uno <em>strumento</em>. La conformit&agrave; GDPR delle attivit&agrave; di trattamento &egrave; responsabilit&agrave; del catechista o della parrocchia che utilizza l'app. Questa analisi descrive come l'app facilita la conformit&agrave;, non la sostituisce.</p>
+    </div>
+
+    <h2>Principi GDPR e conformità di CatechHub</h2>
+
+    <table class="sec-table">
+      <thead><tr><th>Articolo</th><th>Principio</th><th>Come CatechHub lo implementa</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Art. 5</td>
+          <td>Lawfulness, fairness, transparency</td>
+          <td>I dati sono trattati solo per finalità di gestione del catechismo. L'app è trasparente: nessuna raccolta occulta di dati, nessun analytics, nessuna telemetria. Il codice è open source e verificabile.</td>
+        </tr>
+        <tr>
+          <td>Art. 6</td>
+          <td>Lawfulness of processing</td>
+          <td>Base giuridica: consenso dell'interessato (Art. 6.1.a) e compito di interesse pubblico (Art. 6.1.e) — l'attività educativa catechistica. L'app non impone alcun trattamento senza base giuridica.</td>
+        </tr>
+        <tr>
+          <td>Art. 9</td>
+          <td>Special categories of data</td>
+          <td>Allergie, informazioni sanitarie e autorizzazioni uscite autonome sono trattati solo se esplicitamente inseriti dall'utente con consenso esplicito (Art. 9.2.a). Cifratura aggiuntiva sui dati sensibili.</td>
+        </tr>
+        <tr>
+          <td>Art. 12-14</td>
+          <td>Transparency and information</td>
+          <td>L'app fornisce informativa privacy integrata e rimandi alla versione online. Il codice sorgente pubblico funge da documentazione trasparente del trattamento.</td>
+        </tr>
+        <tr>
+          <td>Art. 15</td>
+          <td>Right of access</td>
+          <td>I dati sono immediatamente accessibili all'interno dell'app. L'utente può visualizzare, cercare e filtrare ogni dato inserito. L'esportazione in formato .catechhub permette la portabilità.</td>
+        </tr>
+        <tr>
+          <td>Art. 17</td>
+          <td>Right to erasure</td>
+          <td>Funzione "Elimina dati" integrata nell'app. Cancellazione a cascata (studente, presenze, documenti, note). Disinstallando l'app tutti i dati vengono rimossi dal dispositivo.</td>
+        </tr>
+        <tr>
+          <td>Art. 20</td>
+          <td>Right to data portability</td>
+          <td>Esportazione in formato .catechhub (JSON cifrato). Esportazione selettiva per box. I dati possono essere trasferiti a qualsiasi altro sistema.</td>
+        </tr>
+        <tr>
+          <td>Art. 25</td>
+          <td>Data protection by design and by default</td>
+          <td>Privacy by design: crittografia end-to-end, zero cloud, offline-first, biometrica, FLAG_SECURE, freeRASP. By default: nessuna condivisione, nessuna telemetria, minimizzazione dei dati.</td>
+        </tr>
+        <tr>
+          <td>Art. 32</td>
+          <td>Security of processing</td>
+          <td>AES-256-GCM a riposo, PBKDF2 per backup, ECDH + HKDF per sync, E2EE Bluetooth, AndroidKeyStore, sessione in RAM, timeout 120s, freeRASP anti-tamper.</td>
+        </tr>
+        <tr>
+          <td>Art. 35</td>
+          <td>Data protection impact assessment (DPIA)</td>
+          <td>L'uso di un'app offline per dati di minori richiede una DPIA da parte della parrocchia. CatechHub fornisce tutta la documentazione necessaria (analisi rischi, misure tecniche, registro trattamenti).</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Analisi dei rischi e misure protettive</h2>
+
+    <table class="sec-table">
+      <thead><tr><th>Rischio</th><th>Probabilità</th><th>Impatto</th><th>Mitigazione</th></tr></thead>
+      <tbody>
+        <tr><td>Furto dispositivo</td><td>Bassa</td><td>Alto</td><td>Crittografia AES-256-GCM, chiave in AndroidKeyStore, auth biometrica</td></tr>
+        <tr><td>Accesso non autorizzato</td><td>Media</td><td>Alto</td><td>Autenticazione obbligatoria, timeout sessione 120s</td></tr>
+        <tr><td>Intercettazione sync</td><td>Bassa</td><td>Medio</td><td>E2EE con ECDH + HKDF + AES-256-GCM per pacchetto</td></tr>
+        <tr><td>Perdita dati</td><td>Media</td><td>Alto</td><td>Backup crittografato, export selettivo, merge import</td></tr>
+        <tr><td>Malware/root</td><td>Bassa</td><td>Alto</td><td>freeRASP rilevamento root, hooking, emulatori</td></tr>
+        <tr><td>Errore umano</td><td>Alta</td><td>Medio</td><td>Conferma eliminazione, cronologia modifiche, recovery corruzione Hive</td></tr>
+        <tr><td>Violazione dati minori</td><td>Bassa</td><td>Molto alto</td><td>Minimizzazione dati, nessun cloud, FLAG_SECURE, dati sensibili cifrati</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Disclaimer dello sviluppatore</h2>
+    <div class="alert alert-warning" style="display:block;">
+      <p style="margin-bottom:0.25rem;"><strong>Lo sviluppatore di CatechHub non &egrave; il titolare del trattamento.</strong> Il titolare del trattamento &egrave; il catechista o la parrocchia che utilizza l'app. Lo sviluppatore fornisce uno strumento, non un servizio di trattamento dati. Ogni parrocchia deve condurre la propria DPIA e garantire la conformit&agrave; GDPR delle proprie attivit&agrave;.</p>
+      <p style="margin-bottom:0;">CatechHub &egrave; progettato per facilitare la conformit&agrave;, ma <strong>non pu&ograve; e non deve sostituire</strong> le valutazioni e le decisioni del titolare del trattamento.</p>
+    </div>
+
+    <h2>Documenti correlati</h2>
+    <div class="card-grid">
+      <a href="sicurezza.html" class="card" style="text-decoration:none;color:inherit;">
+        <h3>&#128274; Analisi della Sicurezza</h3>
+        <p>Misure tecniche e organizzative ai sensi dell'Art. 32 GDPR</p>
+      </a>
+      <a href="responsabilita.html" class="card" style="text-decoration:none;color:inherit;">
+        <h3>&#9878; Responsabilit&agrave; e Limitazioni</h3>
+        <p>Ruoli GDPR, disclaimer e raccomandazioni per l'uso conforme</p>
+      </a>
+      <a href="analisi-cnil.html" class="card" style="text-decoration:none;color:inherit;">
+        <h3>&#128203; Analisi CNIL / ANSSI</h3>
+        <p>Metodologia PIA francese, EBIOS e conformità Loi Informatique et Libertés</p>
+      </a>
+      <a href="registro-trattamento.html" class="card" style="text-decoration:none;color:inherit;">
+        <h3>&#128221; Registro Trattamento</h3>
+        <p>Registro delle attività di trattamento ai sensi dell'Art. 30 GDPR</p>
+      </a>
+    </div>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div>
+      <strong>CatechHub</strong> <span class="version-tag"></span> — Registro Elettronico di Catechismo<br>
+      <small>Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.</small>
+    </div>
+    <div>
+      <small>
+        &#128231; <a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a> &middot;
+        &#128247; Instagram (prossimamente) &middot;
+        &#9992; Telegram (prossimamente)
+      </small><br>
+      <a href="../privacy.html">Privacy</a> &middot;
+      <a href="../terms.html">Termini</a> &middot;
+      <a href="index.html">GDPR</a> &middot;
+      <a href="../developer.html">Sviluppatore</a> &middot;
+      <a href="https://github.com/delelimed/CatechHub" class="release-url">GitHub</a><br>
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/nav.js"></script></body>
+</html>

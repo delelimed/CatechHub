@@ -14,6 +14,9 @@ class StudentDetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const name = 'Mario Rossi';
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return AppScaffold(
       title: 'Scheda ragazzo',
@@ -25,19 +28,21 @@ class StudentDetailPage extends StatelessWidget {
           /// =========================
           /// HEADER PROFILO
           /// =========================
-          _ProfileHeader(name: name),
+          _ProfileHeader(name: name, isDark: isDark, colorScheme: colorScheme),
 
           const SizedBox(height: 16),
 
           /// =========================
           /// DATI BASE
           /// =========================
-          const _Section(
+          _Section(
             title: 'Dati ragazzo',
             children: [
-              _InfoRow(label: 'Telefono', value: '3331234567'),
-              _InfoRow(label: 'Classe', value: '3ª Elementare'),
+              _InfoRow(label: 'Telefono', value: '3331234567', isDark: isDark, colorScheme: colorScheme),
+              _InfoRow(label: 'Classe', value: '3ª Elementare', isDark: isDark, colorScheme: colorScheme),
             ],
+            isDark: isDark,
+            colorScheme: colorScheme,
           ),
 
           const SizedBox(height: 16),
@@ -45,17 +50,19 @@ class StudentDetailPage extends StatelessWidget {
           /// =========================
           /// GENITORI
           /// =========================
-          const _Section(
+          _Section(
             title: 'Genitori',
             children: [
-              _InfoRow(label: 'Madre', value: 'Maria Rossi'),
-              _InfoRow(label: 'Cellulare madre', value: '333222111'),
+              _InfoRow(label: 'Madre', value: 'Maria Rossi', isDark: isDark, colorScheme: colorScheme),
+              _InfoRow(label: 'Cellulare madre', value: '333222111', isDark: isDark, colorScheme: colorScheme),
 
               SizedBox(height: 8),
 
-              _InfoRow(label: 'Padre', value: 'Luca Rossi'),
-              _InfoRow(label: 'Cellulare padre', value: '333444555'),
+              _InfoRow(label: 'Padre', value: 'Luca Rossi', isDark: isDark, colorScheme: colorScheme),
+              _InfoRow(label: 'Cellulare padre', value: '333444555', isDark: isDark, colorScheme: colorScheme),
             ],
+            isDark: isDark,
+            colorScheme: colorScheme,
           ),
 
           const SizedBox(height: 16),
@@ -66,11 +73,13 @@ class StudentDetailPage extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? colorScheme.surfaceContainer : Colors.white,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
+                  color: isDark
+                      ? Colors.black.withValues(alpha: 0.3)
+                      : Colors.black.withValues(alpha: 0.04),
                   blurRadius: 12,
                   offset: const Offset(0, 6),
                 )
@@ -79,11 +88,11 @@ class StudentDetailPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Attività',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF174A7E),
+                    color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -92,18 +101,24 @@ class StudentDetailPage extends StatelessWidget {
                   icon: Icons.history,
                   label: 'Storico appelli',
                   onTap: () {},
+                  isDark: isDark,
+                  colorScheme: colorScheme,
                 ),
 
                 _ActionButton(
                   icon: Icons.edit_note,
                   label: 'Modifica dati',
                   onTap: () {},
+                  isDark: isDark,
+                  colorScheme: colorScheme,
                 ),
 
                 _ActionButton(
                   icon: Icons.event,
                   label: 'Presenze',
                   onTap: () {},
+                  isDark: isDark,
+                  colorScheme: colorScheme,
                 ),
               ],
             ),
@@ -119,8 +134,14 @@ class StudentDetailPage extends StatelessWidget {
 /// =========================
 class _ProfileHeader extends StatelessWidget {
   final String name;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
-  const _ProfileHeader({required this.name});
+  const _ProfileHeader({
+    required this.name,
+    required this.isDark,
+    required this.colorScheme,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -128,15 +149,22 @@ class _ProfileHeader extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Colors.white,
-            Colors.blue.shade50.withValues(alpha: 0.5),
-          ],
+          colors: isDark
+              ? [
+                  colorScheme.surfaceContainer,
+                  colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                ]
+              : [
+                  Colors.white,
+                  Colors.blue.shade50.withValues(alpha: 0.5),
+                ],
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.05),
             blurRadius: 16,
             offset: const Offset(0, 10),
           )
@@ -146,7 +174,7 @@ class _ProfileHeader extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 28,
-            backgroundColor: const Color(0xFF174A7E),
+            backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
             child: Text(
               name.isNotEmpty ? name[0] : '?',
               style: const TextStyle(
@@ -163,17 +191,17 @@ class _ProfileHeader extends StatelessWidget {
               children: [
                 Text(
                   name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF174A7E),
+                    color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Scheda anagrafica ragazzo',
                   style: TextStyle(
-                    color: Colors.grey.shade600,
+                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                   ),
                 ),
               ],
@@ -191,10 +219,14 @@ class _ProfileHeader extends StatelessWidget {
 class _Section extends StatelessWidget {
   final String title;
   final List<Widget> children;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
   const _Section({
     required this.title,
     required this.children,
+    required this.isDark,
+    required this.colorScheme,
   });
 
   @override
@@ -202,11 +234,13 @@ class _Section extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? colorScheme.surfaceContainer : Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 6),
           )
@@ -217,9 +251,9 @@ class _Section extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: Color(0xFF174A7E),
+              color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
             ),
           ),
           const SizedBox(height: 12),
@@ -236,10 +270,14 @@ class _Section extends StatelessWidget {
 class _InfoRow extends StatelessWidget {
   final String label;
   final String value;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
   const _InfoRow({
     required this.label,
     required this.value,
+    required this.isDark,
+    required this.colorScheme,
   });
 
   @override
@@ -254,15 +292,16 @@ class _InfoRow extends StatelessWidget {
             child: Text(
               label,
               style: TextStyle(
-                color: Colors.grey.shade600,
+                color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
               ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w500,
+                color: isDark ? colorScheme.onSurface : Colors.black87,
               ),
             ),
           ),
@@ -279,23 +318,32 @@ class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
   const _ActionButton({
     required this.icon,
     required this.label,
     required this.onTap,
+    required this.isDark,
+    required this.colorScheme,
   });
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: const Color(0xFF174A7E)),
-      title: Text(label),
-      trailing: const Icon(
+      leading: Icon(icon, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+      title: Text(
+        label,
+        style: TextStyle(
+          color: isDark ? colorScheme.onSurface : Colors.black87,
+        ),
+      ),
+      trailing: Icon(
         Icons.arrow_forward_ios,
         size: 14,
-        color: Colors.grey,
+        color: isDark ? Colors.grey.shade500 : Colors.grey,
       ),
       onTap: onTap,
     );

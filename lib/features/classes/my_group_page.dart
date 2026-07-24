@@ -123,6 +123,9 @@ class MyGroupPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final classesAsync = ref.watch(classesStreamProvider);
     const uid = AuthService.localUserId;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     final isDesktop = MediaQuery.of(context).size.width > 900;
 
@@ -155,24 +158,28 @@ class MyGroupPage extends ConsumerWidget {
                 children: [
                   const SizedBox(height: 12),
 
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: isDesktop
-                        ? _DesktopActions(
-                            schoolClass: myClass,
-                            students: studentsWithStats,
-                          )
-                        : _MobileActions(
-                            schoolClass: myClass,
-                            students: studentsWithStats,
-                          ),
-                  ),
+Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: isDesktop
+                          ? _DesktopActions(
+                              schoolClass: myClass,
+                              students: studentsWithStats,
+                              isDark: isDark,
+                              colorScheme: colorScheme,
+                            )
+                          : _MobileActions(
+                              schoolClass: myClass,
+                              students: studentsWithStats,
+                              isDark: isDark,
+                              colorScheme: colorScheme,
+                            ),
+                    ),
 
                   const SizedBox(height: 14),
 
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: _ClassHeader(name: myClass.name),
+                    child: _ClassHeader(name: myClass.name, isDark: isDark, colorScheme: colorScheme),
                   ),
 
                   const SizedBox(height: 10),
@@ -194,6 +201,8 @@ class MyGroupPage extends ConsumerWidget {
                                 present: item.totalPresence,
                                 absent: item.totalAbsence,
                                 consecutiveAbsences: item.consecutiveAbsences,
+                                isDark: isDark,
+                                colorScheme: colorScheme,
                               );
                             },
                           ),
@@ -214,10 +223,14 @@ class MyGroupPage extends ConsumerWidget {
 class _MobileActions extends StatelessWidget {
   final SchoolClass schoolClass;
   final List<_StudentWithStats> students;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
   const _MobileActions({
     required this.schoolClass,
     required this.students,
+    required this.isDark,
+    required this.colorScheme,
   });
 
   @override
@@ -232,6 +245,8 @@ class _MobileActions extends StatelessWidget {
                 label: 'Gestione appelli',
                 compact: true,
                 isPrimary: true,
+                isDark: isDark,
+                colorScheme: colorScheme,
                 onTap: () {
                   context.push('/attendance-meetings', extra: schoolClass.id);
                 },
@@ -243,6 +258,8 @@ class _MobileActions extends StatelessWidget {
                 icon: Icons.print_rounded,
                 label: 'Stampa appelli',
                 compact: true,
+                isDark: isDark,
+                colorScheme: colorScheme,
                 onTap: () {
                   Navigator.push(
                     context,
@@ -266,10 +283,14 @@ class _MobileActions extends StatelessWidget {
 class _DesktopActions extends StatelessWidget {
   final SchoolClass schoolClass;
   final List<_StudentWithStats> students;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
   const _DesktopActions({
     required this.schoolClass,
     required this.students,
+    required this.isDark,
+    required this.colorScheme,
   });
 
   @override
@@ -281,6 +302,8 @@ class _DesktopActions extends StatelessWidget {
             icon: Icons.checklist_rounded,
             label: 'Gestione appelli',
             isPrimary: true,
+            isDark: isDark,
+            colorScheme: colorScheme,
             onTap: () {
               context.push('/attendance-meetings', extra: schoolClass.id);
             },
@@ -291,6 +314,8 @@ class _DesktopActions extends StatelessWidget {
           child: _ActionButton(
             icon: Icons.print_rounded,
             label: 'Stampa appelli',
+            isDark: isDark,
+            colorScheme: colorScheme,
             onTap: () {
               Navigator.push(
                 context,
@@ -315,6 +340,8 @@ class _ActionButton extends StatelessWidget {
   final VoidCallback onTap;
   final bool isPrimary;
   final bool compact;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
   const _ActionButton({
     required this.icon,
@@ -322,6 +349,8 @@ class _ActionButton extends StatelessWidget {
     required this.onTap,
     this.isPrimary = false,
     this.compact = false,
+    required this.isDark,
+    required this.colorScheme,
   });
 
   @override
@@ -337,7 +366,9 @@ class _ActionButton extends StatelessWidget {
           horizontal: 12,
         ),
         decoration: BoxDecoration(
-          color: isPrimary ? color : color.withValues(alpha: 0.10),
+          color: isPrimary
+              ? (isDark ? colorScheme.primary : color)
+              : (isDark ? colorScheme.primaryContainer.withValues(alpha: 0.3) : color.withValues(alpha: 0.10)),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
@@ -346,7 +377,7 @@ class _ActionButton extends StatelessWidget {
             Icon(
               icon,
               size: compact ? 18 : 22,
-              color: isPrimary ? Colors.white : color,
+              color: isPrimary ? (isDark ? colorScheme.onPrimary : Colors.white) : (isDark ? colorScheme.primary : color),
             ),
             const SizedBox(width: 8),
             Flexible(
@@ -356,7 +387,7 @@ class _ActionButton extends StatelessWidget {
                 style: TextStyle(
                   fontSize: compact ? 12 : 14,
                   fontWeight: FontWeight.w600,
-                  color: isPrimary ? Colors.white : color,
+                  color: isPrimary ? (isDark ? colorScheme.onPrimary : Colors.white) : (isDark ? colorScheme.primary : color),
                 ),
               ),
             ),
@@ -372,25 +403,57 @@ class _ActionButton extends StatelessWidget {
 /// =========================
 class _ClassHeader extends StatelessWidget {
   final String name;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
-  const _ClassHeader({required this.name});
+  const _ClassHeader({
+    required this.name,
+    required this.isDark,
+    required this.colorScheme,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? colorScheme.surfaceContainer : Colors.white,
         borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          const Icon(Icons.groups_rounded, color: Color(0xFF174A7E)),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+                  : const Color(0xFF174A7E).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.groups_rounded,
+              color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+            ),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               name,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
+              ),
             ),
           ),
         ],
@@ -408,6 +471,8 @@ class _StudentCard extends StatelessWidget {
   final int present;
   final int absent;
   final int consecutiveAbsences;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
   const _StudentCard({
     required this.student,
@@ -415,6 +480,8 @@ class _StudentCard extends StatelessWidget {
     required this.present,
     required this.absent,
     required this.consecutiveAbsences,
+    required this.isDark,
+    required this.colorScheme,
   });
 
   @override
@@ -433,14 +500,22 @@ class _StudentCard extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.all(compact ? 10 : 14),
         decoration: BoxDecoration(
-          color: hasWarning ? Colors.red.shade50 : Colors.white,
+          color: isDark
+              ? (hasWarning
+                  ? colorScheme.errorContainer.withValues(alpha: 0.3)
+                  : colorScheme.surfaceContainer)
+              : (hasWarning ? Colors.red.shade50 : Colors.white),
           borderRadius: BorderRadius.circular(14),
           border: hasWarning
-              ? Border.all(color: Colors.red.shade200, width: 1)
+              ? Border.all(
+                  color: isDark ? colorScheme.error.withValues(alpha: 0.3) : Colors.red.shade200,
+                  width: 1)
               : null,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.3)
+                  : Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -451,11 +526,13 @@ class _StudentCard extends StatelessWidget {
             CircleAvatar(
               radius: compact ? 16 : 20,
               backgroundColor: hasWarning
-                  ? Colors.red.shade100
-                  : Colors.blue.shade50,
+                  ? (isDark ? colorScheme.errorContainer : Colors.red.shade100)
+                  : (isDark ? colorScheme.primaryContainer : Colors.blue.shade50),
               child: Icon(
                 Icons.person,
-                color: hasWarning ? Colors.red.shade900 : const Color(0xFF174A7E),
+                color: hasWarning
+                    ? (isDark ? colorScheme.error : Colors.red.shade900)
+                    : (isDark ? colorScheme.primary : const Color(0xFF174A7E)),
               ),
             ),
 
@@ -471,7 +548,9 @@ class _StudentCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: compact ? 13 : 15,
                       fontWeight: FontWeight.w600,
-                      color: hasWarning ? Colors.red.shade900 : Colors.black87,
+                      color: hasWarning
+                          ? (isDark ? colorScheme.error : Colors.red.shade900)
+                          : (isDark ? colorScheme.onSurface : Colors.black87),
                     ),
                   ),
                   if (hasWarning)
@@ -481,7 +560,7 @@ class _StudentCard extends StatelessWidget {
                         '$consecutiveAbsences assenze di fila!',
                         style: TextStyle(
                           fontSize: 11,
-                          color: Colors.red.shade700,
+                          color: isDark ? colorScheme.error : Colors.red.shade700,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -495,8 +574,8 @@ class _StudentCard extends StatelessWidget {
               children: [
                 Text(
                   '$present',
-                  style: const TextStyle(
-                    color: Colors.green,
+                  style: TextStyle(
+                    color: isDark ? Colors.green.shade400 : Colors.green,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
@@ -504,8 +583,8 @@ class _StudentCard extends StatelessWidget {
                 const SizedBox(width: 10),
                 Text(
                   '$absent',
-                  style: const TextStyle(
-                    color: Colors.red,
+                  style: TextStyle(
+                    color: isDark ? Colors.red.shade400 : Colors.red,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),

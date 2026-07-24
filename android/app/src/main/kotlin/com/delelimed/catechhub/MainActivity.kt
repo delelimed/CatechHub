@@ -117,6 +117,7 @@ class MainActivity : FlutterFragmentActivity() {
      * 2. Registrazione dei MethodChannel per sicurezza e crittografia
      */
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
 
         // SECURITY CHANNEL
         // Gestisce le operazioni di sicurezza generiche dall'interfaccia Flutter.

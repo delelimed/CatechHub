@@ -102,8 +102,14 @@ class UpdateService {
 
   /// Confronto semantico tra due versioni (es. "1.0.3" < "1.1.0").
   static bool isVersionNewerStatic(String current, String latest) {
-    final c = current.split('.').map(int.parse).toList();
-    final l = latest.split('.').map(int.parse).toList();
+    final c = current.split('.').map((s) {
+      final match = RegExp(r'^(\d+)').firstMatch(s);
+      return match != null ? int.parse(match.group(1)!) : 0;
+    }).toList();
+    final l = latest.split('.').map((s) {
+      final match = RegExp(r'^(\d+)').firstMatch(s);
+      return match != null ? int.parse(match.group(1)!) : 0;
+    }).toList();
     for (var i = 0; i < l.length; i++) {
       if (i >= c.length) return true;
       if (l[i] > c[i]) return true;

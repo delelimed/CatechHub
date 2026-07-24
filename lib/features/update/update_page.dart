@@ -74,8 +74,8 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
           for (final asset in assets) {
             if (asset['name'] is String &&
                 (asset['name'] as String).endsWith('.apk')) {
-              apkUrl = asset['url'] as String? ?? asset['browser_download_url'] as String;
-              apkDigest = asset['digest'] as String?;
+              apkUrl = asset['browser_download_url'] as String? ?? asset['url'] as String?;
+              apkDigest = null;
               break;
             }
           }
@@ -172,7 +172,7 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
       try {
         final request = http.Request('GET', Uri.parse(apkUrl));
         request.headers['Accept'] = 'application/octet-stream';
-        final streamedResponse = await client.send(request).timeout(const Duration(seconds: 30));
+        final streamedResponse = await client.send(request).timeout(const Duration(seconds: 60));
 
         if (streamedResponse.statusCode != 200) {
           throw Exception('Download fallito (HTTP ${streamedResponse.statusCode})');
@@ -193,7 +193,6 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
         }
 
         await sink.close();
-        client.close();
 
         if (!await file.exists() || await file.length() == 0) {
           throw Exception('File scaricato vuoto o non valido');

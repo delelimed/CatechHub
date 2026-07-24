@@ -67,6 +67,9 @@ class MainActivity : FlutterFragmentActivity() {
     /** Canale per le operazioni crittografiche sul KeyStore RSA (chiavi, firma, cifratura). */
     private val keystoreChannel = "com.delelimed.catechhub/keystore"
 
+    /** Canale per le operazioni di aggiornamento APK (install, cleanup). */
+    private val updateChannel = "com.delelimed.catechhub/update"
+
     // ─────────────────────────────────────────────────────────────────────────
     // CONFIGURAZIONE KEYSTORE RSA
     // ─────────────────────────────────────────────────────────────────────────
@@ -246,15 +249,39 @@ class MainActivity : FlutterFragmentActivity() {
                                 val keys = listKeys()
                                 runOnMain { result.success(keys) }
                             }
-                            else -> runOnMain { result.notImplemented() }
+            else -> runOnMain { result.notImplemented() }
                         }
                     } catch (e: Exception) {
                         runOnMain {
                             result.error("KEYSTORE_ERROR", e.localizedMessage ?: e.message, null)
                         }
                     }
-}
+    }
         }
+
+        // UPDATE CHANNEL
+        // Gestisce il download e l'installazione degli aggiornamenti APK.
+        // Metodi supportati:
+        // - installApk: installa un APK tramite FileProvider
+        // - cleanupOldApks: elimina file .apk residui
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, updateChannel)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "installApk" -> {
+                        val apkPath = call.argument<String>("apkPath")
+                        if (apkPath == null) {
+                            result.error("BAD_ARGUMENT", "apkPath mancante", null)
+                            return@setMethodCallHandler
+                        }
+                        installApk(apkPath, result)
+                    }
+                    "cleanupOldApks" -> {
+                        cleanupOldApks()
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
 }
 
     /**

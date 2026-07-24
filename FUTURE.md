@@ -5,14 +5,15 @@
 
 ## In sviluppo
 
-- **Nearby Connections API** — Integrazione della sincronizzazione peer-to-peer tramite Nearby Connections di Google, attualmente presente ma non funzionante.
+- **Nearby Connections API** — Integrazione della sincronizzazione peer-to-peer tramite Nearby Connections di Google, attualmente presente ma non funzionante. Data la sua complessità, verrà corretta nel corso delle versioni.
+- **Preparatore di comunicazioni WhatsApp** - Genesi automatica di messaggi whatsapp da condividere con i genitori singolarmente o nel gruppo.flutter
 
 
 ## Pianificate
 
 - **Export Completo** — Esportazione in PDF dell'intero database per archiviazione al termine dell'anno.
 - **Archivio Storico** - implementazione di un archivio per seguire il progresso del ragazzo nel percorso di preparazione.
-- **Preparatore di comunicazioni WhatsApp** - Genesi automatica di messaggi whatsapp da condividere con i genitori singolarmente o nel gruppo.
+
 
 ## In valutazione
 

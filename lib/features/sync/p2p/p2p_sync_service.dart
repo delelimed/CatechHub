@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:nearby_connections/nearby_connections.dart';
-import 'package:cryptography/cryptography.dart';
 
 import '../../../core/services/bluetooth_permission_service.dart';
 import 'p2p_security_service.dart';
@@ -126,13 +125,12 @@ class P2PSyncService {
   bool _isSyncing = false;
   String? _pendingEndpointId;
 
-  P2PSession? _currentSession;
-  P2PSession? get currentSession => _currentSession;
-
   Completer<void>? _pairingCompleter;
 
   bool _syncSendDone = false;
   bool _syncReceiveDone = false;
+
+  String? _connectedDeviceId;
 
   static const Duration _backgroundInterval = Duration(seconds: 120);
   static const Duration _pairingTimeout = Duration(seconds: 120);
@@ -275,7 +273,6 @@ class P2PSyncService {
     _pairingTimeoutTimer = null;
     _pairingCompleter = null;
     _pendingEndpointId = null;
-    _currentSession = null;
     try {
       await _nearby.stopAdvertising();
       await _nearby.stopDiscovery();
@@ -356,7 +353,6 @@ class P2PSyncService {
       _pendingEndpointId = null;
     }
     if (_state.connectedDeviceId == endpointId) {
-      _currentSession = null;
       _updateState(_state.copyWith(
         status: P2PSyncStatus.idle,
         connectedDeviceId: null,
@@ -403,16 +399,13 @@ class P2PSyncService {
   }
 
   Future<String> _tryDecryptMessage(String rawMessage) async {
-    if (_currentSession == null) return rawMessage;
-
-    try {
-      final decoded = P2PEncryptedPayload.decode(rawMessage);
-      final sessionKey = SecretKey(_currentSession!.sessionKey.bytes);
-      final plainText = await _security.decryptPayload(decoded, sessionKey);
-      return plainText;
-    } catch (_) {
-      return rawMessage;
+    final secret = await _sharedSecretForConnection();
+    if (secret != null) {
+      try {
+        return await _security.decryptPayloadString(rawMessage, secret);
+      } catch (_) {}
     }
+    return rawMessage;
   }
 
   Future<void> _handleMessage(
@@ -474,26 +467,35 @@ class P2PSyncService {
       return;
     }
 
-    final remoteFingerprint = remoteIdentity.fingerprint;
+    _connectedDeviceId = remoteIdentity.deviceId;
+    await _saveAssociationIfNeeded(remoteIdentity);
+
+    final localIdentity = await _security.getLocalIdentity();
+    final ack = jsonEncode({
+      'type': 'p2p_handshake_ack',
+      'payload': localIdentity.encode(),
+    });
+    await _sendEncryptedPayload(endpointId, ack);
 
     _updateState(_state.copyWith(
-      status: P2PSyncStatus.handshakeReceived,
+      status: P2PSyncStatus.sessionEstablished,
       connectedDeviceId: endpointId,
       connectedDeviceName: remoteIdentity.deviceName,
-      connectedFingerprint: remoteFingerprint,
+      connectedFingerprint: remoteIdentity.fingerprint,
+      isSessionEncrypted: true,
     ));
 
-    if (_state.role == P2PSyncRole.altroCatechista) {
-      _updateState(_state.copyWith(
-        awaitingConfirmation: true,
-        pendingConfirmationDeviceName: remoteIdentity.deviceName,
-        pendingConfirmationDeviceId: remoteIdentity.deviceId,
-        status: P2PSyncStatus.sessionEstablished,
-      ));
-      return;
-    }
+    final iAmInitiator =
+        localIdentity.deviceId.compareTo(remoteIdentity.deviceId) < 0;
 
-    await _establishSession(endpointId, remoteIdentity, isInitiator: false);
+    if (iAmInitiator) {
+      final authRequest = jsonEncode({
+        'type': 'p2p_auth_request',
+        'deviceId': localIdentity.deviceId,
+        'deviceName': localIdentity.deviceName,
+      });
+      await _sendEncryptedPayload(endpointId, authRequest);
+    }
   }
 
   Future<void> _handleHandshakeAck(
@@ -503,6 +505,8 @@ class P2PSyncService {
     final remoteIdentity = P2PSecurityService.parseQrPayload(rawPayload);
     if (remoteIdentity == null) return;
 
+    _connectedDeviceId = remoteIdentity.deviceId;
+
     _updateState(_state.copyWith(
       connectedFingerprint: remoteIdentity.fingerprint,
       connectedDeviceName: remoteIdentity.deviceName,
@@ -511,10 +515,6 @@ class P2PSyncService {
 
     if (!_isSyncing) {
       await _saveAssociationIfNeeded(remoteIdentity);
-    }
-
-    if (_currentSession != null && _state.connectedDeviceId != null) {
-      await _performBidirectionalSync(_state.connectedDeviceId!, _currentSession!);
     }
   }
 
@@ -575,49 +575,13 @@ class P2PSyncService {
       ));
       return;
     }
-  }
 
-  Future<void> _establishSession(
-      String endpointId, P2PIdentity remoteIdentity, {bool isInitiator = false}) async {
-    try {
-      final session = await _security.createEphemeralSession(
-        remoteDeviceId: remoteIdentity.deviceId,
-        remoteDeviceName: remoteIdentity.deviceName,
-        remotePublicKeyBase64: remoteIdentity.publicKeyBase64,
-        isInitiator: isInitiator,
-      );
-
-      _currentSession = session;
-
-      if (!isInitiator) {
-        await _saveAssociationIfNeeded(remoteIdentity);
-      }
-
-      final localIdentity = await _security.getLocalIdentity();
-      final ack = jsonEncode({
-        'type': 'p2p_handshake_ack',
-        'payload': localIdentity.encode(),
-        'nonce': base64Encode(session.handshakeNonce),
-      });
-      await _sendEncryptedPayload(endpointId, ack);
-
-      _updateState(_state.copyWith(
-        status: P2PSyncStatus.sessionEstablished,
-        isSessionEncrypted: true,
-      ));
-
-      await _performBidirectionalSync(endpointId, session);
-    } catch (e) {
-      debugPrint('[P2P] Session establish error: $e');
-      _updateState(_state.copyWith(
-        status: P2PSyncStatus.error,
-        errorMessage: 'Errore stabilimento sessione cifrata.',
-      ));
+    if (_state.connectedDeviceId != null) {
+      await _performBidirectionalSync(_state.connectedDeviceId!);
     }
   }
 
-  Future<void> _performBidirectionalSync(
-      String endpointId, P2PSession session) async {
+  Future<void> _performBidirectionalSync(String endpointId) async {
     if (_isSyncing) return;
     _isSyncing = true;
     _syncSendDone = false;
@@ -711,22 +675,26 @@ class P2PSyncService {
       await _nearby.disconnectFromEndpoint(endpointId);
     } catch (_) {}
     _pendingEndpointId = null;
-    _currentSession = null;
+    _connectedDeviceId = null;
+  }
+
+  Future<String?> _sharedSecretForConnection() async {
+    if (_connectedDeviceId == null) return null;
+    return await _security.getSharedSecret(_connectedDeviceId!);
   }
 
   Future<void> _sendEncryptedPayload(
       String endpointId, String plainText) async {
-    if (_currentSession != null) {
+    final secret = await _sharedSecretForConnection();
+    if (secret != null) {
       try {
-        final sessionKey = SecretKey(_currentSession!.sessionKey.bytes);
-        final encrypted = await _security.encryptPayload(plainText, sessionKey);
-        await _sendPayload(endpointId, encrypted.encode());
-      } catch (_) {
-        await _sendPayload(endpointId, plainText);
-      }
-    } else {
-      await _sendPayload(endpointId, plainText);
+        final encrypted =
+            await _security.encryptPayloadString(plainText, secret);
+        await _sendPayload(endpointId, encrypted);
+        return;
+      } catch (_) {}
     }
+    await _sendPayload(endpointId, plainText);
   }
 
   Future<void> _sendPayload(String endpointId, String data) async {
@@ -874,10 +842,9 @@ class P2PSyncService {
     ));
   }
 
-  void confirmSync() {
+  Future<void> confirmSync() async {
     if (!_state.awaitingConfirmation) return;
 
-    final deviceId = _state.pendingConfirmationDeviceId;
     final endpointId = _state.connectedDeviceId;
 
     _updateState(_state.copyWith(
@@ -891,13 +858,12 @@ class P2PSyncService {
       final ack = jsonEncode({
         'type': 'p2p_auth_response',
         'accepted': true,
-        'deviceId': deviceId,
       });
-      _sendEncryptedPayload(endpointId, ack);
+      await _sendEncryptedPayload(endpointId, ack);
     }
   }
 
-  void rejectSync() {
+  Future<void> rejectSync() async {
     if (!_state.awaitingConfirmation) return;
 
     final endpointId = _state.connectedDeviceId;
@@ -914,7 +880,7 @@ class P2PSyncService {
         'type': 'p2p_auth_response',
         'accepted': false,
       });
-      _sendEncryptedPayload(endpointId, ack);
+      await _sendEncryptedPayload(endpointId, ack);
     }
   }
 

@@ -246,6 +246,8 @@ class _SettingsAssociationScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _buildBetaWarning(theme, colorScheme),
+                  const SizedBox(height: 16),
                   _buildRoleSelector(theme, colorScheme),
                   const SizedBox(height: 16),
                   _buildQrSection(theme, colorScheme),
@@ -258,6 +260,50 @@ class _SettingsAssociationScreenState
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildBetaWarning(ThemeData theme, ColorScheme colorScheme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.amber.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, color: Colors.amber[800], size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Sync Nearby in fase beta',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.amber[900],
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'La sincronizzazione Bluetooth è ancora in fase di sviluppo e '
+                  'potrebbe non funzionare correttamente. Per scambiare dati in '
+                  'modo affidabile, utilizza la scansione del QR code qui sotto '
+                  'o esporta un file di backup dalle impostazioni.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.amber[900],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

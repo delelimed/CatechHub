@@ -182,80 +182,81 @@ class SettingsPage extends ConsumerWidget {
   }
 
   void _showNotificationSettingsDialog(BuildContext context, WidgetRef ref) {
-    final isEnabled = MeetingNotificationService.areNotificationsEnabled;
-    final currentTime = MeetingNotificationService.notificationTime;
-
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: const Text(
-            'Notifiche incontri',
-            style: TextStyle(color: Color(0xFF174A7E), fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Ricevi un promemoria il giorno prima di ogni incontro di catechismo o riunione, all\'orario che preferisci.',
-                style: TextStyle(fontSize: 14, height: 1.4),
-              ),
-              const SizedBox(height: 20),
-              SwitchListTile(
-                title: const Text('Attiva notifiche'),
-                subtitle: const Text('Ricevi promemoria per incontri e riunioni'),
-                value: isEnabled,
-                activeThumbColor: const Color(0xFF174A7E),
-                onChanged: (value) async {
-                  await MeetingNotificationService.setEnabled(value);
-                  setState(() {});
-                },
-              ),
-              const SizedBox(height: 12),
-              if (isEnabled) ...[
-                ListTile(
-                  title: const Text('Orario notifica'),
-                  subtitle: Text(
-                    currentTime,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF174A7E),
-                    ),
-                  ),
-                  trailing: const Icon(Icons.access_time_rounded, color: Color(0xFF174A7E)),
-                  onTap: () async {
-                    final TimeOfDay? picked = await showTimePicker(
-                      context: context,
-                      initialTime: TimeOfDay(
-                        hour: int.parse(currentTime.split(':')[0]),
-                        minute: int.parse(currentTime.split(':')[1]),
-                      ),
-                    );
-                    if (picked != null && ctx.mounted) {
-                      final formattedTime =
-                          '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
-                      await MeetingNotificationService.setNotificationTime(formattedTime);
-                      setState(() {});
-                    }
+        builder: (ctx, setState) {
+          final isEnabled = MeetingNotificationService.areNotificationsEnabled;
+          final currentTime = MeetingNotificationService.notificationTime;
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            title: const Text(
+              'Notifiche incontri',
+              style: TextStyle(color: Color(0xFF174A7E), fontWeight: FontWeight.bold),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Ricevi un promemoria il giorno prima di ogni incontro di catechismo o riunione, all\'orario che preferisci.',
+                  style: TextStyle(fontSize: 14, height: 1.4),
+                ),
+                const SizedBox(height: 20),
+                SwitchListTile(
+                  title: const Text('Attiva notifiche'),
+                  subtitle: const Text('Ricevi promemoria per incontri e riunioni'),
+                  value: isEnabled,
+                  activeThumbColor: const Color(0xFF174A7E),
+                  onChanged: (value) async {
+                    await MeetingNotificationService.setEnabled(value);
+                    setState(() {});
                   },
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'La notifica verrà inviata il giorno prima dell\'incontro a quest\'ora.',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
-                ),
+                const SizedBox(height: 12),
+                if (isEnabled) ...[
+                  ListTile(
+                    title: const Text('Orario notifica'),
+                    subtitle: Text(
+                      currentTime,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF174A7E),
+                      ),
+                    ),
+                    trailing: const Icon(Icons.access_time_rounded, color: Color(0xFF174A7E)),
+                    onTap: () async {
+                      final TimeOfDay? picked = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay(
+                          hour: int.parse(currentTime.split(':')[0]),
+                          minute: int.parse(currentTime.split(':')[1]),
+                        ),
+                      );
+                      if (picked != null && ctx.mounted) {
+                        final formattedTime =
+                            '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+                        await MeetingNotificationService.setNotificationTime(formattedTime);
+                        setState(() {});
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'La notifica verrà inviata il giorno prima dell\'incontro a quest\'ora.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
               ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Chiudi'),
             ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Chiudi'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

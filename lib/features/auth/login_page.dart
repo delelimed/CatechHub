@@ -465,7 +465,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           const SizedBox(height: 16),
         ],
         Text(
-          'Sblocca con il tuo dispositivo',
+          'Sblocca il registro',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.bold,
             color: const Color(0xFF174A7E),

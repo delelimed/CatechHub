@@ -6,7 +6,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/github/v/release/delelimed/CatechHub?style=flat-square&label=versione&color=blue" alt="Versione"/>
-  <img src="https://img.shields.io/github/actions/workflow/status/delelimed/CatechHub/android-build.yml?style=flat-square&label=build&branch=debug" alt="Build"/>
+  <a href="https://github.com/delelimed/CatechHub/actions/workflows/android-build.yml"><img src="https://github.com/delelimed/CatechHub/actions/workflows/android-build.yml/badge.svg" alt="Flutter Android Build"/></a>
   <img src="https://img.shields.io/github/downloads/delelimed/CatechHub/total?style=flat-square&label=downloads&color=success" alt="Download"/>
   <img src="https://img.shields.io/badge/licenza-MIT-green?style=flat-square" alt="Licenza"/>
   <img src="https://img.shields.io/badge/Android-API%2030%2B-brightgreen?style=flat-square&logo=android" alt="Android"/>

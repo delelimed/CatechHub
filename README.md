@@ -37,12 +37,13 @@ CatechHub adotta un approccio **defense-in-depth**, dove ogni livello è progett
 | Cosa protegge | Come lo fa |
 | --- | --- |
 | **Accesso all'app** | Solo con impronta digitale / riconoscimento facciale / PIN del telefono — nessuna password personalizzata da ricordare |
-| **Dati sul telefono** | Cifrati con **AES-256-GCM** — illeggibili anche se il file viene copiato |
-| **Dati in sincronizzazione** | End-to-end encryption con scambio chiavi **ECDH P-256** via QR code |
-| **Schermo** | Blocco screenshot e screen recording non autorizzati |
+| **Dati sul telefono** | Cifrati con **AES-256-GCM** — chiave master custodita in **AndroidKeyStore** (TEE/StrongBox hardware) |
+| **Sincronizzazione P2P** | End-to-end encryption con scambio chiavi **ECDH P-256** via QR code |
+| **Schermo** | Blocco screenshot e screen recording non autorizzati con FLAG_SECURE |
 | **Runtime** | freeRASP rileva e blocca root, emulatori, tampering e hacking |
-| **Sessione** | Blocco automatico dopo 2 minuti in background |
+| **Sessione** | Blocco automatico dopo 2 minuti in background, stato solo in RAM |
 | **Backup** | Protetto da password con derivazione PBKDF2 (210.000 iterazioni) |
+| **Hardware** | Verifica TEE/StrongBox all'avvio — nessun fallback software per la chiave master |
 
 > **Nessun dato personale lascia mai il tuo telefono** se non durante una sincronizzazione volontaria con un altro catechista di tua fiducia.
 
@@ -65,7 +66,8 @@ CatechHub adotta un approccio **defense-in-depth**, dove ogni livello è progett
 | --- | --- |
 | Framework | Flutter & Dart |
 | Stato | Riverpod |
-| Database locale | Hive (cifrato AES) |
+| Database locale | Hive (cifrato AES-256-GCM) |
+| Chiave master | AndroidKeyStore (TEE/StrongBox hardware) |
 | Crittografia | PointyCastle, cryptography (AES-256-GCM, PBKDF2, ECDH, HKDF) |
 | Sincronizzazione | Bluetooth RFCOMM + protocollo CRDT |
 | Autenticazione | Biometria nativa Android |

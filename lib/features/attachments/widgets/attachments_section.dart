@@ -46,6 +46,9 @@ class AttachmentsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final repo = ref.watch(attachmentsRepositoryProvider);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return StreamBuilder<List<Attachment>>(
       stream: repo.watchForParent(parentId: parentId, parentType: parentType),
@@ -56,11 +59,13 @@ class AttachmentsSection extends ConsumerWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? colorScheme.surfaceContainer : Colors.white,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.3)
+                    : Colors.black.withValues(alpha: 0.04),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -71,19 +76,19 @@ class AttachmentsSection extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.lock_rounded,
-                    color: Color(0xFF174A7E),
+                    color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
                     size: 20,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF174A7E),
+                        color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
                       ),
                     ),
                   ),
@@ -92,14 +97,14 @@ class AttachmentsSection extends ConsumerWidget {
                       tooltip: 'Aggiungi',
                       onPressed: () => _showAddMenu(context, ref),
                       icon: const Icon(Icons.add_circle_outline_rounded),
-                      color: const Color(0xFF174A7E),
+                      color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
                     ),
                 ],
               ),
               const SizedBox(height: 4),
               Text(
                 'Salvati cifrati e compressi (foto max 1600px, JPEG).',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 12, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
               ),
               const SizedBox(height: 12),
               if (snapshot.connectionState == ConnectionState.waiting &&
@@ -108,7 +113,7 @@ class AttachmentsSection extends ConsumerWidget {
               else if (attachments.isEmpty)
                 Text(
                   'Nessun allegato',
-                  style: TextStyle(color: Colors.grey.shade500),
+                  style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade500),
                 )
               else
                 ...attachments.map(
@@ -455,6 +460,10 @@ class _AttachmentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     final icon = attachment.isImage
         ? Icons.image_rounded
         : attachment.isPdf
@@ -464,9 +473,9 @@ class _AttachmentTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 0,
-      color: Colors.grey.shade50,
+      color: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.grey.shade50,
       child: ListTile(
-        leading: Icon(icon, color: const Color(0xFF174A7E)),
+        leading: Icon(icon, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
         title: Text(
           attachment.name,
           maxLines: 1,
@@ -474,6 +483,7 @@ class _AttachmentTile extends StatelessWidget {
         ),
         subtitle: Text(
           '${attachment.sizeLabel} · ${_formatDate(attachment.createdAt)}',
+          style: TextStyle(color: isDark ? Colors.grey.shade400 : null),
         ),
         trailing: readOnly
             ? null

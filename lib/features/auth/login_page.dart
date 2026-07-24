@@ -31,10 +31,12 @@ class _AnimatedGradientBackground extends StatefulWidget {
   const _AnimatedGradientBackground({required this.child});
 
   @override
-  State<_AnimatedGradientBackground> createState() => _AnimatedGradientBackgroundState();
+  State<_AnimatedGradientBackground> createState() =>
+      _AnimatedGradientBackgroundState();
 }
 
-class _AnimatedGradientBackgroundState extends State<_AnimatedGradientBackground>
+class _AnimatedGradientBackgroundState
+    extends State<_AnimatedGradientBackground>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
@@ -165,7 +167,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final groupName = _groupController.text.trim();
 
     if (firstName.isEmpty || lastName.isEmpty || groupName.isEmpty) {
-      setState(() => _errorMessage = 'Nome, cognome e gruppo sono obbligatori.');
+      setState(
+        () => _errorMessage = 'Nome, cognome e gruppo sono obbligatori.',
+      );
       return;
     }
 
@@ -177,7 +181,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     );
 
     if (!ok && mounted) {
-      setState(() => _errorMessage = 'Errore durante la configurazione. Riprova.');
+      setState(
+        () => _errorMessage = 'Errore durante la configurazione. Riprova.',
+      );
     }
   }
 
@@ -185,6 +191,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
     final isLoading = authState.isLoading;
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
 
     // Se già sbloccato, non dovremmo essere qui (router gestisce redirect)
     // Ma per sicurezza mostriamo loading
@@ -199,7 +207,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 430),
+                constraints: BoxConstraints(maxWidth: isLandscape ? 600 : 430),
                 child: Card(
                   elevation: 12,
                   shape: RoundedRectangleBorder(
@@ -207,57 +215,128 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(28),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Image.asset(
-                          'assets/images/logo.png',
-                          height: 120,
-                          errorBuilder: (_, __, ___) =>
-                              const Icon(Icons.menu_book, size: 80),
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'CatechHub',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF174A7E),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          '"${randomQuote.text}"',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontStyle: FontStyle.italic,
-                            fontSize: 13,
-                            color: Colors.grey,
-                          ),
-                        ),
-                        const SizedBox(height: 28),
+                    child: isLandscape
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Image.asset(
+                                      'assets/images/logo.png',
+                                      height: 100,
+                                      errorBuilder: (_, __, ___) =>
+                                          const Icon(Icons.menu_book, size: 80),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    const Text(
+                                      'CatechHub',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF174A7E),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 14),
+                                    Text(
+                                      '"${randomQuote.text}"',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontStyle: FontStyle.italic,
+                                        fontSize: 13,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 24),
+                              Expanded(
+                                flex: 4,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (_isFirstSetup) ...[
+                                      _buildFirstSetupForm(isLoading),
+                                    ] else if (!_checkedLockScreen) ...[
+                                      _buildCheckingLockScreen(),
+                                    ] else if (!_hasSecureLockScreen) ...[
+                                      const HardLockScreen(),
+                                    ] else ...[
+                                      _buildUnlockForm(isLoading),
+                                    ],
+                                    const SizedBox(height: 20),
+                                    const Text(
+                                      'Realizzato con ❤️\n da un catechista per i catechisti',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          )
+                        : Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Image.asset(
+                                'assets/images/logo.png',
+                                height: 120,
+                                errorBuilder: (_, __, ___) =>
+                                    const Icon(Icons.menu_book, size: 80),
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'CatechHub',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF174A7E),
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              Text(
+                                '"${randomQuote.text}"',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontStyle: FontStyle.italic,
+                                  fontSize: 13,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              const SizedBox(height: 28),
 
-                        // Contenuto dinamico in base allo stato
-                        if (_isFirstSetup) ...[
-                          _buildFirstSetupForm(isLoading),
-                        ] else if (!_checkedLockScreen) ...[
-                          _buildCheckingLockScreen(),
-                        ] else if (!_hasSecureLockScreen) ...[
-                          // HARD LOCK SCREEN - Non chiudibile, non bypassabile
-                          const HardLockScreen(),
-                        ] else ...[
-                          _buildUnlockForm(isLoading),
-                        ],
+                              // Contenuto dinamico in base allo stato
+                              if (_isFirstSetup) ...[
+                                _buildFirstSetupForm(isLoading),
+                              ] else if (!_checkedLockScreen) ...[
+                                _buildCheckingLockScreen(),
+                              ] else if (!_hasSecureLockScreen) ...[
+                                // HARD LOCK SCREEN - Non chiudibile, non bypassabile
+                                const HardLockScreen(),
+                              ] else ...[
+                                _buildUnlockForm(isLoading),
+                              ],
 
-                        const SizedBox(height: 20),
-                        const Text(
-                          'Realizzato con ❤️\n da un catechista per i catechisti',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
-                      ],
-                    ),
+                              const SizedBox(height: 20),
+                              const Text(
+                                'Realizzato con ❤️\n da un catechista per i catechisti',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
                   ),
                 ),
               ),
@@ -321,9 +400,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         Text(
           'Crea il tuo profilo',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF174A7E),
-              ),
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF174A7E),
+          ),
         ),
         const SizedBox(height: 8),
         const Text(
@@ -338,7 +417,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           const SizedBox(height: 12),
           _buildTextField(_lastNameController, 'Cognome', Icons.person_outline),
           const SizedBox(height: 12),
-          _buildTextField(_groupController, 'Gruppo / Parrocchia', Icons.groups),
+          _buildTextField(
+            _groupController,
+            'Gruppo / Parrocchia',
+            Icons.groups,
+          ),
           const SizedBox(height: 20),
           ElevatedButton(
             onPressed: _handleSetupProfile,
@@ -384,9 +467,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         Text(
           'Sblocca con il tuo dispositivo',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF174A7E),
-              ),
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF174A7E),
+          ),
         ),
         const SizedBox(height: 8),
         const Text(
@@ -422,7 +505,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon) {
+  Widget _buildTextField(
+    TextEditingController controller,
+    String label,
+    IconData icon,
+  ) {
     return TextField(
       controller: controller,
       decoration: InputDecoration(
@@ -434,7 +521,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         ),
         filled: true,
         fillColor: const Color(0xFF174A7E).withValues(alpha: 0.05),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 16,
+        ),
       ),
     );
   }

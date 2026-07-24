@@ -140,7 +140,17 @@ final HKDF_INFO = 'CatechHub_SessionKey_v2';
 
     <h2 id="security">5. Security architecture</h2>
 
-    <h3>5.1 freeRASP</h3>
+    <h3>5.1 Hardware-backed Master Key (AndroidKeyStore)</h3>
+    <p>A partire dalla versione 2.0, CatechHub richiede <strong>esclusivamente</strong> protezione hardware per la chiave master di cifratura Hive. Il modulo <code>SecurityManager</code>:</p>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>Verifica la presenza di TEE (Trusted Execution Environment) o StrongBox all'avvio tramite <code>local_auth</code> e <code>FlutterSecureStorage</code></li>
+      <li>Genera la chiave master AES-256 tramite <code>Hive.generateSecureKey()</code> e la custodisce in AndroidKeyStore con <code>encryptedSharedPreferences=true</code></li>
+      <li>Se TEE/StrongBox non è disponibile, solleva <code>HardwareSecurityException</code> e blocca l'avvio con <code>SecurityBlockScreen</code></li>
+      <li><strong>Nessun fallback software</strong>: la chiave master non viene mai memorizzata in memoria volatile o storage non protetto</li>
+    </ul>
+    <p>Configurazione Android (<code>flutter_secure_storage</code>): <code>encryptedSharedPreferences: true</code> forza l'uso di <code>KeyGenParameterSpec</code> con <code>setIsStrongBoxBacked(true)</code> su API 28+.</p>
+
+    <h3>5.2 freeRASP</h3>
     <p>Libreria di runtime application self-protection (RASP) che rileva 8 categorie di minacce:</p>
     <table class="sec-table">
       <thead><tr><th>Categoria</th><th>Rilevamento</th></tr></thead>
@@ -158,15 +168,16 @@ final HKDF_INFO = 'CatechHub_SessionKey_v2';
 
     <p>Configurazione: <code>killOnBypass = false</code> (l'utente riceve una schermata di blocco personalizzata <code>SecurityBlockScreen</code> ma non viene forzato alla chiusura).</p>
 
-    <h3>5.2 Auth — local_auth</h3>
+    <h3>5.3 Auth — local_auth</h3>
     <pre>
 Authentication auth = Authentication();
 bool canAuth = await auth.canCheckBiometrics || await auth.isDeviceSupported();
 // biometricOnly = false → fallback a PIN/Pattern/Password del dispositivo
     </pre>
     <p>La sessione vive esclusivamente in RAM: nessun token persistito. Il timeout background è di 120 secondi. Allo scadere, la sessione viene invalidata e l'utente deve riautenticarsi.</p>
+    <p>L'autenticazione locale serve anche come proxy per verificare la presenza di TEE (Trusted Execution Environment) durante il bootstrap di <code>SecurityManager</code>.</p>
 
-    <h3>5.3 Screen security</h3>
+    <h3>5.4 Screen security</h3>
     <pre>
 // MainActivity.kt
 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
@@ -181,15 +192,17 @@ if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
     <pre>
   Defense-in-Depth Security Stack
   ┌─────────────────────────────────────────────────────────────────┐
-  │  Layer 7: freeRASP (root, emulator, hooking, app integrity)    │
+  │  Layer 8: freeRASP (root, emulator, hooking, app integrity)    │
   ├─────────────────────────────────────────────────────────────────┤
-  │  Layer 6: E2EE Sync (ECDH P-256 + HKDF + AES-256-GCM)         │
+  │  Layer 7: E2EE Sync (ECDH P-256 + HKDF + AES-256-GCM)         │
   ├─────────────────────────────────────────────────────────────────┤
-  │  Layer 5: Biometric Auth + Session in RAM (120s timeout)       │
+  │  Layer 6: Biometric Auth + Session in RAM (120s timeout)       │
   ├─────────────────────────────────────────────────────────────────┤
-  │  Layer 4: HiveAesCipher — AES-256-GCM at rest                  │
+  │  Layer 5: HiveAesCipher — AES-256-GCM at rest                  │
   ├─────────────────────────────────────────────────────────────────┤
-  │  Layer 3: AndroidKeyStore — hardware-backed key isolation       │
+  │  Layer 4: AndroidKeyStore — hardware-backed key isolation       │
+  ├─────────────────────────────────────────────────────────────────┤
+  │  Layer 3: SecurityManager — verifica TEE/StrongBox all'avvio   │
   ├─────────────────────────────────────────────────────────────────┤
   │  Layer 2: PBKDF2-HMAC-SHA256 — 210,000 iterations               │
   ├─────────────────────────────────────────────────────────────────┤

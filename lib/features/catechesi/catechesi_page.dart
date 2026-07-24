@@ -43,13 +43,16 @@ class _CatechesiPageState extends ConsumerState<CatechesiPage> {
   @override
   Widget build(BuildContext context) {
     final repo = ref.watch(catechesiRepositoryProvider);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return AppScaffold(
       title: 'Catechesi',
       floatingActionButton: FloatingActionButton.extended(
         elevation: 4,
-        backgroundColor: const Color(0xFF174A7E),
-        foregroundColor: Colors.white,
+        backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+        foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
         icon: const Icon(Icons.add_rounded),
         label: const Text(
           'Nuova catechesi',
@@ -79,7 +82,7 @@ class _CatechesiPageState extends ConsumerState<CatechesiPage> {
                       )
                     : null,
                 filled: true,
-                fillColor: Colors.grey.shade50,
+                fillColor: isDark ? colorScheme.surfaceContainer : Colors.grey.shade50,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
                   borderSide: BorderSide.none,
@@ -118,7 +121,7 @@ class _CatechesiPageState extends ConsumerState<CatechesiPage> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(Icons.menu_book_rounded,
-                              size: 56, color: Colors.grey.shade300),
+                              size: 56, color: isDark ? Colors.grey.shade600 : Colors.grey.shade300),
                           const SizedBox(height: 16),
                           Text(
                             _query.isEmpty
@@ -127,7 +130,7 @@ class _CatechesiPageState extends ConsumerState<CatechesiPage> {
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: Colors.grey.shade700,
+                              color: isDark ? colorScheme.onSurface : Colors.grey.shade700,
                             ),
                           ),
                         ],
@@ -144,6 +147,8 @@ class _CatechesiPageState extends ConsumerState<CatechesiPage> {
                     final c = items[i];
                     return _CatechesiCard(
                       catechesi: c,
+                      isDark: isDark,
+                      colorScheme: colorScheme,
                       onDeleted: () => setState(() {}),
                     );
                   },
@@ -166,8 +171,15 @@ class _CatechesiPageState extends ConsumerState<CatechesiPage> {
 class _CatechesiCard extends StatelessWidget {
   final Catechesi catechesi;
   final VoidCallback onDeleted;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
-  const _CatechesiCard({required this.catechesi, required this.onDeleted});
+  const _CatechesiCard({
+    required this.catechesi,
+    required this.onDeleted,
+    required this.isDark,
+    required this.colorScheme,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -182,12 +194,14 @@ class _CatechesiCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? colorScheme.surfaceContainer : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.grey.shade200),
+          border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade200),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.3)
+                  : Colors.black.withValues(alpha: 0.03),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),
@@ -203,12 +217,12 @@ class _CatechesiCard extends StatelessWidget {
                     catechesi.title,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: const Color(0xFF174A7E),
+                      color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
                     ),
                   ),
                 ),
                 PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert_rounded, size: 20),
+                  icon: Icon(Icons.more_vert_rounded, size: 20, color: isDark ? colorScheme.onSurface : null),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
@@ -275,7 +289,7 @@ class _CatechesiCard extends StatelessWidget {
                 catechesi.description,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.grey.shade700, height: 1.35),
+                style: TextStyle(color: isDark ? Colors.grey.shade300 : Colors.grey.shade700, height: 1.35),
               ),
             ],
             if (catechesi.tags.isNotEmpty) ...[
@@ -288,8 +302,8 @@ class _CatechesiCard extends StatelessWidget {
                       (t) => Chip(
                         label: Text(t),
                         visualDensity: VisualDensity.compact,
-                        side: BorderSide(color: Colors.blue.shade100),
-                        backgroundColor: Colors.blue.shade50,
+                        side: BorderSide(color: isDark ? colorScheme.primary.withValues(alpha: 0.3) : Colors.blue.shade100),
+                        backgroundColor: isDark ? colorScheme.primaryContainer.withValues(alpha: 0.2) : Colors.blue.shade50,
                       ),
                     )
                     .toList(),
@@ -298,11 +312,11 @@ class _CatechesiCard extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                Icon(Icons.update_rounded, size: 14, color: Colors.grey.shade500),
+                Icon(Icons.update_rounded, size: 14, color: isDark ? Colors.grey.shade500 : Colors.grey.shade500),
                 const SizedBox(width: 4),
                 Text(
                   'Modificata ${formatter.format(catechesi.updatedAt)}',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 12, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
                 ),
               ],
             ),

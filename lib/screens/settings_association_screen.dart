@@ -1,48 +1,49 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import '../core/storage/local_database.dart';
-import '../models/association_models.dart';
-import '../services/security_service.dart';
-import '../services/nearby_sync_service.dart';
+import '../core/providers/nearby_sync_provider.dart';
+import '../features/sync/p2p/p2p_sync_service.dart';
+import '../features/sync/p2p/p2p_security_service.dart';
 
-class SettingsAssociationScreen extends StatefulWidget {
+class SettingsAssociationScreen extends ConsumerStatefulWidget {
   const SettingsAssociationScreen({super.key});
 
   @override
-  State<SettingsAssociationScreen> createState() =>
+  ConsumerState<SettingsAssociationScreen> createState() =>
       _SettingsAssociationScreenState();
 }
 
 class _SettingsAssociationScreenState
-    extends State<SettingsAssociationScreen> {
-  final AssociationSecurityService _security = AssociationSecurityService();
-  final NearbySyncService _syncService = NearbySyncService();
+    extends ConsumerState<SettingsAssociationScreen> {
+  final P2PSecurityService _security = P2PSecurityService();
 
-  SyncRole _selectedRole = SyncRole.mioDispositivo;
-  List<DeviceAssociation> _associations = [];
+  P2PSyncRole _selectedRole = P2PSyncRole.mioDispositivo;
+  List<P2PDeviceAssociation> _associations = [];
   bool _isLoading = true;
   bool _isPairingMode = false;
   bool _showScanner = false;
   String? _qrData;
   String? _errorMessage;
   MobileScannerController? _scannerController;
-  StreamSubscription<NearbySyncState>? _syncStateSub;
 
   @override
   void initState() {
     super.initState();
     _initData();
-    _syncStateSub = _syncService.onStateChanged.listen(_onSyncStateChanged);
     _startPairingMode();
+
+    ref.listen<AsyncValue<P2PSyncState>>(nearbySyncStateProvider,
+        (previous, next) {
+      next.whenData(_onSyncStateChanged);
+    });
   }
 
   @override
   void dispose() {
-    _syncStateSub?.cancel();
     _stopPairingMode();
     _stopScanner();
     super.dispose();
@@ -51,7 +52,8 @@ class _SettingsAssociationScreenState
   Future<void> _initData() async {
     setState(() => _isLoading = true);
     try {
-      await _syncService.init();
+      final syncService = ref.read(nearbySyncServiceProvider);
+      await syncService.init();
       final assocs = await _security.getAllAssociations();
       final qrData = await _generateQrData();
 
@@ -59,7 +61,7 @@ class _SettingsAssociationScreenState
         setState(() {
           _associations = assocs;
           _qrData = qrData;
-          _selectedRole = _syncService.currentState.role;
+          _selectedRole = syncService.currentState.role;
           _isLoading = false;
         });
       }
@@ -74,37 +76,19 @@ class _SettingsAssociationScreenState
   }
 
   Future<String> _generateQrData() async {
-    final deviceId = await _security.getOrCreateDeviceId();
-    final deviceName = _getDeviceDisplayName();
-    final publicKeyHex = await _security.getLocalPublicKeyHex();
-
-    final handshake = QrHandshake(
-      deviceId: deviceId,
-      deviceName: deviceName,
-      publicKeyHex: publicKeyHex,
-      timestamp: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-    );
-
-    return handshake.encode();
+    return _security.generateQrPayload();
   }
 
-  String _getDeviceDisplayName() {
-    try {
-      final auth = LocalDatabase.auth();
-      final name = auth.get('local_user_name', defaultValue: '') as String;
-      if (name.trim().isNotEmpty) return name.trim();
-    } catch (_) {}
-    return 'Il mio CatechHub';
-  }
-
-  void _onSyncStateChanged(NearbySyncState state) {
+  void _onSyncStateChanged(P2PSyncState state) {
     if (!mounted) return;
 
-    if (state.status == NearbySyncStatus.completed && state.connectedDeviceName != null) {
+    if (state.status == P2PSyncStatus.completed &&
+        state.connectedDeviceName != null) {
       _refreshAssociations();
       setState(() {
         _isPairingMode = false;
-        _errorMessage = 'Associazione completata con ${state.connectedDeviceName}';
+        _errorMessage =
+            'Associazione completata con ${state.connectedDeviceName}';
       });
     }
 
@@ -118,12 +102,14 @@ class _SettingsAssociationScreenState
       _isPairingMode = true;
       _errorMessage = null;
     });
-    await _syncService.startPairingMode();
+    final syncService = ref.read(nearbySyncServiceProvider);
+    await syncService.startPairingMode();
   }
 
   Future<void> _stopPairingMode() async {
     if (_isPairingMode) {
-      await _syncService.stopPairingMode();
+      final syncService = ref.read(nearbySyncServiceProvider);
+      await syncService.stopPairingMode();
     }
   }
 
@@ -159,32 +145,28 @@ class _SettingsAssociationScreenState
 
       _stopScanner();
 
-      final handshake = QrHandshake.decode(raw);
-      if (handshake == null) {
+      final remoteIdentity = P2PSecurityService.parseQrPayload(raw);
+      if (remoteIdentity == null) {
         setState(() => _errorMessage = 'QR code non valido.');
         return;
       }
 
-      if (!handshake.isFresh) {
-        setState(() => _errorMessage = 'QR code scaduto. '
-            'L\'altro dispositivo deve generarne uno nuovo.');
-        return;
-      }
-
-      final existing = await _security.getAssociation(handshake.deviceId);
+      final existing = await _security.getAssociation(remoteIdentity.deviceId);
       if (existing != null) {
         setState(() => _errorMessage = 'Dispositivo già associato.');
         return;
       }
 
       try {
-        final sharedSecret =
-            await _security.computeSharedSecretHex(handshake.publicKeyHex);
+        final sharedSecret = await _security.computeStaticSharedSecret(
+            remoteIdentity.publicKeyBase64);
 
-        final association = DeviceAssociation(
-          deviceId: handshake.deviceId,
-          deviceName: handshake.deviceName,
-          sharedSecretHex: sharedSecret,
+        final association = P2PDeviceAssociation(
+          deviceId: remoteIdentity.deviceId,
+          deviceName: remoteIdentity.deviceName,
+          publicKeyBase64: remoteIdentity.publicKeyBase64,
+          fingerprint: remoteIdentity.fingerprint,
+          sharedSecretBase64: sharedSecret,
           associatedAt: DateTime.now(),
         );
 
@@ -193,7 +175,8 @@ class _SettingsAssociationScreenState
 
         if (mounted) {
           setState(() {
-            _errorMessage = 'Associazione completata con ${handshake.deviceName}';
+            _errorMessage =
+                'Associazione completata con ${remoteIdentity.deviceName}';
           });
         }
       } catch (e) {
@@ -213,12 +196,12 @@ class _SettingsAssociationScreenState
     }
   }
 
-  Future<void> _removeAssociation(DeviceAssociation assoc) async {
+  Future<void> _removeAssociation(P2PDeviceAssociation assoc) async {
     await _security.removeAssociation(assoc.deviceId);
     await _refreshAssociations();
   }
 
-  Future<void> _confirmRemoveAssociation(DeviceAssociation assoc) async {
+  Future<void> _confirmRemoveAssociation(P2PDeviceAssociation assoc) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -252,8 +235,9 @@ class _SettingsAssociationScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Associazione Dispositivi'),
-        backgroundColor: colorScheme.primaryContainer,
+        title: const Text('Associazione Dispositivi',
+            style: TextStyle(color: Colors.white)),
+        backgroundColor: colorScheme.primary,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -262,6 +246,8 @@ class _SettingsAssociationScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _buildBetaWarning(theme, colorScheme),
+                  const SizedBox(height: 16),
                   _buildRoleSelector(theme, colorScheme),
                   const SizedBox(height: 16),
                   _buildQrSection(theme, colorScheme),
@@ -274,6 +260,50 @@ class _SettingsAssociationScreenState
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildBetaWarning(ThemeData theme, ColorScheme colorScheme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.amber.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, color: Colors.amber[800], size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Sync Nearby in fase beta',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.amber[900],
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'La sincronizzazione Bluetooth è ancora in fase di sviluppo e '
+                  'potrebbe non funzionare correttamente. Per scambiare dati in '
+                  'modo affidabile, utilizza la scansione del QR code qui sotto '
+                  'o esporta un file di backup dalle impostazioni.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.amber[900],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -291,38 +321,42 @@ class _SettingsAssociationScreenState
               ),
             ),
             const SizedBox(height: 12),
-            RadioGroup<SyncRole>(
+            RadioGroup<P2PSyncRole>(
               groupValue: _selectedRole,
               onChanged: (role) {
                 if (role == null) return;
                 setState(() => _selectedRole = role);
-                _syncService.setRole(role);
+                ref.read(nearbySyncServiceProvider).setRole(role);
               },
               child: Column(
                 children: [
-                  RadioListTile<SyncRole>(
+                  RadioListTile<P2PSyncRole>(
                     title: const Text('Mio Dispositivo'),
-                    subtitle: const Text('Sincronizzazione automatica'),
+                    subtitle:
+                        const Text('Sincronizzazione automatica'),
                     secondary: const Icon(Icons.sync),
-                    value: SyncRole.mioDispositivo,
+                    value: P2PSyncRole.mioDispositivo,
                   ),
-                  RadioListTile<SyncRole>(
+                  RadioListTile<P2PSyncRole>(
                     title: const Text('Altro Catechista'),
-                    subtitle: const Text('Chiede conferma prima di sincronizzare'),
+                    subtitle: const Text(
+                        'Chiede conferma prima di sincronizzare'),
                     secondary: const Icon(Icons.how_to_reg),
-                    value: SyncRole.altroCatechista,
+                    value: P2PSyncRole.altroCatechista,
                   ),
-                  RadioListTile<SyncRole>(
+                  RadioListTile<P2PSyncRole>(
                     title: Text(
                       'Responsabile',
                       style: TextStyle(color: Colors.grey[500]),
                     ),
                     subtitle: Text(
-                      'Funzione Responsabile non ancora implementata',
-                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                      'Funzione non ancora implementata',
+                      style:
+                          TextStyle(color: Colors.grey[500], fontSize: 12),
                     ),
-                    secondary: Icon(Icons.admin_panel_settings, color: Colors.grey[500]),
-                    value: SyncRole.responsabile,
+                    secondary: Icon(Icons.admin_panel_settings,
+                        color: Colors.grey[500]),
+                    value: P2PSyncRole.responsabile,
                   ),
                 ],
               ),
@@ -420,10 +454,256 @@ class _SettingsAssociationScreenState
                 ],
               ),
             ],
+            const SizedBox(height: 12),
+            _buildSyncStatusSection(theme, colorScheme),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildSyncStatusSection(
+      ThemeData theme, ColorScheme colorScheme) {
+    final syncState = ref.watch(nearbySyncStateProvider);
+    final daemonController =
+        ref.read(nearbySyncDaemonProvider.notifier);
+    final isDaemonActive = ref.watch(nearbySyncDaemonProvider);
+    final isSyncing = syncState.when(
+      data: (state) =>
+          state.status == P2PSyncStatus.discovering ||
+          state.status == P2PSyncStatus.syncing,
+      loading: () => false,
+      error: (_, _) => false,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDaemonActive
+                ? Colors.green.withValues(alpha: 0.1)
+                : Colors.orange.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isDaemonActive
+                  ? Colors.green.withValues(alpha: 0.3)
+                  : Colors.orange.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.sync,
+                color: isDaemonActive ? Colors.green : Colors.orange,
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Sincronizzazione automatica',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      isDaemonActive
+                          ? 'Attiva - Scansione ogni 120 secondi'
+                          : 'Inattiva',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDaemonActive
+                            ? Colors.green[700]
+                            : Colors.orange[700],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        syncState.when(
+          data: (state) {
+            if (state.isBackgroundSyncActive) {
+              return Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color:
+                      colorScheme.primaryContainer.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        state.status == P2PSyncStatus.discovering
+                            ? 'Scansione dispositivi vicini...'
+                            : state.status == P2PSyncStatus.syncing
+                                ? 'Sincronizzazione dati in corso...'
+                                : 'Sincronizzazione completata',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            if (state.status == P2PSyncStatus.error &&
+                state.errorMessage != null) {
+              return Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border:
+                      Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline,
+                        color: Colors.red[700], size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Errore: ${state.errorMessage}',
+                        style: TextStyle(
+                            fontSize: 13, color: Colors.red[700]),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            if (state.lastSyncAt != null) {
+              return Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.history, color: Colors.blue[700], size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Ultima sincronizzazione: ${_formatLastSync(state.lastSyncAt!)}',
+                      style:
+                          TextStyle(fontSize: 13, color: Colors.blue[700]),
+                    ),
+                  ],
+                ),
+              );
+            }
+            return const SizedBox.shrink();
+          },
+          loading: () => const SizedBox.shrink(),
+          error: (_, _) => const SizedBox.shrink(),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: isSyncing
+                    ? null
+                    : () async {
+                        await daemonController.triggerManualSync();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content:
+                                  Text('Sincronizzazione manuale avviata'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
+                icon: isSyncing
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.sync, size: 22),
+                label: Text(isSyncing
+                    ? 'Sincronizzazione in corso...'
+                    : 'Sincronizza ora'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: isDaemonActive
+                    ? () {
+                        daemonController.setAppForeground(false);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'Sincronizzazione automatica disattivata'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    : () {
+                        daemonController.setAppForeground(true);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'Sincronizzazione automatica attivata (ogni 120s)'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                icon: Icon(
+                    isDaemonActive
+                        ? Icons.pause_circle
+                        : Icons.play_circle,
+                    size: 22),
+                label: Text(isDaemonActive ? 'Pausa auto' : 'Avvia auto'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor:
+                      isDaemonActive ? Colors.orange : Colors.green,
+                  side: BorderSide(
+                    color: isDaemonActive ? Colors.orange : Colors.green,
+                    width: 2,
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  String _formatLastSync(DateTime dateTime) {
+    final now = DateTime.now();
+    final diff = now.difference(dateTime);
+    if (diff.inMinutes < 1) return 'Ora';
+    if (diff.inHours < 1) return '${diff.inMinutes}min fa';
+    if (diff.inDays < 1) return '${diff.inHours}h fa';
+    return '${diff.inDays}g fa';
   }
 
   Widget _buildScannerSection(ThemeData theme) {
@@ -434,7 +714,8 @@ class _SettingsAssociationScreenState
           children: [
             Row(
               children: [
-                Icon(Icons.qr_code_scanner, color: theme.colorScheme.primary),
+                Icon(Icons.qr_code_scanner,
+                    color: theme.colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(
                   'Scansiona QR partner',
@@ -507,12 +788,14 @@ class _SettingsAssociationScreenState
       ),
       child: Row(
         children: [
-          Icon(Icons.info_outline, color: theme.colorScheme.error, size: 20),
+          Icon(Icons.info_outline,
+              color: theme.colorScheme.error, size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               _errorMessage!,
-              style: TextStyle(color: theme.colorScheme.error, fontSize: 13),
+              style:
+                  TextStyle(color: theme.colorScheme.error, fontSize: 13),
             ),
           ),
           IconButton(
@@ -604,15 +887,16 @@ class _SettingsAssociationScreenState
     );
   }
 
-  Widget _buildAssociationTile(DeviceAssociation assoc) {
+  Widget _buildAssociationTile(P2PDeviceAssociation assoc) {
     final daysLeft = assoc.daysRemaining;
     final isExpiring = daysLeft <= 5;
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(vertical: 4),
       leading: CircleAvatar(
-        backgroundColor:
-            isExpiring ? Colors.orange.withValues(alpha: 0.15) : Colors.green.withValues(alpha: 0.15),
+        backgroundColor: isExpiring
+            ? Colors.orange.withValues(alpha: 0.15)
+            : Colors.green.withValues(alpha: 0.15),
         child: Icon(
           isExpiring ? Icons.timer : Icons.check_circle,
           color: isExpiring ? Colors.orange : Colors.green,

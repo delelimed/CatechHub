@@ -57,7 +57,7 @@ class UpdateService {
 
   /// Inizializza il plugin notifiche con callback di navigazione.
   static Future<void> initNotifications() async {
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings('@mipmap/launcher_icon');
     const settings = InitializationSettings(android: androidSettings);
     await _notificationsPlugin.initialize(
       settings: settings,
@@ -102,8 +102,14 @@ class UpdateService {
 
   /// Confronto semantico tra due versioni (es. "1.0.3" < "1.1.0").
   static bool isVersionNewerStatic(String current, String latest) {
-    final c = current.split('.').map(int.parse).toList();
-    final l = latest.split('.').map(int.parse).toList();
+    final c = current.split('.').map((s) {
+      final match = RegExp(r'^(\d+)').firstMatch(s);
+      return match != null ? int.parse(match.group(1)!) : 0;
+    }).toList();
+    final l = latest.split('.').map((s) {
+      final match = RegExp(r'^(\d+)').firstMatch(s);
+      return match != null ? int.parse(match.group(1)!) : 0;
+    }).toList();
     for (var i = 0; i < l.length; i++) {
       if (i >= c.length) return true;
       if (l[i] > c[i]) return true;
@@ -112,12 +118,12 @@ class UpdateService {
     return false;
   }
 
-  static Future<void> _showUpdateNotification(String version) async {
+static Future<void> _showUpdateNotification(String version) async {
     const androidDetails = AndroidNotificationDetails(
       'update_channel_id', 'Aggiornamenti App',
       channelDescription: 'Notifiche per i nuovi aggiornamenti di CatechHub',
       importance: Importance.max, priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
+      icon: '@mipmap/launcher_icon',
     );
     await _notificationsPlugin.show(
       id: 0, title: 'Aggiornamento disponibile',

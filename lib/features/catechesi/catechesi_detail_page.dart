@@ -123,12 +123,16 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: isDark ? colorScheme.surface : Colors.grey.shade50,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: const Color(0xFF174A7E),
-        foregroundColor: Colors.white,
+        backgroundColor: isDark ? colorScheme.primaryContainer : const Color(0xFF174A7E),
+        foregroundColor: isDark ? colorScheme.onPrimaryContainer : Colors.white,
         title: Text(
           _isEditing ? 'Modifica catechesi' : 'Catechesi',
           style: const TextStyle(fontWeight: FontWeight.bold),
@@ -147,6 +151,9 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
 
   Widget _buildReadOnlyView() {
     final formatter = DateFormat('dd MMMM yyyy', 'it_IT');
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -155,20 +162,20 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
         children: [
           Text(
             _catechesi.title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF174A7E),
+              color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
             ),
           ),
           const SizedBox(height: 6),
           Row(
             children: [
-              Icon(Icons.update_rounded, size: 14, color: Colors.grey.shade600),
+              Icon(Icons.update_rounded, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
               const SizedBox(width: 4),
               Text(
                 'Modificata ${formatter.format(_catechesi.updatedAt)}',
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 13, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
               ),
             ],
           ),
@@ -176,11 +183,13 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
           if (_catechesi.description.trim().isNotEmpty) ...[
             _Section(
               icon: Icons.description_rounded,
-              color: Colors.blue,
+              color: isDark ? colorScheme.primary : Colors.blue,
               title: 'Descrizione',
+              isDark: isDark,
+              colorScheme: colorScheme,
               child: Text(
                 _catechesi.description,
-                style: const TextStyle(fontSize: 16, height: 1.5),
+                style: TextStyle(fontSize: 16, height: 1.5, color: isDark ? colorScheme.onSurface : null),
               ),
             ),
             const SizedBox(height: 20),
@@ -188,8 +197,10 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
           if (_catechesi.tags.isNotEmpty) ...[
             _Section(
               icon: Icons.label_rounded,
-              color: Colors.deepPurple,
+              color: isDark ? colorScheme.primary : Colors.deepPurple,
               title: 'Tag',
+              isDark: isDark,
+              colorScheme: colorScheme,
               child: Wrap(
                 spacing: 10,
                 runSpacing: 10,
@@ -198,8 +209,8 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
                       (t) => Chip(
                         label: Text(t),
                         visualDensity: VisualDensity.compact,
-                        side: BorderSide(color: Colors.purple.shade100),
-                        backgroundColor: Colors.purple.shade50,
+                        side: BorderSide(color: isDark ? colorScheme.primary.withValues(alpha: 0.3) : Colors.purple.shade100),
+                        backgroundColor: isDark ? colorScheme.primaryContainer.withValues(alpha: 0.2) : Colors.purple.shade50,
                       ),
                     )
                     .toList(),
@@ -210,8 +221,10 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
           if (_catechesi.biblicalReferences.isNotEmpty) ...[
             _Section(
               icon: Icons.menu_book_rounded,
-              color: Colors.orange,
+              color: isDark ? colorScheme.primary : Colors.orange,
               title: 'Riferimenti biblici',
+              isDark: isDark,
+              colorScheme: colorScheme,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: _catechesi.biblicalReferences
@@ -220,7 +233,7 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Text(
                           '• $b',
-                          style: const TextStyle(fontSize: 15, height: 1.4),
+                          style: TextStyle(fontSize: 15, height: 1.4, color: isDark ? colorScheme.onSurface : null),
                         ),
                       ),
                     )
@@ -232,8 +245,10 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
           if (_catechesi.websiteReferences.isNotEmpty) ...[
             _Section(
               icon: Icons.link_rounded,
-              color: Colors.teal,
+              color: isDark ? colorScheme.primary : Colors.teal,
               title: 'Riferimenti sitografici',
+              isDark: isDark,
+              colorScheme: colorScheme,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: _catechesi.websiteReferences
@@ -255,14 +270,14 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
                           child: Row(
                             children: [
                               Icon(Icons.open_in_new_rounded,
-                                  size: 16, color: Colors.teal.shade700),
+                                  size: 16, color: isDark ? colorScheme.primary : Colors.teal.shade700),
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
                                   w,
                                   style: TextStyle(
                                     fontSize: 15,
-                                    color: Colors.teal.shade700,
+                                    color: isDark ? colorScheme.primary : Colors.teal.shade700,
                                     decoration: TextDecoration.underline,
                                   ),
                                 ),
@@ -289,13 +304,19 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
   }
 
   Widget _buildEditView() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
           _EditField(
             icon: Icons.title_rounded,
-            color: const Color(0xFF174A7E),
+            color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+            isDark: isDark,
+            colorScheme: colorScheme,
             child: TextField(
               controller: _titleController,
               textInputAction: TextInputAction.next,
@@ -308,7 +329,9 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
           const SizedBox(height: 16),
           _EditField(
             icon: Icons.description_rounded,
-            color: Colors.blue,
+            color: isDark ? colorScheme.primary : Colors.blue,
+            isDark: isDark,
+            colorScheme: colorScheme,
             child: TextField(
               controller: _descriptionController,
               maxLines: 8,
@@ -321,7 +344,9 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
           const SizedBox(height: 16),
           _EditField(
             icon: Icons.label_rounded,
-            color: Colors.deepPurple,
+            color: isDark ? colorScheme.primary : Colors.deepPurple,
+            isDark: isDark,
+            colorScheme: colorScheme,
             child: TextField(
               controller: _tagsController,
               decoration: const InputDecoration(
@@ -333,7 +358,9 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
           const SizedBox(height: 16),
           _EditField(
             icon: Icons.menu_book_rounded,
-            color: Colors.orange,
+            color: isDark ? colorScheme.primary : Colors.orange,
+            isDark: isDark,
+            colorScheme: colorScheme,
             child: TextField(
               controller: _biblicalController,
               maxLines: 4,
@@ -346,7 +373,9 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
           const SizedBox(height: 16),
           _EditField(
             icon: Icons.link_rounded,
-            color: Colors.teal,
+            color: isDark ? colorScheme.primary : Colors.teal,
+            isDark: isDark,
+            colorScheme: colorScheme,
             child: TextField(
               controller: _websiteController,
               maxLines: 4,
@@ -367,8 +396,8 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
             width: double.infinity,
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF174A7E),
-                foregroundColor: Colors.white,
+                backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(18),
@@ -393,12 +422,16 @@ class _Section extends StatelessWidget {
   final Color color;
   final String title;
   final Widget child;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
   const _Section({
     required this.icon,
     required this.color,
     required this.title,
     required this.child,
+    required this.isDark,
+    required this.colorScheme,
   });
 
   @override
@@ -407,12 +440,14 @@ class _Section extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? colorScheme.surfaceContainer : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.03),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -447,11 +482,15 @@ class _EditField extends StatelessWidget {
   final Widget child;
   final IconData icon;
   final Color color;
+  final bool isDark;
+  final ColorScheme colorScheme;
 
   const _EditField({
     required this.child,
     required this.icon,
     required this.color,
+    required this.isDark,
+    required this.colorScheme,
   });
 
   @override
@@ -459,12 +498,14 @@ class _EditField extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? colorScheme.surfaceContainer : Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : color.withValues(alpha: 0.2)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.04),
             blurRadius: 16,
             offset: const Offset(0, 8),
           )

@@ -32,15 +32,36 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
     super.dispose();
   }
 
-  void _scrollToMonth(String monthKey) {
+  void _scrollToMonth(
+    String monthKey,
+    List<String> keys,
+    Map<String, List<PlanningMeeting>> grouped,
+  ) {
     final globalKey = _monthKeys[monthKey];
     final context = globalKey?.currentContext;
-    if (context == null) return;
-    Scrollable.ensureVisible(
-      context,
+    if (context != null) {
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+        alignment: 0.1,
+      );
+      return;
+    }
+
+    final idx = keys.indexOf(monthKey);
+    if (idx < 0) return;
+
+    double offset = 220;
+    for (int i = 0; i < idx; i++) {
+      final count = grouped[keys[i]]?.length ?? 0;
+      offset += 50 + count * 95;
+    }
+
+    _scrollController.animateTo(
+      offset.clamp(0, _scrollController.position.maxScrollExtent),
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeInOut,
-      alignment: 0.1,
     );
   }
 
@@ -71,15 +92,14 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
 
       child: classesAsync.when(
         data: (classes) {
-          final myClass = classes.where(
-            (c) => c.catechistIds.contains(uid),
-          );
+          final myClass = classes.where((c) => c.catechistIds.contains(uid));
 
           if (myClass.isEmpty) {
             return _EmptyState(
               icon: Icons.groups_rounded,
               title: 'Nessuna classe assegnata',
-              subtitle: 'Non risulti ancora assegnato ad un gruppo di catechismo.',
+              subtitle:
+                  'Non risulti ancora assegnato ad un gruppo di catechismo.',
             );
           }
 
@@ -89,9 +109,7 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
             stream: repo.getMeetings(),
             builder: (context, snapshot) {
               if (!snapshot.hasData) {
-                return const Center(
-                  child: CircularProgressIndicator(),
-                );
+                return const Center(child: CircularProgressIndicator());
               }
 
               final now = DateTime.now();
@@ -110,21 +128,27 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                 meetings = meetings
                     .where((m) => _normalizeDate(m.date).isBefore(today))
                     .toList();
-                meetings.sort((a, b) => _normalizeDate(b.date)
-                    .compareTo(_normalizeDate(a.date)));
+                meetings.sort(
+                  (a, b) =>
+                      _normalizeDate(b.date).compareTo(_normalizeDate(a.date)),
+                );
               } else {
                 meetings = meetings
                     .where((m) => !_normalizeDate(m.date).isBefore(today))
                     .toList();
-                meetings.sort((a, b) => _normalizeDate(a.date)
-                    .compareTo(_normalizeDate(b.date)));
+                meetings.sort(
+                  (a, b) =>
+                      _normalizeDate(a.date).compareTo(_normalizeDate(b.date)),
+                );
               }
 
               final groupedMeetings = <String, List<PlanningMeeting>>{};
               final monthKeys = <String>[];
               for (final m in meetings) {
-                final key =
-                    DateFormat('MMMM yyyy', 'it_IT').format(_normalizeDate(m.date));
+                final key = DateFormat(
+                  'MMMM yyyy',
+                  'it_IT',
+                ).format(_normalizeDate(m.date));
                 if (!groupedMeetings.containsKey(key)) {
                   groupedMeetings[key] = [];
                   monthKeys.add(key);
@@ -157,27 +181,41 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                       children: [
                         _ToggleChip(
                           label: _showPast ? 'Prossimi' : 'Passati',
-                          icon: _showPast ? Icons.upcoming_rounded : Icons.history_rounded,
+                          icon: _showPast
+                              ? Icons.upcoming_rounded
+                              : Icons.history_rounded,
                           onTap: () {
                             setState(() => _showPast = !_showPast);
                           },
                         ),
-                        if (monthKeys.isNotEmpty)
-                          const SizedBox(width: 8),
-                        ...monthKeys.map((mk) => _MonthChip(
-                          label: mk[0].toUpperCase() + mk.substring(1),
-                          onTap: () => _scrollToMonth(mk),
-                        )),
+                        if (monthKeys.isNotEmpty) const SizedBox(width: 8),
+                        ...monthKeys.map(
+                          (mk) => _MonthChip(
+                            label: mk[0].toUpperCase() + mk.substring(1),
+                            onTap: () =>
+                                _scrollToMonth(mk, monthKeys, groupedMeetings),
+                          ),
+                        ),
                       ],
                     ),
                   ),
                   if (meetings.isEmpty)
                     Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 24),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 60,
+                        horizontal: 24,
+                      ),
                       child: Center(
                         child: Text(
-                          _showPast ? 'Nessun incontro passato' : 'Nessun prossimo incontro',
-                          style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, fontSize: 15),
+                          _showPast
+                              ? 'Nessun incontro passato'
+                              : 'Nessun prossimo incontro',
+                          style: TextStyle(
+                            color: isDark
+                                ? Colors.grey.shade400
+                                : Colors.grey.shade600,
+                            fontSize: 15,
+                          ),
                         ),
                       ),
                     ),
@@ -192,24 +230,40 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                           child: Row(
                             children: [
                               Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 6,
+                                ),
                                 decoration: BoxDecoration(
                                   color: isDark
-                                      ? colorScheme.primaryContainer.withValues(alpha: 0.3)
-                                      : const Color(0xFF174A7E).withValues(alpha: 0.1),
+                                      ? colorScheme.primaryContainer.withValues(
+                                          alpha: 0.3,
+                                        )
+                                      : const Color(
+                                          0xFF174A7E,
+                                        ).withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.calendar_month_rounded, size: 16, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+                                    Icon(
+                                      Icons.calendar_month_rounded,
+                                      size: 16,
+                                      color: isDark
+                                          ? colorScheme.primary
+                                          : const Color(0xFF174A7E),
+                                    ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      monthKey[0].toUpperCase() + monthKey.substring(1),
+                                      monthKey[0].toUpperCase() +
+                                          monthKey.substring(1),
                                       style: TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.bold,
-                                        color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
+                                        color: isDark
+                                            ? colorScheme.onSurface
+                                            : const Color(0xFF174A7E),
                                       ),
                                     ),
                                   ],
@@ -220,18 +274,23 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                         ),
                         ...monthMeetings.map((m) {
                           final isReunion = m.isReunion;
-                          final accentColor =
-                              isReunion ? Colors.deepPurple : const Color(0xFF174A7E);
+                          final accentColor = isReunion
+                              ? Colors.deepPurple
+                              : const Color(0xFF174A7E);
 
                           return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 6,
+                            ),
                             child: InkWell(
                               borderRadius: BorderRadius.circular(24),
                               onTap: () {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => PlanningEditPage(existing: m),
+                                    builder: (_) =>
+                                        PlanningEditPage(existing: m),
                                   ),
                                 );
                               },
@@ -243,11 +302,14 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                                     colors: isDark
                                         ? [
                                             colorScheme.surfaceContainer,
-                                            colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                                            colorScheme.surfaceContainerHighest
+                                                .withValues(alpha: 0.5),
                                           ]
                                         : [
                                             Colors.white,
-                                            Colors.blue.shade50.withValues(alpha: 0.35),
+                                            Colors.blue.shade50.withValues(
+                                              alpha: 0.35,
+                                            ),
                                           ],
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
@@ -255,14 +317,18 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                                   borderRadius: BorderRadius.circular(24),
                                   border: Border.all(
                                     color: isDark
-                                        ? colorScheme.outline.withValues(alpha: 0.2)
+                                        ? colorScheme.outline.withValues(
+                                            alpha: 0.2,
+                                          )
                                         : Colors.blue.shade100,
                                   ),
                                   boxShadow: [
                                     BoxShadow(
                                       color: isDark
                                           ? Colors.black.withValues(alpha: 0.3)
-                                          : Colors.black.withValues(alpha: 0.04),
+                                          : Colors.black.withValues(
+                                              alpha: 0.04,
+                                            ),
                                       blurRadius: 16,
                                       offset: const Offset(0, 8),
                                     ),
@@ -273,7 +339,9 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                                   children: [
                                     Container(
                                       width: 56,
-                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: accentColor,
                                         borderRadius: BorderRadius.circular(14),
@@ -281,7 +349,9 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                                       child: Column(
                                         children: [
                                           Text(
-                                            DateFormat('dd').format(_normalizeDate(m.date)),
+                                            DateFormat(
+                                              'dd',
+                                            ).format(_normalizeDate(m.date)),
                                             style: const TextStyle(
                                               color: Colors.white,
                                               fontSize: 17,
@@ -298,7 +368,9 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                                               fontSize: 10,
                                             ),
                                           ),
-                                          if (isReunion && m.time != null && m.time!.isNotEmpty) ...[
+                                          if (isReunion &&
+                                              m.time != null &&
+                                              m.time!.isNotEmpty) ...[
                                             const SizedBox(height: 2),
                                             Text(
                                               m.time!,
@@ -315,14 +387,16 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                                     const SizedBox(width: 14),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             m.title,
-                                            style: theme.textTheme.titleMedium?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                              color: accentColor,
-                                            ),
+                                            style: theme.textTheme.titleMedium
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: accentColor,
+                                                ),
                                           ),
                                         ],
                                       ),
@@ -340,7 +414,8 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                                           Navigator.push(
                                             context,
                                             MaterialPageRoute(
-                                              builder: (_) => PlanningEditPage(existing: m),
+                                              builder: (_) =>
+                                                  PlanningEditPage(existing: m),
                                             ),
                                           );
                                         }
@@ -382,14 +457,14 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
             },
           );
         },
-        loading: () => const Center(
-          child: CircularProgressIndicator(),
-        ),
+        loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
           child: Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: isDark ? colorScheme.errorContainer.withValues(alpha: 0.3) : Colors.red.shade50,
+              color: isDark
+                  ? colorScheme.errorContainer.withValues(alpha: 0.3)
+                  : Colors.red.shade50,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -426,34 +501,42 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
               ),
               title: Text(
                 'Nuova giornata',
-                style: TextStyle(color: isDark ? colorScheme.onSurface : Colors.black87),
+                style: TextStyle(
+                  color: isDark ? colorScheme.onSurface : Colors.black87,
+                ),
               ),
               subtitle: Text(
                 'Con appello presenze dei ragazzi',
-                style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                style: TextStyle(
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                ),
               ),
               onTap: () {
                 Navigator.pop(ctx);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const PlanningEditPage(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const PlanningEditPage()),
                 );
               },
             ),
             ListTile(
               leading: Icon(
                 Icons.groups_rounded,
-                color: isDark ? colorScheme.primary : Colors.deepPurple.shade700,
+                color: isDark
+                    ? colorScheme.primary
+                    : Colors.deepPurple.shade700,
               ),
               title: Text(
                 'Nuova riunione',
-                style: TextStyle(color: isDark ? colorScheme.onSurface : Colors.black87),
+                style: TextStyle(
+                  color: isDark ? colorScheme.onSurface : Colors.black87,
+                ),
               ),
               subtitle: Text(
                 'Solo programmazione, senza appello',
-                style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                style: TextStyle(
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                ),
               ),
               onTap: () {
                 Navigator.pop(ctx);
@@ -521,10 +604,7 @@ class _MonthChip extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
 
-  const _MonthChip({
-    required this.label,
-    required this.onTap,
-  });
+  const _MonthChip({required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -540,7 +620,9 @@ class _MonthChip extends StatelessWidget {
           color: isDark ? colorScheme.surfaceContainer : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade300,
+            color: isDark
+                ? colorScheme.outline.withValues(alpha: 0.2)
+                : Colors.grey.shade300,
           ),
         ),
         child: Text(
@@ -570,10 +652,7 @@ class _CatechesiBanner extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [
-              Color(0xFF174A7E),
-              Color(0xFF2A6BB0),
-            ],
+            colors: [Color(0xFF174A7E), Color(0xFF2A6BB0)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -673,7 +752,9 @@ class _EmptyState extends StatelessWidget {
               width: 95,
               height: 95,
               decoration: BoxDecoration(
-                color: isDark ? colorScheme.primaryContainer.withValues(alpha: 0.3) : Colors.blue.shade50,
+                color: isDark
+                    ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+                    : Colors.blue.shade50,
                 shape: BoxShape.circle,
               ),
               child: Icon(

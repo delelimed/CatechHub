@@ -55,12 +55,15 @@ class _CommitsPageState extends State<CommitsPage> {
     }
 
     try {
-      final url = _nextPageUrl ??
+      final url =
+          _nextPageUrl ??
           'https://api.github.com/repos/delelimed/CatechHub/commits?per_page=30';
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {'Accept': 'application/vnd.github.v3+json'},
-      ).timeout(const Duration(seconds: 15));
+      final response = await http
+          .get(
+            Uri.parse(url),
+            headers: {'Accept': 'application/vnd.github.v3+json'},
+          )
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as List<dynamic>;
@@ -68,7 +71,9 @@ class _CommitsPageState extends State<CommitsPage> {
         final linkHeader = response.headers['link'];
         String? nextUrl;
         if (linkHeader != null) {
-          final matches = RegExp(r'<([^>]+)>;\s*rel="next"').allMatches(linkHeader);
+          final matches = RegExp(
+            r'<([^>]+)>;\s*rel="next"',
+          ).allMatches(linkHeader);
           if (matches.isNotEmpty) {
             nextUrl = matches.first.group(1);
           }
@@ -126,7 +131,9 @@ class _CommitsPageState extends State<CommitsPage> {
     final colorScheme = theme.colorScheme;
 
     if (_isLoading && _commits.isEmpty) {
-      return Center(child: CircularProgressIndicator(color: colorScheme.primary));
+      return Center(
+        child: CircularProgressIndicator(color: colorScheme.primary),
+      );
     }
 
     if (_error != null && _commits.isEmpty) {
@@ -163,7 +170,11 @@ class _CommitsPageState extends State<CommitsPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline_rounded, size: 64, color: colorScheme.error),
+            Icon(
+              Icons.error_outline_rounded,
+              size: 64,
+              color: colorScheme.error,
+            ),
             const SizedBox(height: 16),
             Text(
               'Impossibile caricare',
@@ -176,7 +187,9 @@ class _CommitsPageState extends State<CommitsPage> {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+              style: TextStyle(
+                color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+              ),
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
@@ -201,7 +214,11 @@ class _CommitsPageState extends State<CommitsPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.history_rounded, size: 64, color: isDark ? Colors.grey.shade600 : Colors.grey.shade400),
+            Icon(
+              Icons.history_rounded,
+              size: 64,
+              color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+            ),
             const SizedBox(height: 16),
             Text(
               'Nessun commit trovato',
@@ -251,14 +268,19 @@ class _CommitCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = theme.colorScheme;
     final sha = commit['sha'] as String? ?? '';
-    final message = commit['commit']?['message'] as String? ?? 'Nessun messaggio';
-    final author = commit['commit']?['author']?['name'] as String? ?? 'Sconosciuto';
+    final message =
+        commit['commit']?['message'] as String? ?? 'Nessun messaggio';
+    final author =
+        commit['commit']?['author']?['name'] as String? ?? 'Sconosciuto';
     final dateStr = commit['commit']?['author']?['date'] as String?;
     final htmlUrl = commit['html_url'] as String? ?? '';
 
     final shortSha = sha.length >= 7 ? sha.substring(0, 7) : sha;
     final date = dateStr != null
-        ? DateFormat('dd MMM yyyy HH:mm', 'it_IT').format(DateTime.parse(dateStr).toLocal())
+        ? DateFormat(
+            'dd MMM yyyy HH:mm',
+            'it_IT',
+          ).format(DateTime.parse(dateStr).toLocal())
         : 'Data sconosciuta';
 
     final cardColor = isDark ? colorScheme.surfaceContainer : Colors.white;
@@ -285,7 +307,7 @@ class _CommitCard extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: htmlUrl.isNotEmpty ? () => context.push('/webview', extra: {'url': htmlUrl}) : null,
+        onTap: () => context.push('/commit-detail', extra: commit),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -294,7 +316,10 @@ class _CommitCard extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: colorScheme.primaryContainer,
                       borderRadius: BorderRadius.circular(6),
@@ -326,23 +351,35 @@ class _CommitCard extends StatelessWidget {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  Icon(Icons.person_outline_rounded, size: 14, color: isDark ? Colors.grey.shade500 : Colors.grey.shade600),
+                  Icon(
+                    Icons.person_outline_rounded,
+                    size: 14,
+                    color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     author,
                     style: TextStyle(
                       fontSize: 12,
-                      color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
+                      color: isDark
+                          ? Colors.grey.shade500
+                          : Colors.grey.shade600,
                     ),
                   ),
                   const SizedBox(width: 16),
-                  Icon(Icons.access_time_rounded, size: 14, color: isDark ? Colors.grey.shade500 : Colors.grey.shade600),
+                  Icon(
+                    Icons.access_time_rounded,
+                    size: 14,
+                    color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     date,
                     style: TextStyle(
                       fontSize: 12,
-                      color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
+                      color: isDark
+                          ? Colors.grey.shade500
+                          : Colors.grey.shade600,
                     ),
                   ),
                 ],
@@ -352,13 +389,16 @@ class _CommitCard extends StatelessWidget {
                 Align(
                   alignment: Alignment.centerRight,
                   child: OutlinedButton.icon(
-                    onPressed: () => context.push('/webview', extra: {'url': htmlUrl}),
+                    onPressed: () =>
+                        context.push('/commit-detail', extra: commit),
                     icon: const Icon(Icons.open_in_new_rounded, size: 16),
                     label: const Text('Visualizza'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: colorScheme.primary,
                       side: BorderSide(color: colorScheme.primary),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
                 ),

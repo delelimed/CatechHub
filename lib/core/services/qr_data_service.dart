@@ -6,7 +6,7 @@
 //
 // CONTESTO PROGETTO:
 //   La condivisione dati è uno dei canali di sincronizzazione (l'alternativa
-//   al Bluetooth RFCOMM). Il flusso è:
+//   al Nearby Connections). Il flusso è:
 //   1. L'utente sceglie i dati da condividere (DataShareOptions)
 //   2. I dati vengono cifrati con PIN temporaneo (AES-256-GCM, 12k iterazioni)
 //   3. Il pacchetto cifrato viene segmentato in QRChunk (max 1200 byte cad.)

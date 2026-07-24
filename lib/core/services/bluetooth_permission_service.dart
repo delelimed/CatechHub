@@ -5,7 +5,7 @@
 // su Android, con supporto differenziato per API 30 (Android 11) e 31+.
 //
 // CONTESTO PROGETTO:
-//   Il modulo di sincronizzazione P2P (Bluetooth RFCOMM) richiede permessi
+//   Il modulo di sincronizzazione P2P (Nearby Connections) richiede permessi
 //   runtime variabili in base alla versione Android:
 //   - Android 11 (API 30): ACCESS_FINE_LOCATION (richiesto da Android per
 //     la scansione Bluetooth, anche se CatechHub non usa la posizione)
@@ -13,7 +13,7 @@
 //     BLUETOOTH_ADVERTISE (localizzazione NON necessaria)
 //
 //   Questo servizio viene chiamato PRIMA di qualsiasi operazione BT
-//   (scansione discovery o connessione RFCOMM) per garantire che
+//   (scansione discovery o connessione Nearby) per garantire che
 //   l'utente abbia concesso i permessi necessari.
 //
 // FLUSSO:
@@ -89,7 +89,7 @@ class BluetoothPermissionService {
   BluetoothPermissionService._();
 
   /// Verifica e richiede tutti i permessi Bluetooth necessari.
-  /// Chiamare PRIMA di scansione o connessione RFCOMM.
+  /// Chiamare PRIMA di scansione o connessione Nearby.
   static Future<PermissionCheckResult> checkAndRequestPermissions({
     BuildContext? context,
   }) async {

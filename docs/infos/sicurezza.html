@@ -44,7 +44,7 @@
     <table class="sec-table">
       <thead><tr><th>Ambito</th><th>Algoritmo</th><th>Parametri</th><th>Standard di riferimento</th></tr></thead>
       <tbody>
-        <tr><td>Dati a riposo (Hive)</td><td>AES-256-GCM</td><td>Nonce 12B, tag 128bit, chiave 256bit</td><td>NIST SP 800-38D</td></tr>
+        <tr><td>Dati a riposo (Hive)</td><td>AES-256-GCM</td><td>Nonce 12B, tag 128bit, chiave 256bit master in AndroidKeyStore (TEE/StrongBox)</td><td>NIST SP 800-38D</td></tr>
         <tr><td>Derivazione chiave (backup)</td><td>PBKDF2-HMAC-SHA256</td><td>210.000 iterazioni, salt 16B, key 32B</td><td>NIST SP 800-132</td></tr>
         <tr><td>Derivazione chiave (share rapido)</td><td>PBKDF2-HMAC-SHA256</td><td>12.000 iterazioni</td><td>NIST SP 800-132</td></tr>
         <tr><td>Scambio chiavi (sync)</td><td>ECDH P-256 (secp256r1)</td><td>Shared secret 32B</td><td>NIST SP 800-56A</td></tr>
@@ -61,6 +61,7 @@
       <li><strong>Autenticazione biometrica</strong>: impronta digitale o riconoscimento facciale tramite BiometricPrompt di Android. <code>biometricOnly=false</code>: se la biometria non è disponibile, fallback a PIN/Pattern/Password del dispositivo.</li>
       <li><strong>Sessione in RAM</strong>: lo stato di autenticazione vive esclusivamente in memoria volatile. Nessun token persistito su disco.</li>
       <li><strong>Timeout sessione</strong>: 120 secondi in background. Trascorso il timeout, la sessione viene invalidata e l'utente deve riautenticarsi.</li>
+      <li><strong>Verifica hardware all'avvio</strong>: <code>SecurityManager</code> controlla la presenza di TEE/StrongBox prima di generare la chiave master. Se l'hardware di sicurezza non è disponibile, l'app si blocca con <code>SecurityBlockScreen</code>.</li>
     </ul>
 
     <h2>3. Sicurezza del dispositivo</h2>
@@ -131,7 +132,7 @@
       <thead><tr><th>Misura</th><th>Implementata?</th><th>Dettaglio</th></tr></thead>
       <tbody>
         <tr><td>Pseudonimizzazione</td><td>Parziale</td><td>I dati non sono pseudonimizzati per default, ma l'utente può esportare dati senza identificativi diretti</td></tr>
-        <tr><td>Crittografia a riposo</td><td>Sì</td><td>AES-256-GCM su tutti i box Hive. Chiave in AndroidKeyStore (hardware-backed se disponibile)</td></tr>
+        <tr><td>Crittografia a riposo</td><td>Sì</td><td>AES-256-GCM su tutti i box Hive. Chiave master in AndroidKeyStore (TEE/StrongBox obbligatorio — nessun fallback software)</td></tr>
         <tr><td>Crittografia in transito</td><td>Sì</td><td>Sync P2P: ECDH + HKDF + AES-256-GCM. Backup: PBKDF2 + AES-256-GCM</td></tr>
         <tr><td>Controllo accesso</td><td>Sì</td><td>Biometria + PIN/Pattern, sessione in RAM, timeout 120s</td></tr>
         <tr><td>Registrazione accessi</td><td>No</td><td>Non implementata. L'app non tiene log degli accessi (coerente con principio di minimizzazione)</td></tr>
@@ -139,7 +140,7 @@
     </table>
 
     <div class="alert alert-success">
-      <strong>Conclusione:</strong> Le misure di sicurezza implementate in CatechHub sono conformi ai requisiti dell'Art. 32 GDPR e forniscono un livello di protezione adeguato al rischio del trattamento di dati di minori. La crittografia AES-256-GCM a riposo, la gestione delle chiavi tramite AndroidKeyStore e l'assenza di server remoti rappresentano i pilastri della strategia di sicurezza.
+      <strong>Conclusione:</strong> Le misure di sicurezza implementate in CatechHub sono conformi ai requisiti dell'Art. 32 GDPR e forniscono un livello di protezione adeguato al rischio del trattamento di dati di minori. La crittografia AES-256-GCM a riposo con chiave master in AndroidKeyStore (TEE/StrongBox), la verifica hardware obbligatoria all'avvio e l'assenza di server remoti rappresentano i pilastri della strategia di sicurezza.
     </div>
 
   </div>

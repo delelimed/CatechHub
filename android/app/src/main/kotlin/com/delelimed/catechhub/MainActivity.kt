@@ -40,21 +40,16 @@ import javax.crypto.spec.PSource
  * Questa Activity funge da ponte nativo Android (MethodChannel) verso il layer
  * Dart/Flutter, e si occupa di:
  *
- * 1. **Sicurezza dello schermo** (FLAG_SECURE): impedisce screenshot eregistrazioni
- *    dello schermo, prottendo i dati degli studenti da accessi non autorizzati.
+ * 1. **Sicurezza dello schermo** (FLAG_SECURE): impedisce screenshot e registrazioni
+ *    dello schermo, proteggendo i dati degli studenti da accessi non autorizzati.
  *    L'utente può attivare/disattivare questa funzione dalle impostazioni dell'app.
  *
  * 2. **Gestione chiavi crittografiche RSA** tramite Android KeyStore: genera,
  *    recupera, firma, verifica, cifra e decifra dati utilizzando coppie di chiavi
  *    RSA 2048-bit memorizzate in modo sicuro nel hardware del dispositivo.
- *    Queste chiavi sono fondamentali per lo scambio peer-to-peer via Bluetooth
- *    (RFCOMM), dove ogni catechista ha una propria coppia di chiavi per autenticare
- *    e cifrare i dati sincronizzati.
  *
- * 3. **Plugin Bluetooth RFCOMM**: registra e gestisce il plugin per la
- *    sincronizzazione Bluetooth Classic tra dispositivi catechisti, basata su
- *    CRDT (Last-Write-Wins) per la risoluzione conflitti e scambio di chiavi
- *    pubbliche tramite codici QR.
+ * 3. **Installazione APK**: gestisce l'installazione degli aggiornamenti tramite
+ *    FileProvider per compatibilità Android 7+ (API 24+).
  *
  * La struttura a MethodChannel consente a Flutter di invocare funzionalità native
  * Android in modo asincrono, mantenendo la separazione tra il codice Dart
@@ -62,18 +57,8 @@ import javax.crypto.spec.PSource
  */
 class MainActivity : FlutterFragmentActivity() {
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        // Pulizia APK scaricati ad ogni avvio dell'app
-        cleanupOldApks()
-    }
-
     // ─────────────────────────────────────────────────────────────────────────
-    // CANALI METHOD CHANNEL
-    // ─────────────────────────────────────────────────────────────────────────
-    // I MethodChannel fungono da ponte di comunicazione tra il codice Dart
-    // (Flutter) e il codice Kotlin nativo (Android). Ogni canale ha un nome
-    // univoco che identifica il dominio funzionale.
+    // METHOD CHANNELS
     // ─────────────────────────────────────────────────────────────────────────
 
     /** Canale per le operazioni di sicurezza generiche (FLAG_SECURE, versione SDK). */
@@ -83,28 +68,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val keystoreChannel = "com.delelimed.catechhub/keystore"
 
     // ─────────────────────────────────────────────────────────────────────────
-    // PLUGIN RFCOMM
-    // ─────────────────────────────────────────────────────────────────────────
-    // Il plugin RFCOMM gestisce la comunicazione Bluetooth Classic tra i
-    // dispositivi dei catechisti. Viene utilizzato per la sincronizzazione
-    // peer-to-peer dei dati (anagrafica, presenze, incontri) senza bisogno
-    // di un server centrale, in linea con la filosofia privacy-first dell'app.
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /** Istanza del plugin RFCOMM, null se il Bluetooth non è disponibile. */
-    private var rfcommServerPlugin: RfcommServerPlugin? = null
-
-    // ─────────────────────────────────────────────────────────────────────────
     // CONFIGURAZIONE KEYSTORE RSA
-    // ─────────────────────────────────────────────────────────────────────────
-    // Android KeyStore è un container sicuro per le chiavi crittografiche che
-    // le protegge a livello hardware, impedendo anche ad altre app (o al
-    // sistema operativo) di accedere alle chiavi private in chiaro.
-    // Le chiavi RSA generate qui vengono utilizzate per:
-    // - Firma digitale dei dati scambiati via Bluetooth (SHA512withRSA)
-    // - Cifratura/decifratura dei payload (RSA/ECB/OAEPPadding)
-    // - Scambio di chiavi pubbliche tramite QR code durante l'abbinamento
-    //   (pairing) tra dispositivi catechisti
     // ─────────────────────────────────────────────────────────────────────────
 
     /** Provider della Android KeyStore, il keystore hardware-backed del dispositivo. */
@@ -133,38 +97,26 @@ class MainActivity : FlutterFragmentActivity() {
     /** Scope coroutine per le operazioni I/O crittografiche, con SupervisorJob per isolare i fallimenti. */
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Pulizia APK scaricati ad ogni avvio dell'app
+        cleanupOldApks()
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // CONFIGURAZIONE DEL FLUTTER ENGINE
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Configura il Flutter Engine registrando i plugin nativi e i MethodChannel
+     * Configura il Flutter Engine registrando i MethodChannel
      * necessari al funzionamento dell'app.
      *
      * Questo metodo viene invocato automaticamente dall'embedding v2 di Flutter
-     * all'avvio dell'activity. Il ordine di inizializzazione è importante:
+     * all'avvio dell'activity. L'ordine di inizializzazione è importante:
      * 1. Chiamata a super per la registrazione automatica dei plugin Flutter
-     * 2. Registrazione del plugin RFCOMM (Bluetooth)
-     * 3. Registrazione dei MethodChannel per sicurezza e crittografia
+     * 2. Registrazione dei MethodChannel per sicurezza e crittografia
      */
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
-        // Viene omesso l'uso esplicito di GeneratedPluginRegistrant.registerWith.
-        // L'embedding v2 di Flutter esegue la registrazione automatica integrata dei plugin.
-        super.configureFlutterEngine(flutterEngine)
-
-        // Registrazione sicura del plugin Bluetooth RFCOMM.
-        // Il Bluetooth potrebbe non essere disponibile su alcuni dispositivi (es. tablet WiFi-only),
-        // quindi l'inizializzazione è protetta da un blocco try-catch per evitare crash.
-        try {
-            rfcommServerPlugin = RfcommServerPlugin(this) { this }
-            rfcommServerPlugin?.register(flutterEngine)
-        } catch (e: Exception) {
-            android.util.Log.e(
-                "MainActivity",
-                "RfcommServerPlugin init fallito (Bluetooth non disponibile?): $e"
-            )
-            rfcommServerPlugin = null
-        }
 
         // SECURITY CHANNEL
         // Gestisce le operazioni di sicurezza generiche dall'interfaccia Flutter.
@@ -316,17 +268,10 @@ class MainActivity : FlutterFragmentActivity() {
 
     /**
      * Ciclo di vita dell'activity: pulizia delle risorse alla distruzione.
-     * Cancella lo scope coroutine e deregistra il plugin RFCOMM per liberare
-     * la risorsa Bluetooth. La deregistrazione è protetta da try-catch perché
-     * potrebbe fallire se il Bluetooth non era stato inizializzato correttamente.
+     * Cancella lo scope coroutine per liberare le risorse I/O.
      */
     override fun onDestroy() {
         ioScope.cancel()
-        try {
-            rfcommServerPlugin?.unregister()
-        } catch (e: Exception) {
-            android.util.Log.w("MainActivity", "Errore deregistrazione RFCOMM (non fatale): $e")
-        }
         super.onDestroy()
     }
 
@@ -339,9 +284,9 @@ class MainActivity : FlutterFragmentActivity() {
     //
     // Flusso tipico di utilizzo nel contesto dell'app:
     // 1. All'avvio dell'app, viene generata una coppia di chiavi RSA
-    // 2. La chiave pubblica viene esportata e scambiate via QR code
+    // 2. La chiave pubblica viene esportata e scambiata via QR code
     //    durante l'abbinamento (pairing) tra dispositivi catechisti
-    // 3. I dati sincronizzati via Bluetooth vengono firmati con la
+    // 3. I dati scambiati durante la sincronizzazione vengono firmati con la
     //    chiave privata per garantirne l'autenticità
     // 4. I dati sensibili vengono cifrati con la chiave pubblica del
     //    destinatario per garantirne la riservatezza

@@ -1,38 +1,32 @@
-// ══════════════════════════════════════════════════════════════════════════════
-// nearby_sync_provider.dart — CatechHub (provider NearbySyncService)
-// ══════════════════════════════════════════════════════════════════════════════
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter/widgets.dart';
 
-import '../../services/nearby_sync_service.dart';
+import '../../features/sync/p2p/p2p_sync_service.dart';
 
-// Provider per il servizio NearbySync (singleton)
-final nearbySyncServiceProvider = Provider<NearbySyncService>((ref) {
-  return NearbySyncService();
+final nearbySyncServiceProvider = Provider<P2PSyncService>((ref) {
+  return P2PSyncService();
 });
 
-// Provider per lo stato del sync (stream)
-final nearbySyncStateProvider = StreamProvider<NearbySyncState>((ref) {
+final nearbySyncStateProvider = StreamProvider<P2PSyncState>((ref) {
   final service = ref.watch(nearbySyncServiceProvider);
   return service.onStateChanged;
 });
 
-// Provider per controllare il daemon (avvia/ferma in base al lifecycle dell'app)
 class NearbySyncDaemonController extends StateNotifier<bool> {
-  final NearbySyncService _service;
+  final P2PSyncService _service;
   bool _isAppInForeground = false;
 
   NearbySyncDaemonController(this._service) : super(false);
 
   void setAppForeground(bool isForeground) {
+    if (_isAppInForeground == isForeground) return;
     _isAppInForeground = isForeground;
     if (isForeground) {
-      _service.startDaemon();
+      _service.startBackgroundSync();
       state = true;
     } else {
-      _service.stopDaemon();
+      _service.stopBackgroundSync();
       state = false;
     }
   }
@@ -44,7 +38,7 @@ class NearbySyncDaemonController extends StateNotifier<bool> {
   @override
   void dispose() {
     if (_isAppInForeground) {
-      _service.stopDaemon();
+      _service.stopBackgroundSync();
     }
     super.dispose();
   }
@@ -56,7 +50,6 @@ final nearbySyncDaemonProvider =
   return NearbySyncDaemonController(service);
 });
 
-// Widget per gestire il lifecycle del daemon (da inserire nell'albero widget principale)
 class NearbySyncLifecycleManager extends ConsumerStatefulWidget {
   final Widget child;
 
@@ -68,14 +61,14 @@ class NearbySyncLifecycleManager extends ConsumerStatefulWidget {
 }
 
 class _NearbySyncLifecycleManagerState
-    extends ConsumerState<NearbySyncLifecycleManager> with WidgetsBindingObserver {
+    extends ConsumerState<NearbySyncLifecycleManager>
+    with WidgetsBindingObserver {
   bool _daemonStarted = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Avvia il daemon immediatamente se l'app è già in foreground
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_daemonStarted) {
         _daemonStarted = true;
@@ -104,7 +97,6 @@ class _NearbySyncLifecycleManagerState
         daemonController.setAppForeground(false);
         break;
       case AppLifecycleState.inactive:
-        // Non fermiamo il daemon qui, solo su paused/detached
         break;
     }
   }

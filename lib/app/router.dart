@@ -512,7 +512,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // ═══════════════════════════════════════════════════════════════════
 
       /// Selezione modalità condivisione: invio o ricezione dati.
-      /// Supporta QR code e Bluetooth RFCOMM.
+      /// Supporta QR code e Nearby Connections.
       GoRoute(
         path: '/data-share',
         builder: (context, state) => const DataShareSelectionPage(),

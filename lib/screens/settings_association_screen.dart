@@ -6,10 +6,8 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../core/providers/nearby_sync_provider.dart';
-import '../core/storage/local_database.dart';
-import '../models/association_models.dart';
-import '../services/security_service.dart';
-import '../services/nearby_sync_service.dart';
+import '../features/sync/p2p/p2p_sync_service.dart';
+import '../features/sync/p2p/p2p_security_service.dart';
 
 class SettingsAssociationScreen extends ConsumerStatefulWidget {
   const SettingsAssociationScreen({super.key});
@@ -21,10 +19,10 @@ class SettingsAssociationScreen extends ConsumerStatefulWidget {
 
 class _SettingsAssociationScreenState
     extends ConsumerState<SettingsAssociationScreen> {
-  final AssociationSecurityService _security = AssociationSecurityService();
+  final P2PSecurityService _security = P2PSecurityService();
 
-  SyncRole _selectedRole = SyncRole.mioDispositivo;
-  List<DeviceAssociation> _associations = [];
+  P2PSyncRole _selectedRole = P2PSyncRole.mioDispositivo;
+  List<P2PDeviceAssociation> _associations = [];
   bool _isLoading = true;
   bool _isPairingMode = false;
   bool _showScanner = false;
@@ -38,8 +36,8 @@ class _SettingsAssociationScreenState
     _initData();
     _startPairingMode();
 
-    // Listen to sync state changes from the provider
-    ref.listen<AsyncValue<NearbySyncState>>(nearbySyncStateProvider, (previous, next) {
+    ref.listen<AsyncValue<P2PSyncState>>(nearbySyncStateProvider,
+        (previous, next) {
       next.whenData(_onSyncStateChanged);
     });
   }
@@ -78,37 +76,19 @@ class _SettingsAssociationScreenState
   }
 
   Future<String> _generateQrData() async {
-    final deviceId = await _security.getOrCreateDeviceId();
-    final deviceName = _getDeviceDisplayName();
-    final publicKeyHex = await _security.getLocalPublicKeyHex();
-
-    final handshake = QrHandshake(
-      deviceId: deviceId,
-      deviceName: deviceName,
-      publicKeyHex: publicKeyHex,
-      timestamp: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-    );
-
-    return handshake.encode();
+    return _security.generateQrPayload();
   }
 
-  String _getDeviceDisplayName() {
-    try {
-      final auth = LocalDatabase.auth();
-      final name = auth.get('local_user_name', defaultValue: '') as String;
-      if (name.trim().isNotEmpty) return name.trim();
-    } catch (_) {}
-    return 'Il mio CatechHub';
-  }
-
-  void _onSyncStateChanged(NearbySyncState state) {
+  void _onSyncStateChanged(P2PSyncState state) {
     if (!mounted) return;
 
-    if (state.status == NearbySyncStatus.completed && state.connectedDeviceName != null) {
+    if (state.status == P2PSyncStatus.completed &&
+        state.connectedDeviceName != null) {
       _refreshAssociations();
       setState(() {
         _isPairingMode = false;
-        _errorMessage = 'Associazione completata con ${state.connectedDeviceName}';
+        _errorMessage =
+            'Associazione completata con ${state.connectedDeviceName}';
       });
     }
 
@@ -165,32 +145,28 @@ class _SettingsAssociationScreenState
 
       _stopScanner();
 
-      final handshake = QrHandshake.decode(raw);
-      if (handshake == null) {
+      final remoteIdentity = P2PSecurityService.parseQrPayload(raw);
+      if (remoteIdentity == null) {
         setState(() => _errorMessage = 'QR code non valido.');
         return;
       }
 
-      if (!handshake.isFresh) {
-        setState(() => _errorMessage = 'QR code scaduto. '
-            'L\'altro dispositivo deve generarne uno nuovo.');
-        return;
-      }
-
-      final existing = await _security.getAssociation(handshake.deviceId);
+      final existing = await _security.getAssociation(remoteIdentity.deviceId);
       if (existing != null) {
         setState(() => _errorMessage = 'Dispositivo già associato.');
         return;
       }
 
       try {
-        final sharedSecret =
-            await _security.computeSharedSecretHex(handshake.publicKeyHex);
+        final sharedSecret = await _security.computeStaticSharedSecret(
+            remoteIdentity.publicKeyBase64);
 
-        final association = DeviceAssociation(
-          deviceId: handshake.deviceId,
-          deviceName: handshake.deviceName,
-          sharedSecretHex: sharedSecret,
+        final association = P2PDeviceAssociation(
+          deviceId: remoteIdentity.deviceId,
+          deviceName: remoteIdentity.deviceName,
+          publicKeyBase64: remoteIdentity.publicKeyBase64,
+          fingerprint: remoteIdentity.fingerprint,
+          sharedSecretBase64: sharedSecret,
           associatedAt: DateTime.now(),
         );
 
@@ -199,7 +175,8 @@ class _SettingsAssociationScreenState
 
         if (mounted) {
           setState(() {
-            _errorMessage = 'Associazione completata con ${handshake.deviceName}';
+            _errorMessage =
+                'Associazione completata con ${remoteIdentity.deviceName}';
           });
         }
       } catch (e) {
@@ -219,12 +196,12 @@ class _SettingsAssociationScreenState
     }
   }
 
-  Future<void> _removeAssociation(DeviceAssociation assoc) async {
+  Future<void> _removeAssociation(P2PDeviceAssociation assoc) async {
     await _security.removeAssociation(assoc.deviceId);
     await _refreshAssociations();
   }
 
-  Future<void> _confirmRemoveAssociation(DeviceAssociation assoc) async {
+  Future<void> _confirmRemoveAssociation(P2PDeviceAssociation assoc) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -258,8 +235,9 @@ class _SettingsAssociationScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Associazione Dispositivi'),
-        backgroundColor: colorScheme.primaryContainer,
+        title: const Text('Associazione Dispositivi',
+            style: TextStyle(color: Colors.white)),
+        backgroundColor: colorScheme.primary,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -297,7 +275,7 @@ class _SettingsAssociationScreenState
               ),
             ),
             const SizedBox(height: 12),
-            RadioGroup<SyncRole>(
+            RadioGroup<P2PSyncRole>(
               groupValue: _selectedRole,
               onChanged: (role) {
                 if (role == null) return;
@@ -306,29 +284,33 @@ class _SettingsAssociationScreenState
               },
               child: Column(
                 children: [
-                  RadioListTile<SyncRole>(
+                  RadioListTile<P2PSyncRole>(
                     title: const Text('Mio Dispositivo'),
-                    subtitle: const Text('Sincronizzazione automatica'),
+                    subtitle:
+                        const Text('Sincronizzazione automatica'),
                     secondary: const Icon(Icons.sync),
-                    value: SyncRole.mioDispositivo,
+                    value: P2PSyncRole.mioDispositivo,
                   ),
-                  RadioListTile<SyncRole>(
+                  RadioListTile<P2PSyncRole>(
                     title: const Text('Altro Catechista'),
-                    subtitle: const Text('Chiede conferma prima di sincronizzare'),
+                    subtitle: const Text(
+                        'Chiede conferma prima di sincronizzare'),
                     secondary: const Icon(Icons.how_to_reg),
-                    value: SyncRole.altroCatechista,
+                    value: P2PSyncRole.altroCatechista,
                   ),
-                  RadioListTile<SyncRole>(
+                  RadioListTile<P2PSyncRole>(
                     title: Text(
                       'Responsabile',
                       style: TextStyle(color: Colors.grey[500]),
                     ),
                     subtitle: Text(
-                      'Funzione Responsabile non ancora implementata',
-                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                      'Funzione non ancora implementata',
+                      style:
+                          TextStyle(color: Colors.grey[500], fontSize: 12),
                     ),
-                    secondary: Icon(Icons.admin_panel_settings, color: Colors.grey[500]),
-                    value: SyncRole.responsabile,
+                    secondary: Icon(Icons.admin_panel_settings,
+                        color: Colors.grey[500]),
+                    value: P2PSyncRole.responsabile,
                   ),
                 ],
               ),
@@ -434,12 +416,16 @@ class _SettingsAssociationScreenState
     );
   }
 
-  Widget _buildSyncStatusSection(ThemeData theme, ColorScheme colorScheme) {
+  Widget _buildSyncStatusSection(
+      ThemeData theme, ColorScheme colorScheme) {
     final syncState = ref.watch(nearbySyncStateProvider);
-    final daemonController = ref.read(nearbySyncDaemonProvider.notifier);
+    final daemonController =
+        ref.read(nearbySyncDaemonProvider.notifier);
     final isDaemonActive = ref.watch(nearbySyncDaemonProvider);
     final isSyncing = syncState.when(
-      data: (state) => state.status == NearbySyncStatus.scanning || state.status == NearbySyncStatus.connecting || state.status == NearbySyncStatus.syncing,
+      data: (state) =>
+          state.status == P2PSyncStatus.discovering ||
+          state.status == P2PSyncStatus.syncing,
       loading: () => false,
       error: (_, _) => false,
     );
@@ -450,10 +436,14 @@ class _SettingsAssociationScreenState
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: isDaemonActive ? Colors.green.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
+            color: isDaemonActive
+                ? Colors.green.withValues(alpha: 0.1)
+                : Colors.orange.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isDaemonActive ? Colors.green.withValues(alpha: 0.3) : Colors.orange.withValues(alpha: 0.3),
+              color: isDaemonActive
+                  ? Colors.green.withValues(alpha: 0.3)
+                  : Colors.orange.withValues(alpha: 0.3),
             ),
           ),
           child: Row(
@@ -475,10 +465,14 @@ class _SettingsAssociationScreenState
                       ),
                     ),
                     Text(
-                      isDaemonActive ? 'Attiva - Scansione ogni 120 secondi' : 'Inattiva - Tocca "Avvia auto" per attivare',
+                      isDaemonActive
+                          ? 'Attiva - Scansione ogni 120 secondi'
+                          : 'Inattiva',
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDaemonActive ? Colors.green[700] : Colors.orange[700],
+                        color: isDaemonActive
+                            ? Colors.green[700]
+                            : Colors.orange[700],
                       ),
                     ),
                   ],
@@ -494,7 +488,8 @@ class _SettingsAssociationScreenState
               return Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withValues(alpha: 0.3),
+                  color:
+                      colorScheme.primaryContainer.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -507,13 +502,11 @@ class _SettingsAssociationScreenState
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        state.status == NearbySyncStatus.scanning
+                        state.status == P2PSyncStatus.discovering
                             ? 'Scansione dispositivi vicini...'
-                            : state.status == NearbySyncStatus.connecting
-                                ? 'Connessione in corso...'
-                                : state.status == NearbySyncStatus.syncing
-                                    ? 'Sincronizzazione dati in corso...'
-                                    : 'Sincronizzazione completata',
+                            : state.status == P2PSyncStatus.syncing
+                                ? 'Sincronizzazione dati in corso...'
+                                : 'Sincronizzazione completata',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
@@ -523,22 +516,26 @@ class _SettingsAssociationScreenState
                 ),
               );
             }
-            if (state.status == NearbySyncStatus.error && state.errorMessage != null) {
+            if (state.status == P2PSyncStatus.error &&
+                state.errorMessage != null) {
               return Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.red.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                  border:
+                      Border.all(color: Colors.red.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.error_outline, color: Colors.red[700], size: 20),
+                    Icon(Icons.error_outline,
+                        color: Colors.red[700], size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Errore: ${state.errorMessage}',
-                        style: TextStyle(fontSize: 13, color: Colors.red[700]),
+                        style: TextStyle(
+                            fontSize: 13, color: Colors.red[700]),
                       ),
                     ),
                   ],
@@ -558,7 +555,8 @@ class _SettingsAssociationScreenState
                     const SizedBox(width: 8),
                     Text(
                       'Ultima sincronizzazione: ${_formatLastSync(state.lastSyncAt!)}',
-                      style: TextStyle(fontSize: 13, color: Colors.blue[700]),
+                      style:
+                          TextStyle(fontSize: 13, color: Colors.blue[700]),
                     ),
                   ],
                 ),
@@ -581,7 +579,8 @@ class _SettingsAssociationScreenState
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Sincronizzazione manuale avviata'),
+                              content:
+                                  Text('Sincronizzazione manuale avviata'),
                               duration: Duration(seconds: 2),
                             ),
                           );
@@ -591,10 +590,13 @@ class _SettingsAssociationScreenState
                     ? const SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
                       )
                     : const Icon(Icons.sync, size: 22),
-                label: Text(isSyncing ? 'Sincronizzazione in corso...' : 'Sincronizza ora'),
+                label: Text(isSyncing
+                    ? 'Sincronizzazione in corso...'
+                    : 'Sincronizza ora'),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   backgroundColor: colorScheme.primary,
@@ -610,7 +612,8 @@ class _SettingsAssociationScreenState
                         daemonController.setAppForeground(false);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Sincronizzazione automatica disattivata'),
+                            content: Text(
+                                'Sincronizzazione automatica disattivata'),
                             duration: Duration(seconds: 2),
                           ),
                         );
@@ -619,15 +622,21 @@ class _SettingsAssociationScreenState
                         daemonController.setAppForeground(true);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Sincronizzazione automatica attivata (ogni 120s)'),
+                            content: Text(
+                                'Sincronizzazione automatica attivata (ogni 120s)'),
                             duration: Duration(seconds: 2),
                           ),
                         );
                       },
-                icon: Icon(isDaemonActive ? Icons.pause_circle : Icons.play_circle, size: 22),
+                icon: Icon(
+                    isDaemonActive
+                        ? Icons.pause_circle
+                        : Icons.play_circle,
+                    size: 22),
                 label: Text(isDaemonActive ? 'Pausa auto' : 'Avvia auto'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: isDaemonActive ? Colors.orange : Colors.green,
+                  foregroundColor:
+                      isDaemonActive ? Colors.orange : Colors.green,
                   side: BorderSide(
                     color: isDaemonActive ? Colors.orange : Colors.green,
                     width: 2,
@@ -659,7 +668,8 @@ class _SettingsAssociationScreenState
           children: [
             Row(
               children: [
-                Icon(Icons.qr_code_scanner, color: theme.colorScheme.primary),
+                Icon(Icons.qr_code_scanner,
+                    color: theme.colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(
                   'Scansiona QR partner',
@@ -732,12 +742,14 @@ class _SettingsAssociationScreenState
       ),
       child: Row(
         children: [
-          Icon(Icons.info_outline, color: theme.colorScheme.error, size: 20),
+          Icon(Icons.info_outline,
+              color: theme.colorScheme.error, size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               _errorMessage!,
-              style: TextStyle(color: theme.colorScheme.error, fontSize: 13),
+              style:
+                  TextStyle(color: theme.colorScheme.error, fontSize: 13),
             ),
           ),
           IconButton(
@@ -829,15 +841,16 @@ class _SettingsAssociationScreenState
     );
   }
 
-  Widget _buildAssociationTile(DeviceAssociation assoc) {
+  Widget _buildAssociationTile(P2PDeviceAssociation assoc) {
     final daysLeft = assoc.daysRemaining;
     final isExpiring = daysLeft <= 5;
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(vertical: 4),
       leading: CircleAvatar(
-        backgroundColor:
-            isExpiring ? Colors.orange.withValues(alpha: 0.15) : Colors.green.withValues(alpha: 0.15),
+        backgroundColor: isExpiring
+            ? Colors.orange.withValues(alpha: 0.15)
+            : Colors.green.withValues(alpha: 0.15),
         child: Icon(
           isExpiring ? Icons.timer : Icons.check_circle,
           color: isExpiring ? Colors.orange : Colors.green,

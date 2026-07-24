@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:nearby_connections/nearby_connections.dart';
+import 'package:cryptography/cryptography.dart';
 
 import '../../../core/services/bluetooth_permission_service.dart';
 import 'p2p_security_service.dart';
@@ -130,7 +131,10 @@ class P2PSyncService {
 
   Completer<void>? _pairingCompleter;
 
-  static const Duration _backgroundInterval = Duration(minutes: 5);
+  bool _syncSendDone = false;
+  bool _syncReceiveDone = false;
+
+  static const Duration _backgroundInterval = Duration(seconds: 120);
   static const Duration _pairingTimeout = Duration(seconds: 120);
   static const String _serviceId = 'ch.catechhub.app';
 
@@ -144,6 +148,55 @@ class P2PSyncService {
   Future<void> init() async {
     if (_initialized) return;
     _initialized = true;
+
+    final hasAssociations = await _security.hasValidAssociation();
+    if (hasAssociations) {
+      startBackgroundSync();
+      _startSilentDiscovery();
+    }
+  }
+
+  Future<void> _startSilentDiscovery() async {
+    final permResult =
+        await BluetoothPermissionService.checkAndRequestPermissions();
+    if (!permResult.allGranted) return;
+
+    try {
+      await _nearby.startAdvertising(
+        'CH_Sync',
+        Strategy.P2P_CLUSTER,
+        onConnectionInitiated: _onConnectionInitiated,
+        onConnectionResult: _onConnectionResult,
+        onDisconnected: _onDisconnected,
+        serviceId: _serviceId,
+      );
+
+      await _nearby.startDiscovery(
+        'CH_Sync',
+        Strategy.P2P_CLUSTER,
+        onEndpointFound: (endpointId, name, serviceId) {
+          if (!name.startsWith('CH_')) return;
+          final deviceId = _extractDeviceId(name);
+          if (deviceId == null) return;
+
+          Future(() async {
+            final assoc = await _security.getAssociation(deviceId);
+            if (assoc != null && assoc.isValid && _pendingEndpointId == null && !_isSyncing) {
+              _pendingEndpointId = endpointId;
+              await _nearby.requestConnection(
+                'CH_Sync',
+                endpointId,
+                onConnectionInitiated: _onConnectionInitiated,
+                onConnectionResult: _onConnectionResult,
+                onDisconnected: _onDisconnected,
+              );
+            }
+          });
+        },
+        onEndpointLost: (_) {},
+        serviceId: _serviceId,
+      );
+    } catch (_) {}
   }
 
   Future<void> setRole(P2PSyncRole role) async {
@@ -255,11 +308,6 @@ class P2PSyncService {
       String endpointId, ConnectionInfo info) async {
     if (_state.role == P2PSyncRole.responsabile) {
       await _nearby.rejectConnection(endpointId);
-      _updateState(_state.copyWith(
-        status: P2PSyncStatus.error,
-        errorMessage:
-            'Funzione Responsabile in fase di implementazione.',
-      ));
       return;
     }
 
@@ -347,16 +395,30 @@ class P2PSyncService {
   void _onPayloadReceived(String endpointId, Payload payload) {
     if (payload.bytes == null) return;
     try {
-      final message = utf8.decode(payload.bytes!);
-      _handleMessage(endpointId, message);
+      final rawMessage = utf8.decode(payload.bytes!);
+      _handleMessage(endpointId, rawMessage);
     } catch (e) {
       debugPrint('[P2P] Payload decode error: $e');
     }
   }
 
-  Future<void> _handleMessage(
-      String endpointId, String message) async {
+  Future<String> _tryDecryptMessage(String rawMessage) async {
+    if (_currentSession == null) return rawMessage;
+
     try {
+      final decoded = P2PEncryptedPayload.decode(rawMessage);
+      final sessionKey = SecretKey(_currentSession!.sessionKey.bytes);
+      final plainText = await _security.decryptPayload(decoded, sessionKey);
+      return plainText;
+    } catch (_) {
+      return rawMessage;
+    }
+  }
+
+  Future<void> _handleMessage(
+      String endpointId, String rawMessage) async {
+    try {
+      final message = await _tryDecryptMessage(rawMessage);
       final decoded = jsonDecode(message);
       if (decoded is! Map<String, dynamic>) return;
 
@@ -447,9 +509,36 @@ class P2PSyncService {
       isSessionEncrypted: true,
     ));
 
-    // Initiator starts sync after receiving ack
+    if (!_isSyncing) {
+      await _saveAssociationIfNeeded(remoteIdentity);
+    }
+
     if (_currentSession != null && _state.connectedDeviceId != null) {
       await _performBidirectionalSync(_state.connectedDeviceId!, _currentSession!);
+    }
+  }
+
+  Future<void> _saveAssociationIfNeeded(P2PIdentity remoteIdentity) async {
+    try {
+      final existing = await _security.getAssociation(remoteIdentity.deviceId);
+      if (existing != null) return;
+
+      final sharedSecret = await _security.computeStaticSharedSecret(
+          remoteIdentity.publicKeyBase64);
+
+      final association = P2PDeviceAssociation(
+        deviceId: remoteIdentity.deviceId,
+        deviceName: remoteIdentity.deviceName,
+        publicKeyBase64: remoteIdentity.publicKeyBase64,
+        fingerprint: remoteIdentity.fingerprint,
+        sharedSecretBase64: sharedSecret,
+        associatedAt: DateTime.now(),
+      );
+
+      await _security.saveAssociation(association);
+      debugPrint('[P2P] Association saved for ${remoteIdentity.deviceName}');
+    } catch (e) {
+      debugPrint('[P2P] Error saving association: $e');
     }
   }
 
@@ -500,6 +589,10 @@ class P2PSyncService {
 
       _currentSession = session;
 
+      if (!isInitiator) {
+        await _saveAssociationIfNeeded(remoteIdentity);
+      }
+
       final localIdentity = await _security.getLocalIdentity();
       final ack = jsonEncode({
         'type': 'p2p_handshake_ack',
@@ -513,7 +606,6 @@ class P2PSyncService {
         isSessionEncrypted: true,
       ));
 
-      // Start bidirectional sync after session is established
       await _performBidirectionalSync(endpointId, session);
     } catch (e) {
       debugPrint('[P2P] Session establish error: $e');
@@ -524,22 +616,20 @@ class P2PSyncService {
     }
   }
 
-  /// Performs bidirectional sync using HiveSyncEngine with LWW conflict resolution
-  /// Syncs all 13 Hive boxes securely using the established session key
-  Future<void> _performBidirectionalSync(String endpointId, P2PSession session) async {
+  Future<void> _performBidirectionalSync(
+      String endpointId, P2PSession session) async {
     if (_isSyncing) return;
     _isSyncing = true;
+    _syncSendDone = false;
+    _syncReceiveDone = false;
 
     _updateState(_state.copyWith(status: P2PSyncStatus.syncing));
 
     try {
       final engine = HiveSyncEngine();
       final lastSync = await engine.getLastSyncTimestamp();
-
-      // Build local index
       final localIndex = engine.buildLocalIndex();
 
-      // Send local index to remote
       final indexPayload = jsonEncode({
         'type': 'p2p_sync_index',
         'index': localIndex.map((e) => e.toJson()).toList(),
@@ -547,15 +637,12 @@ class P2PSyncService {
       });
       await _sendEncryptedPayload(endpointId, indexPayload);
 
-      // Wait for remote index and data
-      // The response will come through _handleSyncIndex and _handleSyncData
-      // We'll use a completer to wait for the sync to complete
       final completer = Completer<SyncResult>();
 
-      // Set up one-time listeners for sync response
       late final StreamSubscription<P2PSyncState> stateSub;
       stateSub = onStateChanged.listen((state) {
-        if (state.status == P2PSyncStatus.completed || state.status == P2PSyncStatus.error) {
+        if (state.status == P2PSyncStatus.completed ||
+            state.status == P2PSyncStatus.error) {
           stateSub.cancel();
           if (!completer.isCompleted) {
             if (state.status == P2PSyncStatus.completed) {
@@ -576,7 +663,6 @@ class P2PSyncService {
         }
       });
 
-      // Wait for sync to complete (with timeout)
       final result = await completer.future.timeout(
         const Duration(seconds: 60),
         onTimeout: () {
@@ -590,6 +676,8 @@ class P2PSyncService {
       );
 
       _isSyncing = false;
+      _syncSendDone = false;
+      _syncReceiveDone = false;
 
       if (result.success) {
         _updateState(_state.copyWith(
@@ -604,8 +692,12 @@ class P2PSyncService {
           errorMessage: result.error,
         ));
       }
+
+      _cleanupSessionAfterSync(endpointId);
     } catch (e) {
       _isSyncing = false;
+      _syncSendDone = false;
+      _syncReceiveDone = false;
       debugPrint('[P2P] Sync error: $e');
       _updateState(_state.copyWith(
         status: P2PSyncStatus.error,
@@ -614,12 +706,20 @@ class P2PSyncService {
     }
   }
 
+  Future<void> _cleanupSessionAfterSync(String endpointId) async {
+    try {
+      await _nearby.disconnectFromEndpoint(endpointId);
+    } catch (_) {}
+    _pendingEndpointId = null;
+    _currentSession = null;
+  }
+
   Future<void> _sendEncryptedPayload(
       String endpointId, String plainText) async {
     if (_currentSession != null) {
       try {
-        final encrypted = await _security.encryptPayload(
-            plainText, _currentSession!.sessionKey);
+        final sessionKey = SecretKey(_currentSession!.sessionKey.bytes);
+        final encrypted = await _security.encryptPayload(plainText, sessionKey);
         await _sendPayload(endpointId, encrypted.encode());
       } catch (_) {
         await _sendPayload(endpointId, plainText);
@@ -646,19 +746,15 @@ class P2PSyncService {
       final engine = HiveSyncEngine();
       final localIndex = engine.buildLocalIndex();
 
-      // Parse remote index
       final remoteIndexData = message['index'] as List<dynamic>? ?? [];
       final remoteIndex = remoteIndexData
           .map((e) => SyncIndexEntry.fromJson(Map<String, dynamic>.from(e)))
           .toList();
 
-      // Compute what we need from remote
       final neededFromRemote = engine.computeNeededRecords(remoteIndex);
+      final neededFromLocal =
+          engine.computeNeededRecordsFromLocal(localIndex, remoteIndex);
 
-      // Compute what remote needs from us
-      final neededFromLocal = engine.computeNeededRecordsFromLocal(localIndex, remoteIndex);
-
-      // Send our records that remote needs
       var sentCount = 0;
       if (neededFromLocal.isNotEmpty) {
         final localRecords = engine.fetchRecords(neededFromLocal);
@@ -669,26 +765,25 @@ class P2PSyncService {
         await _sendEncryptedPayload(endpointId, recordsPayload);
         sentCount = localRecords.length;
       }
+      _syncSendDone = true;
 
-      // Request records we need from remote
       if (neededFromRemote.isNotEmpty) {
         final requestPayload = jsonEncode({
           'type': 'p2p_sync_request',
           'keys': neededFromRemote,
         });
         await _sendEncryptedPayload(endpointId, requestPayload);
+        _syncReceiveDone = false;
+      } else {
+        _syncReceiveDone = true;
       }
 
-      // If we have nothing to exchange, we're done
-      if (neededFromRemote.isEmpty && neededFromLocal.isEmpty) {
+      if (_syncSendDone && _syncReceiveDone) {
         _updateState(_state.copyWith(
           status: P2PSyncStatus.completed,
           sentRecords: sentCount,
           receivedRecords: 0,
         ));
-      } else {
-        // Wait for remote to respond with records
-        // State will be updated in _handleSyncData
       }
     } catch (e) {
       debugPrint('[P2P] Handle sync index error: $e');
@@ -708,15 +803,26 @@ class P2PSyncService {
               .toList() ??
           [];
 
-      if (keys.isEmpty) return;
+      if (keys.isEmpty) {
+        _syncSendDone = true;
+        if (_syncSendDone && _syncReceiveDone) {
+          _updateState(_state.copyWith(status: P2PSyncStatus.completed));
+        }
+        return;
+      }
 
-      // Fetch and send requested records
       final records = engine.fetchRecords(keys);
       final recordsPayload = jsonEncode({
         'type': 'p2p_sync_data',
         'records': engine.serializeRecords(records),
       });
       await _sendEncryptedPayload(endpointId, recordsPayload);
+
+      _syncSendDone = true;
+
+      if (_syncSendDone && _syncReceiveDone) {
+        _updateState(_state.copyWith(status: P2PSyncStatus.completed));
+      }
     } catch (e) {
       debugPrint('[P2P] Handle sync request error: $e');
     }
@@ -729,18 +835,26 @@ class P2PSyncService {
       final recordsData = message['records'] as List<dynamic>? ?? [];
       final records = engine.deserializeRecords(recordsData);
 
-      // Apply remote records with LWW conflict resolution
       final result = await engine.applyRemoteRecords(records);
 
-      _updateState(_state.copyWith(
-        status: P2PSyncStatus.completed,
-        sentRecords: _state.sentRecords,
-        receivedRecords: result.receivedRecords,
-        lastSyncAt: result.syncTimestamp,
-      ));
+      _syncReceiveDone = true;
 
-      // Save sync timestamp
       await engine.saveLastSyncTimestamp(result.syncTimestamp);
+
+      if (_syncSendDone && _syncReceiveDone) {
+        final ack = jsonEncode({
+          'type': 'p2p_sync_ack',
+          'received': result.receivedRecords,
+        });
+        await _sendEncryptedPayload(endpointId, ack);
+
+        _updateState(_state.copyWith(
+          status: P2PSyncStatus.completed,
+          sentRecords: _state.sentRecords,
+          receivedRecords: result.receivedRecords,
+          lastSyncAt: result.syncTimestamp,
+        ));
+      }
     } catch (e) {
       debugPrint('[P2P] Handle sync data error: $e');
       _updateState(_state.copyWith(
@@ -752,7 +866,9 @@ class P2PSyncService {
 
   Future<void> _handleSyncAck(
       String endpointId, Map<String, dynamic> message) async {
-    // Sync acknowledged by remote
+    _syncSendDone = true;
+    _syncReceiveDone = true;
+
     _updateState(_state.copyWith(
       status: P2PSyncStatus.completed,
     ));
@@ -761,22 +877,45 @@ class P2PSyncService {
   void confirmSync() {
     if (!_state.awaitingConfirmation) return;
 
+    final deviceId = _state.pendingConfirmationDeviceId;
+    final endpointId = _state.connectedDeviceId;
+
     _updateState(_state.copyWith(
       awaitingConfirmation: false,
       pendingConfirmationDeviceName: null,
       pendingConfirmationDeviceId: null,
       status: P2PSyncStatus.sessionEstablished,
     ));
+
+    if (endpointId != null) {
+      final ack = jsonEncode({
+        'type': 'p2p_auth_response',
+        'accepted': true,
+        'deviceId': deviceId,
+      });
+      _sendEncryptedPayload(endpointId, ack);
+    }
   }
 
   void rejectSync() {
     if (!_state.awaitingConfirmation) return;
+
+    final endpointId = _state.connectedDeviceId;
+
     _updateState(_state.copyWith(
       awaitingConfirmation: false,
       pendingConfirmationDeviceName: null,
       pendingConfirmationDeviceId: null,
       status: P2PSyncStatus.idle,
     ));
+
+    if (endpointId != null) {
+      final ack = jsonEncode({
+        'type': 'p2p_auth_response',
+        'accepted': false,
+      });
+      _sendEncryptedPayload(endpointId, ack);
+    }
   }
 
   Future<void> sendSyncData(
@@ -801,6 +940,8 @@ class P2PSyncService {
     _updateState(_state.copyWith(isBackgroundSyncActive: false));
   }
 
+  Future<void> triggerManualSync() => _backgroundSyncCycle();
+
   Future<void> _backgroundSyncCycle() async {
     if (_isSyncing) return;
     final associations = await _security.getAllAssociations();
@@ -824,16 +965,15 @@ class P2PSyncService {
 
           Future(() async {
             final assoc = await _security.getAssociation(deviceId);
-            if (assoc != null && assoc.isValid) {
-              if (_state.role == P2PSyncRole.mioDispositivo) {
-                _nearby.requestConnection(
-                  'CH_Sync',
-                  endpointId,
-                  onConnectionInitiated: _onConnectionInitiated,
-                  onConnectionResult: _onConnectionResult,
-                  onDisconnected: _onDisconnected,
-                );
-              }
+            if (assoc != null && assoc.isValid && _pendingEndpointId == null) {
+              _pendingEndpointId = endpointId;
+              await _nearby.requestConnection(
+                'CH_Sync',
+                endpointId,
+                onConnectionInitiated: _onConnectionInitiated,
+                onConnectionResult: _onConnectionResult,
+                onDisconnected: _onDisconnected,
+              );
             }
           });
         },
@@ -847,6 +987,7 @@ class P2PSyncService {
     } finally {
       await _nearby.stopAllEndpoints();
       _isSyncing = false;
+      _pendingEndpointId = null;
       _updateState(_state.copyWith(status: P2PSyncStatus.idle));
     }
   }

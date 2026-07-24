@@ -49,8 +49,8 @@ import 'core/config/env_config.dart';
 //   FASE 6 - Avvio app Flutter con Riverpod ProviderScope
 //
 // HARDWARE BLUETOOTH:
-//   NESSUNA istanza di ClassicConnectionManager o BluetoothClassicService
-//   viene creata nel main(). Tutta la logica hardware viene delegata
+//   NESSUNA istanza di gestione Bluetooth viene creata nel main().
+//   Tutta la logica hardware viene delegata
 //   al metodo initState() della pagina che ne ha bisogno, protetta da
 //   try-catch, per evitare crash se il Bluetooth non è disponibile.
 //
@@ -74,7 +74,7 @@ import 'core/config/env_config.dart';
 // CONTESTO PROGETTO:
 //   CatechHub gestisce dati sensibili di minori (anagrafica, allergie,
 //   contatti genitori) e sincronizza i dati tra dispositivi catechisti
-//   via Bluetooth RFCOMM. Il bootstrap garantisce che:
+//   via Nearby Connections (Google Nearby API). Il bootstrap garantisce che:
 //   - Il database locale Hive sia inizializzato e riparato se corrotto
 //   - I permessi siano richiesti in modo sequenziale e non invasivo
 //   - L'app mostri errori leggibili in caso di fallimenti critici
@@ -123,7 +123,7 @@ void _initUpdateServiceNavigatorKey() {
 ///     tutti i tentativi, l'app mostra schermata di errore fatale.
 ///
 /// HARDWARE BLUETOOTH:
-///   NESSUNA istanza di ClassicConnectionManager o BluetoothClassicService
+///   NESSUNA istanza di gestione Bluetooth
 ///   viene creata nel main(). Tutta la logica hardware viene delegata
 ///   al metodo initState() della pagina che ne ha bisogno, protetta da
 ///   try-catch, per evitare crash se il Bluetooth non è disponibile.
@@ -558,7 +558,7 @@ Future<void> main() async {
       // - MyApp: widget radice che configura il tema, il router, e la logica
       //   di autenticazione
       //
-      // La logica Bluetooth (ClassicConnectionManager, BluetoothClassicService)
+      // La logica Bluetooth (Nearby Connections)
       // viene inizializzata SOLO quando l'utente naviga alla pagina di sync,
       // all'interno di initState() protetto da try-catch.
       // ═══════════════════════════════════════════════════════════════════════

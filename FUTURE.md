@@ -11,14 +11,13 @@
 
 ## Pianificate
 
-- **Template PDF personalizzabili** — Permettere ai catechisti di personalizzare intestazioni, loghi e layout dei PDF generati.
 - **Export Completo** — Esportazione in PDF dell'intero database per archiviazione al termine dell'anno.
-- **Responsabile Catechistico** — Inserimento della modalità "Responsabile" per la gestione centralizzata delle classi.
 - **Archivio Storico** - implementazione di un archivio per seguire il progresso del ragazzo nel percorso di preparazione.
 - **Preparatore di comunicazioni WhatsApp** - Genesi automatica di messaggi whatsapp da condividere con i genitori singolarmente o nel gruppo.
 
 ## In valutazione
 
+- **Responsabile Catechistico** — Inserimento della modalità "Responsabile" per la gestione centralizzata delle classi.
 - **Import da Excel / CSV** — Importazione massiva di elenchi ragazzi da fogli di calcolo.
 - **Gestione Incontri - Uscite** - possibilità di gestire separatamente gli incontri di una giornata.
 - **Gestione MultiGruppo** - Possibilità per il catechista di gestire più di un gruppo, anche di anni diversi

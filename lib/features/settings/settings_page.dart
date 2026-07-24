@@ -2,7 +2,7 @@
 ///
 /// Funge da hub di navigazione per tutte le sezioni di configurazione:
 /// - **Profilo**: card con nome e ruolo del catechista autenticato
-/// - **Gestione**: collegamento alla gestione del gruppo e dei ragazzi
+/// - **Gestione**: collegamento alla gestione del gruppo e dei ragazzi, soglia assenze, cancellazione dati
 /// - **Supporto**: invio feedback tramite Wiredash (solo se il consenso remoto è attivo)
 /// - **Sicurezza**: privacy, cancellazione selettiva dati
 /// - **App**: aggiornamenti, condivisione dati, licenze open source
@@ -21,7 +21,84 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/auth/auth_provider.dart';
 import '../../core/providers/theme_provider.dart';
 import '../../core/security/privacy_settings.dart';
+import '../../core/services/meeting_notification_service.dart';
 import '../../shared/widgets/app_scaffold.dart';
+
+void _showDeleteDataDialog(BuildContext context, WidgetRef ref) {
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      title: const Text(
+        'Cancella dati salvati',
+        style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+      ),
+      content: const Text(
+        'Questa azione eliminerà TUTTI i dati locali (studenti, classi, presenze, documenti, note, programmazione). '
+        'L\'operazione NON può essere annullata. Sei sicuro di voler procedere?',
+        style: TextStyle(fontSize: 14, height: 1.4),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('Annulla'),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          onPressed: () async {
+            Navigator.of(ctx).pop();
+            // Show confirmation dialog
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                title: const Text(
+                  'Conferma cancellazione',
+                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                ),
+                content: const Text(
+                  'ATTENZIONE: Tutti i dati saranno persi definitivamente. '
+                  'Non è possibile ripristinarli senza un backup.',
+                  style: TextStyle(fontSize: 14, height: 1.4),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: const Text('Annulla'),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    child: const Text('Elimina tutto'),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed == true && context.mounted) {
+              // Here you would implement the actual data deletion
+              // For now show a message
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Funzione di cancellazione completa in fase di implementazione'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            }
+          },
+          child: const Text('Conferma'),
+        ),
+      ],
+    ),
+  );
+}
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -104,6 +181,85 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
+  void _showNotificationSettingsDialog(BuildContext context, WidgetRef ref) {
+    final isEnabled = MeetingNotificationService.areNotificationsEnabled;
+    final currentTime = MeetingNotificationService.notificationTime;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Text(
+            'Notifiche incontri',
+            style: TextStyle(color: Color(0xFF174A7E), fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Ricevi un promemoria il giorno prima di ogni incontro di catechismo o riunione, all\'orario che preferisci.',
+                style: TextStyle(fontSize: 14, height: 1.4),
+              ),
+              const SizedBox(height: 20),
+              SwitchListTile(
+                title: const Text('Attiva notifiche'),
+                subtitle: const Text('Ricevi promemoria per incontri e riunioni'),
+                value: isEnabled,
+                activeThumbColor: const Color(0xFF174A7E),
+                onChanged: (value) async {
+                  await MeetingNotificationService.setEnabled(value);
+                  setState(() {});
+                },
+              ),
+              const SizedBox(height: 12),
+              if (isEnabled) ...[
+                ListTile(
+                  title: const Text('Orario notifica'),
+                  subtitle: Text(
+                    currentTime,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF174A7E),
+                    ),
+                  ),
+                  trailing: const Icon(Icons.access_time_rounded, color: Color(0xFF174A7E)),
+                  onTap: () async {
+                    final TimeOfDay? picked = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay(
+                        hour: int.parse(currentTime.split(':')[0]),
+                        minute: int.parse(currentTime.split(':')[1]),
+                      ),
+                    );
+                    if (picked != null && ctx.mounted) {
+                      final formattedTime =
+                          '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+                      await MeetingNotificationService.setNotificationTime(formattedTime);
+                      setState(() {});
+                    }
+                  },
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'La notifica verrà inviata il giorno prima dell\'incontro a quest\'ora.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Chiudi'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final privacy = ref.watch(privacySettingsProvider);
@@ -150,6 +306,27 @@ class SettingsPage extends ConsumerWidget {
                 onTap: () => _showAbsenceThresholdDialog(context, ref),
               ),
 
+              const SizedBox(height: 12),
+
+              _SettingsItem(
+                icon: Icons.delete_forever_rounded,
+                title: 'Cancella dati salvati',
+                subtitle: 'Elimina anagrafica, presenze, giornate o allegati',
+                color: Colors.red,
+                isDestructive: true,
+                onTap: () => _showDeleteDataDialog(context, ref),
+              ),
+
+              const SizedBox(height: 12),
+
+              _SettingsItem(
+                icon: Icons.notifications_active_rounded,
+                title: 'Notifiche incontri',
+                subtitle: 'Ricevi un promemoria il giorno prima di incontri e riunioni',
+                color: Colors.blue,
+                onTap: () => _showNotificationSettingsDialog(context, ref),
+              ),
+
               const SizedBox(height: 24),
 
               /// =========================
@@ -187,36 +364,6 @@ class SettingsPage extends ConsumerWidget {
                     );
                   }
                 },
-              ),
-
-              const SizedBox(height: 24),
-
-              /// =========================
-              /// SICUREZZA
-              /// =========================
-              const _SectionTitle(title: 'Sicurezza'),
-
-              const SizedBox(height: 12),
-
-              _SettingsItem(
-                icon: Icons.lock_rounded,
-                title: 'Privacy e sicurezza',
-                subtitle: 'Gestisci i tuoi dati personali',
-                color: Colors.green,
-                onTap: () {
-                  context.push('/privacy-security');
-                },
-              ),
-
-              const SizedBox(height: 12),
-
-              _SettingsItem(
-                icon: Icons.delete_forever_rounded,
-                title: 'Cancella dati salvati',
-                subtitle: 'Elimina anagrafica, presenze, giornate o allegati',
-                color: Colors.red,
-                isDestructive: true,
-                onTap: () => context.push('/delete-data'),
               ),
 
               const SizedBox(height: 24),
@@ -418,14 +565,20 @@ class _ThemeSelectorItem extends ConsumerWidget {
   void _showThemeDialog(BuildContext context, WidgetRef ref) {
     final currentTheme = ref.read(themeNotifierProvider);
     final notifier = ref.read(themeNotifierProvider.notifier);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text(
+        title: Text(
           'Scegli il tema',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+          ),
         ),
         content: RadioGroup<AppThemeMode>(
           groupValue: currentTheme,
@@ -445,10 +598,12 @@ class _ThemeSelectorItem extends ConsumerWidget {
                   mode.displayName,
                   style: TextStyle(
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                    color: isSelected ? const Color(0xFF174A7E) : Colors.black87,
+                    color: isSelected
+                        ? (isDark ? colorScheme.primary : const Color(0xFF174A7E))
+                        : colorScheme.onSurface,
                   ),
                 ),
-                activeColor: const Color(0xFF174A7E),
+                activeColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
               );
             }).toList(),
           ),

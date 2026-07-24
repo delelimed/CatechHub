@@ -57,7 +57,7 @@ class UpdateService {
 
   /// Inizializza il plugin notifiche con callback di navigazione.
   static Future<void> initNotifications() async {
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings('@mipmap/launcher_icon');
     const settings = InitializationSettings(android: androidSettings);
     await _notificationsPlugin.initialize(
       settings: settings,
@@ -112,12 +112,12 @@ class UpdateService {
     return false;
   }
 
-  static Future<void> _showUpdateNotification(String version) async {
+static Future<void> _showUpdateNotification(String version) async {
     const androidDetails = AndroidNotificationDetails(
       'update_channel_id', 'Aggiornamenti App',
       channelDescription: 'Notifiche per i nuovi aggiornamenti di CatechHub',
       importance: Importance.max, priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
+      icon: '@mipmap/launcher_icon',
     );
     await _notificationsPlugin.show(
       id: 0, title: 'Aggiornamento disponibile',

@@ -23,6 +23,7 @@ import 'core/security/security_block_screen.dart';
 import 'core/security/security_manager.dart';
 import 'core/security/security_service.dart';
 import 'core/services/update_service.dart';
+import 'core/services/meeting_notification_service.dart';
 import 'core/storage/local_database.dart';
 import 'core/storage/migration_manager.dart';
 import 'core/config/env_config.dart';
@@ -522,6 +523,7 @@ Future<void> main() async {
       // Configurazione della chiave navigazione per il servizio aggiornamenti,
       // inizializzazione notifiche push, pulizia APK vecchi, e verifica
       // aggiornamenti all'avvio se abilitata nelle impostazioni utente.
+      // Inizializza anche il servizio notifiche per gli incontri/riunioni.
       //
       // Tutte queste operazioni usano INTERNET, non Bluetooth.
       // Non interagiscono con i dati sensibili degli studenti.
@@ -533,6 +535,11 @@ Future<void> main() async {
         if (privacy.checkUpdatesOnStart) {
           await UpdateService.checkForUpdates();
         }
+        // Inizializza il servizio notifiche per incontri e riunioni
+        MeetingNotificationService.initializeTimeZones();
+        await MeetingNotificationService.initialize();
+        // Sincronizza le notifiche con i meeting esistenti
+        await MeetingNotificationService.syncWithPlanning();
       } catch (e) {
         // Servizi di aggiornamento non fatale: l'app può funzionare.
         debugPrint('[MAIN] Servizi aggiornamento falliti (non fatale): $e');

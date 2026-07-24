@@ -315,6 +315,14 @@ Widget _buildActionButtons(BuildContext context, ThemeData theme) {
   return Column(
     children: [
       _ActionButton(
+        icon: Icons.lock_rounded,
+        title: 'Privacy e sicurezza',
+        subtitle: 'Gestisci i tuoi dati personali e preferenze',
+        onTap: () => context.push('/privacy-security'),
+        theme: theme,
+      ),
+      const SizedBox(height: 10),
+      _ActionButton(
         icon: Icons.history_rounded,
         title: 'Changelog',
         subtitle: 'Cronologia versioni e novità',

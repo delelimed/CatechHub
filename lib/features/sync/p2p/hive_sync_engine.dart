@@ -1,9 +1,13 @@
 import 'dart:convert';
+import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:cryptography/cryptography.dart';
 import 'package:hive/hive.dart';
 
 import '../../../core/storage/local_database.dart';
+import 'p2p_security_service.dart';
 
 class SyncRecord {
   final String id;
@@ -130,8 +134,12 @@ class HiveSyncEngine {
     LocalDatabase.attendanceBox: 'attendance',
     LocalDatabase.documentsBox: 'documents',
     LocalDatabase.documentDeliveriesBox: 'document_deliveries',
+    LocalDatabase.attachmentsBox: 'attachments',
     LocalDatabase.contactNotesBox: 'contact_notes',
+    LocalDatabase.catechesiBox: 'catechesi',
+    LocalDatabase.meetingCatechesiBox: 'meeting_catechesi',
     LocalDatabase.studentDailyNotesBox: 'student_daily_notes',
+    LocalDatabase.trustedDevicesBox: 'trusted_devices',
   };
 
   static const _lastSyncKey = 'p2p_last_sync_timestamp';
@@ -408,5 +416,155 @@ class HiveSyncEngine {
     for (final record in records) {
       encryptRecord(record.data);
     }
+  }
+
+  /// Encrypts a payload using the session key (AES-GCM)
+  static Future<String> encryptPayload(
+    String plainText,
+    SecretKey sessionKey,
+  ) async {
+    final nonce = Uint8List.fromList(_secureRandom(12));
+    final secretBox = await AesGcm.with256bits().encrypt(
+      utf8.encode(plainText),
+      secretKey: sessionKey,
+      nonce: nonce,
+    );
+
+    final payload = P2PEncryptedPayload(
+      nonce: Uint8List.fromList(secretBox.nonce),
+      ciphertext: Uint8List.fromList(secretBox.cipherText),
+      mac: Uint8List.fromList(secretBox.mac.bytes),
+      useChacha: false,
+    );
+    return payload.encode();
+  }
+
+  /// Decrypts a payload using the session key (AES-GCM)
+  static Future<String> decryptPayload(
+    String encryptedPayload,
+    SecretKey sessionKey,
+  ) async {
+    final encrypted = P2PEncryptedPayload.decode(encryptedPayload);
+    final secretBox = SecretBox(
+      encrypted.ciphertext,
+      nonce: encrypted.nonce,
+      mac: Mac(encrypted.mac),
+    );
+
+    final plainBytes = await AesGcm.with256bits().decrypt(
+      secretBox,
+      secretKey: sessionKey,
+    );
+
+    return utf8.decode(plainBytes);
+  }
+
+  /// Performs a full bidirectional sync with a remote device
+  /// Uses LWW (Last-Write-Wins) conflict resolution based on updatedAt
+  /// 
+  /// [sessionKey] - The shared session key from P2PSecurityService (ECDH + HKDF derived)
+  /// [fetchRemoteIndex] - Function to fetch remote index
+  /// [fetchRemoteRecords] - Function to fetch remote records by keys
+  /// [sendLocalIndex] - Function to send local index to remote
+  /// [sendLocalRecords] - Function to send local records to remote
+  /// [onProgress] - Optional progress callback (sent, received, total)
+  Future<SyncResult> performFullSync({
+    required SecretKey sessionKey,
+    required Future<List<SyncIndexEntry>> Function() fetchRemoteIndex,
+    required Future<List<SyncRecord>> Function(List<String> keys) fetchRemoteRecords,
+    required Future<void> Function(List<SyncIndexEntry> index) sendLocalIndex,
+    required Future<void> Function(List<SyncRecord> records) sendLocalRecords,
+    void Function(int sent, int received, int total)? onProgress,
+  }) async {
+    try {
+      // Step 1: Build local index
+      final localIndex = buildLocalIndex();
+      
+      // Step 2: Send local index to remote
+      await sendLocalIndex(localIndex);
+      
+      // Step 3: Fetch remote index
+      final remoteIndex = await fetchRemoteIndex();
+      
+      // Step 4: Compute what we need from remote
+      final neededFromRemote = computeNeededRecords(remoteIndex);
+      
+      // Step 5: Compute what remote needs from us
+      final neededFromLocal = computeNeededRecordsFromLocal(localIndex, remoteIndex);
+      
+      // Step 6: Send our records that remote needs
+      var sentCount = 0;
+      if (neededFromLocal.isNotEmpty) {
+        final localRecords = fetchRecords(neededFromLocal);
+        await sendLocalRecords(localRecords);
+        sentCount = localRecords.length;
+      }
+      
+      // Step 7: Fetch and apply remote records we need
+      var receivedCount = 0;
+      var conflictsResolved = 0;
+      
+      if (neededFromRemote.isNotEmpty) {
+        final remoteRecords = await fetchRemoteRecords(neededFromRemote);
+        
+        // Apply with conflict resolution
+        final result = await applyRemoteRecords(remoteRecords);
+        receivedCount = result.receivedRecords;
+        conflictsResolved = result.conflictsResolved;
+      }
+      
+      onProgress?.call(sentCount, receivedCount, sentCount + receivedCount);
+      
+      return SyncResult(
+        success: true,
+        sentRecords: sentCount,
+        receivedRecords: receivedCount,
+        syncTimestamp: DateTime.now().toUtc(),
+        conflictsResolved: conflictsResolved,
+      );
+    } catch (e) {
+      return SyncResult(
+        success: false,
+        error: e.toString(),
+        syncTimestamp: DateTime.now().toUtc(),
+      );
+    }
+  }
+
+  /// Computes which local records the remote needs based on index comparison
+  List<String> computeNeededRecordsFromLocal(
+    List<SyncIndexEntry> localIndex,
+    List<SyncIndexEntry> remoteIndex,
+  ) {
+    final needed = <String>[];
+    final remoteIndexMap = {for (final e in remoteIndex) '${e.boxName}:${e.id}': e};
+    
+    for (final local in localIndex) {
+      final key = '${local.boxName}:${local.id}';
+      final remote = remoteIndexMap[key];
+      
+      if (remote == null) {
+        // Remote doesn't have this record at all
+        needed.add(key);
+      } else if (local.updatedAt.isAfter(remote.updatedAt)) {
+        // Local is newer
+        needed.add(key);
+      } else if (local.updatedAt == remote.updatedAt && local.checksum != remote.checksum) {
+        // Same timestamp but different content
+        needed.add(key);
+      }
+    }
+    
+    return needed;
+  }
+
+  /// Generates cryptographically secure random bytes
+  static Uint8List _secureRandom(int length) {
+    final random = Random.secure();
+    final bytes = Uint8List(length);
+    for (int i = 0; i < length; i++) {
+      bytes[i] = random.nextInt(256);
+    }
+    return bytes;
   }
 }

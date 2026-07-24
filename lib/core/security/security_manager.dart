@@ -43,8 +43,8 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import 'dart:convert';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:local_auth/local_auth.dart';
@@ -145,17 +145,18 @@ class SecurityManager {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // PASSO 1: VERIFICA HARDWARE BIOMETRICO (PROXY PER TEE)
+    // PASSO 1: VERIFICA AUTENTICAZIONE DISPOSITIVO (PROXY PER TEE)
     // ─────────────────────────────────────────────────────────────────────────
-    // local_auth verifica se il dispositivo ha un sensore biometrico e
-    // se l'autenticazione biometrica è disponibile. Questo è un forte indicatore
-    // della presenza di un TEE (Trusted Execution Environment), poiché le
-    // chiavi biometriche sono gestite esclusivamente nel TEE.
+    // local_auth verifica se il dispositivo ha un metodo di autenticazione
+    // configurato (biometria OPPURE PIN/pattern/password del dispositivo).
+    // Su Android 10+ (API 29+), la presenza di un PIN/pattern/password
+    // implica la presenza di un TEE (Trusted Execution Environment) poiché
+    // la verifica delle credenziali avviene all'interno del TEE.
     //
     // NOTA: Questo NON garantisce StrongBox, ma garantisce TEE base.
     // StrongBox è un requisito aggiuntivo (hardware dedicato) che il
     // Keystore userà automaticamente se disponibile (API 28+).
-    await _verifyBiometricHardware();
+    await _verifyAuthenticationCapability();
 
     // ─────────────────────────────────────────────────────────────────────────
     // PASSO 2: TEST FLUTTER_SECURE_STORAGE CON ANDROID KEYSTORE
@@ -197,65 +198,73 @@ class SecurityManager {
   }
 
   // ══════════════════════════════════════════════════════════════════════════════
-  // VERIFICA HARDWARE BIOMETRICO (PROXY TEE)
+  // VERIFICA AUTENTICAZIONE DISPOSITIVO (PROXY TEE)
   // ══════════════════════════════════════════════════════════════════════════════
   ///
-  /// Verifica che il dispositivo abbia hardware biometrico funzionante.
+  /// Verifica che il dispositivo abbia un metodo di autenticazione configurato
+  /// (biometria OPPURE PIN/pattern/password del dispositivo).
   ///
-  /// Su Android, le chiavi biometriche sono generate e usate ESCLUSIVAMENTE
-  /// all'interno del TEE (Trusted Execution Environment). La presenza di
-  /// autenticazione biometrica disponibile implica quindi la presenza di un TEE.
+  /// Su Android 10+ (minSdk 30), `canCheckBiometrics` tramite `local_auth`
+  /// restituisce true in DUE casi:
+  /// 1. L'utente ha una biometria registrata (impronta, volto, iride)
+  /// 2. L'utente ha un PIN/pattern/password del dispositivo configurato
   ///
-  /// Se non ci sono biometrici disponibili:
-  /// - Il dispositivo potrebbe non avere TEE (raro su Android 10+)
-  /// - O l'utente non ha registrato impronte/volto
-  /// - In entrambi i casi, NON possiamo garantire protezione hardware
+  /// In entrambi i casi, la verifica avviene all'interno del TEE
+  /// (Trusted Execution Environment), quindi la presenza di uno qualsiasi
+  /// di questi metodi implica TEE presente.
   ///
-  /// THROWS: HardwareSecurityException se biometria non disponibile
-  Future<void> _verifyBiometricHardware() async {
+  /// Se nessun metodo è disponibile:
+  /// - Solleva HardwareSecurityException con istruzioni chiare per l'utente
+  ///
+  /// NOTE:
+  /// - `getAvailableBiometrics()` restituisce una lista vuota quando
+  ///   è configurato solo il PIN/pattern (nessuna biometria reale)
+  /// - `canCheckBiometrics` = true + lista vuota = solo PIN/pattern → OK
+  ///
+  /// THROWS: HardwareSecurityException se nessun metodo di autenticazione
+  Future<void> _verifyAuthenticationCapability() async {
     final LocalAuthentication auth = LocalAuthentication();
 
-    // Verifica se il dispositivo supporta l'autenticazione biometrica
-    final bool canCheckBiometrics = await auth.canCheckBiometrics;
-
-    if (!canCheckBiometrics) {
-      throw const HardwareSecurityException(
-        'Dispositivo non conforme ai requisiti di sicurezza hardware: '
-        'nessun hardware biometrico/TEE rilevato.',
-        technicalDetail: 'LocalAuthentication.canCheckBiometrics() = false',
-      );
-    }
-
-    // Verifica quali tipi di biometria sono disponibili
-    final List<BiometricType> availableBiometrics =
+    final bool canCheck = await auth.canCheckBiometrics;
+    final List<BiometricType> available =
         await auth.getAvailableBiometrics();
 
-    // Su Android 10+ (minSdk 30), BIOMETRIC_STRONG e BIOMETRIC_WEAK
-    // indicano autenticazione basata su TEE. DEVICE_CREDENTIAL (PIN/Pattern)
-    // non usa TEE per le chiavi.
-    final bool hasStrongBiometric = availableBiometrics.contains(
+    // Nessun metodo di autenticazione configurato
+    if (!canCheck && available.isEmpty) {
+      throw const HardwareSecurityException(
+        'Nessun metodo di autenticazione del dispositivo rilevato.\n\n'
+        'Configura un PIN, pattern o password nelle impostazioni di sicurezza '
+        'del dispositivo (Impostazioni → Schermata blocco → Tipo blocco schermo).\n\n'
+        'In alternativa, registra un\'impronta digitale o il riconoscimento facciale.\n\n'
+        'Questa applicazione richiede la protezione crittografica hardware '
+        '(TEE/StrongBox) per salvaguardare i dati sensibili.',
+        technicalDetail: 'canCheckBiometrics=false, availableBiometrics=[]',
+      );
+    }
+
+    // canCheck = true, available vuoto → solo PIN/Pattern/Password
+    // Su Android 10+, la verifica PIN/Pattern/Password è TEE-backed
+    if (available.isEmpty) {
+      debugPrint('[SECURITY] Autenticazione: solo credenziali dispositivo (PIN/pattern)');
+      return;
+    }
+
+    // Biometrie disponibili: verifica siano forti
+    final bool hasStrongBiometric = available.contains(
       BiometricType.strong,
     ) ||
-        availableBiometrics.contains(BiometricType.fingerprint) ||
-        availableBiometrics.contains(BiometricType.face) ||
-        availableBiometrics.contains(BiometricType.iris);
+        available.contains(BiometricType.fingerprint) ||
+        available.contains(BiometricType.face) ||
+        available.contains(BiometricType.iris);
 
-    if (!hasStrongBiometric && availableBiometrics.isNotEmpty) {
-      // Solo BIOMETRIC_WEAK o DEVICE_CREDENTIAL → non sufficiente
+    if (!hasStrongBiometric) {
       throw HardwareSecurityException(
         'Dispositivo non conforme: autenticazione biometrica forte non disponibile.',
-        technicalDetail: 'Biometrici disponibili: $availableBiometrics',
+        technicalDetail: 'Biometrici disponibili: $available',
       );
     }
 
-    if (availableBiometrics.isEmpty) {
-      // Nessun biometrico registrato dall'utente
-      throw const HardwareSecurityException(
-        'Dispositivo non conforme: nessuna autenticazione biometrica configurata. '
-        'Configura impronta digitale o riconoscimento facciale nelle impostazioni.',
-        technicalDetail: 'Nessun biometrico registrato (getAvailableBiometrics vuoto)',
-      );
-    }
+    debugPrint('[SECURITY] Autenticazione: biometria forte disponibile (TEE garantito)');
   }
 
   // ══════════════════════════════════════════════════════════════════════════════

@@ -20,3 +20,6 @@
 ## In valutazione
 
 - **Import da Excel / CSV** — Importazione massiva di elenchi ragazzi da fogli di calcolo.
+- **Gestione Incontri - Uscite** - possibilità di gestire separatamente gli incontri di una giornata.
+- **Gestione MultiGruppo** - Possibilità per il catechista di gestire più di un gruppo, anche di anni diversi
+- **Supplenze** - possibilità per un catechista di assegnare momentaneamente la supplenza del proprio gruppo ad un altro catechista, manenendo requisiti di sicurezza elevati

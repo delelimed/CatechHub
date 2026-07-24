@@ -386,11 +386,9 @@ Future<void> main() async {
         runApp(MaterialApp(
           debugShowCheckedModeBanner: false,
           home: SecurityBlockScreen(
-            message: 'Dispositivo non conforme ai requisiti di sicurezza hardware.\n\n'
+            message: 'Impossibile avviare l\'applicazione.\n\n'
                 '${e.userMessage}\n\n'
-                'Questa applicazione gestisce dati sensibili di minori e richiede '
-                'protezione crittografica hardware (TEE/StrongBox).\n\n'
-                'Contattare l\'amministratore per assistenza.',
+                'Dopo aver configurato un metodo di sblocco, riavvia l\'app.',
           ),
         ));
         return;

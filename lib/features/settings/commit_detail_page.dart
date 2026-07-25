@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../shared/utils/markdown.dart';
+
 class CommitDetailPage extends StatelessWidget {
   final Map<String, dynamic> commit;
 
@@ -148,9 +150,9 @@ class CommitDetailPage extends StatelessWidget {
               title: 'Messaggio',
               icon: Icons.message,
               theme: theme,
-              child: SelectableText(
+              child: buildSelectableMarkdownText(
                 message,
-                style: TextStyle(
+                TextStyle(
                   fontSize: 14,
                   height: 1.5,
                   color: Colors.grey.shade800,

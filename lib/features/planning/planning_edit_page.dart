@@ -292,14 +292,16 @@ class _PlanningEditPageState extends ConsumerState<PlanningEditPage> {
                   title: 'Foto e PDF dell\'incontro',
                   readOnly: _readOnly,
                 ),
-                const SizedBox(height: 20),
-                _CatechesiAssociationSection(
-                  associatedIds: associatedCatechesiIds,
-                  onChanged: (ids) {
-                    setState(() => associatedCatechesiIds = ids);
-                  },
-                  readOnly: _readOnly,
-                ),
+                if (!isReunion) ...[
+                  const SizedBox(height: 20),
+                  _CatechesiAssociationSection(
+                    associatedIds: associatedCatechesiIds,
+                    onChanged: (ids) {
+                      setState(() => associatedCatechesiIds = ids);
+                    },
+                    readOnly: _readOnly,
+                  ),
+                ],
                 const SizedBox(height: 24),
                 if (!_readOnly)
                   SizedBox(

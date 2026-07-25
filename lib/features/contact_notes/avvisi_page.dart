@@ -18,12 +18,12 @@ class AvvisiPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Condividi avviso'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_rounded),
-            onPressed: () => _editTemplate(context, ref, null),
-          ),
-        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.lightBlue,
+        foregroundColor: Colors.white,
+        onPressed: () => _editTemplate(context, ref, null),
+        child: const Icon(Icons.add_rounded),
       ),
       body: templates.isEmpty
           ? Center(

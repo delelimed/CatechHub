@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../shared/utils/markdown.dart';
+
 class ReleaseDetailPage extends StatelessWidget {
   final Map<String, dynamic> release;
 
@@ -240,9 +242,9 @@ class ReleaseDetailPage extends StatelessWidget {
               children: [
                 Text('• ', style: TextStyle(color: mutedColor, fontSize: 14)),
                 Expanded(
-                  child: Text(
+                  child: buildMarkdownText(
                     trimmed.substring(2),
-                    style: TextStyle(
+                    TextStyle(
                       color: textColor,
                       fontSize: 14,
                       height: 1.5,
@@ -263,9 +265,9 @@ class ReleaseDetailPage extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: quoteBorder),
             ),
-            child: Text(
+            child: buildMarkdownText(
               trimmed.substring(2),
-              style: TextStyle(
+              TextStyle(
                 color: quoteTextColor,
                 fontSize: 13,
                 fontStyle: FontStyle.italic,
@@ -277,9 +279,9 @@ class ReleaseDetailPage extends StatelessWidget {
         widgets.add(
           Padding(
             padding: const EdgeInsets.only(top: 2, bottom: 2),
-            child: Text(
+            child: buildMarkdownText(
               trimmed,
-              style: TextStyle(color: textColor, fontSize: 14, height: 1.5),
+              TextStyle(color: textColor, fontSize: 14, height: 1.5),
             ),
           ),
         );

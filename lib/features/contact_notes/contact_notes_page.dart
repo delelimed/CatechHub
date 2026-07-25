@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import 'package:go_router/go_router.dart';
+
 import '../../shared/models/student_model.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../students/students_repository.dart';
@@ -28,8 +30,63 @@ class ContactNotesPage extends ConsumerWidget {
 
     return AppScaffold(
       title: 'Registro di Contatto',
-      child: students.isEmpty
-          ? Center(
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          InkWell(
+            onTap: () => context.push('/avvisi'),
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.green.shade600,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.green.withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.send_rounded, color: Colors.white, size: 28),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Condividi avviso',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Invia messaggi a genitori e ragazzi',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.white.withValues(alpha: 0.85),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: Colors.white.withValues(alpha: 0.7),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          if (students.isEmpty)
+            Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(
@@ -49,34 +106,32 @@ class ContactNotesPage extends ConsumerWidget {
                 ),
               ),
             )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: students.length,
-              itemBuilder: (context, index) {
-                final student = students[index];
-                final latestNotes =
-                    contactNotesRepo.getNotesForStudentSync(student.id);
-                final lastNote =
-                    latestNotes.isNotEmpty ? latestNotes.first : null;
+          else
+            ...students.map((student) {
+              final latestNotes =
+                  contactNotesRepo.getNotesForStudentSync(student.id);
+              final lastNote =
+                  latestNotes.isNotEmpty ? latestNotes.first : null;
 
-                return _StudentContactTile(
-                  student: student,
-                  lastNote: lastNote,
-                  isDark: isDark,
-                  colorScheme: colorScheme,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => StudentContactNotesPage(
-                          student: student,
-                        ),
+              return _StudentContactTile(
+                student: student,
+                lastNote: lastNote,
+                isDark: isDark,
+                colorScheme: colorScheme,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => StudentContactNotesPage(
+                        student: student,
                       ),
-                    );
-                  },
-                );
-              },
-            ),
+                    ),
+                  );
+                },
+              );
+            }),
+        ],
+      ),
     );
   }
 }

@@ -27,7 +27,12 @@ class StudentsRepository {
   Future<void> addStudent(Student student) async {
     final id = student.id.isEmpty ? LocalDatabase.newId('student') : student.id;
     final catechistName = getCurrentCatechistName();
-    await _box.put(id, _normalize(student).copyWith(lastModifiedBy: catechistName).toMap());
+    final now = DateTime.now();
+    await _box.put(id, _normalize(student).copyWith(
+      lastModifiedBy: catechistName,
+      createdAt: now,
+      updatedAt: now,
+    ).toMap());
   }
 
   Stream<List<Student>> getAllStudents() {
@@ -50,7 +55,17 @@ class StudentsRepository {
 
   Future<void> updateStudent(String id, Student student) async {
     final catechistName = getCurrentCatechistName();
-    await _box.put(id, _normalize(student).copyWith(lastModifiedBy: catechistName).toMap());
+    final existing = _box.get(id);
+    DateTime? existingCreatedAt;
+    if (existing != null) {
+      final map = LocalDatabase.toStringDynamicMap(existing);
+      existingCreatedAt = DateTime.tryParse(map['createdAt']?.toString() ?? '');
+    }
+    await _box.put(id, _normalize(student).copyWith(
+      lastModifiedBy: catechistName,
+      createdAt: existingCreatedAt ?? DateTime.now(),
+      updatedAt: DateTime.now(),
+    ).toMap());
   }
 
   Student _normalize(Student student) {

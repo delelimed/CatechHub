@@ -31,6 +31,7 @@ import '../../core/storage/attachment_optimizer.dart';
 import '../../core/storage/encrypted_file_storage.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/attachment_model.dart';
+import '../../shared/utils/auth_utils.dart';
 
 /// Provider Riverpod per [AttachmentsRepository].
 ///
@@ -97,6 +98,7 @@ class AttachmentsRepository {
     final id = LocalDatabase.newId('attachment');
     await EncryptedFileStorage.write(id, optimized.bytes);
 
+    final now = DateTime.now();
     final attachment = Attachment(
       id: id,
       parentId: parentId,
@@ -104,9 +106,11 @@ class AttachmentsRepository {
       name: optimized.name,
       mimeType: optimized.mimeType,
       size: optimized.savedBytes,
-      createdAt: DateTime.now(),
+      createdAt: now,
+      updatedAt: now,
       fileHash: sha256.convert(optimized.bytes).toString(),
       description: description,
+      lastModifiedBy: getCurrentCatechistName(),
     );
 
     await _box.put(id, attachment.toMap());
@@ -158,6 +162,8 @@ class AttachmentsRepository {
     final data = _box.get(attachmentId) as Map<String, dynamic>?;
     if (data == null) return;
     data['name'] = name;
+    data['lastModifiedBy'] = getCurrentCatechistName();
+    data['updatedAt'] = DateTime.now().toIso8601String();
     await _box.put(attachmentId, data);
   }
 }

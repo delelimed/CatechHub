@@ -36,13 +36,23 @@ class ClassesRepository {
   Future<void> addClass(SchoolClass c) async {
     final id = c.id.isEmpty ? LocalDatabase.newId('class') : c.id;
     final catechistName = getCurrentCatechistName();
-    await _box.put(id, c.copyWith(id: id, lastModifiedBy: catechistName).toMap());
+    final now = DateTime.now();
+    await _box.put(id, c.copyWith(
+      id: id,
+      lastModifiedBy: catechistName,
+      createdAt: now,
+      updatedAt: now,
+    ).toMap());
   }
 
   Future<void> updateClass(String id, SchoolClass c) async {
     final previous = _getClass(id);
     final catechistName = getCurrentCatechistName();
-    await _box.put(id, c.copyWith(id: id, lastModifiedBy: catechistName).toMap());
+    await _box.put(id, c.copyWith(
+      id: id,
+      lastModifiedBy: catechistName,
+      updatedAt: DateTime.now(),
+    ).toMap());
 
     if (previous == null) return;
 

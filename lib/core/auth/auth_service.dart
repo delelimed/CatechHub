@@ -14,6 +14,7 @@ import 'package:local_auth_darwin/local_auth_darwin.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../storage/local_database.dart';
+import '../../features/sync/p2p/p2p_security_service.dart';
 import '../../shared/models/class_model.dart';
 
 /// Servizio di autenticazione basato ESCLUSIVAMENTE su biometrica nativa Android
@@ -245,6 +246,8 @@ class AuthService {
       );
       await classBox.put(classId, newClass.toMap());
 
+      await P2PSecurityService().refreshIdentityName();
+
       _sessionUnlocked = true;
       _cachedUser = null;
       dev.log('Profilo iniziale configurato e sessione sbloccata');
@@ -277,6 +280,7 @@ class AuthService {
         final ln = lastName ?? _box.get('last_name', defaultValue: '');
         await _box.put('local_user_name', '$fn $ln'.trim());
       }
+      await P2PSecurityService().refreshIdentityName();
       _cachedUser = null;
       return true;
     } catch (e) {

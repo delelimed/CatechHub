@@ -61,6 +61,12 @@ class Attachment {
   /// Descrizione opzionale dell'allegato (testo libero).
   final String? description;
 
+  /// Timestamp dell'ultima modifica (UTC, ISO 8601).
+  final DateTime updatedAt;
+
+  /// Nome del catechista che ha modificato per ultimo questo record.
+  final String lastModifiedBy;
+
   Attachment({
     required this.id,
     required this.parentId,
@@ -71,7 +77,9 @@ class Attachment {
     required this.createdAt,
     required this.fileHash,
     this.description,
-  });
+    DateTime? updatedAt,
+    this.lastModifiedBy = '',
+  }) : updatedAt = updatedAt ?? createdAt;
 
   factory Attachment.fromMap(String id, Map<String, dynamic> data) {
     return Attachment(
@@ -85,6 +93,8 @@ class Attachment {
           DateTime.now(),
       fileHash: data['fileHash'] ?? '',
       description: data['description'],
+      updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+      lastModifiedBy: data['lastModifiedBy'] ?? '',
     );
   }
 
@@ -98,6 +108,8 @@ class Attachment {
       'createdAt': createdAt.toIso8601String(),
       'fileHash': fileHash,
       'description': description,
+      'updatedAt': updatedAt.toIso8601String(),
+      'lastModifiedBy': lastModifiedBy,
     };
   }
 

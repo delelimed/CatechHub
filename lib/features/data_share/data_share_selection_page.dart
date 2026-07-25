@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/providers/data_share_provider.dart';
-import '../../core/services/data_export_service.dart';
 import '../../core/services/qr_data_service.dart';
 import '../../shared/widgets/app_scaffold.dart';
 
@@ -82,6 +81,16 @@ class DataShareSelectionPage extends ConsumerWidget {
             colorScheme: colorScheme,
             onTap: () => context.push('/backup'),
           ),
+          const SizedBox(height: 16),
+          _ActionCard(
+            icon: Icons.picture_as_pdf_rounded,
+            title: 'Esporta Report PDF',
+            subtitle: 'Genera un report completo del gruppo',
+            color: Colors.red,
+            isDark: isDark,
+            colorScheme: colorScheme,
+            onTap: () => context.push('/pdf-report'),
+          ),
         ],
       ),
     );
@@ -135,7 +144,6 @@ class DataShareSelectionPage extends ConsumerWidget {
     bool includeContactNotes = false;
     bool includeCatechesi = false;
     bool includeAnnotazioni = false;
-    bool _isPreparing = false;
 
     showDialog(
       context: context,
@@ -160,163 +168,107 @@ class DataShareSelectionPage extends ConsumerWidget {
           ),
           content: SizedBox(
             width: double.maxFinite,
-            child: _isPreparing
-                ? Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CircularProgressIndicator(color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
-                        const SizedBox(height: 16),
-                        Text('Preparazione dati in corso...', style: TextStyle(color: isDark ? colorScheme.onSurface : null)),
-                      ],
-                    ),
-                  )
-                : SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _ModuleCheckbox(
-                          label: 'Anagrafica ragazzi',
-                          subtitle: 'Nomi, cognomi, contatti genitori',
-                          icon: Icons.people_rounded,
-                          value: includeAnagrafica,
-                          isDark: isDark,
-                          colorScheme: colorScheme,
-                          onChanged: (v) => setDialogState(
-                            () => includeAnagrafica = v,
-                          ),
-                        ),
-                        _ModuleCheckbox(
-                          label: 'Presenze',
-                          subtitle: 'Registro presenze e assenze',
-                          icon: Icons.fact_check_rounded,
-                          value: includeAgenda,
-                          isDark: isDark,
-                          colorScheme: colorScheme,
-                          onChanged: (v) => setDialogState(
-                            () => includeAgenda = v,
-                          ),
-                        ),
-                        _ModuleCheckbox(
-                          label: 'Programmazione',
-                          subtitle: 'Giornate e incontri programmati',
-                          icon: Icons.calendar_month_rounded,
-                          value: includeProgrammazione,
-                          isDark: isDark,
-                          colorScheme: colorScheme,
-                          onChanged: (v) => setDialogState(
-                            () => includeProgrammazione = v,
-                          ),
-                        ),
-                        _ModuleCheckbox(
-                          label: 'Documenti',
-                          subtitle: 'Certificati, autorizzazioni, consegne',
-                          icon: Icons.description_rounded,
-                          value: includeDocumenti,
-                          isDark: isDark,
-                          colorScheme: colorScheme,
-                          onChanged: (v) => setDialogState(
-                            () => includeDocumenti = v,
-                          ),
-                        ),
-                        _ModuleCheckbox(
-                          label: 'Note di contatto',
-                          subtitle: 'Comunicazioni con le famiglie',
-                          icon: Icons.contact_mail_rounded,
-                          value: includeContactNotes,
-                          isDark: isDark,
-                          colorScheme: colorScheme,
-                          onChanged: (v) => setDialogState(
-                            () => includeContactNotes = v,
-                          ),
-                        ),
-                        _ModuleCheckbox(
-                          label: 'Catechesi',
-                          subtitle: 'Argomenti e contenuti delle catechesi',
-                          icon: Icons.menu_book_rounded,
-                          value: includeCatechesi,
-                          isDark: isDark,
-                          colorScheme: colorScheme,
-                          onChanged: (v) => setDialogState(
-                            () => includeCatechesi = v,
-                          ),
-                        ),
-                        _ModuleCheckbox(
-                          label: 'Annotazioni giornaliere',
-                          subtitle: 'Note e osservazioni sui ragazzi',
-                          icon: Icons.note_alt_rounded,
-                          value: includeAnnotazioni,
-                          isDark: isDark,
-                          colorScheme: colorScheme,
-                          onChanged: (v) => setDialogState(
-                            () => includeAnnotazioni = v,
-                          ),
-                        ),
-                      ],
-                    ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _ModuleCheckbox(
+                    label: 'Anagrafica ragazzi',
+                    subtitle: 'Nomi, cognomi, contatti genitori',
+                    icon: Icons.people_rounded,
+                    value: includeAnagrafica,
+                    isDark: isDark,
+                    colorScheme: colorScheme,
+                    onChanged: (v) => setDialogState(() => includeAnagrafica = v),
                   ),
+                  _ModuleCheckbox(
+                    label: 'Presenze',
+                    subtitle: 'Registro presenze e assenze',
+                    icon: Icons.fact_check_rounded,
+                    value: includeAgenda,
+                    isDark: isDark,
+                    colorScheme: colorScheme,
+                    onChanged: (v) => setDialogState(() => includeAgenda = v),
+                  ),
+                  _ModuleCheckbox(
+                    label: 'Programmazione',
+                    subtitle: 'Giornate e incontri programmati',
+                    icon: Icons.calendar_month_rounded,
+                    value: includeProgrammazione,
+                    isDark: isDark,
+                    colorScheme: colorScheme,
+                    onChanged: (v) => setDialogState(() => includeProgrammazione = v),
+                  ),
+                  _ModuleCheckbox(
+                    label: 'Documenti',
+                    subtitle: 'Certificati, autorizzazioni, consegne',
+                    icon: Icons.description_rounded,
+                    value: includeDocumenti,
+                    isDark: isDark,
+                    colorScheme: colorScheme,
+                    onChanged: (v) => setDialogState(() => includeDocumenti = v),
+                  ),
+                  _ModuleCheckbox(
+                    label: 'Note di contatto',
+                    subtitle: 'Comunicazioni con le famiglie',
+                    icon: Icons.contact_mail_rounded,
+                    value: includeContactNotes,
+                    isDark: isDark,
+                    colorScheme: colorScheme,
+                    onChanged: (v) => setDialogState(() => includeContactNotes = v),
+                  ),
+                  _ModuleCheckbox(
+                    label: 'Catechesi',
+                    subtitle: 'Argomenti e contenuti delle catechesi',
+                    icon: Icons.menu_book_rounded,
+                    value: includeCatechesi,
+                    isDark: isDark,
+                    colorScheme: colorScheme,
+                    onChanged: (v) => setDialogState(() => includeCatechesi = v),
+                  ),
+                  _ModuleCheckbox(
+                    label: 'Annotazioni giornaliere',
+                    subtitle: 'Note e osservazioni sui ragazzi',
+                    icon: Icons.note_alt_rounded,
+                    value: includeAnnotazioni,
+                    isDark: isDark,
+                    colorScheme: colorScheme,
+                    onChanged: (v) => setDialogState(() => includeAnnotazioni = v),
+                  ),
+                ],
+              ),
+            ),
           ),
-          actions: _isPreparing
-              ? []
-              : [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: Text('Annulla', style: TextStyle(color: isDark ? colorScheme.primary : null)),
-                  ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-                      foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: () async {
-                      setDialogState(() => _isPreparing = true);
-                      try {
-                        final allData = await DataExportService.exportSelectiveData(
-                          includeAnagrafica: includeAnagrafica,
-                          includeAgenda: includeAgenda,
-                          includeProgrammazione: includeProgrammazione,
-                          includeDocumenti: includeDocumenti,
-                          includeContactNotes: includeContactNotes,
-                          includeCatechesi: includeCatechesi,
-                          includeAnnotazioni: includeAnnotazioni,
-                        );
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Annulla', style: TextStyle(color: isDark ? colorScheme.primary : null)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () {
+                      final options = DataShareOptions(
+                        includeAnagrafica: includeAnagrafica,
+                        includeAgenda: includeAgenda,
+                        includeProgrammazione: includeProgrammazione,
+                        includeDocumenti: includeDocumenti,
+                        includeContactNotes: includeContactNotes,
+                        includeCatechesi: includeCatechesi,
+                        includeAnnotazioni: includeAnnotazioni,
+                      );
 
-                        final options = DataShareOptions(
-                          includeAnagrafica: includeAnagrafica,
-                          includeAgenda: includeAgenda,
-                          includeProgrammazione: includeProgrammazione,
-                          includeDocumenti: includeDocumenti,
-                          includeContactNotes: includeContactNotes,
-                          includeCatechesi: includeCatechesi,
-                          includeAnnotazioni: includeAnnotazioni,
-                        );
+                      ref.read(dataShareOptionsProvider.notifier).state =
+                          options;
 
-                        final shareData = QRDataService.prepareDataForShare(
-                          options,
-                          allData,
-                        );
-
-                        final pin = QRDataService.generatePin();
-
-                        ref.read(dataShareDataProvider.notifier).state =
-                            shareData;
-                        ref.read(dataSharePinProvider.notifier).state = pin;
-
-                        if (ctx.mounted) Navigator.pop(ctx);
-                        if (context.mounted) {
-                          context.push('/data-share/send');
-                        }
-                      } catch (e) {
-                        setDialogState(() => _isPreparing = false);
-                        if (ctx.mounted) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            SnackBar(content: Text('Errore: $e')),
-                          );
-                        }
+                      Navigator.pop(ctx);
+                      if (context.mounted) {
+                        context.push('/data-share/send');
                       }
                     },
                     child: const Text('Invia'),

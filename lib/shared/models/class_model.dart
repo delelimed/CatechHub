@@ -42,13 +42,22 @@ class SchoolClass {
   /// Nome del catechista che ha modificato per ultimo questo record.
   final String lastModifiedBy;
 
+  /// Timestamp di creazione (UTC, ISO 8601).
+  final DateTime createdAt;
+
+  /// Timestamp dell'ultima modifica (UTC, ISO 8601).
+  final DateTime updatedAt;
+
   SchoolClass({
     required this.id,
     required this.name,
     required this.studentIds,
     required this.catechistIds,
     this.lastModifiedBy = '',
-  });
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  })  : createdAt = createdAt ?? DateTime.now(),
+        updatedAt = updatedAt ?? DateTime.now();
 
   SchoolClass copyWith({
     String? id,
@@ -56,6 +65,8 @@ class SchoolClass {
     List<String>? studentIds,
     List<String>? catechistIds,
     String? lastModifiedBy,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return SchoolClass(
       id: id ?? this.id,
@@ -63,6 +74,8 @@ class SchoolClass {
       studentIds: studentIds ?? this.studentIds,
       catechistIds: catechistIds ?? this.catechistIds,
       lastModifiedBy: lastModifiedBy ?? this.lastModifiedBy,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -77,6 +90,8 @@ class SchoolClass {
           .map((value) => value.toString())
           .toList(),
       lastModifiedBy: data['lastModifiedBy'] ?? '',
+      createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
+      updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
     );
   }
 
@@ -86,6 +101,8 @@ class SchoolClass {
       'studentIds': studentIds,
       'catechistIds': catechistIds,
       'lastModifiedBy': lastModifiedBy,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
     };
   }
 }

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:hive/hive.dart';
 import 'package:nearby_connections/nearby_connections.dart';
 
 import '../../../core/services/bluetooth_permission_service.dart';
@@ -119,7 +120,6 @@ class P2PSyncService {
   P2PSyncState _state = const P2PSyncState();
   P2PSyncState get currentState => _state;
 
-  Timer? _backgroundTimer;
   Timer? _pairingTimeoutTimer;
   bool _initialized = false;
   bool _isSyncing = false;
@@ -132,9 +132,15 @@ class P2PSyncService {
 
   String? _connectedDeviceId;
 
-  static const Duration _backgroundInterval = Duration(seconds: 120);
+  bool _continuousModeActive = false;
+  final Set<String> _connectedEndpoints = {};
+  bool _restartingEndpoints = false;
+  StreamSubscription<BoxEvent>? _hiveBoxesSub;
+
   static const Duration _pairingTimeout = Duration(seconds: 120);
+  static const Duration _reconnectDelay = Duration(seconds: 5);
   static const String _serviceId = 'ch.catechhub.app';
+  static const String _syncPrefix = 'CH_';
 
   void _emitState() => _stateController.add(_state);
 
@@ -147,42 +153,131 @@ class P2PSyncService {
     if (_initialized) return;
     _initialized = true;
 
+    await _security.refreshIdentityName();
+
     final hasAssociations = await _security.hasValidAssociation();
     if (hasAssociations) {
-      startBackgroundSync();
-      _startSilentDiscovery();
+      _startContinuousMode();
     }
   }
 
-  Future<void> _startSilentDiscovery() async {
+  Future<void> _startContinuousMode() async {
+    if (_continuousModeActive) return;
+    _continuousModeActive = true;
+
     final permResult =
         await BluetoothPermissionService.checkAndRequestPermissions();
     if (!permResult.allGranted) return;
 
+    _startAdvertising();
+    _startDiscovery();
+    _watchLocalChanges();
+    _scheduleReconnectCycle();
+
+    _updateState(_state.copyWith(
+      isBackgroundSyncActive: true,
+      clearError: true,
+    ));
+  }
+
+  void _stopContinuousMode() {
+    _continuousModeActive = false;
+    _hiveBoxesSub?.cancel();
+    _hiveBoxesSub = null;
     try {
+      _nearby.stopAdvertising();
+      _nearby.stopDiscovery();
+    } catch (_) {}
+  }
+
+  Future<void> _startAdvertising() async {
+    if (!_continuousModeActive) return;
+    try {
+      final identity = await _security.getLocalIdentity();
       await _nearby.startAdvertising(
-        'CH_Sync',
+        '$_syncPrefix${identity.deviceId}',
         Strategy.P2P_CLUSTER,
         onConnectionInitiated: _onConnectionInitiated,
         onConnectionResult: _onConnectionResult,
         onDisconnected: _onDisconnected,
         serviceId: _serviceId,
       );
+    } catch (_) {
+      Future.delayed(const Duration(seconds: 3), _startAdvertising);
+    }
+  }
 
+  Future<void> _startDiscovery() async {
+    if (!_continuousModeActive) return;
+    try {
       await _nearby.startDiscovery(
-        'CH_Sync',
+        _syncPrefix,
         Strategy.P2P_CLUSTER,
         onEndpointFound: (endpointId, name, serviceId) {
-          if (!name.startsWith('CH_')) return;
+          if (!name.startsWith(_syncPrefix)) return;
           final deviceId = _extractDeviceId(name);
           if (deviceId == null) return;
 
           Future(() async {
+            if (_connectedEndpoints.contains(endpointId)) return;
+            if (_pendingEndpointId != null) return;
+
             final assoc = await _security.getAssociation(deviceId);
-            if (assoc != null && assoc.isValid && _pendingEndpointId == null && !_isSyncing) {
+            if (assoc != null && assoc.isValid) {
               _pendingEndpointId = endpointId;
               await _nearby.requestConnection(
-                'CH_Sync',
+                '$_syncPrefix${assoc.deviceId}',
+                endpointId,
+                onConnectionInitiated: _onConnectionInitiated,
+                onConnectionResult: _onConnectionResult,
+                onDisconnected: _onDisconnected,
+              );
+            }
+          });
+        },
+        onEndpointLost: (_) {},
+        serviceId: _serviceId,
+      );
+    } catch (_) {
+      Future.delayed(const Duration(seconds: 3), _startDiscovery);
+    }
+  }
+
+  void _scheduleReconnectCycle() {
+    if (!_continuousModeActive) return;
+    Future.delayed(_reconnectDelay, () {
+      _attemptKnownDeviceConnections();
+      _scheduleReconnectCycle();
+    });
+  }
+
+  Future<void> _attemptKnownDeviceConnections() async {
+    if (!_continuousModeActive || _restartingEndpoints) return;
+    if (_pendingEndpointId != null) return;
+
+    final associations = await _security.getAllAssociations();
+    if (associations.isEmpty) return;
+
+    try {
+      await _nearby.stopDiscovery();
+      await _nearby.startDiscovery(
+        _syncPrefix,
+        Strategy.P2P_CLUSTER,
+        onEndpointFound: (endpointId, name, serviceId) {
+          if (!name.startsWith(_syncPrefix)) return;
+          final deviceId = _extractDeviceId(name);
+          if (deviceId == null) return;
+
+          Future(() async {
+            if (_connectedEndpoints.contains(endpointId)) return;
+            if (_connectedEndpoints.length >= associations.length) return;
+            if (_pendingEndpointId != null) return;
+
+            final assoc = await _security.getAssociation(deviceId);
+            if (assoc != null && assoc.isValid) {
+              _pendingEndpointId = endpointId;
+              await _nearby.requestConnection(
+                '$_syncPrefix${assoc.deviceId}',
                 endpointId,
                 onConnectionInitiated: _onConnectionInitiated,
                 onConnectionResult: _onConnectionResult,
@@ -195,6 +290,70 @@ class P2PSyncService {
         serviceId: _serviceId,
       );
     } catch (_) {}
+  }
+
+  void _watchLocalChanges() {
+    _hiveBoxesSub?.cancel();
+    final controllers = <StreamController<BoxEvent>>[];
+    for (final boxName in HiveSyncEngine.syncableBoxes.keys) {
+      try {
+        final box = Hive.box<Map>(boxName);
+        final ctrl = StreamController<BoxEvent>.broadcast();
+        box.watch().listen((event) {
+          if (!ctrl.isClosed) ctrl.add(event);
+        });
+        controllers.add(ctrl);
+      } catch (_) {}
+    }
+    if (controllers.isEmpty) return;
+
+    DateTime _lastChangeEmit = DateTime.now();
+    final mergedCtrl = StreamController<BoxEvent>.broadcast();
+    for (final ctrl in controllers) {
+      ctrl.stream.listen((event) {
+        if (!mergedCtrl.isClosed) mergedCtrl.add(event);
+      });
+    }
+    _hiveBoxesSub = mergedCtrl.stream.listen((event) {
+      final now = DateTime.now();
+      if (now.difference(_lastChangeEmit).inMilliseconds >= 500) {
+        _lastChangeEmit = now;
+        _onLocalDataChanged();
+      }
+    });
+  }
+
+  Future<void> _onLocalDataChanged() async {
+    if (_connectedEndpoints.isEmpty) return;
+    if (_isSyncing) return;
+
+    final engine = HiveSyncEngine();
+    final lastSync = await engine.getLastSyncTimestamp();
+    final modified = engine.extractModifiedRecords(lastSync);
+    if (modified.isEmpty) return;
+
+    for (final endpointId in _connectedEndpoints.toList()) {
+      await _pushIncrementalSync(endpointId, modified);
+    }
+    await engine.saveLastSyncTimestamp(DateTime.now().toUtc());
+  }
+
+  Future<void> _pushIncrementalSync(
+      String endpointId, List<SyncRecord> records) async {
+    try {
+      final modifiedKeys = records
+          .map((r) => '${r.boxName}:${r.id}')
+          .toList();
+      if (modifiedKeys.isEmpty) return;
+
+      final payload = jsonEncode({
+        'type': 'p2p_sync_request',
+        'keys': modifiedKeys,
+      });
+      await _sendEncryptedPayload(endpointId, payload);
+    } catch (e) {
+      debugPrint('[P2P] Incremental push error: $e');
+    }
   }
 
   Future<void> setRole(P2PSyncRole role) async {
@@ -223,6 +382,12 @@ class P2PSyncService {
       return;
     }
 
+    _restartingEndpoints = true;
+    try {
+      await _nearby.stopAdvertising();
+      await _nearby.stopDiscovery();
+    } catch (_) {}
+
     _updateState(_state.copyWith(
       isPairingMode: true,
       status: P2PSyncStatus.pairing,
@@ -232,7 +397,7 @@ class P2PSyncService {
     try {
       final identity = await _security.getLocalIdentity();
       final displayName =
-          'CH_${identity.deviceId.length > 16 ? identity.deviceId.substring(0, 16) : identity.deviceId}';
+          '$_syncPrefix${identity.deviceId}';
 
       await _nearby.startAdvertising(
         displayName,
@@ -273,21 +438,28 @@ class P2PSyncService {
     _pairingTimeoutTimer = null;
     _pairingCompleter = null;
     _pendingEndpointId = null;
+    _restartingEndpoints = false;
     try {
       await _nearby.stopAdvertising();
       await _nearby.stopDiscovery();
-      await _nearby.stopAllEndpoints();
     } catch (_) {}
 
     _updateState(_state.copyWith(
       isPairingMode: false,
       status: P2PSyncStatus.idle,
     ));
+
+    if (_continuousModeActive) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _startAdvertising();
+        _startDiscovery();
+      });
+    }
   }
 
   void _onEndpointFound(
       String endpointId, String endpointName, String serviceId) {
-    if (!endpointName.startsWith('CH_')) return;
+    if (!endpointName.startsWith(_syncPrefix)) return;
     if (_pendingEndpointId != null) return;
 
     _pendingEndpointId = endpointId;
@@ -308,7 +480,7 @@ class P2PSyncService {
       return;
     }
 
-    if (!_state.isPairingMode) {
+    if (!_state.isPairingMode && !_continuousModeActive) {
       final deviceId = _extractDeviceId(info.endpointName);
       if (deviceId != null) {
         final association = await _security.getAssociation(deviceId);
@@ -333,6 +505,7 @@ class P2PSyncService {
   void _onConnectionResult(String endpointId, Status status) {
     if (status == Status.CONNECTED) {
       _pairingCompleter?.complete();
+      _connectedEndpoints.add(endpointId);
       _sendHandshakePayload(endpointId);
       _updateState(_state.copyWith(
         status: P2PSyncStatus.sessionEstablished,
@@ -349,6 +522,8 @@ class P2PSyncService {
   }
 
   void _onDisconnected(String endpointId) {
+    _connectedEndpoints.remove(endpointId);
+    _endpointConnIdMap.remove(endpointId);
     if (_pendingEndpointId == endpointId) {
       _pendingEndpointId = null;
     }
@@ -363,9 +538,11 @@ class P2PSyncService {
     }
   }
 
+  final Map<String, String> _endpointConnIdMap = {};
+
   String? _extractDeviceId(String endpointName) {
     try {
-      if (endpointName.startsWith('CH_')) {
+      if (endpointName.startsWith(_syncPrefix)) {
         return endpointName.substring(3);
       }
     } catch (_) {}
@@ -422,13 +599,13 @@ class P2PSyncService {
           await _handleHandshake(endpointId, decoded);
           break;
         case 'p2p_handshake_ack':
-          await _handleHandshakeAck(decoded);
+          await _handleHandshakeAck(endpointId, decoded);
           break;
         case 'p2p_auth_request':
           await _handleAuthRequest(endpointId, decoded);
           break;
         case 'p2p_auth_response':
-          await _handleAuthResponse(decoded);
+          await _handleAuthResponse(endpointId, decoded);
           break;
         case 'p2p_sync_index':
           await _handleSyncIndex(endpointId, decoded);
@@ -463,11 +640,14 @@ class P2PSyncService {
       try {
         await _nearby.disconnectFromEndpoint(endpointId);
       } catch (_) {}
+      _connectedEndpoints.remove(endpointId);
       _pendingEndpointId = null;
       return;
     }
 
+    _endpointConnIdMap[endpointId] = remoteIdentity.deviceId;
     _connectedDeviceId = remoteIdentity.deviceId;
+    _connectedEndpoints.add(endpointId);
     await _saveAssociationIfNeeded(remoteIdentity);
 
     final localIdentity = await _security.getLocalIdentity();
@@ -499,13 +679,15 @@ class P2PSyncService {
   }
 
   Future<void> _handleHandshakeAck(
-      Map<String, dynamic> message) async {
+      String endpointId, Map<String, dynamic> message) async {
     final rawPayload = message['payload'] as String?;
     if (rawPayload == null) return;
     final remoteIdentity = P2PSecurityService.parseQrPayload(rawPayload);
     if (remoteIdentity == null) return;
 
+    _endpointConnIdMap[endpointId] = remoteIdentity.deviceId;
     _connectedDeviceId = remoteIdentity.deviceId;
+    _connectedEndpoints.add(endpointId);
 
     _updateState(_state.copyWith(
       connectedFingerprint: remoteIdentity.fingerprint,
@@ -516,12 +698,38 @@ class P2PSyncService {
     if (!_isSyncing) {
       await _saveAssociationIfNeeded(remoteIdentity);
     }
+
+    final localIdentity = await _security.getLocalIdentity();
+    final iAmInitiator =
+        localIdentity.deviceId.compareTo(remoteIdentity.deviceId) < 0;
+
+    if (iAmInitiator) {
+      final authRequest = jsonEncode({
+        'type': 'p2p_auth_request',
+        'deviceId': localIdentity.deviceId,
+        'deviceName': localIdentity.deviceName,
+      });
+      await _sendEncryptedPayload(endpointId, authRequest);
+    }
   }
 
   Future<void> _saveAssociationIfNeeded(P2PIdentity remoteIdentity) async {
     try {
       final existing = await _security.getAssociation(remoteIdentity.deviceId);
-      if (existing != null) return;
+      if (existing != null) {
+        if (existing.deviceName != remoteIdentity.deviceName) {
+          final updated = P2PDeviceAssociation(
+            deviceId: existing.deviceId,
+            deviceName: remoteIdentity.deviceName,
+            publicKeyBase64: existing.publicKeyBase64,
+            fingerprint: existing.fingerprint,
+            sharedSecretBase64: existing.sharedSecretBase64,
+            associatedAt: existing.associatedAt,
+          );
+          await _security.saveAssociation(updated);
+        }
+        return;
+      }
 
       final sharedSecret = await _security.computeStaticSharedSecret(
           remoteIdentity.publicKeyBase64);
@@ -566,7 +774,7 @@ class P2PSyncService {
   }
 
   Future<void> _handleAuthResponse(
-      Map<String, dynamic> message) async {
+      String endpointId, Map<String, dynamic> message) async {
     final accepted = message['accepted'] == true;
     if (!accepted) {
       _updateState(_state.copyWith(
@@ -576,9 +784,7 @@ class P2PSyncService {
       return;
     }
 
-    if (_state.connectedDeviceId != null) {
-      await _performBidirectionalSync(_state.connectedDeviceId!);
-    }
+    await _performBidirectionalSync(endpointId);
   }
 
   Future<void> _performBidirectionalSync(String endpointId) async {
@@ -644,20 +850,25 @@ class P2PSyncService {
       _syncReceiveDone = false;
 
       if (result.success) {
-        _updateState(_state.copyWith(
-          status: P2PSyncStatus.completed,
-          lastSyncAt: result.syncTimestamp,
-          sentRecords: result.sentRecords,
-          receivedRecords: result.receivedRecords,
-        ));
+        if (_state.connectedDeviceId == endpointId) {
+          _updateState(_state.copyWith(
+            status: P2PSyncStatus.completed,
+            lastSyncAt: result.syncTimestamp,
+            sentRecords: result.sentRecords,
+            receivedRecords: result.receivedRecords,
+          ));
+        } else {
+          _updateState(_state.copyWith(
+            status: P2PSyncStatus.completed,
+            lastSyncAt: result.syncTimestamp,
+          ));
+        }
       } else {
         _updateState(_state.copyWith(
           status: P2PSyncStatus.error,
           errorMessage: result.error,
         ));
       }
-
-      _cleanupSessionAfterSync(endpointId);
     } catch (e) {
       _isSyncing = false;
       _syncSendDone = false;
@@ -670,14 +881,6 @@ class P2PSyncService {
     }
   }
 
-  Future<void> _cleanupSessionAfterSync(String endpointId) async {
-    try {
-      await _nearby.disconnectFromEndpoint(endpointId);
-    } catch (_) {}
-    _pendingEndpointId = null;
-    _connectedDeviceId = null;
-  }
-
   Future<String?> _sharedSecretForConnection() async {
     if (_connectedDeviceId == null) return null;
     return await _security.getSharedSecret(_connectedDeviceId!);
@@ -685,7 +888,14 @@ class P2PSyncService {
 
   Future<void> _sendEncryptedPayload(
       String endpointId, String plainText) async {
-    final secret = await _sharedSecretForConnection();
+    final deviceId = _endpointConnIdMap[endpointId];
+    String? secret;
+    if (deviceId != null) {
+      secret = await _security.getSharedSecret(deviceId);
+    }
+    if (secret == null) {
+      secret = await _sharedSecretForConnection();
+    }
     if (secret != null) {
       try {
         final encrypted =
@@ -837,9 +1047,11 @@ class P2PSyncService {
     _syncSendDone = true;
     _syncReceiveDone = true;
 
-    _updateState(_state.copyWith(
-      status: P2PSyncStatus.completed,
-    ));
+    if (_state.connectedDeviceId == endpointId) {
+      _updateState(_state.copyWith(
+        status: P2PSyncStatus.completed,
+      ));
+    }
   }
 
   Future<void> confirmSync() async {
@@ -894,75 +1106,30 @@ class P2PSyncService {
   }
 
   Future<void> startBackgroundSync() async {
-    _backgroundTimer?.cancel();
-    _backgroundTimer =
-        Timer.periodic(_backgroundInterval, (_) => _backgroundSyncCycle());
-    _updateState(_state.copyWith(isBackgroundSyncActive: true));
+    _startContinuousMode();
   }
 
   void stopBackgroundSync() {
-    _backgroundTimer?.cancel();
-    _backgroundTimer = null;
+    _stopContinuousMode();
     _updateState(_state.copyWith(isBackgroundSyncActive: false));
   }
 
-  Future<void> triggerManualSync() => _backgroundSyncCycle();
-
-  Future<void> _backgroundSyncCycle() async {
-    if (_isSyncing) return;
-    final associations = await _security.getAllAssociations();
-    if (associations.isEmpty) return;
-
-    final permResult =
-        await BluetoothPermissionService.checkAndRequestPermissions();
-    if (!permResult.allGranted) return;
-
-    _isSyncing = true;
-    _updateState(_state.copyWith(status: P2PSyncStatus.discovering));
-
-    try {
-      await _nearby.startDiscovery(
-        'CH_Sync',
-        Strategy.P2P_CLUSTER,
-        onEndpointFound: (endpointId, name, serviceId) {
-          if (!name.startsWith('CH_')) return;
-          final deviceId = _extractDeviceId(name);
-          if (deviceId == null) return;
-
-          Future(() async {
-            final assoc = await _security.getAssociation(deviceId);
-            if (assoc != null && assoc.isValid && _pendingEndpointId == null) {
-              _pendingEndpointId = endpointId;
-              await _nearby.requestConnection(
-                'CH_Sync',
-                endpointId,
-                onConnectionInitiated: _onConnectionInitiated,
-                onConnectionResult: _onConnectionResult,
-                onDisconnected: _onDisconnected,
-              );
-            }
-          });
-        },
-        onEndpointLost: (_) {},
-        serviceId: _serviceId,
-      );
-
-      await Future.delayed(const Duration(seconds: 15));
-      await _nearby.stopDiscovery();
-    } catch (_) {
-    } finally {
-      await _nearby.stopAllEndpoints();
-      _isSyncing = false;
-      _pendingEndpointId = null;
-      _updateState(_state.copyWith(status: P2PSyncStatus.idle));
+  Future<void> triggerManualSync() async {
+    if (_connectedEndpoints.isEmpty) {
+      _attemptKnownDeviceConnections();
+      await Future.delayed(const Duration(seconds: 3));
+    }
+    final endpoints = _connectedEndpoints.toList();
+    if (endpoints.isNotEmpty) {
+      await _performBidirectionalSync(endpoints.first);
     }
   }
 
   void dispose() {
     _pairingTimeoutTimer?.cancel();
-    _backgroundTimer?.cancel();
+    _hiveBoxesSub?.cancel();
     stopPairingMode();
-    stopBackgroundSync();
+    _stopContinuousMode();
     _stateController.close();
     _syncDataController.close();
   }

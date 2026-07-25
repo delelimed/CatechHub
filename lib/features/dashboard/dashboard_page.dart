@@ -757,46 +757,51 @@ class _QuickActionsGrid extends StatelessWidget {
       ),
     ];
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: constraints.maxWidth < 420 ? 220 : 260,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            mainAxisExtent: 68,
-          ),
-          itemCount: actions.length,
-          itemBuilder: (context, index) {
-            final item = actions[index];
-            return InkWell(
-              onTap: () => context.push(item.path),
-              borderRadius: BorderRadius.circular(16),
-              child: _Panel(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Icon(item.icon, color: iconColor),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        item.title,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: textColor,
-                        ),
-                      ),
-                    ),
-                  ],
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(child: _buildAction(context, actions[0], iconColor, textColor)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildAction(context, actions[1], iconColor, textColor)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _buildAction(context, actions[2], iconColor, textColor)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildAction(context, actions[3], iconColor, textColor)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAction(BuildContext context, _ActionItem item, Color iconColor, Color textColor) {
+    return InkWell(
+      onTap: () => context.push(item.path),
+      borderRadius: BorderRadius.circular(16),
+      child: _Panel(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(item.icon, color: iconColor),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                item.title,
+                softWrap: true,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
                 ),
               ),
-            );
-          },
-        );
-      },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

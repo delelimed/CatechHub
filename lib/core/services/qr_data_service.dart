@@ -31,6 +31,8 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
+import 'package:hive/hive.dart';
+import '../storage/local_database.dart';
 import 'encryption_service.dart';
 
 class DataShareOptions {
@@ -200,5 +202,305 @@ class QRDataService {
     }
     if (options.includeAnnotazioni) shareData['annotazioni_giornaliere'] = allData['annotazioni_giornaliere'] ?? {};
     return shareData;
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // DIFFERENTIAL SYNC — INDICE DATABASE E CONFRONTO
+  // ═════════════════════════════════════════════════════════════════════════
+
+  /// Costruisce l'indice del database locale per un sottoinsieme di moduli.
+  /// L'indice contiene per ogni record: id, updatedAt, checksum del contenuto.
+  static Map<String, dynamic> buildDatabaseIndex(DataShareOptions options) {
+    final modules = <String, Map<String, dynamic>>{};
+
+    if (options.includeAnagrafica) {
+      modules['anagrafica'] = _indexBox(LocalDatabase.students(), 'students_box');
+      modules['classi'] = _indexBox(LocalDatabase.classes(), 'classes_box');
+    }
+    if (options.includeAgenda) {
+      modules['agenda'] = _indexBox(LocalDatabase.attendance(), 'attendance_box');
+    }
+    if (options.includeProgrammazione) {
+      modules['programmazione'] = _indexBox(LocalDatabase.planning(), 'planning_box');
+    }
+    if (options.includeDocumenti) {
+      modules['documenti'] = _indexBox(LocalDatabase.documents(), 'documents_box');
+      modules['consegne_documenti'] = _indexBox(LocalDatabase.documentDeliveries(), 'document_deliveries_box');
+    }
+    if (options.includeContactNotes) {
+      modules['note_contatto'] = _indexBox(LocalDatabase.contactNotes(), 'contact_notes_box');
+    }
+    if (options.includeCatechesi) {
+      modules['catechesi'] = _indexBox(LocalDatabase.catechesi(), 'catechesi_box');
+      modules['associazioni_catechesi'] = _indexBox(LocalDatabase.meetingCatechesi(), 'meeting_catechesi_box');
+    }
+    if (options.includeAnnotazioni) {
+      modules['annotazioni'] = _indexBox(LocalDatabase.studentDailyNotes(), 'student_daily_notes_box');
+    }
+
+    return {
+      'v': 1,
+      't': DateTime.now().toUtc().toIso8601String(),
+      'm': modules,
+    };
+  }
+
+  /// Indica un singolo box Hive: per ogni record estrae id, updatedAt e checksum.
+  /// Supporta sia box Map che box con valori di altro tipo (es. List).
+  static Map<String, dynamic> _indexBox(Box box, String boxName) {
+    final records = <List<dynamic>>[];
+    String? globalLatestTs;
+
+    for (final key in box.keys) {
+      final id = key.toString();
+      final raw = box.get(key);
+      if (raw == null) continue;
+
+      String updatedAt;
+      String checksum;
+
+      if (raw is Map) {
+        final data = LocalDatabase.toStringDynamicMap(raw);
+        updatedAt = _extractUpdatedAt(data);
+        checksum = _recordChecksum(data);
+      } else {
+        updatedAt = DateTime.now().toUtc().toIso8601String();
+        checksum = sha256.convert(utf8.encode(jsonEncode(raw))).toString().substring(0, 8);
+      }
+
+      records.add([id, updatedAt, checksum]);
+
+      if (globalLatestTs == null || updatedAt.compareTo(globalLatestTs) > 0) {
+        globalLatestTs = updatedAt;
+      }
+    }
+
+    return {
+      't': globalLatestTs ?? DateTime.fromMillisecondsSinceEpoch(0).toUtc().toIso8601String(),
+      'c': records.length,
+      'r': records,
+    };
+  }
+
+  static String _extractUpdatedAt(Map<String, dynamic> data) {
+    final raw = data['updatedAt']?.toString();
+    if (raw != null) {
+      final dt = DateTime.tryParse(raw)?.toUtc();
+      if (dt != null) return dt.toIso8601String();
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0).toUtc().toIso8601String();
+  }
+
+  /// Checksum del contenuto del record (esclude campi temporali).
+  static String _recordChecksum(Map<String, dynamic> data) {
+    final normalized = Map<String, dynamic>.from(data);
+    normalized.remove('updatedAt');
+    normalized.remove('createdAt');
+    return sha256.convert(utf8.encode(jsonEncode(normalized))).toString().substring(0, 8);
+  }
+
+  /// Dato l'indice remoto [remoteIndex] e le opzioni di condivisione,
+  /// calcola la differenza e restituisce SOLO i record da aggiornare
+  /// nel formato atteso da DataExportService.importData().
+  static Future<Map<String, dynamic>> computeDiffExport(
+    Map<String, dynamic> remoteIndex,
+    DataShareOptions options,
+  ) async {
+    final remoteModules = (remoteIndex['m'] as Map<String, dynamic>?) ?? {};
+    final diff = <String, dynamic>{};
+
+    if (options.includeAnagrafica) {
+      final studentsDiff = _computeBoxDiff(remoteModules['anagrafica'], LocalDatabase.students(), 'students_box');
+      final classesDiff = _computeBoxDiff(remoteModules['classi'], LocalDatabase.classes(), 'classes_box');
+      if (studentsDiff.isNotEmpty || classesDiff.isNotEmpty) {
+        diff['anagrafica'] = {
+          if (studentsDiff.isNotEmpty) 'students': studentsDiff,
+          if (classesDiff.isNotEmpty) 'classes': classesDiff,
+        };
+      }
+    }
+
+    if (options.includeAgenda) {
+      final agendaDiff = _computeBoxDiff(remoteModules['agenda'], LocalDatabase.attendance(), 'attendance_box');
+      if (agendaDiff.isNotEmpty) {
+        diff['agenda'] = {'attendance': agendaDiff};
+      }
+    }
+
+    if (options.includeProgrammazione) {
+      final planningDiff = _computeBoxDiff(remoteModules['programmazione'], LocalDatabase.planning(), 'planning_box');
+      if (planningDiff.isNotEmpty) {
+        diff['programmazione'] = {'planning': planningDiff};
+      }
+    }
+
+    if (options.includeDocumenti) {
+      final docsDiff = _computeBoxDiff(remoteModules['documenti'], LocalDatabase.documents(), 'documents_box');
+      final deliveriesDiff = _computeBoxDiff(remoteModules['consegne_documenti'], LocalDatabase.documentDeliveries(), 'document_deliveries_box');
+      if (docsDiff.isNotEmpty || deliveriesDiff.isNotEmpty) {
+        diff['documenti'] = {
+          if (docsDiff.isNotEmpty) 'documents': docsDiff,
+          if (deliveriesDiff.isNotEmpty) 'deliveries': deliveriesDiff,
+        };
+      }
+    }
+
+    if (options.includeContactNotes) {
+      final notesDiff = _computeBoxDiff(remoteModules['note_contatto'], LocalDatabase.contactNotes(), 'contact_notes_box');
+      if (notesDiff.isNotEmpty) {
+        diff['note_contatto'] = {'notes': notesDiff};
+      }
+    }
+
+    if (options.includeCatechesi) {
+      final catechesiDiff = _computeBoxDiff(remoteModules['catechesi'], LocalDatabase.catechesi(), 'catechesi_box');
+      if (catechesiDiff.isNotEmpty) {
+        diff['catechesi'] = {'catechesi': catechesiDiff};
+      }
+      final assocDiff = _computeSimpleBoxDiff(remoteModules['associazioni_catechesi'], LocalDatabase.meetingCatechesi());
+      if (assocDiff.isNotEmpty) {
+        diff['associazioni_catechesi'] = {'associazioni': assocDiff};
+      }
+    }
+
+    if (options.includeAnnotazioni) {
+      final annotDiff = _computeBoxDiff(remoteModules['annotazioni'], LocalDatabase.studentDailyNotes(), 'student_daily_notes_box');
+      if (annotDiff.isNotEmpty) {
+        diff['annotazioni_giornaliere'] = {'notes': annotDiff};
+      }
+    }
+
+    return diff;
+  }
+
+  /// Confronta i record locali con l'indice remoto e restituisce
+  /// la lista dei record locali che sono nuovi o più aggiornati.
+  static List<Map<String, dynamic>> _computeBoxDiff(
+    dynamic remoteModuleData,
+    Box<Map> localBox,
+    String boxName,
+  ) {
+    if (remoteModuleData == null) {
+      // Il modulo non esiste nel remoto: invia TUTTI i record locali
+      return _allLocalRecords(localBox);
+    }
+
+    final remoteRecords = _parseRemoteRecords(remoteModuleData);
+    final needed = <Map<String, dynamic>>[];
+
+    for (final key in localBox.keys) {
+      final id = key.toString();
+      final raw = localBox.get(key);
+      if (raw == null) continue;
+      final data = LocalDatabase.toStringDynamicMap(raw);
+      final localUpdatedAt = _extractUpdatedAt(data);
+      final localChecksum = _recordChecksum(data);
+
+      final remote = remoteRecords[id];
+      if (remote == null) {
+        // Record non presente nel remoto → invia
+        final record = Map<String, dynamic>.from(data);
+        record['id'] = id;
+        needed.add(record);
+      } else {
+        final remoteTs = remote['ts'] as String;
+        final remoteChecksum = remote['cs'] as String;
+        if (localUpdatedAt.compareTo(remoteTs) > 0) {
+          // Locale più recente → invia
+          final record = Map<String, dynamic>.from(data);
+          record['id'] = id;
+          needed.add(record);
+        } else if (localUpdatedAt == remoteTs && localChecksum != remoteChecksum) {
+          // Stesso timestamp ma checksum diverso → invia (conflitto, vince locale)
+          final record = Map<String, dynamic>.from(data);
+          record['id'] = id;
+          needed.add(record);
+        }
+        // else: record identico o remoto più recente → salta
+      }
+    }
+
+    return needed;
+  }
+
+  /// Confronta record in un box non-Map (es. meetingCatechesi con valori List).
+  static List<Map<String, dynamic>> _computeSimpleBoxDiff(
+    dynamic remoteModuleData,
+    Box localBox,
+  ) {
+    if (remoteModuleData == null) {
+      final all = <Map<String, dynamic>>[];
+      for (final key in localBox.keys) {
+        final val = localBox.get(key);
+        if (val != null) {
+          all.add({'meetingId': key.toString(), 'catechesiIds': val is List ? val : []});
+        }
+      }
+      return all;
+    }
+
+    final remoteRecords = _parseRemoteRecords(remoteModuleData);
+    final needed = <Map<String, dynamic>>[];
+
+    for (final key in localBox.keys) {
+      final id = key.toString();
+      final raw = localBox.get(key);
+      if (raw == null) continue;
+
+      final localChecksum = sha256.convert(utf8.encode(jsonEncode(raw))).toString().substring(0, 8);
+      final remote = remoteRecords[id];
+
+      if (remote == null) {
+        needed.add({'meetingId': id, 'catechesiIds': raw is List ? raw : []});
+      } else if (remote['cs'] != localChecksum) {
+        needed.add({'meetingId': id, 'catechesiIds': raw is List ? raw : []});
+      }
+    }
+
+    return needed;
+  }
+
+  /// Estrae TUTTI i record da un box (usato quando il remoto non ha il modulo).
+  static List<Map<String, dynamic>> _allLocalRecords(Box<Map> box) {
+    final records = <Map<String, dynamic>>[];
+    for (final key in box.keys) {
+      final raw = box.get(key);
+      if (raw == null) continue;
+      final data = LocalDatabase.toStringDynamicMap(raw);
+      data['id'] = key.toString();
+      records.add(data);
+    }
+    return records;
+  }
+
+  /// Converte l'indice remoto in una mappa id → {ts, cs} per confronto veloce.
+  static Map<String, Map<String, String>> _parseRemoteRecords(dynamic moduleData) {
+    final result = <String, Map<String, String>>{};
+    if (moduleData is! Map) return result;
+    final recordsList = (moduleData['r'] as List<dynamic>?) ?? [];
+    for (final entry in recordsList) {
+      if (entry is List && entry.length >= 3) {
+        result[entry[0].toString()] = {
+          'ts': entry[1].toString(),
+          'cs': entry[2].toString(),
+        };
+      }
+    }
+    return result;
+  }
+
+  /// Serializza l'indice in chunk QR (ritorna mappe per compatibilità con compute).
+  static List<Map<String, dynamic>> serializeIndexToChunks(Map<String, dynamic> indexMap) {
+    final compressed = compressData(indexMap);
+    final segments = segmentData(compressed);
+    return segments.asMap().entries.map(
+      (entry) => createQRChunk(entry.value, entry.key, segments.length).toMap(),
+    ).toList();
+  }
+
+  /// Deserializza una lista di chunk QR in una mappa indice.
+  static Map<String, dynamic> deserializeIndexFromChunks(List<QRChunk> chunks) {
+    final assembled = assembleChunks(chunks);
+    return decompressData(assembled);
   }
 }

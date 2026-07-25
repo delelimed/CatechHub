@@ -46,6 +46,12 @@ class ContactNote {
   /// Nome del catechista che ha modificato per ultimo questo record.
   final String lastModifiedBy;
 
+  /// Timestamp di creazione (UTC, ISO 8601).
+  final DateTime createdAt;
+
+  /// Timestamp dell'ultima modifica (UTC, ISO 8601).
+  final DateTime updatedAt;
+
   ContactNote({
     required this.id,
     required this.studentId,
@@ -53,7 +59,10 @@ class ContactNote {
     required this.medium,
     required this.notes,
     this.lastModifiedBy = '',
-  });
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  })  : createdAt = createdAt ?? DateTime.now(),
+        updatedAt = updatedAt ?? DateTime.now();
 
   factory ContactNote.fromMap(String id, Map<String, dynamic> data) {
     return ContactNote(
@@ -64,6 +73,8 @@ class ContactNote {
       medium: data['medium'] ?? 'de_visu',
       notes: data['notes'] ?? '',
       lastModifiedBy: data['lastModifiedBy'] ?? '',
+      createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
+      updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
     );
   }
 
@@ -74,6 +85,8 @@ class ContactNote {
       'medium': medium,
       'notes': notes,
       'lastModifiedBy': lastModifiedBy,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
     };
   }
 

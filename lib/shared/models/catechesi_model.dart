@@ -57,6 +57,9 @@ class Catechesi {
   /// Timestamp dell'ultima modifica (UTC, ISO 8601).
   final DateTime updatedAt;
 
+  /// Nome del catechista che ha modificato per ultimo questo record.
+  final String lastModifiedBy;
+
   Catechesi({
     required this.id,
     required this.title,
@@ -67,6 +70,7 @@ class Catechesi {
     required this.description,
     required this.createdAt,
     required this.updatedAt,
+    this.lastModifiedBy = '',
   });
 
   Catechesi copyWith({
@@ -79,6 +83,7 @@ class Catechesi {
     String? description,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? lastModifiedBy,
   }) {
     return Catechesi(
       id: id ?? this.id,
@@ -90,6 +95,7 @@ class Catechesi {
       description: description ?? this.description,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      lastModifiedBy: lastModifiedBy ?? this.lastModifiedBy,
     );
   }
 
@@ -103,6 +109,7 @@ class Catechesi {
       'description': description,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
+      'lastModifiedBy': lastModifiedBy,
     };
   }
 
@@ -117,6 +124,7 @@ class Catechesi {
       description: data['description'] ?? '',
       createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
       updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+      lastModifiedBy: data['lastModifiedBy'] ?? '',
     );
   }
 }

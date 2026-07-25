@@ -62,6 +62,12 @@ class PlanningMeeting {
   /// Nome del catechista che ha modificato per ultimo questo record.
   final String lastModifiedBy;
 
+  /// Timestamp di creazione (UTC, ISO 8601).
+  final DateTime createdAt;
+
+  /// Timestamp dell'ultima modifica (UTC, ISO 8601).
+  final DateTime updatedAt;
+
   PlanningMeeting({
     required this.id,
     required this.classId,
@@ -73,7 +79,10 @@ class PlanningMeeting {
     required this.notes,
     this.isReunion = false,
     this.lastModifiedBy = '',
-  });
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  })  : createdAt = createdAt ?? DateTime.now(),
+        updatedAt = updatedAt ?? DateTime.now();
 
   PlanningMeeting copyWith({
     String? id,
@@ -86,6 +95,8 @@ class PlanningMeeting {
     String? notes,
     bool? isReunion,
     String? lastModifiedBy,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return PlanningMeeting(
       id: id ?? this.id,
@@ -98,6 +109,8 @@ class PlanningMeeting {
       notes: notes ?? this.notes,
       isReunion: isReunion ?? this.isReunion,
       lastModifiedBy: lastModifiedBy ?? this.lastModifiedBy,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -112,6 +125,8 @@ class PlanningMeeting {
       'notes': notes,
       'isReunion': isReunion,
       'lastModifiedBy': lastModifiedBy,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
     };
   }
 
@@ -132,6 +147,8 @@ class PlanningMeeting {
       notes: data['notes'] ?? data['publicNotes'] ?? '',
       isReunion: data['isReunion'] == true,
       lastModifiedBy: data['lastModifiedBy'] ?? '',
+      createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
+      updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
     );
   }
 }

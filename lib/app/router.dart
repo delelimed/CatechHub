@@ -17,6 +17,7 @@ import '../features/planning/planning_page.dart';
 import '../features/documents/documents_page.dart';
 import '../features/settings/settings_page.dart';
 import '../features/contact_notes/contact_notes_page.dart';
+import '../features/contact_notes/avvisi_page.dart' show AvvisiPage;
 
 import '../features/settings/licenses_page.dart';
 import '../features/settings/changelog_page.dart';
@@ -28,6 +29,7 @@ import '../features/onboarding/presentation/screens/onboarding_page.dart';
 import '../core/storage/local_database.dart';
 import '../features/settings/backup_page.dart';
 import '../features/settings/delete_data_page.dart';
+import '../features/settings/pdf_report_page.dart';
 import '../features/documents/document_detail_page.dart';
 import '../features/students/allergies_page.dart';
 import '../features/students/autonomous_exits_page.dart';
@@ -439,6 +441,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       /// Pagina di backup e ripristino dati: esporta/importa backup cifrati.
       GoRoute(path: '/backup', builder: (context, state) => const BackupPage()),
 
+      /// Pagina di esportazione report PDF (in sviluppo).
+      GoRoute(
+        path: '/pdf-report',
+        builder: (context, state) => const PdfReportPage(),
+      ),
+
       // ═══════════════════════════════════════════════════════════════════
       // CONTACT NOTES - Note di contatto genitori
       // ═══════════════════════════════════════════════════════════════════
@@ -448,6 +456,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/contact-notes',
         builder: (context, state) => const ContactNotesPage(),
+      ),
+
+      /// Gestione avvisi e messaggi standard per genitori.
+      GoRoute(
+        path: '/avvisi',
+        builder: (context, state) => const AvvisiPage(),
       ),
 
       // ═══════════════════════════════════════════════════════════════════

@@ -22,15 +22,17 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
 
   bool _notificationGranted = false;
   bool _cameraGranted = false;
+  bool _locationGranted = false;
   bool _bluetoothGranted = false;
 
   bool _notificationRequested = false;
   bool _cameraRequested = false;
+  bool _locationRequested = false;
   bool _bluetoothRequested = false;
 
   String? _errorMessage;
 
-  static const _totalPages = 8;
+  static const _totalPages = 9;
 
   @override
   void dispose() {
@@ -79,6 +81,25 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       if (mounted) await _showSettingsDialog(
         'Fotocamera non autorizzata',
         'Per scansionare i codici QR di associazione o condivisione offline, attiva la fotocamera dalle impostazioni del dispositivo.',
+      );
+    }
+  }
+
+  Future<void> _requestLocationPermission() async {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _locationRequested = true;
+      _errorMessage = null;
+    });
+
+    final status = await Permission.locationWhenInUse.request();
+    if (status.isGranted || status.isLimited) {
+      setState(() => _locationGranted = true);
+    } else if (status.isPermanentlyDenied || status.isRestricted) {
+      if (mounted) await _showSettingsDialog(
+        'Posizione non autorizzata',
+        'Per la sincronizzazione Bluetooth tra catechisti, autorizza la posizione dalle impostazioni del dispositivo. '
+        'CatechHub non usa la tua posizione per geolocalizzazione.',
       );
     }
   }
@@ -173,6 +194,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                   _buildDataSensitivityPage(),
                   _buildNotificationPermissionPage(),
                   _buildCameraPermissionPage(),
+                  _buildLocationPermissionPage(),
                   _buildBluetoothPermissionPage(),
                   _buildReadyPage(),
                   _buildLegalDisclaimerPage(),
@@ -214,7 +236,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     if (index == 0 || index == 1 || index == 2 || index == _totalPages - 1) return 0;
     if (index == 3 && _notificationGranted) return 1;
     if (index == 4 && _cameraGranted) return 1;
-    if (index == 5 && _bluetoothGranted) return 1;
+    if (index == 5 && _locationGranted) return 1;
+    if (index == 6 && _bluetoothGranted) return 1;
     return index < _currentPage ? -1 : 0;
   }
 
@@ -584,7 +607,86 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     );
   }
 
-  // ─── PAGE 5: CONNESSIONE PERMISSION ────────────────────────────────
+  // ─── PAGE 6: LOCATION PERMISSION ────────────────────────────────
+
+  Widget _buildLocationPermissionPage() {
+    return _buildPageContainer(
+      Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const SizedBox(height: 40),
+          Icon(
+            _locationGranted ? Icons.check_circle_rounded : Icons.location_on_rounded,
+            size: 80,
+            color: _locationGranted ? Colors.green : const Color(0xFF174A7E),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Permesso: Posizione',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 6))],
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'A cosa serve:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF174A7E)),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Il permesso di posizione è richiesto da Android per la sincronizzazione Bluetooth '
+                  'tra catechisti (Nearby Connections).',
+                  style: TextStyle(fontSize: 14, color: Colors.black87, height: 1.5),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Perché ne abbiamo bisogno:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF174A7E)),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'CatechHub NON usa la tua posizione per geolocalizzazione. '
+                  'Android richiede questo permesso per permettere all\'app di rilevare e connettersi '
+                  'ad altri dispositivi nelle vicinanze tramite Bluetooth. '
+                  'La posizione non viene mai salvata, trasmessa o condivisa.',
+                  style: TextStyle(fontSize: 14, color: Colors.black87, height: 1.5),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
+          if (!_locationGranted)
+            _buildPermissionButton(
+              'Attiva posizione',
+              _requestLocationPermission,
+              _locationRequested,
+            )
+          else
+            _buildGrantedBadge(),
+          const SizedBox(height: 24),
+          if (_locationGranted || _locationRequested)
+            _buildNextButton('Continua')
+          else
+            Text(
+              'Puoi saltare e attivare la posizione più tardi dalle Impostazioni.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+            ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  // ─── PAGE 7: CONNESSIONE PERMISSION ────────────────────────────────
 
   Widget _buildBluetoothPermissionPage() {
     return _buildPageContainer(
@@ -665,8 +767,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   // ─── PAGE 6: READY ─────────────────────────────────────────────────
 
   Widget _buildReadyPage() {
-    final allGranted = _notificationGranted && _cameraGranted && _bluetoothGranted;
-    final someSkipped = !_notificationGranted || !_cameraGranted || !_bluetoothGranted;
+    final allGranted = _notificationGranted && _cameraGranted && _locationGranted && _bluetoothGranted;
+    final someSkipped = !_notificationGranted || !_cameraGranted || !_locationGranted || !_bluetoothGranted;
 
     return _buildPageContainer(
       Column(
@@ -696,6 +798,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                 _buildPermissionSummary('Notifiche', _notificationGranted),
                 const SizedBox(height: 8),
                 _buildPermissionSummary('Fotocamera', _cameraGranted),
+                const SizedBox(height: 8),
+                _buildPermissionSummary('Posizione', _locationGranted),
                 const SizedBox(height: 8),
                 _buildPermissionSummary('Connessione', _bluetoothGranted),
               ],

@@ -29,6 +29,9 @@ class _SettingsAssociationScreenState
   String? _qrData;
   String? _errorMessage;
   MobileScannerController? _scannerController;
+  bool _qrScanJustCompleted = false;
+  String? _lastScannedDeviceName;
+  Timer? _reciprocalCheckTimer;
 
   @override
   void initState() {
@@ -46,6 +49,7 @@ class _SettingsAssociationScreenState
   void dispose() {
     _stopPairingMode();
     _stopScanner();
+    _reciprocalCheckTimer?.cancel();
     super.dispose();
   }
 
@@ -117,6 +121,8 @@ class _SettingsAssociationScreenState
     setState(() {
       _showScanner = true;
       _errorMessage = null;
+      _qrScanJustCompleted = false;
+      _lastScannedDeviceName = null;
     });
     _startScanner();
   }
@@ -175,9 +181,33 @@ class _SettingsAssociationScreenState
 
         if (mounted) {
           setState(() {
-            _errorMessage =
-                'Associazione completata con ${remoteIdentity.deviceName}';
+            _qrScanJustCompleted = true;
+            _lastScannedDeviceName = remoteIdentity.deviceName;
+            _errorMessage = 'Associazione salvata: ${remoteIdentity.deviceName}';
           });
+        }
+
+        _startReciprocalCheck(remoteIdentity.deviceId);
+
+        if (mounted) {
+          await showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Associazione salvata!'),
+              content: Text(
+                'Ora mostra il tuo QR all\'altro dispositivo (${remoteIdentity.deviceName}) '
+                'affinché possa completare l\'associazione reciproca.\n\n'
+                'L\'altro catechista deve scansionare il tuo QR usando il pulsante '
+                '"Scansiona QR partner".',
+              ),
+              actions: [
+                FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('Ok, mostra il mio QR'),
+                ),
+              ],
+            ),
+          );
         }
       } catch (e) {
         if (mounted) {
@@ -187,6 +217,32 @@ class _SettingsAssociationScreenState
 
       return;
     }
+  }
+
+  void _startReciprocalCheck(String scannedDeviceId) {
+    _reciprocalCheckTimer?.cancel();
+    final initialCount = _associations.length;
+    _reciprocalCheckTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      final current = await _security.getAllAssociations();
+      if (current.length > initialCount) {
+        timer.cancel();
+        if (mounted) {
+          setState(() {
+            _associations = current;
+            _qrScanJustCompleted = false;
+            _errorMessage = 'Associazione reciproca completata!';
+          });
+        }
+      }
+    });
+
+    Future.delayed(const Duration(seconds: 30), () {
+      _reciprocalCheckTimer?.cancel();
+    });
   }
 
   Future<void> _refreshAssociations() async {
@@ -375,7 +431,10 @@ class _SettingsAssociationScreenState
           children: [
             Row(
               children: [
-                Icon(Icons.qr_code_2, color: colorScheme.primary),
+                Icon(
+                  _qrScanJustCompleted ? Icons.check_circle : Icons.qr_code_2,
+                  color: _qrScanJustCompleted ? Colors.green : colorScheme.primary,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'Il mio codice QR',
@@ -386,6 +445,28 @@ class _SettingsAssociationScreenState
               ],
             ),
             const SizedBox(height: 16),
+            if (_qrScanJustCompleted && _lastScannedDeviceName != null)
+              Container(
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green[700], size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Hai salvato $_lastScannedDeviceName. Ora mostra questo QR all\'altro dispositivo.',
+                        style: TextStyle(fontSize: 13, color: Colors.green[800]),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             if (_qrData != null)
               Container(
                 padding: const EdgeInsets.all(16),
@@ -714,8 +795,10 @@ class _SettingsAssociationScreenState
           children: [
             Row(
               children: [
-                Icon(Icons.qr_code_scanner,
-                    color: theme.colorScheme.primary),
+                Icon(_qrScanJustCompleted
+                    ? Icons.check_circle_outline
+                    : Icons.qr_code_scanner,
+                    color: _qrScanJustCompleted ? Colors.green : theme.colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(
                   'Scansiona QR partner',
@@ -725,6 +808,29 @@ class _SettingsAssociationScreenState
                 ),
               ],
             ),
+            const SizedBox(height: 8),
+            if (_qrScanJustCompleted)
+              Container(
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Associazione salvata. Ora chiedi all\'altro catechista di scansionare il tuo QR.',
+                        style: TextStyle(fontSize: 13, color: Colors.blue[800]),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             const SizedBox(height: 12),
             if (_showScanner && _scannerController != null)
               SizedBox(

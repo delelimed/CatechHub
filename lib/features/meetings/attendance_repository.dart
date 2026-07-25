@@ -45,12 +45,21 @@ class AttendanceRepository {
     required Map<String, String> presence,
   }) async {
     final catechistName = getCurrentCatechistName();
+    final now = DateTime.now();
+    final existing = _box.get(meetingId);
+    String? existingCreatedAt;
+    if (existing != null) {
+      final map = LocalDatabase.toStringDynamicMap(existing);
+      existingCreatedAt = map['createdAt']?.toString();
+    }
     await _box.put(meetingId, {
       'meetingId': meetingId,
       'date': date.toIso8601String(),
       'classId': classId,
       'presence': presence,
       'lastModifiedBy': catechistName,
+      'createdAt': existingCreatedAt ?? now.toIso8601String(),
+      'updatedAt': now.toIso8601String(),
     });
   }
 }

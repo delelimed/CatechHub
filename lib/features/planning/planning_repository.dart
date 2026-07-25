@@ -59,8 +59,12 @@ class PlanningRepository {
     }
 
     final id = m.id.isEmpty ? LocalDatabase.newId('meeting') : m.id;
+    final catechistName = getCurrentCatechistName();
+    final now = DateTime.now();
     final data = m.toMap();
-    data['lastModifiedBy'] = getCurrentCatechistName();
+    data['lastModifiedBy'] = catechistName;
+    data['createdAt'] = now.toIso8601String();
+    data['updatedAt'] = now.toIso8601String();
     await _box.put(id, data);
 
     // Sincronizza con le notifiche
@@ -78,8 +82,16 @@ class PlanningRepository {
       throw Exception(_sameDayError(m.isReunion));
     }
 
+    final existingData = _box.get(id);
+    String? existingCreatedAt;
+    if (existingData != null) {
+      final map = LocalDatabase.toStringDynamicMap(existingData);
+      existingCreatedAt = map['createdAt']?.toString();
+    }
     final data = m.toMap();
     data['lastModifiedBy'] = getCurrentCatechistName();
+    data['createdAt'] = existingCreatedAt ?? data['createdAt'];
+    data['updatedAt'] = DateTime.now().toIso8601String();
     await _box.put(id, data);
 
     // Sincronizza con le notifiche

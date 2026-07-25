@@ -127,7 +127,7 @@ class HiveSyncEngine {
   factory HiveSyncEngine() => _instance;
   HiveSyncEngine._();
 
-  static const _syncableBoxes = {
+  static const syncableBoxes = {
     LocalDatabase.studentsBox: 'students',
     LocalDatabase.classesBox: 'classes',
     LocalDatabase.planningBox: 'planning',
@@ -169,7 +169,7 @@ class HiveSyncEngine {
   List<SyncIndexEntry> buildLocalIndex() {
     final index = <SyncIndexEntry>[];
 
-    for (final entry in _syncableBoxes.entries) {
+    for (final entry in syncableBoxes.entries) {
       final boxName = entry.key;
       try {
         final box = Hive.box<Map>(boxName);
@@ -199,7 +199,7 @@ class HiveSyncEngine {
   List<SyncRecord> extractModifiedRecords(DateTime since) {
     final records = <SyncRecord>[];
 
-    for (final entry in _syncableBoxes.entries) {
+    for (final entry in syncableBoxes.entries) {
       final boxName = entry.key;
       try {
         final box = Hive.box<Map>(boxName);
@@ -298,7 +298,7 @@ class HiveSyncEngine {
     var conflictsResolved = 0;
 
     for (final remote in records) {
-      if (!_syncableBoxes.containsKey(remote.boxName)) continue;
+      if (!syncableBoxes.containsKey(remote.boxName)) continue;
 
       try {
         final box = Hive.box<Map>(remote.boxName);

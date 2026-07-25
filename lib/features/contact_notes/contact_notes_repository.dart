@@ -43,8 +43,18 @@ class ContactNotesRepository {
   /// Se l'ID è vuoto, ne genera uno automaticamente.
   Future<void> addNote(ContactNote note) async {
     final id = note.id.isEmpty ? LocalDatabase.newId('contact_note') : note.id;
+    final catechistName = getCurrentCatechistName();
+    final now = DateTime.now();
+    final existing = _box.get(id);
+    String? existingCreatedAt;
+    if (existing != null) {
+      final map = LocalDatabase.toStringDynamicMap(existing);
+      existingCreatedAt = map['createdAt']?.toString();
+    }
     final data = note.toMap();
-    data['lastModifiedBy'] = getCurrentCatechistName();
+    data['lastModifiedBy'] = catechistName;
+    data['createdAt'] = existingCreatedAt ?? now.toIso8601String();
+    data['updatedAt'] = now.toIso8601String();
     await _box.put(id, data);
   }
 

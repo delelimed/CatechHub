@@ -207,14 +207,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: isLandscape ? 600 : 430),
+                constraints: BoxConstraints(maxWidth: isLandscape ? 760 : 430),
                 child: Card(
                   elevation: 12,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(32),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(28),
+                    padding: EdgeInsets.all(isLandscape ? 40 : 28),
                     child: isLandscape
                         ? Row(
                             mainAxisSize: MainAxisSize.min,
@@ -227,27 +227,27 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                   children: [
                                     Image.asset(
                                       'assets/images/logo.png',
-                                      height: 100,
+                                      height: isLandscape ? 140 : 100,
                                       errorBuilder: (_, __, ___) =>
                                           const Icon(Icons.menu_book, size: 80),
                                     ),
                                     const SizedBox(height: 12),
-                                    const Text(
+                                    Text(
                                       'CatechHub',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
-                                        fontSize: 22,
+                                        fontSize: isLandscape ? 28 : 22,
                                         fontWeight: FontWeight.bold,
-                                        color: Color(0xFF174A7E),
+                                        color: const Color(0xFF174A7E),
                                       ),
                                     ),
                                     const SizedBox(height: 14),
                                     Text(
                                       '"${randomQuote.text}"',
                                       textAlign: TextAlign.center,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontStyle: FontStyle.italic,
-                                        fontSize: 13,
+                                        fontSize: isLandscape ? 15 : 13,
                                         color: Colors.grey,
                                       ),
                                     ),
@@ -261,13 +261,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     if (_isFirstSetup) ...[
-                                      _buildFirstSetupForm(isLoading),
+                                      _buildFirstSetupForm(isLoading, isLandscape),
                                     ] else if (!_checkedLockScreen) ...[
                                       _buildCheckingLockScreen(),
                                     ] else if (!_hasSecureLockScreen) ...[
                                       const HardLockScreen(),
                                     ] else ...[
-                                      _buildUnlockForm(isLoading),
+                                      _buildUnlockForm(isLoading, isLandscape),
                                     ],
                                     const SizedBox(height: 20),
                                     const Text(
@@ -316,14 +316,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
                               // Contenuto dinamico in base allo stato
                               if (_isFirstSetup) ...[
-                                _buildFirstSetupForm(isLoading),
+                                _buildFirstSetupForm(isLoading, isLandscape),
                               ] else if (!_checkedLockScreen) ...[
                                 _buildCheckingLockScreen(),
                               ] else if (!_hasSecureLockScreen) ...[
                                 // HARD LOCK SCREEN - Non chiudibile, non bypassabile
                                 const HardLockScreen(),
                               ] else ...[
-                                _buildUnlockForm(isLoading),
+                                _buildUnlockForm(isLoading, isLandscape),
                               ],
 
                               const SizedBox(height: 20),
@@ -393,7 +393,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     );
   }
 
-  Widget _buildFirstSetupForm(bool isLoading) {
+  Widget _buildFirstSetupForm(bool isLoading, bool isLandscape) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -405,22 +405,23 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           ),
         ),
         const SizedBox(height: 8),
-        const Text(
+        Text(
           'L\'app usa il blocco schermo del tuo telefono (impronta, volto, PIN) '
           'per proteggere i dati. Non serve creare un PIN separato.',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 12, color: Colors.grey),
+          style: TextStyle(fontSize: isLandscape ? 13 : 12, color: Colors.grey),
         ),
         const SizedBox(height: 24),
         if (!isLoading) ...[
-          _buildTextField(_firstNameController, 'Nome', Icons.person),
+          _buildTextField(_firstNameController, 'Nome', Icons.person, isLandscape),
           const SizedBox(height: 12),
-          _buildTextField(_lastNameController, 'Cognome', Icons.person_outline),
+          _buildTextField(_lastNameController, 'Cognome', Icons.person_outline, isLandscape),
           const SizedBox(height: 12),
           _buildTextField(
             _groupController,
             'Gruppo / Parrocchia',
             Icons.groups,
+            isLandscape,
           ),
           const SizedBox(height: 20),
           ElevatedButton(
@@ -428,14 +429,17 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF174A7E),
               foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 50),
+              minimumSize: Size(double.infinity, isLandscape ? 56 : 50),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
             ),
-            child: const Text(
+            child: Text(
               'Crea profilo e accedi',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: isLandscape ? 17 : 16,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -443,7 +447,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     );
   }
 
-  Widget _buildUnlockForm(bool isLoading) {
+  Widget _buildUnlockForm(bool isLoading, bool isLandscape) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -472,10 +476,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           ),
         ),
         const SizedBox(height: 8),
-        const Text(
+        Text(
           'Usa l\'impronta digitale, il riconoscimento facciale o il PIN del telefono.',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, color: Colors.grey),
+          style: TextStyle(fontSize: isLandscape ? 14 : 13, color: Colors.grey),
         ),
         const SizedBox(height: 24),
         ElevatedButton.icon(
@@ -485,16 +489,22 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            padding: EdgeInsets.symmetric(
+              horizontal: isLandscape ? 28 : 24,
+              vertical: isLandscape ? 24 : 20,
+            ),
             minimumSize: const Size(double.infinity, 0),
             maximumSize: const Size(double.infinity, 80),
           ),
           onPressed: isLoading ? null : _handleBiometricUnlock,
-          icon: const Icon(Icons.fingerprint, size: 28),
+          icon: Icon(Icons.fingerprint, size: isLandscape ? 32 : 28),
           label: Text(
             'Accedi con impronta / volto / PIN telefono',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontSize: isLandscape ? 15 : 14,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
         if (isLoading) ...[
@@ -508,8 +518,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Widget _buildTextField(
     TextEditingController controller,
     String label,
-    IconData icon,
-  ) {
+    IconData icon, [
+    bool isLandscape = false,
+  ]) {
     return TextField(
       controller: controller,
       decoration: InputDecoration(
@@ -521,9 +532,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         ),
         filled: true,
         fillColor: const Color(0xFF174A7E).withValues(alpha: 0.05),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 16,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: isLandscape ? 24 : 20,
+          vertical: isLandscape ? 20 : 16,
         ),
       ),
     );

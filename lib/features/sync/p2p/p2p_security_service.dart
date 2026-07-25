@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:hive/hive.dart';
 
 class P2PIdentity {
   final String deviceId;
@@ -233,6 +234,13 @@ class P2PSecurityService {
 
   Future<String> _getDeviceDisplayName() async {
     try {
+      final authBox = Hive.box('registroBox');
+      final name = authBox.get('local_user_name');
+      if (name != null && name.toString().trim().isNotEmpty) {
+        return name.toString().trim();
+      }
+    } catch (_) {}
+    try {
       const prefs = FlutterSecureStorage();
       final name = await prefs.read(key: 'device_display_name');
       if (name != null && name.trim().isNotEmpty) {
@@ -245,6 +253,25 @@ class P2PSecurityService {
   String _randomHex(int length) {
     final random = Random.secure();
     return List.generate(length, (_) => random.nextInt(16).toRadixString(16)).join();
+  }
+
+  Future<void> refreshIdentityName() async {
+    try {
+      final identity = await getLocalIdentity();
+      final newName = await _getDeviceDisplayName();
+      if (identity.deviceName != newName) {
+        final updated = P2PIdentity(
+          deviceId: identity.deviceId,
+          deviceName: newName,
+          publicKeyBase64: identity.publicKeyBase64,
+          fingerprint: identity.fingerprint,
+        );
+        await _secureStorage.write(
+          key: _localIdentityKey,
+          value: jsonEncode(updated.toJson()),
+        );
+      }
+    } catch (_) {}
   }
 
   Future<String> getPublicKeyBase64() async {

@@ -71,6 +71,12 @@ class Student {
   /// Nome del catechista che ha modificato per ultimo questo record.
   final String lastModifiedBy;
 
+  /// Timestamp di creazione (UTC, ISO 8601).
+  final DateTime createdAt;
+
+  /// Timestamp dell'ultima modifica (UTC, ISO 8601).
+  final DateTime updatedAt;
+
   Student({
     required this.id,
     required this.name,
@@ -88,7 +94,10 @@ class Student {
     this.autonomousExits,
     this.notes,
     this.lastModifiedBy = '',
-  });
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  })  : createdAt = createdAt ?? DateTime.now(),
+        updatedAt = updatedAt ?? DateTime.now();
 
   /// Deserializza da Map (proveniente da Hive o da sync CRDT).
   /// I campi mancanti defaultano a stringa vuota o DateTime.now().
@@ -111,6 +120,8 @@ class Student {
       autonomousExits: data['autonomousExits'],
       notes: data['notes'],
       lastModifiedBy: data['lastModifiedBy'] ?? '',
+      createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
+      updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
     );
   }
 
@@ -148,6 +159,8 @@ class Student {
     String? autonomousExits,
     String? notes,
     String? lastModifiedBy,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return Student(
       id: id ?? this.id,
@@ -166,6 +179,8 @@ class Student {
       autonomousExits: autonomousExits ?? this.autonomousExits,
       notes: notes ?? this.notes,
       lastModifiedBy: lastModifiedBy ?? this.lastModifiedBy,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -188,6 +203,8 @@ class Student {
       'autonomousExits': autonomousExits,
       'notes': notes,
       'lastModifiedBy': lastModifiedBy,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
     };
   }
 }

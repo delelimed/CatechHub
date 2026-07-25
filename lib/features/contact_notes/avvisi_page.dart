@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:share_plus/share_plus.dart';
-
 import '../../shared/models/avviso_template_model.dart';
+import '../../shared/models/contact_note_model.dart';
+import '../../shared/models/planning_meeting.dart';
+import '../../shared/models/student_model.dart';
+import '../../core/storage/local_database.dart';
+import '../students/students_repository.dart';
 import 'avvisi_repository.dart';
+import 'avvisi_utils.dart';
+import 'contact_notes_repository.dart';
 
 class AvvisiPage extends ConsumerWidget {
   const AvvisiPage({super.key});
@@ -132,7 +137,7 @@ class AvvisiPage extends ConsumerWidget {
                                 icon: Icons.share_rounded,
                                 label: 'Invia',
                                 color: Colors.green,
-                                onTap: () => _inviaTemplate(context, template),
+                                onTap: () => _inviaTemplate(context, ref, template),
                               ),
                               const SizedBox(width: 8),
                               _ActionChip(
@@ -160,10 +165,362 @@ class AvvisiPage extends ConsumerWidget {
     );
   }
 
-  void _inviaTemplate(BuildContext context, AvvisoTemplate template) {
-    SharePlus.instance.share(
-      ShareParams(text: template.text, subject: template.title),
+  Future<void> _inviaTemplate(BuildContext context, WidgetRef ref, AvvisoTemplate template) async {
+    if (!hasPlaceholders(template.text)) {
+      _openWhatsAppForTemplate(context, ref, template, null, null, null);
+      return;
+    }
+
+    final student = await _selectStudent(context, ref);
+    if (student == null) return;
+
+    final parentInfo = await _selectParent(context, student);
+    if (parentInfo == null) return;
+
+    _openWhatsAppForTemplate(context, ref, template, student, parentInfo.$1, parentInfo.$2);
+  }
+
+  Future<Student?> _selectStudent(BuildContext context, WidgetRef ref) async {
+    final students = ref.read(studentsRepositoryProvider).getAllStudentsSync();
+    if (students.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Nessun ragazzo presente in anagrafica')),
+        );
+      }
+      return null;
+    }
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    String query = '';
+
+    final result = await showModalBottomSheet<Student>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? Theme.of(context).colorScheme.surfaceContainer : null,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final filtered = query.isEmpty
+                ? students
+                : students.where((s) =>
+                    s.name.toLowerCase().contains(query.toLowerCase()) ||
+                    s.surname.toLowerCase().contains(query.toLowerCase())).toList();
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                left: 20,
+                right: 20,
+                top: 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Seleziona un ragazzo',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Theme.of(context).colorScheme.onSurface : null,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    decoration: InputDecoration(
+                      hintText: 'Cerca ragazzo...',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onChanged: (v) => setState(() => query = v),
+                  ),
+                  const SizedBox(height: 12),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.5,
+                    ),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: filtered.length,
+                      itemBuilder: (context, index) {
+                        final s = filtered[index];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.green.withValues(alpha: 0.1),
+                            child: Text(
+                              '${s.name[0]}${s.surname[0]}',
+                              style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          title: Text('${s.name} ${s.surname}'),
+                          subtitle: s.classId != null
+                              ? Text(
+                                  _getClassName(s.classId!),
+                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                                )
+                              : null,
+                          onTap: () => Navigator.pop(ctx, s),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
+
+    return result;
+  }
+
+  String _getClassName(String classId) {
+    try {
+      final data = LocalDatabase.classes().get(classId);
+      if (data != null) {
+        final map = Map<String, dynamic>.from(data);
+        return map['name']?.toString() ?? '';
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  Future<(String, String)?> _selectParent(BuildContext context, Student student) async {
+    final contacts = <(String label, String name, String phone)>[];
+
+    if (student.motherPhone.isNotEmpty) {
+      final name = '${student.motherName} ${student.motherSurname}'.trim();
+      contacts.add(('Mamma', name.isNotEmpty ? name : student.motherName, student.motherPhone));
+    }
+    if (student.fatherPhone.isNotEmpty) {
+      final name = '${student.fatherName} ${student.fatherSurname}'.trim();
+      contacts.add(('Papà', name.isNotEmpty ? name : student.fatherName, student.fatherPhone));
+    }
+    if (student.studentPhone.isNotEmpty) {
+      contacts.add(('Ragazzo', '${student.name} ${student.surname}', student.studentPhone));
+    }
+
+    if (contacts.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Nessun numero di telefono registrato per questo ragazzo')),
+        );
+      }
+      return null;
+    }
+
+    if (contacts.length == 1) {
+      final c = contacts.first;
+      return (c.$2, c.$3);
+    }
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final result = await showModalBottomSheet<MapEntry<String, String>>(
+      context: context,
+      backgroundColor: isDark ? Theme.of(context).colorScheme.surfaceContainer : null,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Invia a...',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Theme.of(context).colorScheme.onSurface : null,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...contacts.map((c) => ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.green.withValues(alpha: 0.1),
+                      child: Icon(Icons.phone_android_rounded, color: Colors.green.shade600),
+                    ),
+                    title: Text(c.$1),
+                    subtitle: Text(
+                      '${c.$2} — ${c.$3}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                    ),
+                    onTap: () => Navigator.pop(ctx, MapEntry(c.$2, c.$3)),
+                  )),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (result == null) return null;
+    return (result.key, result.value);
+  }
+
+  void _openWhatsAppForTemplate(
+    BuildContext context,
+    WidgetRef ref,
+    AvvisoTemplate template,
+    Student? student,
+    String? parentName,
+    String? phone,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    String finalMessage = template.text;
+
+    if (student != null) {
+      String? groupName;
+      String? meetingDate;
+
+      if (student.classId != null) {
+        groupName = _getClassName(student.classId!);
+        final nextMeeting = _getNextMeeting(student.classId!);
+        if (nextMeeting != null) {
+          meetingDate =
+              '${nextMeeting.date.day.toString().padLeft(2, '0')}/${nextMeeting.date.month.toString().padLeft(2, '0')}/${nextMeeting.date.year}';
+        }
+      }
+
+      AbsenceData? absenceData;
+      if (template.text.contains('{assenze_consecutive}') ||
+          template.text.contains('{ultima_presenza}')) {
+        absenceData = computeAbsenceData(student.id, student.classId ?? '');
+      }
+
+      finalMessage = resolvePlaceholders(
+        template.text,
+        student,
+        parentName: parentName,
+        groupName: groupName,
+        meetingDate: meetingDate,
+        consecutiveAbsences: absenceData?.consecutiveAbsences,
+        lastPresenceDate: absenceData?.lastPresenceDate,
+      );
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? Theme.of(context).colorScheme.surfaceContainer : null,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.send_rounded, color: Colors.green.shade600, size: 24),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Invia messaggio',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Theme.of(context).colorScheme.onSurface : null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (phone != null && student != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'A: ${parentName ?? ''} (${student.name} ${student.surname})',
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                  ),
+                ),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  finalMessage,
+                  style: const TextStyle(fontSize: 14, height: 1.4),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Annulla'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade600,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.open_in_new, size: 18),
+                    label: const Text('Apri WhatsApp'),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      openWhatsApp(phone, finalMessage);
+                      if (student != null) {
+                        _recordContactNote(ref, student, finalMessage, phone);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  PlanningMeeting? _getNextMeeting(String classId) {
+    try {
+      final box = LocalDatabase.planning();
+      final now = DateTime.now();
+      PlanningMeeting? closest;
+
+      for (final key in box.keys) {
+        final data = LocalDatabase.toStringDynamicMap(box.get(key));
+        if (data['classId'] != classId) continue;
+        if (data['isReunion'] == true) continue;
+        final meeting = PlanningMeeting.fromMap(key.toString(), data);
+        if (!meeting.date.isBefore(now)) {
+          if (closest == null || meeting.date.isBefore(closest.date)) {
+            closest = meeting;
+          }
+        }
+      }
+      return closest;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _recordContactNote(WidgetRef ref, Student student, String message, String? phone) {
+    final note = ContactNote(
+      id: '',
+      studentId: student.id,
+      dateTime: DateTime.now(),
+      medium: 'whatsapp',
+      notes: 'Inviato messaggio: "$message"${phone != null ? ' al $phone' : ''}',
+    );
+    ref.read(contactNotesRepoProvider).addNote(note);
   }
 
   void _editTemplate(BuildContext context, WidgetRef ref, AvvisoTemplate? existing) {

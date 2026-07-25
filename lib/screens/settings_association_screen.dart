@@ -165,18 +165,16 @@ class _SettingsAssociationScreenState
 
       try {
         final sharedSecret = await _security.computeStaticSharedSecret(
-            remoteIdentity.publicKeyBase64);
+            remoteIdentity.publicKeyBase64,
+            forDeviceId: remoteIdentity.deviceId);
 
-        final association = P2PDeviceAssociation(
+        await _security.registerAndSaveAssociation(
           deviceId: remoteIdentity.deviceId,
           deviceName: remoteIdentity.deviceName,
           publicKeyBase64: remoteIdentity.publicKeyBase64,
           fingerprint: remoteIdentity.fingerprint,
           sharedSecretBase64: sharedSecret,
-          associatedAt: DateTime.now(),
         );
-
-        await _security.saveAssociation(association);
         await _refreshAssociations();
 
         if (mounted) {

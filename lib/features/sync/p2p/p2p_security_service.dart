@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart' show sha256;
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive/hive.dart';
@@ -74,6 +75,8 @@ class P2PDeviceAssociation {
   final String fingerprint;
   final String sharedSecretBase64;
   final DateTime associatedAt;
+  final String devicePrivateKeyBase64;
+  final String devicePublicKeyBase64;
 
   const P2PDeviceAssociation({
     required this.deviceId,
@@ -82,6 +85,8 @@ class P2PDeviceAssociation {
     required this.fingerprint,
     required this.sharedSecretBase64,
     required this.associatedAt,
+    required this.devicePrivateKeyBase64,
+    required this.devicePublicKeyBase64,
   });
 
   bool get isValid => DateTime.now().difference(associatedAt).inDays < 30;
@@ -99,6 +104,8 @@ class P2PDeviceAssociation {
         'fingerprint': fingerprint,
         'sharedSecret': sharedSecretBase64,
         'associatedAt': associatedAt.toUtc().toIso8601String(),
+        'privKey': devicePrivateKeyBase64,
+        'pubKey': devicePublicKeyBase64,
       };
 
   factory P2PDeviceAssociation.fromJson(Map<String, dynamic> json) =>
@@ -109,7 +116,27 @@ class P2PDeviceAssociation {
         fingerprint: json['fingerprint'] as String? ?? '',
         sharedSecretBase64: json['sharedSecret'] as String,
         associatedAt: DateTime.parse(json['associatedAt'] as String).toLocal(),
+        devicePrivateKeyBase64: json['privKey'] as String? ?? '',
+        devicePublicKeyBase64: json['pubKey'] as String? ?? '',
       );
+
+  SimpleKeyPairData? get keyPair {
+    if (devicePrivateKeyBase64.isEmpty || devicePublicKeyBase64.isEmpty) {
+      return null;
+    }
+    try {
+      return SimpleKeyPairData(
+        base64Decode(devicePrivateKeyBase64),
+        publicKey: SimplePublicKey(
+          base64Decode(devicePublicKeyBase64),
+          type: KeyPairType.x25519,
+        ),
+        type: KeyPairType.x25519,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
 }
 
 class P2PEncryptedPayload {
@@ -174,7 +201,7 @@ class P2PSecurityService {
     );
   }
 
-  Future<SimpleKeyPair> getOrCreateKeyPair() async {
+  Future<SimpleKeyPair> getOrCreateIdentityKeyPair() async {
     final stored = await _secureStorage.read(key: _localKeyPairName);
     if (stored != null && stored.isNotEmpty) {
       try {
@@ -188,10 +215,10 @@ class P2PSecurityService {
         );
       } catch (_) {}
     }
-    return _generateAndStoreKeyPair();
+    return _generateAndStoreIdentityKeyPair();
   }
 
-  Future<SimpleKeyPair> _generateAndStoreKeyPair() async {
+  Future<SimpleKeyPair> _generateAndStoreIdentityKeyPair() async {
     final keyPair = await _x25519.newKeyPair();
     final publicKey = await keyPair.extractPublicKey();
     final privateKeyData = await keyPair.extractPrivateKeyBytes();
@@ -201,6 +228,17 @@ class P2PSecurityService {
     });
     await _secureStorage.write(key: _localKeyPairName, value: stored);
     return keyPair;
+  }
+
+  Future<SimpleKeyPairData> _generateDeviceKeyPair() async {
+    final keyPair = await _x25519.newKeyPair();
+    final publicKey = await keyPair.extractPublicKey();
+    final privateKeyData = await keyPair.extractPrivateKeyBytes();
+    return SimpleKeyPairData(
+      privateKeyData,
+      publicKey: SimplePublicKey(publicKey.bytes, type: KeyPairType.x25519),
+      type: KeyPairType.x25519,
+    );
   }
 
   Future<P2PIdentity> getLocalIdentity() async {
@@ -214,7 +252,7 @@ class P2PSecurityService {
   }
 
   Future<P2PIdentity> _createAndStoreIdentity() async {
-    final keyPair = await getOrCreateKeyPair();
+    final keyPair = await getOrCreateIdentityKeyPair();
     final publicKey = await keyPair.extractPublicKey();
     final deviceId =
         'CH_${DateTime.now().microsecondsSinceEpoch}_${_randomHex(6)}';
@@ -275,7 +313,7 @@ class P2PSecurityService {
   }
 
   Future<String> getPublicKeyBase64() async {
-    final keyPair = await getOrCreateKeyPair();
+    final keyPair = await getOrCreateIdentityKeyPair();
     final publicKey = await keyPair.extractPublicKey();
     return base64Encode(publicKey.bytes);
   }
@@ -294,9 +332,11 @@ class P2PSecurityService {
     return P2PIdentity.decode(raw);
   }
 
-  Future<String> computeStaticSharedSecret(String remotePublicKeyBase64) async {
+  Future<String> computeStaticSharedSecret(String remotePublicKeyBase64, {String? forDeviceId}) async {
     final remoteKeyBytes = base64Decode(remotePublicKeyBase64);
-    final keyPair = await getOrCreateKeyPair();
+    final keyPair = forDeviceId != null
+        ? await _getOrCreateAssociationKeyPair(forDeviceId)
+        : await getOrCreateIdentityKeyPair();
 
     final sharedSecret = await _x25519.sharedSecretKey(
       keyPair: keyPair,
@@ -307,6 +347,15 @@ class P2PSecurityService {
     return base64Encode(secretBytes);
   }
 
+  Future<SimpleKeyPairData> _getOrCreateAssociationKeyPair(String deviceId) async {
+    final existing = await getAssociation(deviceId);
+    if (existing != null && existing.devicePrivateKeyBase64.isNotEmpty) {
+      final kp = existing.keyPair;
+      if (kp != null) return kp;
+    }
+    return _generateDeviceKeyPair();
+  }
+
   Future<P2PSession> createEphemeralSession({
     required String remoteDeviceId,
     required String remoteDeviceName,
@@ -315,7 +364,7 @@ class P2PSecurityService {
   }) async {
     final ephemeralKeyPair = await X25519().newKeyPair();
     final remoteKeyBytes = base64Decode(remotePublicKeyBase64);
-    final myKeyPair = await getOrCreateKeyPair();
+    final myKeyPair = await _getOrCreateAssociationKeyPair(remoteDeviceId);
 
     final staticShared = await _x25519.sharedSecretKey(
       keyPair: myKeyPair,
@@ -441,6 +490,30 @@ class P2PSecurityService {
     return utf8.decode(plainBytes);
   }
 
+  Future<SimpleKeyPairData> registerAndSaveAssociation({
+    required String deviceId,
+    required String deviceName,
+    required String publicKeyBase64,
+    required String fingerprint,
+    required String sharedSecretBase64,
+  }) async {
+    final deviceKeyPair = await _generateDeviceKeyPair();
+    final devicePubKey = await deviceKeyPair.extractPublicKey();
+
+    final association = P2PDeviceAssociation(
+      deviceId: deviceId,
+      deviceName: deviceName,
+      publicKeyBase64: publicKeyBase64,
+      fingerprint: fingerprint,
+      sharedSecretBase64: sharedSecretBase64,
+      associatedAt: DateTime.now(),
+      devicePrivateKeyBase64: base64Encode(deviceKeyPair.bytes),
+      devicePublicKeyBase64: base64Encode(devicePubKey.bytes),
+    );
+    await saveAssociation(association);
+    return deviceKeyPair;
+  }
+
   Future<void> saveAssociation(P2PDeviceAssociation association) async {
     final key = '$_storagePrefix${association.deviceId}';
     await _secureStorage.write(
@@ -516,6 +589,36 @@ class P2PSecurityService {
   Future<String?> getSharedSecret(String deviceId) async {
     final assoc = await getAssociation(deviceId);
     return assoc?.sharedSecretBase64;
+  }
+
+  Future<String?> getDevicePrivateKey(String deviceId) async {
+    final assoc = await getAssociation(deviceId);
+    return assoc?.devicePrivateKeyBase64;
+  }
+
+  Future<String?> getDevicePublicKey(String deviceId) async {
+    final assoc = await getAssociation(deviceId);
+    return assoc?.devicePublicKeyBase64;
+  }
+
+  /// Derives a 6-digit pairing code from the ECDH shared secret.
+  /// Both devices compute the SAME code from the SAME shared secret.
+  /// User visually compares codes to verify no MitM attack.
+  static String computePairingCode(String sharedSecretBase64) {
+    final secretBytes = base64Decode(sharedSecretBase64);
+    final hash = sha256.convert(secretBytes);
+    final code = ((hash.bytes[0] << 16) | (hash.bytes[1] << 8) | hash.bytes[2]) % 1000000;
+    return code.toString().padLeft(6, '0');
+  }
+
+  /// Verifies that the public key received over the air matches the
+  /// stored association (key pinning). If they differ, a MitM attack
+  /// may be in progress.
+  static bool publicKeyMatchesAssociation(
+    P2PDeviceAssociation assoc,
+    String receivedPublicKeyBase64,
+  ) {
+    return assoc.publicKeyBase64 == receivedPublicKeyBase64;
   }
 }
 

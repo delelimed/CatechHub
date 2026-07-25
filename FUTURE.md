@@ -10,6 +10,7 @@
 
 
 ## Pianificate
+v1.1.0
 
 - **Export Completo** — Esportazione in PDF dell'intero database per archiviazione al termine dell'anno.
 - **Archivio Storico** - implementazione di un archivio per seguire il progresso del ragazzo nel percorso di preparazione.

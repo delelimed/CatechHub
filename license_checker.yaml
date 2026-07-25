@@ -1,0 +1,17 @@
+# license_checker.yaml
+
+# Licenze accettate per le dipendenze del progetto
+permittedLicenses:
+  - MIT
+  - BSD-2-Clause
+  - BSD-3-Clause
+  - Apache-2.0
+
+# Licenze che desideri bloccare (es. copyleft stringente)
+rejectedLicenses:
+  - GPL-2.0
+  - GPL-3.0
+  - AGPL-3.0
+
+# Eventuali pacchetti da approvare manualmente se la licenza non viene rilevata in automatico
+approvedPackages: {}

@@ -18,6 +18,7 @@ enum P2PSyncStatus {
   advertising,
   handshakeSent,
   handshakeReceived,
+  pairingVerification,
   sessionEstablished,
   syncing,
   completed,
@@ -40,6 +41,11 @@ class P2PSyncState {
   final String? pendingConfirmationDeviceName;
   final String? pendingConfirmationDeviceId;
   final bool isSessionEncrypted;
+  final int nearbyAssociationsCount;
+  final bool isDataUpToDate;
+  final String? pairingCode;
+  final String? remotePairingCode;
+  final String? remoteDeviceFingerprint;
 
   const P2PSyncState({
     this.status = P2PSyncStatus.idle,
@@ -57,6 +63,11 @@ class P2PSyncState {
     this.pendingConfirmationDeviceName,
     this.pendingConfirmationDeviceId,
     this.isSessionEncrypted = false,
+    this.nearbyAssociationsCount = 0,
+    this.isDataUpToDate = false,
+    this.pairingCode,
+    this.remotePairingCode,
+    this.remoteDeviceFingerprint,
   });
 
   P2PSyncState copyWith({
@@ -75,6 +86,11 @@ class P2PSyncState {
     String? pendingConfirmationDeviceName,
     String? pendingConfirmationDeviceId,
     bool? isSessionEncrypted,
+    int? nearbyAssociationsCount,
+    bool? isDataUpToDate,
+    String? pairingCode,
+    String? remotePairingCode,
+    String? remoteDeviceFingerprint,
     bool clearError = false,
   }) {
     return P2PSyncState(
@@ -98,6 +114,13 @@ class P2PSyncState {
       pendingConfirmationDeviceId:
           pendingConfirmationDeviceId ?? this.pendingConfirmationDeviceId,
       isSessionEncrypted: isSessionEncrypted ?? this.isSessionEncrypted,
+      nearbyAssociationsCount:
+          nearbyAssociationsCount ?? this.nearbyAssociationsCount,
+      isDataUpToDate: isDataUpToDate ?? this.isDataUpToDate,
+      pairingCode: pairingCode ?? this.pairingCode,
+      remotePairingCode: remotePairingCode ?? this.remotePairingCode,
+      remoteDeviceFingerprint:
+          remoteDeviceFingerprint ?? this.remoteDeviceFingerprint,
     );
   }
 }
@@ -106,6 +129,12 @@ class P2PSyncService {
   static final P2PSyncService _instance = P2PSyncService._();
   factory P2PSyncService() => _instance;
   P2PSyncService._();
+
+  // CRITICO: Strategy.P2P_CLUSTER impone comunicazione esclusivamente
+  // via WiFi Direct o Bluetooth (P2P assoluto). NESSUN dato transita
+  // mai via internet, router, modem o altri dispositivi di rete.
+  // L'API Nearby Connections di Google utilizza esclusivamente
+  // connessioni P2P quando si usa questa strategia.
 
   final Nearby _nearby = Nearby();
   final P2PSecurityService _security = P2PSecurityService();
@@ -121,9 +150,12 @@ class P2PSyncService {
   P2PSyncState get currentState => _state;
 
   Timer? _pairingTimeoutTimer;
+  Timer? _periodicSyncTimer;
   bool _initialized = false;
   bool _isSyncing = false;
   String? _pendingEndpointId;
+
+  P2PIdentity? _pendingHandshakeIdentity;
 
   Completer<void>? _pairingCompleter;
 
@@ -134,11 +166,14 @@ class P2PSyncService {
 
   bool _continuousModeActive = false;
   final Set<String> _connectedEndpoints = {};
+  final Set<String> _nearbyDiscoveredDevices = {};
+  final Set<String> _sessionConfirmedDevices = {};
   bool _restartingEndpoints = false;
   StreamSubscription<BoxEvent>? _hiveBoxesSub;
 
   static const Duration _pairingTimeout = Duration(seconds: 120);
   static const Duration _reconnectDelay = Duration(seconds: 5);
+  static const Duration _periodicSyncInterval = Duration(seconds: 60);
   static const String _serviceId = 'ch.catechhub.app';
   static const String _syncPrefix = 'CH_';
 
@@ -173,6 +208,7 @@ class P2PSyncService {
     _startDiscovery();
     _watchLocalChanges();
     _scheduleReconnectCycle();
+    _startPeriodicSync();
 
     _updateState(_state.copyWith(
       isBackgroundSyncActive: true,
@@ -184,10 +220,35 @@ class P2PSyncService {
     _continuousModeActive = false;
     _hiveBoxesSub?.cancel();
     _hiveBoxesSub = null;
+    _periodicSyncTimer?.cancel();
+    _periodicSyncTimer = null;
+    _nearbyDiscoveredDevices.clear();
     try {
       _nearby.stopAdvertising();
       _nearby.stopDiscovery();
     } catch (_) {}
+  }
+
+  void _startPeriodicSync() {
+    _periodicSyncTimer?.cancel();
+    _periodicSyncTimer = Timer.periodic(_periodicSyncInterval, (_) {
+      _performPeriodicSync();
+    });
+  }
+
+  Future<void> _performPeriodicSync() async {
+    if (_connectedEndpoints.isEmpty) return;
+    if (_isSyncing) return;
+
+    final endpoints = _connectedEndpoints.toList();
+    if (endpoints.isNotEmpty) {
+      await _performBidirectionalSync(endpoints.first);
+    }
+
+    _updateState(_state.copyWith(
+      isDataUpToDate: _state.lastSyncAt != null &&
+          DateTime.now().difference(_state.lastSyncAt!).inSeconds < 60,
+    ));
   }
 
   Future<void> _startAdvertising() async {
@@ -219,11 +280,14 @@ class P2PSyncService {
           if (deviceId == null) return;
 
           Future(() async {
-            if (_connectedEndpoints.contains(endpointId)) return;
-            if (_pendingEndpointId != null) return;
-
             final assoc = await _security.getAssociation(deviceId);
             if (assoc != null && assoc.isValid) {
+              _nearbyDiscoveredDevices.add(deviceId);
+              _updateNearbyCount();
+
+              if (_connectedEndpoints.contains(endpointId)) return;
+              if (_pendingEndpointId != null) return;
+
               _pendingEndpointId = endpointId;
               await _nearby.requestConnection(
                 '$_syncPrefix${assoc.deviceId}',
@@ -235,12 +299,23 @@ class P2PSyncService {
             }
           });
         },
-        onEndpointLost: (_) {},
+        onEndpointLost: (endpointId) {
+          _nearbyDiscoveredDevices.remove(endpointId);
+          _updateNearbyCount();
+        },
         serviceId: _serviceId,
       );
     } catch (_) {
       Future.delayed(const Duration(seconds: 3), _startDiscovery);
     }
+  }
+
+  void _updateNearbyCount() {
+    _updateState(_state.copyWith(
+      nearbyAssociationsCount: _nearbyDiscoveredDevices.length,
+      isDataUpToDate: _state.lastSyncAt != null &&
+          DateTime.now().difference(_state.lastSyncAt!).inSeconds < 60,
+    ));
   }
 
   void _scheduleReconnectCycle() {
@@ -645,36 +720,78 @@ class P2PSyncService {
       return;
     }
 
+    final existingAssoc =
+        await _security.getAssociation(remoteIdentity.deviceId);
+
+    // KEY PINNING: if an association exists and public key differs → MitM
+    if (existingAssoc != null &&
+        !P2PSecurityService.publicKeyMatchesAssociation(
+            existingAssoc, remoteIdentity.publicKeyBase64)) {
+      debugPrint('[P2P] MITM DETECTED: public key mismatch for ${remoteIdentity.deviceId}');
+      try {
+        await _nearby.disconnectFromEndpoint(endpointId);
+      } catch (_) {}
+      _connectedEndpoints.remove(endpointId);
+      _pendingEndpointId = null;
+      _updateState(_state.copyWith(
+        status: P2PSyncStatus.error,
+        errorMessage: 'MITM rilevato: la chiave pubblica del dispositivo '
+            '${remoteIdentity.deviceName} non corrisponde a quella salvata.',
+      ));
+      return;
+    }
+
     _endpointConnIdMap[endpointId] = remoteIdentity.deviceId;
     _connectedDeviceId = remoteIdentity.deviceId;
     _connectedEndpoints.add(endpointId);
-    await _saveAssociationIfNeeded(remoteIdentity);
 
     final localIdentity = await _security.getLocalIdentity();
     final ack = jsonEncode({
       'type': 'p2p_handshake_ack',
       'payload': localIdentity.encode(),
     });
-    await _sendEncryptedPayload(endpointId, ack);
 
-    _updateState(_state.copyWith(
-      status: P2PSyncStatus.sessionEstablished,
-      connectedDeviceId: endpointId,
-      connectedDeviceName: remoteIdentity.deviceName,
-      connectedFingerprint: remoteIdentity.fingerprint,
-      isSessionEncrypted: true,
-    ));
+    if (existingAssoc != null) {
+      // Existing association: proceed with encrypted session immediately
+      await _sendEncryptedPayload(endpointId, ack);
+      _updateState(_state.copyWith(
+        status: P2PSyncStatus.sessionEstablished,
+        connectedDeviceId: endpointId,
+        connectedDeviceName: remoteIdentity.deviceName,
+        connectedFingerprint: remoteIdentity.fingerprint,
+        isSessionEncrypted: true,
+      ));
 
-    final iAmInitiator =
-        localIdentity.deviceId.compareTo(remoteIdentity.deviceId) < 0;
+      final iAmInitiator =
+          localIdentity.deviceId.compareTo(remoteIdentity.deviceId) < 0;
+      if (iAmInitiator) {
+        final authRequest = jsonEncode({
+          'type': 'p2p_auth_request',
+          'deviceId': localIdentity.deviceId,
+          'deviceName': localIdentity.deviceName,
+        });
+        await _sendEncryptedPayload(endpointId, authRequest);
+      }
+    } else {
+      // New association: require pairing code verification (MitM protection)
+      final sharedSecret = await _security.computeStaticSharedSecret(
+        remoteIdentity.publicKeyBase64,
+        forDeviceId: remoteIdentity.deviceId,
+      );
+      final code = P2PSecurityService.computePairingCode(sharedSecret);
 
-    if (iAmInitiator) {
-      final authRequest = jsonEncode({
-        'type': 'p2p_auth_request',
-        'deviceId': localIdentity.deviceId,
-        'deviceName': localIdentity.deviceName,
-      });
-      await _sendEncryptedPayload(endpointId, authRequest);
+      _pendingHandshakeIdentity = remoteIdentity;
+      await _sendEncryptedPayload(endpointId, ack);
+
+      _updateState(_state.copyWith(
+        status: P2PSyncStatus.pairingVerification,
+        connectedDeviceId: endpointId,
+        connectedDeviceName: remoteIdentity.deviceName,
+        connectedFingerprint: remoteIdentity.fingerprint,
+        isSessionEncrypted: true,
+        pairingCode: code,
+        remoteDeviceFingerprint: remoteIdentity.fingerprint,
+      ));
     }
   }
 
@@ -685,31 +802,81 @@ class P2PSyncService {
     final remoteIdentity = P2PSecurityService.parseQrPayload(rawPayload);
     if (remoteIdentity == null) return;
 
+    final existingAssoc =
+        await _security.getAssociation(remoteIdentity.deviceId);
+
+    // KEY PINNING: reject if existing association has different public key
+    if (existingAssoc != null &&
+        !P2PSecurityService.publicKeyMatchesAssociation(
+            existingAssoc, remoteIdentity.publicKeyBase64)) {
+      debugPrint('[P2P] MITM DETECTED in ack: public key mismatch for ${remoteIdentity.deviceId}');
+      try {
+        await _nearby.disconnectFromEndpoint(endpointId);
+      } catch (_) {}
+      _connectedEndpoints.remove(endpointId);
+      _pendingEndpointId = null;
+      _updateState(_state.copyWith(
+        status: P2PSyncStatus.error,
+        errorMessage: 'MITM rilevato: chiave pubblica alterata per ${remoteIdentity.deviceName}.',
+      ));
+      return;
+    }
+
     _endpointConnIdMap[endpointId] = remoteIdentity.deviceId;
     _connectedDeviceId = remoteIdentity.deviceId;
     _connectedEndpoints.add(endpointId);
 
-    _updateState(_state.copyWith(
-      connectedFingerprint: remoteIdentity.fingerprint,
-      connectedDeviceName: remoteIdentity.deviceName,
-      isSessionEncrypted: true,
-    ));
+    if (existingAssoc != null) {
+      if (!_isSyncing) {
+        await _saveAssociationIfNeeded(remoteIdentity);
+      }
 
-    if (!_isSyncing) {
-      await _saveAssociationIfNeeded(remoteIdentity);
-    }
+      _updateState(_state.copyWith(
+        connectedFingerprint: remoteIdentity.fingerprint,
+        connectedDeviceName: remoteIdentity.deviceName,
+        isSessionEncrypted: true,
+      ));
 
-    final localIdentity = await _security.getLocalIdentity();
-    final iAmInitiator =
-        localIdentity.deviceId.compareTo(remoteIdentity.deviceId) < 0;
+      final localIdentity = await _security.getLocalIdentity();
+      final iAmInitiator =
+          localIdentity.deviceId.compareTo(remoteIdentity.deviceId) < 0;
 
-    if (iAmInitiator) {
-      final authRequest = jsonEncode({
-        'type': 'p2p_auth_request',
-        'deviceId': localIdentity.deviceId,
-        'deviceName': localIdentity.deviceName,
-      });
-      await _sendEncryptedPayload(endpointId, authRequest);
+      if (iAmInitiator) {
+        final authRequest = jsonEncode({
+          'type': 'p2p_auth_request',
+          'deviceId': localIdentity.deviceId,
+          'deviceName': localIdentity.deviceName,
+        });
+        await _sendEncryptedPayload(endpointId, authRequest);
+      }
+    } else {
+      final localIdentity = await _security.getLocalIdentity();
+      final sharedSecret = await _security.computeStaticSharedSecret(
+        remoteIdentity.publicKeyBase64,
+        forDeviceId: remoteIdentity.deviceId,
+      );
+      final code = P2PSecurityService.computePairingCode(sharedSecret);
+
+      _pendingHandshakeIdentity = remoteIdentity;
+      _updateState(_state.copyWith(
+        status: P2PSyncStatus.pairingVerification,
+        connectedFingerprint: remoteIdentity.fingerprint,
+        connectedDeviceName: remoteIdentity.deviceName,
+        isSessionEncrypted: true,
+        pairingCode: code,
+        remoteDeviceFingerprint: remoteIdentity.fingerprint,
+      ));
+
+      final iAmInitiator =
+          localIdentity.deviceId.compareTo(remoteIdentity.deviceId) < 0;
+      if (iAmInitiator) {
+        final authRequest = jsonEncode({
+          'type': 'p2p_auth_request',
+          'deviceId': localIdentity.deviceId,
+          'deviceName': localIdentity.deviceName,
+        });
+        await _sendEncryptedPayload(endpointId, authRequest);
+      }
     }
   }
 
@@ -717,6 +884,12 @@ class P2PSyncService {
     try {
       final existing = await _security.getAssociation(remoteIdentity.deviceId);
       if (existing != null) {
+        if (!P2PSecurityService.publicKeyMatchesAssociation(
+            existing, remoteIdentity.publicKeyBase64)) {
+          debugPrint('[P2P] MITM detected in _saveAssociationIfNeeded: '
+              'key mismatch for ${remoteIdentity.deviceId}');
+          return;
+        }
         if (existing.deviceName != remoteIdentity.deviceName) {
           final updated = P2PDeviceAssociation(
             deviceId: existing.deviceId,
@@ -725,6 +898,8 @@ class P2PSyncService {
             fingerprint: existing.fingerprint,
             sharedSecretBase64: existing.sharedSecretBase64,
             associatedAt: existing.associatedAt,
+            devicePrivateKeyBase64: existing.devicePrivateKeyBase64,
+            devicePublicKeyBase64: existing.devicePublicKeyBase64,
           );
           await _security.saveAssociation(updated);
         }
@@ -732,18 +907,17 @@ class P2PSyncService {
       }
 
       final sharedSecret = await _security.computeStaticSharedSecret(
-          remoteIdentity.publicKeyBase64);
+          remoteIdentity.publicKeyBase64,
+          forDeviceId: remoteIdentity.deviceId);
 
-      final association = P2PDeviceAssociation(
+      await _security.registerAndSaveAssociation(
         deviceId: remoteIdentity.deviceId,
         deviceName: remoteIdentity.deviceName,
         publicKeyBase64: remoteIdentity.publicKeyBase64,
         fingerprint: remoteIdentity.fingerprint,
         sharedSecretBase64: sharedSecret,
-        associatedAt: DateTime.now(),
       );
 
-      await _security.saveAssociation(association);
       debugPrint('[P2P] Association saved for ${remoteIdentity.deviceName}');
     } catch (e) {
       debugPrint('[P2P] Error saving association: $e');
@@ -756,6 +930,16 @@ class P2PSyncService {
     final deviceName = message['deviceName'] as String? ?? 'Sconosciuto';
 
     if (_state.role != P2PSyncRole.altroCatechista) {
+      final ack = jsonEncode({
+        'type': 'p2p_auth_response',
+        'accepted': true,
+        'deviceId': deviceId,
+      });
+      await _sendEncryptedPayload(endpointId, ack);
+      return;
+    }
+
+    if (deviceId != null && _sessionConfirmedDevices.contains(deviceId)) {
       final ack = jsonEncode({
         'type': 'p2p_auth_response',
         'accepted': true,
@@ -1054,10 +1238,89 @@ class P2PSyncService {
     }
   }
 
+  Future<void> confirmPairingCode() async {
+    if (_state.status != P2PSyncStatus.pairingVerification) return;
+    if (_state.connectedDeviceId == null) return;
+
+    final endpointId = _state.connectedDeviceId!;
+    final remoteIdentity = _pendingHandshakeIdentity;
+    if (remoteIdentity == null) {
+      _updateState(_state.copyWith(
+        status: P2PSyncStatus.error,
+        errorMessage: 'Errore: identità remota persa durante verifica.',
+      ));
+      return;
+    }
+
+    final existing = await _security.getAssociation(remoteIdentity.deviceId);
+    if (existing != null) {
+      _updateState(_state.copyWith(
+        status: P2PSyncStatus.sessionEstablished,
+        pairingCode: null,
+        remotePairingCode: null,
+      ));
+      return;
+    }
+
+    final localIdentity = await _security.getLocalIdentity();
+
+    await _saveAssociationIfNeeded(remoteIdentity);
+
+    _pendingHandshakeIdentity = null;
+
+    _updateState(_state.copyWith(
+      status: P2PSyncStatus.sessionEstablished,
+      pairingCode: null,
+      remotePairingCode: null,
+    ));
+
+    final iAmInitiator =
+        localIdentity.deviceId.compareTo(remoteIdentity.deviceId) < 0;
+
+    if (iAmInitiator) {
+      final authRequest = jsonEncode({
+        'type': 'p2p_auth_request',
+        'deviceId': localIdentity.deviceId,
+        'deviceName': localIdentity.deviceName,
+      });
+      await _sendEncryptedPayload(endpointId, authRequest);
+    }
+  }
+
+  Future<void> rejectPairingCode() async {
+    if (_state.status != P2PSyncStatus.pairingVerification) return;
+    if (_state.connectedDeviceId == null) return;
+
+    final endpointId = _state.connectedDeviceId!;
+    try {
+      await _nearby.disconnectFromEndpoint(endpointId);
+    } catch (_) {}
+    _connectedEndpoints.remove(endpointId);
+    _pendingEndpointId = null;
+    _pendingHandshakeIdentity = null;
+
+    _updateState(_state.copyWith(
+      status: P2PSyncStatus.idle,
+      connectedDeviceId: null,
+      connectedDeviceName: null,
+      connectedFingerprint: null,
+      isSessionEncrypted: false,
+      pairingCode: null,
+      remotePairingCode: null,
+      errorMessage: 'Codice di verifica non corrispondente. '
+          'Possibile attacco MitM: associazione annullata.',
+    ));
+  }
+
   Future<void> confirmSync() async {
     if (!_state.awaitingConfirmation) return;
 
     final endpointId = _state.connectedDeviceId;
+    final confirmedDeviceId = _state.pendingConfirmationDeviceId;
+
+    if (confirmedDeviceId != null) {
+      _sessionConfirmedDevices.add(confirmedDeviceId);
+    }
 
     _updateState(_state.copyWith(
       awaitingConfirmation: false,
@@ -1127,9 +1390,13 @@ class P2PSyncService {
 
   void dispose() {
     _pairingTimeoutTimer?.cancel();
+    _periodicSyncTimer?.cancel();
     _hiveBoxesSub?.cancel();
     stopPairingMode();
     _stopContinuousMode();
+    _nearbyDiscoveredDevices.clear();
+    _sessionConfirmedDevices.clear();
+    _pendingHandshakeIdentity = null;
     _stateController.close();
     _syncDataController.close();
   }

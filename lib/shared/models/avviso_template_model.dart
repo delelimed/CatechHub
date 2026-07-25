@@ -9,7 +9,8 @@ class AvvisoTemplate {
     _Placeholder('{nome_genitore}', 'Nome del genitore'),
     _Placeholder('{nome_gruppo}', 'Nome del gruppo'),
     _Placeholder('{data_incontro}', 'Data del prossimo incontro'),
-    _Placeholder('{ora_incontro}', 'Ora del prossimo incontro'),
+    _Placeholder('{assenze_consecutive}', 'Nr. assenze consecutive'),
+    _Placeholder('{ultima_presenza}', 'Data ultima presenza'),
   ];
 
   const AvvisoTemplate({

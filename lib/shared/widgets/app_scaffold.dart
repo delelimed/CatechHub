@@ -34,6 +34,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../widgets/sync_status_dot.dart';
 import 'side_menu.dart';
 
 class AppScaffold extends StatelessWidget {
@@ -151,7 +152,7 @@ class AppScaffold extends StatelessWidget {
         ? colorScheme.outline.withValues(alpha: 0.2)
         : Colors.grey.shade200;
 
-    return Scaffold(
+    final scaffold = Scaffold(
       backgroundColor: scaffoldBg,
       floatingActionButton: floatingActionButton,
 
@@ -373,6 +374,17 @@ class AppScaffold extends StatelessWidget {
                 ),
               ),
             ),
+    );
+
+    return Stack(
+      children: [
+        scaffold,
+        Positioned(
+          bottom: isDesktop ? 16 : 80,
+          right: isDesktop ? 16 : 28,
+          child: const SyncStatusDot(),
+        ),
+      ],
     );
   }
 }

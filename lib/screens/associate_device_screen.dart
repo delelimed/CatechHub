@@ -35,12 +35,14 @@ class _AssociateDeviceScreenState
   String? _successMessage;
 
   MobileScannerController? _scannerController;
-  bool _showScanner = false;
   String? _lastScannedDeviceName;
   String? _scannedDeviceId;
+  bool _qrScanned = false;
 
-  Timer? _reciprocalCheckTimer;
-  bool _waitingForReciprocal = false;
+  bool _isPairing = false;
+  bool _p2pComplete = false;
+  Timer? _pairingTimeoutTimer;
+  StreamSubscription<P2PSyncState>? _p2pStateSub;
 
   @override
   void initState() {
@@ -51,7 +53,9 @@ class _AssociateDeviceScreenState
   @override
   void dispose() {
     _stopScanner();
-    _reciprocalCheckTimer?.cancel();
+    _pairingTimeoutTimer?.cancel();
+    _p2pStateSub?.cancel();
+    _stopP2pPairing();
     super.dispose();
   }
 
@@ -102,28 +106,11 @@ class _AssociateDeviceScreenState
       _errorMessage = null;
       _successMessage = null;
     });
-  }
-
-  void _proceedToShowQrAfterScan() {
-    setState(() {
-      _currentStep = _AssociationStep.showQr;
-      _showScanner = false;
-      _waitingForReciprocal = true;
-    });
-    _startReciprocalCheck(_scannedDeviceId);
-  }
-
-  void _proceedToScanAfterShow() {
-    setState(() {
-      _currentStep = _AssociationStep.scanQr;
-      _errorMessage = null;
-    });
-    _openScanner();
+    _startShowQrWithP2p();
   }
 
   void _openScanner() {
     setState(() {
-      _showScanner = true;
       _errorMessage = null;
     });
     _scannerController = MobileScannerController(
@@ -139,19 +126,122 @@ class _AssociateDeviceScreenState
       _scannerController?.dispose();
     } catch (_) {}
     _scannerController = null;
-    _showScanner = false;
   }
 
   void _resetWizard() {
     _stopScanner();
-    _reciprocalCheckTimer?.cancel();
+    _pairingTimeoutTimer?.cancel();
+    _p2pStateSub?.cancel();
+    _stopP2pPairing();
     setState(() {
       _currentStep = _AssociationStep.roleChoice;
       _errorMessage = null;
       _successMessage = null;
       _lastScannedDeviceName = null;
       _scannedDeviceId = null;
-      _waitingForReciprocal = false;
+      _qrScanned = false;
+      _isPairing = false;
+      _p2pComplete = false;
+    });
+  }
+
+  void _stopP2pPairing() {
+    try {
+      ref.read(nearbySyncServiceProvider).stopPairingMode();
+    } catch (_) {}
+  }
+
+  void _startShowQrWithP2p() {
+    _p2pComplete = false;
+    _isPairing = false;
+    _qrScanned = false;
+    _watchP2pState();
+    _startP2pPairing();
+  }
+
+  void _startScanFirstP2p() {
+    _p2pComplete = false;
+    _isPairing = false;
+    _watchP2pState();
+    _startP2pPairing();
+  }
+
+  void _watchP2pState() {
+    _p2pStateSub?.cancel();
+    final service = ref.read(nearbySyncServiceProvider);
+    _p2pStateSub = service.onStateChanged.listen((state) {
+      if (!mounted) return;
+
+      final step = _currentStep;
+
+      if (state.status == P2PSyncStatus.sessionEstablished ||
+          state.status == P2PSyncStatus.completed ||
+          state.status == P2PSyncStatus.syncing) {
+
+        if (_p2pComplete) return;
+        _p2pComplete = true;
+        _pairingTimeoutTimer?.cancel();
+
+        if (step == _AssociationStep.showQr && _choseScanFirst) {
+          setState(() {
+            _currentStep = _AssociationStep.complete;
+            _successMessage = _lastScannedDeviceName != null
+                ? 'Dispositivo associato: $_lastScannedDeviceName'
+                : 'Associazione completata!';
+            _errorMessage = null;
+            _isPairing = false;
+          });
+        } else if (step == _AssociationStep.scanQr && !_choseScanFirst) {
+          setState(() {
+            _currentStep = _AssociationStep.complete;
+            _successMessage = _lastScannedDeviceName != null
+                ? 'Dispositivo associato: $_lastScannedDeviceName'
+                : 'Associazione completata!';
+            _errorMessage = null;
+            _isPairing = false;
+          });
+        }
+      } else if (state.status == P2PSyncStatus.pairingVerification) {
+        if (!_choseScanFirst && step == _AssociationStep.showQr) {
+          _pairingTimeoutTimer?.cancel();
+          _autoSwitchToScanner();
+        }
+      } else if (state.status == P2PSyncStatus.error) {
+        if (!_p2pComplete && _isPairing) {
+          setState(() {
+            _errorMessage = state.errorMessage ?? 'Errore di connessione.';
+            _isPairing = false;
+          });
+        }
+      }
+    });
+  }
+
+  void _autoSwitchToScanner() {
+    if (mounted) {
+      setState(() {
+        _currentStep = _AssociationStep.scanQr;
+        _errorMessage = null;
+        _successMessage = 'QR rilevato! Ora inquadra il QR partner.';
+      });
+      _openScanner();
+    }
+  }
+
+  void _startP2pPairing() {
+    if (_isPairing) return;
+    _isPairing = true;
+    ref.read(nearbySyncServiceProvider).startPairingMode();
+    _pairingTimeoutTimer = Timer(const Duration(seconds: 120), () {
+      if (mounted && !_p2pComplete) {
+        setState(() {
+          _errorMessage =
+              'Tempo scaduto. Assicurati che l\'altro dispositivo '
+              'abbia scansionato il tuo QR.';
+          _isPairing = false;
+        });
+        _stopP2pPairing();
+      }
     });
   }
 
@@ -160,7 +250,11 @@ class _AssociateDeviceScreenState
       final raw = barcode.rawValue;
       if (raw == null || raw.isEmpty) continue;
 
-      _stopScanner();
+      if (_scannedDeviceId != null) {
+        final sameDevice =
+            P2PSecurityService.parseQrPayload(raw)?.deviceId == _scannedDeviceId;
+        if (sameDevice) return;
+      }
 
       final remoteIdentity = P2PSecurityService.parseQrPayload(raw);
       if (remoteIdentity == null) {
@@ -168,7 +262,8 @@ class _AssociateDeviceScreenState
         return;
       }
 
-      final existing = await _security.getAssociation(remoteIdentity.deviceId);
+      final existing =
+          await _security.getAssociation(remoteIdentity.deviceId);
       if (existing != null) {
         setState(() => _errorMessage = 'Dispositivo già associato.');
         return;
@@ -195,16 +290,31 @@ class _AssociateDeviceScreenState
           setState(() {
             _lastScannedDeviceName = remoteIdentity.deviceName;
             _scannedDeviceId = remoteIdentity.deviceId;
+            _qrScanned = true;
             _errorMessage = null;
             _successMessage =
                 'Associazione salvata: ${remoteIdentity.deviceName}';
           });
+        }
 
+        _stopScanner();
+
+        if (mounted) {
           if (_choseScanFirst) {
-            _proceedToShowQrAfterScan();
+            setState(() {
+              _currentStep = _AssociationStep.showQr;
+            });
+            _startScanFirstP2p();
           } else {
+            final service = ref.read(nearbySyncServiceProvider);
+            if (service.currentState.status ==
+                P2PSyncStatus.pairingVerification) {
+              await service.confirmPairingCode();
+            }
             setState(() {
               _currentStep = _AssociationStep.complete;
+              _successMessage =
+                  'Dispositivo associato: ${remoteIdentity.deviceName}';
             });
           }
         }
@@ -216,41 +326,6 @@ class _AssociateDeviceScreenState
 
       return;
     }
-  }
-
-  void _startReciprocalCheck(String? scannedDeviceId) {
-    if (scannedDeviceId == null) return;
-    _reciprocalCheckTimer?.cancel();
-    _reciprocalCheckTimer =
-        Timer.periodic(const Duration(seconds: 3), (timer) async {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      final reciprocalAssoc = await _security.getAssociation(scannedDeviceId);
-      if (reciprocalAssoc != null && reciprocalAssoc.remoteRole != null) {
-        timer.cancel();
-        if (mounted) {
-          setState(() {
-            _waitingForReciprocal = false;
-            _currentStep = _AssociationStep.complete;
-            _successMessage = 'Associazione reciproca completata!';
-          });
-        }
-      }
-    });
-
-    Future.delayed(const Duration(seconds: 30), () {
-      _reciprocalCheckTimer?.cancel();
-      if (mounted && _waitingForReciprocal) {
-        setState(() {
-          _waitingForReciprocal = false;
-          _errorMessage =
-              'Tempo scaduto. Assicurati che l\'altro dispositivo '
-              'abbia scansionato il tuo QR.';
-        });
-      }
-    });
   }
 
   @override
@@ -371,7 +446,9 @@ class _AssociateDeviceScreenState
                 labels[i],
                 style: TextStyle(
                   fontSize: 9,
-                  color: isActive ? Theme.of(context).colorScheme.primary : Colors.grey[400],
+                  color: isActive
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.grey[400],
                   fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
@@ -409,7 +486,7 @@ class _AssociateDeviceScreenState
                 Icon(Icons.person_outline, color: colorScheme.primary, size: 24),
                 const SizedBox(width: 8),
                 Text(
-                  'Scegli il ruolo del dispositivo',
+                  'Scegli il ruolo dei dispositivi',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -418,7 +495,7 @@ class _AssociateDeviceScreenState
             ),
             const SizedBox(height: 4),
             Text(
-              'Il ruolo determina come si comporterà la sincronizzazione.',
+              'Entrambi i dispositivi devono avere lo STESSO ruolo.',
               style: TextStyle(color: Colors.grey[600], fontSize: 13),
             ),
             const SizedBox(height: 16),
@@ -431,7 +508,7 @@ class _AssociateDeviceScreenState
                 children: [
                   RadioListTile<P2PSyncRole>(
                     title: const Text('Mio Dispositivo'),
-                    subtitle: const Text('Sincronizzazione automatica con gli altri catechisti'),
+                    subtitle: const Text('Sincronizzazione automatica'),
                     secondary: const Icon(Icons.sync),
                     value: P2PSyncRole.mioDispositivo,
                     contentPadding: EdgeInsets.zero,
@@ -487,6 +564,12 @@ class _AssociateDeviceScreenState
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.grey[600], fontSize: 13),
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  'Il passaggio da QR a scanner sarà automatico.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                ),
               ],
             ),
           ),
@@ -539,18 +622,17 @@ class _AssociateDeviceScreenState
             subtitle: 'Inquadra il QR code mostrato dall\'altro catechista',
             color: colorScheme.primary,
           ),
-          const SizedBox(height: 16),
         ] else ...[
           _buildInfoCard(
             icon: Icons.qr_code_scanner,
             title: 'Ora scansiona il QR partner',
             subtitle:
-                'L\'altro dispositivo dovrebbe mostrare il suo QR. Inquadralo con la fotocamera.',
+                'Passaggio automatico dopo che l\'altro ha scansionato il tuo QR.',
             color: Colors.orange,
           ),
-          const SizedBox(height: 16),
         ],
-        if (_showScanner && _scannerController != null)
+        const SizedBox(height: 16),
+        if (_scannerController != null)
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: SizedBox(
@@ -561,24 +643,17 @@ class _AssociateDeviceScreenState
               ),
             ),
           )
-        else if (_showScanner)
+        else
           const SizedBox(
             height: 280,
             child: Center(child: CircularProgressIndicator()),
           ),
-        const SizedBox(height: 12),
-        if (_showScanner)
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                _stopScanner();
-                setState(() {
-                  _showScanner = false;
-                });
-              },
-              icon: const Icon(Icons.close),
-              label: const Text('Chiudi scanner'),
+        if (_choseScanFirst && _qrScanned)
+          Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: Text(
+              'QR scansionato! Passaggio automatico in corso...',
+              style: TextStyle(color: Colors.green[600], fontSize: 13),
             ),
           ),
       ],
@@ -592,9 +667,10 @@ class _AssociateDeviceScreenState
           _buildInfoCard(
             icon: Icons.info_outline,
             title: 'Mostra questo QR all\'altro dispositivo',
-            subtitle:
-                'Hai già scansionato $_lastScannedDeviceName.\n'
-                'Ora l\'altro catechista deve scansionare il tuo QR.',
+            subtitle: _lastScannedDeviceName != null
+                ? 'Hai già scansionato $_lastScannedDeviceName.\n'
+                    'Ora l\'altro catechista deve scansionare il tuo QR.'
+                : 'In attesa che l\'altro dispositivo scansion il tuo QR...',
             color: Colors.green,
           ),
         ] else ...[
@@ -602,7 +678,8 @@ class _AssociateDeviceScreenState
             icon: Icons.qr_code,
             title: 'Mostra il tuo QR',
             subtitle:
-                'Mostra questo QR all\'altro catechista per farlo scansionare.',
+                'Quando l\'altro dispositivo lo scansionerà,\n'
+                'passerai automaticamente alla fotocamera.',
             color: colorScheme.primary,
           ),
         ],
@@ -631,7 +708,7 @@ class _AssociateDeviceScreenState
             ),
           ),
         const SizedBox(height: 16),
-        if (_waitingForReciprocal) ...[
+        if (_isPairing && !_p2pComplete) ...[
           const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -642,30 +719,10 @@ class _AssociateDeviceScreenState
               ),
               SizedBox(width: 10),
               Text(
-                'In attesa che l\'altro completi l\'associazione...',
+                'In attesa connessione...',
                 style: TextStyle(color: Colors.grey, fontSize: 13),
               ),
             ],
-          ),
-        ],
-        if (!_choseScanFirst && !_waitingForReciprocal) ...[
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: _proceedToScanAfterShow,
-              icon: const Icon(Icons.qr_code_scanner),
-              label: const Text('Ora scansiona il QR partner'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Dopo che l\'altro ha scansionato il tuo QR,\npremi qui per scansionare il suo.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: Colors.grey[500]),
           ),
         ],
       ],
@@ -822,5 +879,3 @@ class _AssociateDeviceScreenState
     );
   }
 }
-
-

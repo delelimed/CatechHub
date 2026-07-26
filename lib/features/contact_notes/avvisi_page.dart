@@ -15,8 +15,8 @@ class AvvisiPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final repo = ref.watch(avvisiRepoProvider);
-    final templates = repo.getAll();
+    final templatesAsync = ref.watch(avvisiTemplatesProvider);
+    final templates = templatesAsync.asData?.value ?? [];
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
@@ -210,6 +210,23 @@ class AvvisiPage extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     String query = '';
 
+    String? _studentMeetingDate(String classId) {
+      final m = _getNextMeeting(classId);
+      if (m == null) return null;
+      return '${m.date.day.toString().padLeft(2, '0')}/${m.date.month.toString().padLeft(2, '0')}/${m.date.year}';
+    }
+
+    String _studentAbsenceInfo(Student s) {
+      if (s.classId == null) return '';
+      final data = computeAbsenceData(s.id, s.classId!);
+      final parts = <String>[];
+      if (data.lastPresenceDate != null) {
+        parts.add('Ultima: ${data.lastPresenceDate}');
+      }
+      parts.add('Assenze: ${data.consecutiveAbsences}');
+      return parts.join(' · ');
+    }
+
     final result = await showModalBottomSheet<Student>(
       context: context,
       isScrollControlled: true,
@@ -264,6 +281,8 @@ class AvvisiPage extends ConsumerWidget {
                       itemCount: filtered.length,
                       itemBuilder: (context, index) {
                         final s = filtered[index];
+                        final meetingDate = s.classId != null ? _studentMeetingDate(s.classId!) : null;
+                        final absInfo = _studentAbsenceInfo(s);
                         return ListTile(
                           leading: CircleAvatar(
                             backgroundColor: Colors.green.withValues(alpha: 0.1),
@@ -273,12 +292,25 @@ class AvvisiPage extends ConsumerWidget {
                             ),
                           ),
                           title: Text('${s.name} ${s.surname}'),
-                          subtitle: s.classId != null
-                              ? Text(
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (s.classId != null)
+                                Text(
                                   _getClassName(s.classId!),
                                   style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                                )
-                              : null,
+                                ),
+                              if (meetingDate != null || absInfo.isNotEmpty)
+                                Text(
+                                  [
+                                    if (meetingDate != null) 'Incontro: $meetingDate',
+                                    if (absInfo.isNotEmpty) absInfo,
+                                  ].join(' · '),
+                                  style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                                ),
+                            ],
+                          ),
+                          isThreeLine: meetingDate != null || absInfo.isNotEmpty,
                           onTap: () => Navigator.pop(ctx, s),
                         );
                       },
@@ -647,7 +679,6 @@ class AvvisiPage extends ConsumerWidget {
                           );
                           ref.read(avvisiRepoProvider).save(template);
                           Navigator.pop(dialogContext);
-                          (context as Element).markNeedsBuild();
                         },
                         child: const Text('Salva'),
                       ),

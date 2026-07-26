@@ -14,6 +14,7 @@ v1.1.0
 
 - **Export Completo** — Esportazione in PDF dell'intero database per archiviazione al termine dell'anno.
 - **Archivio Storico** - implementazione di un archivio per seguire il progresso del ragazzo nel percorso di preparazione.
+- **Conteggio Rapido** - Possibilità di effettuare un conteggio rapido da confrontare con il numero di presenti del giorno, per verificare la completezza del gruppo senza dover ripetere l'appello.
 
 
 ## In valutazione

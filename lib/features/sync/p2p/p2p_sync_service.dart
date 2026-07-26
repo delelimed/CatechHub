@@ -506,7 +506,7 @@ class P2PSyncService {
       );
 
       await _nearby.startDiscovery(
-        displayName,
+        _syncPrefix,
         Strategy.P2P_CLUSTER,
         onEndpointFound: _onEndpointFound,
         onEndpointLost: (_) {},
@@ -656,7 +656,7 @@ class P2PSyncService {
         remote == P2PSyncRole.responsabile) {
       return false;
     }
-    return local != remote;
+    return local == remote;
   }
 
   Future<void> _sendHandshakePayload(String endpointId) async {
@@ -765,9 +765,9 @@ class P2PSyncService {
       _pendingEndpointId = null;
       _updateState(_state.copyWith(
         status: P2PSyncStatus.error,
-        errorMessage: 'Ruoli incompatibili: entrambi i dispositivi sono '
-            'impostati come "${_state.role.name}". '
-            'Uno deve essere "mioDispositivo" e l\'altro "altroCatechista".',
+        errorMessage: 'Ruoli incompatibili: i due dispositivi devono '
+            'avere lo stesso ruolo. Entrambi "mioDispositivo" o '
+            'entrambi "altroCatechista".',
       ));
       return;
     }
@@ -883,9 +883,9 @@ class P2PSyncService {
       _pendingEndpointId = null;
       _updateState(_state.copyWith(
         status: P2PSyncStatus.error,
-        errorMessage: 'Ruoli incompatibili: entrambi i dispositivi sono '
-            'impostati come "${_state.role.name}". '
-            'Uno deve essere "mioDispositivo" e l\'altro "altroCatechista".',
+        errorMessage: 'Ruoli incompatibili: i due dispositivi devono '
+            'avere lo stesso ruolo. Entrambi "mioDispositivo" o '
+            'entrambi "altroCatechista".',
       ));
       return;
     }
@@ -1284,19 +1284,10 @@ class P2PSyncService {
     }
 
     final existing = await _security.getAssociation(remoteIdentity.deviceId);
-    if (existing != null) {
-      _updateState(_state.copyWith(
-        status: P2PSyncStatus.sessionEstablished,
-        pairingCode: null,
-        remotePairingCode: null,
-      ));
-      return;
+    if (existing == null) {
+      await _saveAssociationIfNeeded(remoteIdentity,
+          remoteRole: _pendingHandshakeRemoteRole);
     }
-
-    final localIdentity = await _security.getLocalIdentity();
-
-    await _saveAssociationIfNeeded(remoteIdentity,
-        remoteRole: _pendingHandshakeRemoteRole);
 
     _pendingHandshakeIdentity = null;
     _pendingHandshakeRemoteRole = null;
@@ -1307,6 +1298,9 @@ class P2PSyncService {
       remotePairingCode: null,
     ));
 
+    await _ensureSessionKey(endpointId);
+
+    final localIdentity = await _security.getLocalIdentity();
     final iAmInitiator =
         localIdentity.deviceId.compareTo(remoteIdentity.deviceId) < 0;
 

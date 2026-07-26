@@ -1,3 +1,4 @@
+import '../../features/sync/p2p/p2p_security_service.dart';
 import '../../shared/models/attachment_model.dart';
 import '../../shared/models/attachment_parent_type.dart';
 import 'encrypted_file_storage.dart';
@@ -31,6 +32,9 @@ enum DataDeletionCategory {
 
   /// Documenti e consegne: certificati, autorizzazioni, consegne.
   documenti,
+
+  /// Associazioni con altri catechisti e dispositivi.
+  associazioni,
 }
 
 /// Resoconto delle quantità di dati presenti prima della cancellazione.
@@ -46,6 +50,7 @@ class DataDeletionCounts {
     required this.attachments,
     required this.documents,
     required this.deliveries,
+    required this.associations,
   });
 
   final int students;
@@ -56,8 +61,9 @@ class DataDeletionCounts {
   final int attachments;
   final int documents;
   final int deliveries;
+  final int associations;
 
-  int get total => students + attendance + planning + catechesi + contactNotes + attachments + documents + deliveries;
+  int get total => students + attendance + planning + catechesi + contactNotes + attachments + documents + deliveries + associations;
 }
 
 /// Servizio per la cancellazione selettiva dei dati.
@@ -89,6 +95,7 @@ class DataDeletionService {
       attachments: LocalDatabase.attachments().length,
       documents: LocalDatabase.documents().length,
       deliveries: LocalDatabase.documentDeliveries().length,
+      associations: LocalDatabase.trustedDevices().length,
     );
   }
 
@@ -144,6 +151,10 @@ class DataDeletionService {
 
     if (categories.contains(DataDeletionCategory.anagrafica)) {
       await _deleteAnagrafica();
+    }
+
+    if (categories.contains(DataDeletionCategory.associazioni)) {
+      await P2PSecurityService().removeAllAssociations();
     }
   }
 

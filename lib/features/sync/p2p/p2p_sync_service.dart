@@ -992,7 +992,7 @@ class P2PSyncService {
       'role': _state.role.name,
     });
 
-    if (existingAssoc != null) {
+    if (existingAssoc != null && !_state.isPairingMode) {
       addLog('DEBUG', 'Handshake: associazione esistente, invio ack cifrato');
       await _sendEncryptedPayload(endpointId, ack);
       _updateState(_state.copyWith(
@@ -1016,10 +1016,9 @@ class P2PSyncService {
         addLog('DEBUG', 'Auth request inviata a $endpointId');
       }
     } else {
-      addLog('DEBUG', 'Handshake: nuova associazione, calcolo pairing code');
+      addLog('DEBUG', 'Handshake: calcolo pairing code');
       final sharedSecret = await _security.computeStaticSharedSecret(
         remoteIdentity.publicKeyBase64,
-        forDeviceId: remoteIdentity.deviceId,
       );
       final code = P2PSecurityService.computePairingCode(sharedSecret);
 
@@ -1104,7 +1103,7 @@ class P2PSyncService {
     _endpointConnIdMap[endpointId] = remoteIdentity.deviceId;
     _connectedEndpoints.add(endpointId);
 
-    if (existingAssoc != null) {
+    if (existingAssoc != null && !_state.isPairingMode) {
       await _saveAssociationIfNeeded(remoteIdentity, remoteRole: remoteRole);
 
       _updateState(_state.copyWith(
@@ -1129,7 +1128,6 @@ class P2PSyncService {
     } else {
       final sharedSecret = await _security.computeStaticSharedSecret(
         remoteIdentity.publicKeyBase64,
-        forDeviceId: remoteIdentity.deviceId,
       );
       final code = P2PSecurityService.computePairingCode(sharedSecret);
 
@@ -1177,8 +1175,7 @@ class P2PSyncService {
       }
 
       final sharedSecret = await _security.computeStaticSharedSecret(
-          remoteIdentity.publicKeyBase64,
-          forDeviceId: remoteIdentity.deviceId);
+          remoteIdentity.publicKeyBase64);
 
       await _security.registerAndSaveAssociation(
         deviceId: remoteIdentity.deviceId,

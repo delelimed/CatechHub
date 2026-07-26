@@ -372,39 +372,30 @@ class P2PSecurityService {
     required String remotePublicKeyBase64,
     bool isInitiator = false,
   }) async {
-    final ephemeralKeyPair = await X25519().newKeyPair();
     final remoteKeyBytes = base64Decode(remotePublicKeyBase64);
-    final myKeyPair = await _getOrCreateAssociationKeyPair(remoteDeviceId);
+    final identityKeyPair = await getOrCreateIdentityKeyPair();
 
-    final staticShared = await _x25519.sharedSecretKey(
-      keyPair: myKeyPair,
+    final sharedSecret = await _x25519.sharedSecretKey(
+      keyPair: identityKeyPair,
       remotePublicKey: SimplePublicKey(remoteKeyBytes, type: KeyPairType.x25519),
     );
-    final staticBytes = await staticShared.extractBytes();
+    final sharedBytes = await sharedSecret.extractBytes();
 
-    final ecdhe = await _x25519.sharedSecretKey(
-      keyPair: ephemeralKeyPair,
-      remotePublicKey: SimplePublicKey(remoteKeyBytes, type: KeyPairType.x25519),
-    );
-    final ecdheBytes = await ecdhe.extractBytes();
-
-    final handshakeNonce = secureRandom(32);
+    final hkdfInput = sha256.convert(sharedBytes).bytes;
+    final handshakeNonce = Uint8List.fromList(hkdfInput.sublist(0, 32));
 
     final hkdf = Hkdf(
       hmac: Hmac(_sha256Algo),
       outputLength: 32,
     );
 
+    final localIdentity = await getLocalIdentity();
+    final ids = [localIdentity.deviceId, remoteDeviceId]..sort();
     final info = utf8.encode(
-        'CatechHub_P2P_Session_v2:$remoteDeviceId:${isInitiator ? 'init' : 'resp'}');
-
-    final inputKeyMaterial = Uint8List(staticBytes.length + ecdheBytes.length + handshakeNonce.length);
-    inputKeyMaterial.setAll(0, staticBytes);
-    inputKeyMaterial.setAll(staticBytes.length, ecdheBytes);
-    inputKeyMaterial.setAll(staticBytes.length + ecdheBytes.length, handshakeNonce);
+        'CatechHub_P2P_Session_v2:${ids[0]}:${ids[1]}');
 
     final sessionKeyData = await hkdf.deriveKey(
-      secretKey: SecretKey(inputKeyMaterial),
+      secretKey: SecretKey(Uint8List.fromList(sharedBytes)),
       nonce: handshakeNonce,
       info: info,
     );

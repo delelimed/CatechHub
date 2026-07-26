@@ -197,14 +197,12 @@ class AvvisiPage extends ConsumerWidget {
   String _resolveDateOnly(BuildContext context, WidgetRef ref, String text) {
     if (!hasPlaceholders(text)) return text;
     try {
-      final students = ref.read(studentsRepositoryProvider).getAllStudentsSync();
-      if (students.isEmpty) return text;
-      final student = students.first;
-      if (student.classId == null) return text;
-
       String result = text;
-      final groupName = _getClassName(student.classId!);
-      final nextMeeting = _getNextMeeting(student.classId!);
+      final students = ref.read(studentsRepositoryProvider).getAllStudentsSync();
+      final classId = students.isNotEmpty ? students.first.classId : null;
+
+      final groupName = classId != null ? _getClassName(classId) : '';
+      final nextMeeting = _getNextMeeting(classId);
       if (groupName.isNotEmpty) {
         result = result.replaceAll('{nome_gruppo}', groupName);
       }
@@ -560,7 +558,7 @@ class AvvisiPage extends ConsumerWidget {
     );
   }
 
-  PlanningMeeting? _getNextMeeting(String classId) {
+  PlanningMeeting? _getNextMeeting([String? classId]) {
     try {
       final repo = PlanningRepository();
       final meetings = repo.getMeetingsSync();
@@ -570,7 +568,7 @@ class AvvisiPage extends ConsumerWidget {
 
       for (final meeting in meetings) {
         if (meeting.isReunion) continue;
-        if (meeting.classId != classId) continue;
+        if (classId != null && meeting.classId != classId) continue;
         final meetingDate = DateTime(meeting.date.year, meeting.date.month, meeting.date.day);
         if (!meetingDate.isBefore(today)) {
           if (closest == null || meeting.date.isBefore(closest.date)) {

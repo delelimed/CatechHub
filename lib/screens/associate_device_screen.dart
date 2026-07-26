@@ -229,13 +229,11 @@ class _AssociateDeviceScreenState
           });
         }
       } else if (state.status == P2PSyncStatus.pairingVerification) {
-        if (!_choseScanFirst && step == _AssociationStep.showQr && !_pairingDialogShown) {
+        if (step == _AssociationStep.showQr && !_pairingDialogShown) {
           _pairingDialogShown = true;
           _pairingTimeoutTimer?.cancel();
           if (state.pairingCode != null) {
             _showPairingCodeDialog(service, state.pairingCode!);
-          } else {
-            _autoSwitchToScanner();
           }
         }
       } else if (state.status == P2PSyncStatus.error) {
@@ -300,9 +298,18 @@ class _AssociateDeviceScreenState
                   style: TextStyle(color: Colors.red)),
             ),
             FilledButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.of(ctx).pop();
-                _autoSwitchToScanner();
+                await service.confirmPairingCode();
+                if (_choseScanFirst) {
+                  if (mounted) {
+                    setState(() {
+                      _successMessage = 'Codice verificato! Mostra il QR per il partner.';
+                    });
+                  }
+                } else {
+                  _autoSwitchToScanner();
+                }
               },
               child: const Text('Codici corrispondono'),
             ),
@@ -359,81 +366,80 @@ class _AssociateDeviceScreenState
 
       final existing =
           await _security.getAssociation(remoteIdentity.deviceId);
-      if (existing != null) {
-        setState(() => _errorMessage = 'Dispositivo già associato.');
-        return;
+
+      if (mounted) {
+        setState(() {
+          _lastScannedDeviceName = remoteIdentity.deviceName;
+          _scannedDeviceId = remoteIdentity.deviceId;
+          _qrScanned = true;
+          _errorMessage = null;
+        });
       }
 
-      try {
-        final syncService = ref.read(nearbySyncServiceProvider);
-        final localRole = syncService.currentState.role.name;
-
-        final sharedSecret = await _security.computeStaticSharedSecret(
-            remoteIdentity.publicKeyBase64,
-            forDeviceId: remoteIdentity.deviceId);
-
-        await _security.registerAndSaveAssociation(
-          deviceId: remoteIdentity.deviceId,
-          deviceName: remoteIdentity.deviceName,
-          publicKeyBase64: remoteIdentity.publicKeyBase64,
-          fingerprint: remoteIdentity.fingerprint,
-          sharedSecretBase64: sharedSecret,
-          localRole: localRole,
-        );
-
+      if (_choseScanFirst) {
+        _stopScanner();
         if (mounted) {
           setState(() {
-            _lastScannedDeviceName = remoteIdentity.deviceName;
-            _scannedDeviceId = remoteIdentity.deviceId;
-            _qrScanned = true;
-            _errorMessage = null;
-            _successMessage =
-                'Associazione salvata: ${remoteIdentity.deviceName}';
+            _currentStep = _AssociationStep.showQr;
           });
+          _startScanFirstP2p();
+        }
+      } else {
+        if (existing == null) {
+          try {
+            final syncService = ref.read(nearbySyncServiceProvider);
+            final localRole = syncService.currentState.role.name;
+
+            final sharedSecret = await _security.computeStaticSharedSecret(
+                remoteIdentity.publicKeyBase64);
+
+            await _security.registerAndSaveAssociation(
+              deviceId: remoteIdentity.deviceId,
+              deviceName: remoteIdentity.deviceName,
+              publicKeyBase64: remoteIdentity.publicKeyBase64,
+              fingerprint: remoteIdentity.fingerprint,
+              sharedSecretBase64: sharedSecret,
+              localRole: localRole,
+            );
+          } catch (e) {
+            if (mounted) {
+              setState(() => _errorMessage = 'Errore salvataggio associazione: $e');
+            }
+            return;
+          }
         }
 
         _stopScanner();
 
         if (mounted) {
-          if (_choseScanFirst) {
-            setState(() {
-              _currentStep = _AssociationStep.showQr;
-            });
-            _startScanFirstP2p();
+          final service = ref.read(nearbySyncServiceProvider);
+          final currentState = service.currentState;
+          if (currentState.status ==
+              P2PSyncStatus.pairingVerification) {
+            await service.confirmPairingCode();
+          } else if (currentState.connectedDeviceId != null &&
+              _scannedDeviceId != null) {
+            await service.finalizeAssociation(
+              currentState.connectedDeviceId!,
+              _scannedDeviceId!,
+            );
           } else {
-            final service = ref.read(nearbySyncServiceProvider);
-            final currentState = service.currentState;
-            if (currentState.status ==
-                P2PSyncStatus.pairingVerification) {
-              await service.confirmPairingCode();
-            } else if (currentState.connectedDeviceId != null &&
-                _scannedDeviceId != null) {
+            service.addLog('WARN',
+                'Stato inatteso: ${currentState.status}, '
+                'connectedDeviceId=${currentState.connectedDeviceId}, '
+                'scannedDeviceId=$_scannedDeviceId');
+            if (currentState.connectedDeviceId != null) {
               await service.finalizeAssociation(
                 currentState.connectedDeviceId!,
-                _scannedDeviceId!,
+                remoteIdentity.deviceId,
               );
-            } else {
-              service.addLog('WARN',
-                  'Stato inatteso: ${currentState.status}, '
-                  'connectedDeviceId=${currentState.connectedDeviceId}, '
-                  'scannedDeviceId=$_scannedDeviceId');
-              if (currentState.connectedDeviceId != null) {
-                await service.finalizeAssociation(
-                  currentState.connectedDeviceId!,
-                  remoteIdentity.deviceId,
-                );
-              }
             }
-            setState(() {
-              _currentStep = _AssociationStep.complete;
-              _successMessage =
-                  'Dispositivo associato: ${remoteIdentity.deviceName}';
-            });
           }
-        }
-      } catch (e) {
-        if (mounted) {
-          setState(() => _errorMessage = 'Errore associazione: $e');
+          setState(() {
+            _currentStep = _AssociationStep.complete;
+            _successMessage =
+                'Dispositivo associato: ${remoteIdentity.deviceName}';
+          });
         }
       }
 

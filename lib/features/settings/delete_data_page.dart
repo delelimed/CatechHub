@@ -119,6 +119,8 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
         return 'Foto e PDF allegati';
       case DataDeletionCategory.documenti:
         return 'Documenti e consegne';
+      case DataDeletionCategory.associazioni:
+        return 'Associazioni dispositivi';
     }
   }
 
@@ -138,6 +140,8 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
         return 'Tutti i file cifrati (foto e PDF)';
       case DataDeletionCategory.documenti:
         return 'Certificati, autorizzazioni e consegne';
+      case DataDeletionCategory.associazioni:
+        return 'Dispositivi associati e chiavi di sincronizzazione';
     }
   }
 
@@ -157,6 +161,8 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
         return _counts.attachments;
       case DataDeletionCategory.documenti:
         return _counts.documents;
+      case DataDeletionCategory.associazioni:
+        return _counts.associations;
     }
   }
 
@@ -310,6 +316,8 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
         return Icons.attach_file_rounded;
       case DataDeletionCategory.documenti:
         return Icons.description_rounded;
+      case DataDeletionCategory.associazioni:
+        return Icons.sync_alt_rounded;
     }
   }
 }

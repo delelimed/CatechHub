@@ -187,9 +187,15 @@ class _AssociateDeviceScreenState
           return;
         }
 
-        _p2pComplete = true;
+        if (!_choseScanFirst &&
+            step == _AssociationStep.showQr &&
+            state.status == P2PSyncStatus.sessionEstablished &&
+            !state.authenticatedByRemote) {
+          return;
+        }
 
         if (step == _AssociationStep.showQr && _choseScanFirst) {
+          _p2pComplete = true;
           setState(() {
             _currentStep = _AssociationStep.complete;
             _successMessage = _lastScannedDeviceName != null
@@ -199,6 +205,7 @@ class _AssociateDeviceScreenState
             _isPairing = false;
           });
         } else if (step == _AssociationStep.scanQr && !_choseScanFirst) {
+          _p2pComplete = true;
           setState(() {
             _currentStep = _AssociationStep.complete;
             _successMessage = _lastScannedDeviceName != null
@@ -314,15 +321,27 @@ class _AssociateDeviceScreenState
             _startScanFirstP2p();
           } else {
             final service = ref.read(nearbySyncServiceProvider);
-            if (service.currentState.status ==
+            final currentState = service.currentState;
+            if (currentState.status ==
                 P2PSyncStatus.pairingVerification) {
               await service.confirmPairingCode();
-            } else if (service.currentState.connectedDeviceId != null &&
+            } else if (currentState.connectedDeviceId != null &&
                 _scannedDeviceId != null) {
               await service.finalizeAssociation(
-                service.currentState.connectedDeviceId!,
+                currentState.connectedDeviceId!,
                 _scannedDeviceId!,
               );
+            } else {
+              service.addLog('WARN',
+                  'Stato inatteso: ${currentState.status}, '
+                  'connectedDeviceId=${currentState.connectedDeviceId}, '
+                  'scannedDeviceId=$_scannedDeviceId');
+              if (currentState.connectedDeviceId != null) {
+                await service.finalizeAssociation(
+                  currentState.connectedDeviceId!,
+                  remoteIdentity.deviceId,
+                );
+              }
             }
             setState(() {
               _currentStep = _AssociationStep.complete;

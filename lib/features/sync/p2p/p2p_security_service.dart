@@ -7,6 +7,8 @@ import 'package:cryptography/cryptography.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive/hive.dart';
 
+import '../../../core/storage/local_database.dart';
+
 class P2PIdentity {
   final String deviceId;
   final String deviceName;
@@ -526,21 +528,22 @@ class P2PSecurityService {
     return deviceKeyPair;
   }
 
+  Box<Map> get _assocBox => Hive.box<Map>(LocalDatabase.trustedDevicesBox);
+
   Future<void> saveAssociation(P2PDeviceAssociation association) async {
-    final key = '$_storagePrefix${association.deviceId}';
-    await _secureStorage.write(
-      key: key,
-      value: jsonEncode(association.toJson()),
-    );
+    await _assocBox.put(association.deviceId, association.toJson());
   }
 
   Future<P2PDeviceAssociation?> getAssociation(String deviceId) async {
-    final key = '$_storagePrefix$deviceId';
-    final raw = await _secureStorage.read(key: key);
-    if (raw == null) return null;
     try {
+      final raw = _assocBox.get(deviceId);
+      if (raw == null) {
+        final migrated = await _migrateFromSecureStorage(deviceId);
+        if (migrated != null) return migrated;
+        return null;
+      }
       final assoc =
-          P2PDeviceAssociation.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+          P2PDeviceAssociation.fromJson(Map<String, dynamic>.from(raw));
       if (!assoc.isValid) {
         await removeAssociation(deviceId);
         return null;
@@ -552,28 +555,30 @@ class P2PSecurityService {
   }
 
   Future<List<P2PDeviceAssociation>> getAllAssociations() async {
-    final allKeys = await _secureStorage.readAll();
     final associations = <P2PDeviceAssociation>[];
-    final expiredKeys = <String>[];
+    final expiredIds = <String>[];
 
-    for (final entry in allKeys.entries) {
-      if (!entry.key.startsWith(_storagePrefix)) continue;
+    await _migrateAllFromSecureStorage(associations);
+
+    for (final key in _assocBox.keys) {
       try {
+        final raw = _assocBox.get(key);
+        if (raw == null) continue;
         final assoc = P2PDeviceAssociation.fromJson(
-          jsonDecode(entry.value) as Map<String, dynamic>,
+          Map<String, dynamic>.from(raw),
         );
         if (assoc.isValid) {
           associations.add(assoc);
         } else {
-          expiredKeys.add(entry.key);
+          expiredIds.add(key.toString());
         }
       } catch (_) {
-        expiredKeys.add(entry.key);
+        expiredIds.add(key.toString());
       }
     }
 
-    for (final key in expiredKeys) {
-      await _secureStorage.delete(key: key);
+    for (final id in expiredIds) {
+      await _assocBox.delete(id);
     }
 
     associations.sort((a, b) => b.associatedAt.compareTo(a.associatedAt));
@@ -581,14 +586,57 @@ class P2PSecurityService {
   }
 
   Future<void> removeAssociation(String deviceId) async {
+    await _assocBox.delete(deviceId);
     await _secureStorage.delete(key: '$_storagePrefix$deviceId');
   }
 
   Future<void> removeAllAssociations() async {
+    await _assocBox.clear();
     final allKeys = await _secureStorage.readAll();
     for (final key in allKeys.keys) {
       if (key.startsWith(_storagePrefix)) {
         await _secureStorage.delete(key: key);
+      }
+    }
+  }
+
+  Future<P2PDeviceAssociation?> _migrateFromSecureStorage(
+      String deviceId) async {
+    final key = '$_storagePrefix$deviceId';
+    final raw = await _secureStorage.read(key: key);
+    if (raw == null) return null;
+    try {
+      final assoc = P2PDeviceAssociation.fromJson(
+        jsonDecode(raw) as Map<String, dynamic>,
+      );
+      if (assoc.isValid) {
+        await saveAssociation(assoc);
+        await _secureStorage.delete(key: key);
+        return assoc;
+      }
+      await _secureStorage.delete(key: key);
+    } catch (_) {
+      await _secureStorage.delete(key: key);
+    }
+    return null;
+  }
+
+  Future<void> _migrateAllFromSecureStorage(
+      List<P2PDeviceAssociation> associations) async {
+    final allKeys = await _secureStorage.readAll();
+    for (final entry in allKeys.entries) {
+      if (!entry.key.startsWith(_storagePrefix)) continue;
+      try {
+        final assoc = P2PDeviceAssociation.fromJson(
+          jsonDecode(entry.value) as Map<String, dynamic>,
+        );
+        if (assoc.isValid) {
+          await saveAssociation(assoc);
+          associations.add(assoc);
+        }
+        await _secureStorage.delete(key: entry.key);
+      } catch (_) {
+        await _secureStorage.delete(key: entry.key);
       }
     }
   }

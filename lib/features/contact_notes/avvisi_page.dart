@@ -561,7 +561,6 @@ class AvvisiPage extends ConsumerWidget {
   }
 
   PlanningMeeting? _getNextMeeting(String classId) {
-    if (classId.isEmpty) return null;
     try {
       final repo = PlanningRepository();
       final meetings = repo.getMeetingsSync();
@@ -570,7 +569,6 @@ class AvvisiPage extends ConsumerWidget {
       PlanningMeeting? closest;
 
       for (final meeting in meetings) {
-        if (meeting.classId != classId) continue;
         if (meeting.isReunion) continue;
         final meetingDate = DateTime(meeting.date.year, meeting.date.month, meeting.date.day);
         if (!meetingDate.isBefore(today)) {

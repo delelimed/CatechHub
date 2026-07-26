@@ -48,6 +48,10 @@ class P2PSyncState {
   final String? remotePairingCode;
   final String? remoteDeviceFingerprint;
   final bool authenticatedByRemote;
+  final int totalRecordsToExchange;
+  final int sentRecordsCount;
+  final int receivedRecordsCount;
+  final bool largeSyncInProgress;
 
   const P2PSyncState({
     this.status = P2PSyncStatus.idle,
@@ -71,7 +75,17 @@ class P2PSyncState {
     this.remotePairingCode,
     this.remoteDeviceFingerprint,
     this.authenticatedByRemote = false,
+    this.totalRecordsToExchange = 0,
+    this.sentRecordsCount = 0,
+    this.receivedRecordsCount = 0,
+    this.largeSyncInProgress = false,
   });
+
+  double get syncProgressPercent {
+    if (totalRecordsToExchange == 0) return 0;
+    return ((sentRecordsCount + receivedRecordsCount) / totalRecordsToExchange)
+        .clamp(0.0, 1.0);
+  }
 
   P2PSyncState copyWith({
     bool? authenticatedByRemote,
@@ -95,6 +109,10 @@ class P2PSyncState {
     String? pairingCode,
     String? remotePairingCode,
     String? remoteDeviceFingerprint,
+    int? totalRecordsToExchange,
+    int? sentRecordsCount,
+    int? receivedRecordsCount,
+    bool? largeSyncInProgress,
     bool clearError = false,
   }) {
     return P2PSyncState(
@@ -127,6 +145,13 @@ class P2PSyncState {
           remoteDeviceFingerprint ?? this.remoteDeviceFingerprint,
       authenticatedByRemote:
           authenticatedByRemote ?? this.authenticatedByRemote,
+      totalRecordsToExchange:
+          totalRecordsToExchange ?? this.totalRecordsToExchange,
+      sentRecordsCount: sentRecordsCount ?? this.sentRecordsCount,
+      receivedRecordsCount:
+          receivedRecordsCount ?? this.receivedRecordsCount,
+      largeSyncInProgress:
+          largeSyncInProgress ?? this.largeSyncInProgress,
     );
   }
 }
@@ -180,6 +205,11 @@ class P2PSyncService {
     if (_syncLogs.length > _maxLogEntries) {
       _syncLogs.removeAt(0);
     }
+  }
+
+  void clearLogs() {
+    _syncLogs.clear();
+    addLog('INFO', 'Log cancellati dall\'utente');
   }
 
   Stream<P2PSyncState> get onStateChanged => _stateController.stream;
@@ -402,6 +432,7 @@ class P2PSyncService {
   void _scheduleReconnectCycle() {
     if (!_continuousModeActive) return;
     Future.delayed(_reconnectDelay, () {
+      if (!_continuousModeActive) return;
       _attemptKnownDeviceConnections();
       _scheduleReconnectCycle();
     });
@@ -432,7 +463,9 @@ class P2PSyncService {
 
   void _watchLocalChanges() {
     _hiveBoxesSub?.cancel();
+    addLog('DEBUG', 'Avvio osservazione modifiche locali');
     final controllers = <StreamController<BoxEvent>>[];
+    int watchedBoxes = 0;
     for (final boxName in HiveSyncEngine.syncableBoxes.keys) {
       try {
         final box = Hive.box<Map>(boxName);
@@ -441,9 +474,14 @@ class P2PSyncService {
           if (!ctrl.isClosed) ctrl.add(event);
         });
         controllers.add(ctrl);
+        watchedBoxes++;
       } catch (_) {}
     }
-    if (controllers.isEmpty) return;
+    if (controllers.isEmpty) {
+      addLog('WARN', 'Nessun box Hive disponibile per watch');
+      return;
+    }
+    addLog('DEBUG', 'Watch attivato su $watchedBoxes box Hive');
 
     DateTime _lastChangeEmit = DateTime.now();
     final mergedCtrl = StreamController<BoxEvent>.broadcast();
@@ -463,12 +501,19 @@ class P2PSyncService {
 
   Future<void> _onLocalDataChanged() async {
     if (_connectedEndpoints.isEmpty) return;
-    if (_isSyncing) return;
+    if (_isSyncing) {
+      addLog('DEBUG', 'Modifica locale ignorata: sync in corso');
+      return;
+    }
 
     final engine = HiveSyncEngine();
     final lastSync = await engine.getLastSyncTimestamp();
     final modified = engine.extractModifiedRecords(lastSync);
-    if (modified.isEmpty) return;
+    if (modified.isEmpty) {
+      addLog('DEBUG', 'Modifica locale rilevata ma nessun nuovo record');
+      return;
+    }
+    addLog('INFO', 'Modifiche locali rilevate: ${modified.length} record da sincronizzare');
 
     for (final endpointId in _connectedEndpoints.toList()) {
       await _pushIncrementalSync(endpointId, modified);
@@ -479,18 +524,18 @@ class P2PSyncService {
   Future<void> _pushIncrementalSync(
       String endpointId, List<SyncRecord> records) async {
     try {
-      final modifiedKeys = records
-          .map((r) => '${r.boxName}:${r.id}')
-          .toList();
-      if (modifiedKeys.isEmpty) return;
+      if (records.isEmpty) return;
 
-      final payload = jsonEncode({
-        'type': 'p2p_sync_request',
-        'keys': modifiedKeys,
+      addLog('INFO', 'Invio incrementale: ${records.length} nuovi/modificati record');
+      final engine = HiveSyncEngine();
+      final recordsPayload = jsonEncode({
+        'type': 'p2p_sync_data',
+        'records': engine.serializeRecords(records),
       });
-      await _sendEncryptedPayload(endpointId, payload);
+      await _sendEncryptedPayload(endpointId, recordsPayload);
+      addLog('INFO', 'Invio incrementale completato');
     } catch (e) {
-      debugPrint('[P2P] Incremental push error: $e');
+      addLog('ERROR', 'Errore invio incrementale: $e');
     }
   }
 
@@ -621,7 +666,7 @@ class P2PSyncService {
       return;
     }
 
-    if (!_state.isPairingMode && !_continuousModeActive) {
+    if (!_state.isPairingMode) {
       final deviceId = _extractDeviceId(info.endpointName);
       if (deviceId != null) {
         final association = await _security.getAssociation(deviceId);
@@ -630,13 +675,15 @@ class P2PSyncService {
           await _nearby.rejectConnection(endpointId);
           return;
         }
+        addLog('DEBUG', 'Associazione valida trovata per $deviceId, accetto connessione');
       } else {
         addLog('WARN', 'Rifiuto connessione: impossibile estrarre deviceId');
         await _nearby.rejectConnection(endpointId);
         return;
       }
+    } else {
+      addLog('DEBUG', 'Modalità pairing: accetto connessione senza verifica associazione');
     }
-    addLog('DEBUG', 'Accetto connessione da $endpointId');
     _pendingEndpointId = endpointId;
 
     await _nearby.acceptConnection(
@@ -1000,9 +1047,7 @@ class P2PSyncService {
     _connectedEndpoints.add(endpointId);
 
     if (existingAssoc != null) {
-      if (!_isSyncing) {
-        await _saveAssociationIfNeeded(remoteIdentity, remoteRole: remoteRole);
-      }
+      await _saveAssociationIfNeeded(remoteIdentity, remoteRole: remoteRole);
 
       _updateState(_state.copyWith(
         connectedFingerprint: remoteIdentity.fingerprint,
@@ -1021,6 +1066,7 @@ class P2PSyncService {
           'deviceName': localIdentity.deviceName,
         });
         await _sendEncryptedPayload(endpointId, authRequest);
+        addLog('DEBUG', 'Auth request inviata a $endpointId');
       }
     } else {
       final sharedSecret = await _security.computeStaticSharedSecret(
@@ -1096,8 +1142,10 @@ class P2PSyncService {
       String endpointId, Map<String, dynamic> message) async {
     final deviceId = message['deviceId'] as String?;
     final deviceName = message['deviceName'] as String? ?? 'Sconosciuto';
+    addLog('INFO', 'Richiesta autenticazione da $deviceName ($deviceId)');
 
     if (_state.role != P2PSyncRole.altroCatechista) {
+      addLog('INFO', 'Auto-accettazione auth per $deviceName (ruolo: ${_state.role.name})');
       final ack = jsonEncode({
         'type': 'p2p_auth_response',
         'accepted': true,
@@ -1109,6 +1157,7 @@ class P2PSyncService {
     }
 
     if (deviceId != null && _sessionConfirmedDevices.contains(deviceId)) {
+      addLog('INFO', 'Auth già confermata per $deviceName, rieinvio risposta');
       final ack = jsonEncode({
         'type': 'p2p_auth_response',
         'accepted': true,
@@ -1118,6 +1167,7 @@ class P2PSyncService {
       return;
     }
 
+    addLog('INFO', 'In attesa conferma utente per sincronizzazione con $deviceName');
     _updateState(_state.copyWith(
       awaitingConfirmation: true,
       pendingConfirmationDeviceName: deviceName,
@@ -1190,7 +1240,8 @@ class P2PSyncService {
       phase.sendDone = false;
       phase.receiveDone = false;
       _isSyncing = false;
-      addLog('INFO', 'Sincronizzazione completata con $endpointId');
+      addLog('INFO', 'Sincronizzazione completata con $endpointId '
+          '(${_state.totalRecordsToExchange} record totali)');
 
       try {
         for (final entry in HiveSyncEngine.syncableBoxes.entries) {
@@ -1202,6 +1253,10 @@ class P2PSyncService {
       _updateState(_state.copyWith(
         status: P2PSyncStatus.completed,
         lastSyncAt: DateTime.now(),
+        totalRecordsToExchange: 0,
+        sentRecordsCount: 0,
+        receivedRecordsCount: 0,
+        largeSyncInProgress: false,
       ));
     }
   }
@@ -1288,30 +1343,48 @@ class P2PSyncService {
           .map((e) => SyncIndexEntry.fromJson(Map<String, dynamic>.from(e)))
           .toList();
 
-      addLog('DEBUG',
+      addLog('INFO',
           'Indice remoto ricevuto: ${remoteIndex.length} record, locale: ${localIndex.length}');
 
       final neededFromRemote = engine.computeNeededRecords(remoteIndex);
       final neededFromLocal =
           engine.computeNeededRecordsFromLocal(localIndex, remoteIndex);
 
-      addLog('DEBUG',
-          'Record necessari dal remoto: ${neededFromRemote.length}, dal locale: ${neededFromLocal.length}');
+      final totalToExchange = neededFromRemote.length + neededFromLocal.length;
+      addLog('INFO',
+          'Scambio necessario: $totalToExchange record '
+          '(invio ${neededFromLocal.length}, ricezione ${neededFromRemote.length})');
+
+      _updateState(_state.copyWith(
+        totalRecordsToExchange: totalToExchange,
+        sentRecordsCount: 0,
+        receivedRecordsCount: 0,
+        largeSyncInProgress: totalToExchange > 50,
+      ));
+
+      if (totalToExchange > 50) {
+        addLog('INFO',
+            'Sincronizzazione estesa rilevata: $totalToExchange record. '
+            'Verrà mostrato l\'avanzamento.');
+      }
 
       if (neededFromLocal.isNotEmpty) {
         final localRecords = engine.fetchRecords(neededFromLocal);
-        addLog('DEBUG', 'Invio ${localRecords.length} record al remoto');
+        addLog('INFO', 'Invio ${localRecords.length} record al remoto');
+        _updateState(_state.copyWith(
+          sentRecordsCount: localRecords.length,
+        ));
         final recordsPayload = jsonEncode({
           'type': 'p2p_sync_data',
           'records': engine.serializeRecords(localRecords),
         });
         await _sendEncryptedPayload(endpointId, recordsPayload);
+        addLog('INFO', 'Invio completato: ${localRecords.length} record');
       }
       phase.sendDone = true;
-      addLog('DEBUG', 'SendDone per $endpointId');
 
       if (neededFromRemote.isNotEmpty) {
-        addLog('DEBUG',
+        addLog('INFO',
             'Richiesta ${neededFromRemote.length} record dal remoto');
         final requestPayload = jsonEncode({
           'type': 'p2p_sync_request',
@@ -1319,7 +1392,7 @@ class P2PSyncService {
         });
         await _sendEncryptedPayload(endpointId, requestPayload);
       } else {
-        addLog('DEBUG', 'Nessun record necessario dal remoto');
+        addLog('INFO', 'Nessun record necessario dal remoto');
         phase.receiveDone = true;
         _checkSyncComplete(endpointId);
       }
@@ -1352,15 +1425,18 @@ class P2PSyncService {
       }
 
       final records = engine.fetchRecords(keys);
-      addLog('DEBUG', 'Invio ${records.length} record richiesti');
+      addLog('INFO', 'Invio ${records.length} record richiesti');
+      _updateState(_state.copyWith(
+        sentRecordsCount: _state.sentRecordsCount + records.length,
+      ));
       final recordsPayload = jsonEncode({
         'type': 'p2p_sync_data',
         'records': engine.serializeRecords(records),
       });
       await _sendEncryptedPayload(endpointId, recordsPayload);
+      addLog('INFO', 'Invio ${records.length} record completato');
 
       phase.sendDone = true;
-      addLog('DEBUG', 'SendDone dopo sync_request per $endpointId');
       _checkSyncComplete(endpointId);
     } catch (e) {
       addLog('ERROR', 'Errore risposta richiesta sync: $e');
@@ -1382,6 +1458,14 @@ class P2PSyncService {
       final result = await engine.applyRemoteRecords(records);
       addLog('INFO',
           'Applicati ${result.receivedRecords} record, ${result.conflictsResolved} conflitti risolti');
+
+      _updateState(_state.copyWith(
+        receivedRecordsCount: _state.receivedRecordsCount + result.receivedRecords,
+        largeSyncInProgress:
+            _state.totalRecordsToExchange > 50 &&
+            _state.sentRecordsCount + _state.receivedRecordsCount + result.receivedRecords <
+                _state.totalRecordsToExchange,
+      ));
 
       phase.receiveDone = true;
       addLog('DEBUG', 'ReceiveDone per $endpointId');
@@ -1536,13 +1620,18 @@ class P2PSyncService {
   }
 
   Future<void> confirmSync() async {
-    if (!_state.awaitingConfirmation) return;
+    if (!_state.awaitingConfirmation) {
+      addLog('WARN', 'confirmSync chiamato senza richiesta in sospeso');
+      return;
+    }
 
+    addLog('INFO', 'Sync confermata dall\'utente');
     final endpointId = _state.connectedDeviceId;
     final confirmedDeviceId = _state.pendingConfirmationDeviceId;
 
     if (confirmedDeviceId != null) {
       _sessionConfirmedDevices.add(confirmedDeviceId);
+      addLog('DEBUG', 'Dispositivo $confirmedDeviceId aggiunto ai confermati');
     }
 
     _updateState(_state.copyWith(
@@ -1558,12 +1647,17 @@ class P2PSyncService {
         'accepted': true,
       });
       await _sendEncryptedPayload(endpointId, ack);
+      addLog('DEBUG', 'Risposta auth positiva inviata a $endpointId');
     }
   }
 
   Future<void> rejectSync() async {
-    if (!_state.awaitingConfirmation) return;
+    if (!_state.awaitingConfirmation) {
+      addLog('WARN', 'rejectSync chiamato senza richiesta in sospeso');
+      return;
+    }
 
+    addLog('INFO', 'Sync rifiutata dall\'utente');
     final endpointId = _state.connectedDeviceId;
 
     _updateState(_state.copyWith(
@@ -1579,6 +1673,7 @@ class P2PSyncService {
         'accepted': false,
       });
       await _sendEncryptedPayload(endpointId, ack);
+      addLog('DEBUG', 'Risposta auth negativa inviata a $endpointId');
     }
   }
 

@@ -24,10 +24,7 @@ class SyncLogPage extends ConsumerWidget {
               icon: const Icon(Icons.delete_sweep, color: Colors.white70),
               tooltip: 'Cancella log',
               onPressed: () {
-                ref.read(nearbySyncServiceProvider).addLog(
-                      'INFO',
-                      'Log cancellati dall\'utente',
-                    );
+                ref.read(nearbySyncServiceProvider).clearLogs();
               },
             ),
         ],

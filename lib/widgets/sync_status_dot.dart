@@ -49,6 +49,14 @@ class SyncStatusDot extends ConsumerWidget {
         if (!state.isBackgroundSyncActive) {
           return const SizedBox.shrink();
         }
+        if (state.largeSyncInProgress && state.totalRecordsToExchange > 0) {
+          final progress = state.syncProgressPercent;
+          return _ProgressDot(
+            color: _toMaterialColor(_resolveColor(state)),
+            progress: progress,
+            percent: (progress * 100).round(),
+          );
+        }
         return _Dot(color: _toMaterialColor(_resolveColor(state)));
       },
       loading: () => const SizedBox.shrink(),
@@ -75,6 +83,53 @@ class _Dot extends StatelessWidget {
             color: color.withValues(alpha: 0.5),
             blurRadius: 4,
             spreadRadius: 1,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProgressDot extends StatelessWidget {
+  final Color color;
+  final double progress;
+  final int percent;
+  const _ProgressDot({
+    required this.color,
+    required this.progress,
+    required this.percent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 28,
+      height: 28,
+      margin: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.transparent,
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(
+              value: progress,
+              strokeWidth: 3,
+              backgroundColor: color.withValues(alpha: 0.2),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            ),
+          ),
+          Text(
+            '$percent',
+            style: TextStyle(
+              fontSize: 8,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
           ),
         ],
       ),

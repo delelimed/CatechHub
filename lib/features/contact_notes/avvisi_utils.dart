@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../shared/models/student_model.dart';
@@ -51,7 +52,7 @@ class AbsenceData {
 }
 
 AbsenceData computeAbsenceData(String studentId, String classId) {
-  if (classId.isEmpty || studentId.isEmpty) {
+  if (studentId.isEmpty) {
     return AbsenceData(consecutiveAbsences: 0);
   }
 
@@ -59,51 +60,48 @@ AbsenceData computeAbsenceData(String studentId, String classId) {
   final attendances = repo.getAttendanceSync();
 
   try {
-    final classMeetings = <Map<String, dynamic>>[];
-    for (final a in attendances) {
-      final aClassId = a['classId']?.toString();
-      if (aClassId == null || aClassId != classId) continue;
-      final dateStr = a['date']?.toString();
-      if (dateStr == null || dateStr.isEmpty) continue;
-      classMeetings.add(a);
-    }
-    classMeetings.sort((a, b) {
-      final aDate = DateTime.tryParse(a['date']?.toString() ?? '') ??
-          DateTime.fromMillisecondsSinceEpoch(0);
-      final bDate = DateTime.tryParse(b['date']?.toString() ?? '') ??
-          DateTime.fromMillisecondsSinceEpoch(0);
-      return bDate.compareTo(aDate);
-    });
+    final sortedRecords = attendances.toList()
+      ..sort((a, b) {
+        final aDate = DateTime.tryParse(a['date']?.toString() ?? '') ??
+            DateTime.now();
+        final bDate = DateTime.tryParse(b['date']?.toString() ?? '') ??
+            DateTime.now();
+        return bDate.compareTo(aDate);
+      });
 
-    int consecutive = 0;
-    String? lastPresence;
+    int consecutiveAbsences = 0;
+    String? lastPresenceDate;
+    bool countingConsecutive = true;
 
-    for (final meeting in classMeetings) {
-      final presenceRaw = meeting['presence'];
-      if (presenceRaw == null) continue;
-      final presence = (presenceRaw is Map)
-          ? Map<String, dynamic>.from(presenceRaw)
-          : <String, dynamic>{};
-      final status = presence[studentId]?.toString() ?? '';
+    for (final record in sortedRecords) {
+      final presenceMap =
+          Map<String, dynamic>.from(record['presence'] as Map? ?? {});
+      final studentStatus = presenceMap[studentId]?.toString();
 
-      if (status == 'Presente') {
-        if (lastPresence == null) {
-          final meetingDate =
-              DateTime.tryParse(meeting['date']?.toString() ?? '');
-          if (meetingDate != null) {
-            lastPresence =
-                '${meetingDate.day.toString().padLeft(2, '0')}/${meetingDate.month.toString().padLeft(2, '0')}/${meetingDate.year}';
+      if (studentStatus == null) continue;
+
+      if (studentStatus == 'Assente') {
+        if (countingConsecutive) {
+          consecutiveAbsences++;
+        }
+      } else if (studentStatus == 'Giustificato') {
+        if (countingConsecutive) {
+          consecutiveAbsences++;
+        }
+      } else if (studentStatus == 'Presente') {
+        if (lastPresenceDate == null) {
+          final date = DateTime.tryParse(record['date']?.toString() ?? '');
+          if (date != null) {
+            lastPresenceDate = DateFormat('dd/MM/yyyy').format(date);
           }
         }
-        break;
-      } else if (status == 'Assente' || status == 'Giustificato') {
-        consecutive++;
+        countingConsecutive = false;
       }
     }
 
     return AbsenceData(
-      consecutiveAbsences: consecutive,
-      lastPresenceDate: lastPresence,
+      consecutiveAbsences: consecutiveAbsences,
+      lastPresenceDate: lastPresenceDate,
     );
   } catch (e) {
     return AbsenceData(consecutiveAbsences: 0);

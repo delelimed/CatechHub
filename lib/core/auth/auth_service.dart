@@ -213,38 +213,49 @@ class AuthService {
   }
 
   /// Configurazione profilo iniziale (onboarding).
-  /// Salva nome, cognome, gruppo. NESSUN PIN app.
+  /// Salva nome, cognome. Se [createClass] è true, salva anche [groupName]
+  /// e crea la classe iniziale. Se false, salva solo nome/cognome e l'utente
+  /// si unirà a una classe esistente via P2P sync.
   /// Sblocca automaticamente la sessione.
   Future<bool> setupInitialProfile({
     required String firstName,
     required String lastName,
-    required String groupName,
+    String? groupName,
+    bool createClass = true,
   }) async {
-    if (firstName.trim().isEmpty ||
-        lastName.trim().isEmpty ||
-        groupName.trim().isEmpty) {
+    if (firstName.trim().isEmpty || lastName.trim().isEmpty) {
       dev.log('Campi profilo vuoti');
+      return false;
+    }
+    if (createClass && (groupName == null || groupName.trim().isEmpty)) {
+      dev.log('Nome gruppo richiesto per creazione classe');
       return false;
     }
 
     try {
       await _box.put('first_name', firstName.trim());
       await _box.put('last_name', lastName.trim());
-      await _box.put('group_name', groupName.trim());
-      await _box.put('local_user_name', '${firstName.trim()} ${lastName.trim()}');
+      await _box.put('setup_mode', createClass ? 'create' : 'join');
+      final fullName = '${firstName.trim()} ${lastName.trim()}';
+      await _box.put('local_user_name', fullName);
 
-      // Crea automaticamente la classe/gruppo iniziale
-      final classBox = LocalDatabase.classes();
-      final classId = LocalDatabase.newId('class');
-      final catechistName = '${firstName.trim()} ${lastName.trim()}';
-      final newClass = SchoolClass(
-        id: classId,
-        name: groupName.trim(),
-        studentIds: [],
-        catechistIds: [localUserId],
-        lastModifiedBy: catechistName,
-      );
-      await classBox.put(classId, newClass.toMap());
+      if (createClass) {
+        await _box.put('group_name', groupName!.trim());
+
+        // Crea automaticamente la classe/gruppo iniziale
+        final classBox = LocalDatabase.classes();
+        final classId = LocalDatabase.newId('class');
+        final newClass = SchoolClass(
+          id: classId,
+          name: groupName.trim(),
+          studentIds: [],
+          catechistIds: [localUserId],
+          lastModifiedBy: fullName,
+          uniqueCode: generateClassUniqueCode(),
+          nameLocked: false,
+        );
+        await classBox.put(classId, newClass.toMap());
+      }
 
       await P2PSecurityService().refreshIdentityName();
 

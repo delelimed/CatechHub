@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hive/hive.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -891,7 +892,17 @@ class _AssociateDeviceScreenState
                 const SizedBox(width: 12),
                 Expanded(
                   child: FilledButton(
-                    onPressed: () => context.pop(),
+                    onPressed: () {
+                      // Se siamo in modalità onboarding (join), vai direttamente
+                      // alla dashboard invece di tornare indietro.
+                      final auth = Hive.box('auth');
+                      final setupMode = auth.get('setup_mode', defaultValue: 'create');
+                      if (setupMode == 'join') {
+                        context.go('/');
+                      } else {
+                        context.pop();
+                      }
+                    },
                     child: const Text('Torna alla sync'),
                   ),
                 ),

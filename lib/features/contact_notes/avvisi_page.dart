@@ -458,6 +458,13 @@ class AvvisiPage extends ConsumerWidget {
               '${nextMeeting.date.day.toString().padLeft(2, '0')}/${nextMeeting.date.month.toString().padLeft(2, '0')}/${nextMeeting.date.year}';
         }
       }
+      if (meetingDate == null) {
+        final fallbackMeeting = _getNextMeeting();
+        if (fallbackMeeting != null) {
+          meetingDate =
+              '${fallbackMeeting.date.day.toString().padLeft(2, '0')}/${fallbackMeeting.date.month.toString().padLeft(2, '0')}/${fallbackMeeting.date.year}';
+        }
+      }
 
       AbsenceData? absenceData;
       if (template.text.contains('{assenze_consecutive}') ||

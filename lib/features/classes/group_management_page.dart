@@ -239,7 +239,9 @@ class _GroupHeader extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Tap per modificare il nome',
+                  schoolClass.nameLocked
+                      ? 'Nome sincronizzato — non modificabile'
+                      : 'Tap per modificare il nome',
                   style: TextStyle(
                     fontSize: 12,
                     color: isDark ? Colors.grey.shade400 : Colors.grey,
@@ -250,7 +252,9 @@ class _GroupHeader extends ConsumerWidget {
           ),
           IconButton(
             icon: Icon(Icons.edit, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
-            onPressed: () => _showEditNameDialog(context, ref),
+            onPressed: schoolClass.nameLocked
+                ? null
+                : () => _showEditNameDialog(context, ref),
           ),
         ],
       ),

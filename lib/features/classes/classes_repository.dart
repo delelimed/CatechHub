@@ -35,10 +35,12 @@ class ClassesRepository {
 
   Future<void> addClass(SchoolClass c) async {
     final id = c.id.isEmpty ? LocalDatabase.newId('class') : c.id;
+    final code = c.uniqueCode.isEmpty ? generateClassUniqueCode() : c.uniqueCode;
     final catechistName = getCurrentCatechistName();
     final now = DateTime.now();
     await _box.put(id, c.copyWith(
       id: id,
+      uniqueCode: code,
       lastModifiedBy: catechistName,
       createdAt: now,
       updatedAt: now,
@@ -152,5 +154,21 @@ class ClassesRepository {
     final data = _box.get(id);
     if (data == null) return null;
     return SchoolClass.fromMap(id, LocalDatabase.toStringDynamicMap(data));
+  }
+
+  /// Assicura che tutte le classi abbiano un [uniqueCode].
+  /// Da chiamare all'avvio per backfillare classi create prima
+  /// dell'introduzione del campo.
+  Future<void> ensureUniqueCodes() async {
+    for (final key in _box.keys) {
+      final raw = _box.get(key);
+      if (raw == null) continue;
+      final data = LocalDatabase.toStringDynamicMap(raw);
+      if (data['uniqueCode'] == null || (data['uniqueCode'] as String).isEmpty) {
+        data['uniqueCode'] = generateClassUniqueCode();
+        data['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+        await _box.put(key, data);
+      }
+    }
   }
 }

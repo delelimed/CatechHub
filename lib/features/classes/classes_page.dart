@@ -84,7 +84,8 @@ class ClassesPage extends ConsumerWidget {
                       canEditOnly: canEditOnly,
                       classId: c.id,
                       className: c.name,
-                      onEditName: canEditOnly
+                      nameLocked: c.nameLocked,
+                      onEditName: canEditOnly && !c.nameLocked
                           ? (newName) {
                               ref.read(classesRepoProvider).updateClass(
                                     c.id,
@@ -166,6 +167,7 @@ class _ClassCard extends StatelessWidget {
   final bool canEditOnly;
   final String classId;
   final String className;
+  final bool nameLocked;
   final Function(String)? onEditName;
 
   const _ClassCard({
@@ -177,6 +179,7 @@ class _ClassCard extends StatelessWidget {
     this.canEditOnly = false,
     required this.classId,
     required this.className,
+    this.nameLocked = false,
     this.onEditName,
   });
 
@@ -304,14 +307,17 @@ class _ClassCard extends StatelessWidget {
                 ),
                 onSelected: (value) {
                   if (value == 'edit') {
-                    _showEditNameDialog(context);
+                    if (!nameLocked) {
+                      _showEditNameDialog(context);
+                    }
                   }
                 },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(
-                    value: 'edit',
-                    child: Text('Modifica nome'),
-                  ),
+                itemBuilder: (_) => [
+                  if (!nameLocked)
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Text('Modifica nome'),
+                    ),
                 ],
               )
             else

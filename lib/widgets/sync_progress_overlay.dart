@@ -31,11 +31,17 @@ class _SyncProgressOverlayState extends ConsumerState<SyncProgressOverlay> {
     super.dispose();
   }
 
+  bool _showingSessionPermission = false;
+
   void _onStateChanged(P2PSyncState state) {
     if (!mounted) return;
     if (state.awaitingConfirmation && !_showingConfirmation) {
       _showingConfirmation = true;
       _showSyncConfirmation(state);
+    }
+    if (state.awaitingSessionPermission && !_showingSessionPermission) {
+      _showingSessionPermission = true;
+      _showSessionPermission(state);
     }
     if (state.largeSyncInProgress &&
         state.totalRecordsToExchange > 0 &&
@@ -80,6 +86,44 @@ class _SyncProgressOverlayState extends ConsumerState<SyncProgressOverlay> {
         );
       },
     ).then((_) => _showingConfirmation = false);
+  }
+
+  void _showSessionPermission(P2PSyncState state) {
+    final service = ref.read(nearbySyncServiceProvider);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Permesso sincronizzazione'),
+          content: Text(
+            '${state.pendingSessionDeviceName ?? "Un dispositivo"} è nelle vicinanze.\n\n'
+            'Autorizzi la sincronizzazione automatica per questa sessione?\n\n'
+            'Il permesso sarà valido fino alla chiusura dell\'app.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _showingSessionPermission = false;
+                service.denySessionPermission();
+              },
+              child: const Text('Rifiuta',
+                  style: TextStyle(color: Colors.red)),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _showingSessionPermission = false;
+                service.grantSessionPermission();
+                service.startBackgroundSync();
+              },
+              child: const Text('Autorizza'),
+            ),
+          ],
+        );
+      },
+    ).then((_) => _showingSessionPermission = false);
   }
 
   void _showProgressSheet(P2PSyncState state) {

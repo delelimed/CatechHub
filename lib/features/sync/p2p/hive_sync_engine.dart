@@ -75,12 +75,14 @@ class SyncIndexEntry {
   final String boxName;
   final DateTime updatedAt;
   final String checksum;
+  final bool isDeleted;
 
   SyncIndexEntry({
     required this.id,
     required this.boxName,
     required this.updatedAt,
     required this.checksum,
+    this.isDeleted = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -88,6 +90,7 @@ class SyncIndexEntry {
         'box': boxName,
         'updatedAt': updatedAt.toUtc().toIso8601String(),
         'checksum': checksum,
+        'isDeleted': isDeleted,
       };
 
   factory SyncIndexEntry.fromJson(Map<String, dynamic> json) =>
@@ -96,6 +99,7 @@ class SyncIndexEntry {
         boxName: json['box'] as String,
         updatedAt: DateTime.parse(json['updatedAt'] as String).toUtc(),
         checksum: json['checksum'] as String? ?? '',
+        isDeleted: json['isDeleted'] == true,
       );
 }
 
@@ -162,6 +166,7 @@ class HiveSyncEngine {
     final normalized = Map<String, dynamic>.from(data);
     normalized.remove('updatedAt');
     normalized.remove('createdAt');
+    normalized.remove('nameLocked');
     final json = jsonEncode(normalized);
     return sha256.convert(utf8.encode(json)).toString().substring(0, 12);
   }
@@ -182,12 +187,14 @@ class HiveSyncEngine {
               DateTime.tryParse(data['updatedAt']?.toString() ?? '')
                       ?.toUtc() ??
                   DateTime.fromMillisecondsSinceEpoch(0).toUtc();
+          final isDeleted = data['isDeleted'] == true;
           final checksum = _computeRecordChecksum(data);
           index.add(SyncIndexEntry(
             id: id,
             boxName: boxName,
             updatedAt: updatedAt,
             checksum: checksum,
+            isDeleted: isDeleted,
           ));
         }
       } catch (_) {}
@@ -236,9 +243,15 @@ class HiveSyncEngine {
       try {
         final box = Hive.box<Map>(remote.boxName);
         final localRaw = box.get(remote.id);
+        final localIsDeleted = localRaw != null
+            ? (LocalDatabase.toStringDynamicMap(localRaw)['isDeleted'] == true)
+            : false;
+
         if (localRaw == null) {
-          needed.add(
-              '${remote.boxName}:${remote.id}');
+          if (!remote.isDeleted) {
+            needed.add(
+                '${remote.boxName}:${remote.id}');
+          }
           continue;
         }
         final localData = LocalDatabase.toStringDynamicMap(localRaw);
@@ -246,6 +259,10 @@ class HiveSyncEngine {
             DateTime.tryParse(localData['updatedAt']?.toString() ?? '')
                     ?.toUtc() ??
                 DateTime.fromMillisecondsSinceEpoch(0).toUtc();
+
+        if (remote.isDeleted && !localIsDeleted) {
+          continue;
+        }
 
         if (remote.updatedAt.isAfter(localUpdatedAt)) {
           needed.add(
@@ -303,10 +320,15 @@ class HiveSyncEngine {
       try {
         final box = Hive.box<Map>(remote.boxName);
         final localRaw = box.get(remote.id);
+        final isClassBox = remote.boxName == 'classes';
 
         if (localRaw == null) {
           if (!remote.isDeleted) {
-            await box.put(remote.id, remote.data);
+            final data = Map<String, dynamic>.from(remote.data);
+            if (isClassBox && data['nameLocked'] != true) {
+              data['nameLocked'] = true;
+            }
+            await box.put(remote.id, data);
             appliedCount++;
           }
           continue;
@@ -317,6 +339,11 @@ class HiveSyncEngine {
             DateTime.tryParse(localData['updatedAt']?.toString() ?? '')
                     ?.toUtc() ??
                 DateTime.fromMillisecondsSinceEpoch(0).toUtc();
+        final localIsDeleted = localData['isDeleted'] == true;
+
+        if (remote.isDeleted && !localIsDeleted) {
+          continue;
+        }
 
         if (remote.updatedAt.isAfter(localUpdatedAt)) {
           if (remote.isDeleted) {
@@ -325,7 +352,11 @@ class HiveSyncEngine {
             merged['updatedAt'] = remote.updatedAt.toIso8601String();
             await box.put(remote.id, merged);
           } else {
-            await box.put(remote.id, remote.data);
+            final data = Map<String, dynamic>.from(remote.data);
+            if (isClassBox) {
+              data['nameLocked'] = localData['nameLocked'] ?? true;
+            }
+            await box.put(remote.id, data);
           }
           appliedCount++;
         } else if (remote.updatedAt == localUpdatedAt) {
@@ -337,6 +368,9 @@ class HiveSyncEngine {
               changed = true;
             }
           });
+          if (isClassBox) {
+            merged['nameLocked'] = localData['nameLocked'] ?? true;
+          }
           if (changed) {
             merged['updatedAt'] = DateTime.now().toUtc().toIso8601String();
             await box.put(remote.id, merged);
@@ -544,13 +578,16 @@ class HiveSyncEngine {
       final remote = remoteIndexMap[key];
       
       if (remote == null) {
-        // Remote doesn't have this record at all
+        if (!local.isDeleted) {
+          needed.add(key);
+        }
+      } else if (remote.isDeleted && !local.isDeleted) {
         needed.add(key);
       } else if (local.updatedAt.isAfter(remote.updatedAt)) {
-        // Local is newer
-        needed.add(key);
+        if (!local.isDeleted) {
+          needed.add(key);
+        }
       } else if (local.updatedAt == remote.updatedAt && local.checksum != remote.checksum) {
-        // Same timestamp but different content
         needed.add(key);
       }
     }

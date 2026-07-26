@@ -251,7 +251,21 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         error: (_, __) => isLoginPath ? null : '/login',
         data: (user) {
           if (user == null && !isLoginPath) return '/login';
-          if (user != null && isLoginPath) return '/';
+          if (user != null && isLoginPath) {
+            // Se l'utente ha scelto "unisciti" durante l'onboarding e
+            // non ha ancora classi, reindirizza all'associazione P2P.
+            try {
+              final setupMode =
+                  LocalDatabase.auth().get('setup_mode', defaultValue: 'create');
+              if (setupMode == 'join') {
+                final classesBox = LocalDatabase.classes();
+                if (classesBox.isEmpty) {
+                  return '/settings/associate-device';
+                }
+              }
+            } catch (_) {}
+            return '/';
+          }
           return null;
         },
       );

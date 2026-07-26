@@ -14,6 +14,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_service.dart';
 import '../../shared/models/class_model.dart';
+import '../../features/classes/classes_repository.dart';
 import '../storage/local_database.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
@@ -27,6 +28,12 @@ class LocalAuthNotifier extends AsyncNotifier<Map<String, dynamic>?> {
 
   @override
   Future<Map<String, dynamic>?> build() async {
+    if (_authService.isProfileConfigured) {
+      try {
+        final repo = ClassesRepository();
+        await repo.ensureUniqueCodes();
+      } catch (_) {}
+    }
     final logged = _authService.isUnlocked;
     return logged ? _authService.currentUser : null;
   }
@@ -62,12 +69,14 @@ class LocalAuthNotifier extends AsyncNotifier<Map<String, dynamic>?> {
   }
 
   /// Configurazione profilo INIZIALE (prima volta).
-  /// Salva: nome, cognome, gruppo. NON chiede PIN (usa biometria telefono).
-  /// Crea automaticamente la SchoolClass iniziale.
+  /// Salva: nome, cognome e opzionalmente crea la classe.
+  /// Se [createClass] è false, l'utente si unirà a una classe via P2P.
+  /// NON chiede PIN (usa biometria telefono).
   Future<bool> setupInitialProfile({
     required String firstName,
     required String lastName,
-    required String groupName,
+    String? groupName,
+    bool createClass = true,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -76,6 +85,7 @@ class LocalAuthNotifier extends AsyncNotifier<Map<String, dynamic>?> {
           firstName: firstName,
           lastName: lastName,
           groupName: groupName,
+          createClass: createClass,
         ),
         const Duration(seconds: 30),
         'Timeout durante la configurazione',
@@ -86,20 +96,24 @@ class LocalAuthNotifier extends AsyncNotifier<Map<String, dynamic>?> {
         return false;
       }
 
-      try {
-        final classBox = LocalDatabase.classes();
-        final classId = LocalDatabase.newId('class');
-        final newClass = SchoolClass(
-          id: classId,
-          name: groupName,
-          studentIds: [],
-          catechistIds: [AuthService.localUserId],
-        );
-        await classBox.put(classId, newClass.toMap());
-      } catch (e, stack) {
-        await _authService.signOut();
-        state = AsyncValue.error(e, stack);
-        return false;
+      if (createClass) {
+        try {
+          final classBox = LocalDatabase.classes();
+          final classId = LocalDatabase.newId('class');
+          final newClass = SchoolClass(
+            id: classId,
+            name: groupName!,
+            studentIds: [],
+            catechistIds: [AuthService.localUserId],
+            uniqueCode: generateClassUniqueCode(),
+            nameLocked: false,
+          );
+          await classBox.put(classId, newClass.toMap());
+        } catch (e, stack) {
+          await _authService.signOut();
+          state = AsyncValue.error(e, stack);
+          return false;
+        }
       }
 
       state = AsyncValue.data(_authService.currentUser);

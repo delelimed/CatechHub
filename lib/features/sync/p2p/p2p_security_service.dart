@@ -652,12 +652,15 @@ class P2PSecurityService {
     return assoc?.devicePublicKeyBase64;
   }
 
-  /// Derives a 6-digit pairing code from the ECDH shared secret.
-  /// Both devices compute the SAME code from the SAME shared secret.
-  /// User visually compares codes to verify no MitM attack.
-  static String computePairingCode(String sharedSecretBase64) {
+  /// Derives a 6-digit pairing code from the ECDH shared secret
+  /// and a session-specific nonce. Each pairing session gets a different
+  /// code even between the same two devices.
+  static String computePairingCode(String sharedSecretBase64, {String? sessionNonce}) {
     final secretBytes = base64Decode(sharedSecretBase64);
-    final hash = sha256.convert(secretBytes);
+    final combined = sessionNonce != null
+        ? sha256.convert(utf8.encode(sessionNonce)).bytes + secretBytes
+        : secretBytes;
+    final hash = sha256.convert(combined);
     final code = ((hash.bytes[0] << 16) | (hash.bytes[1] << 8) | hash.bytes[2]) % 1000000;
     return code.toString().padLeft(6, '0');
   }

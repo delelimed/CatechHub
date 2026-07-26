@@ -52,6 +52,10 @@ class P2PSyncState {
   final int sentRecordsCount;
   final int receivedRecordsCount;
   final bool largeSyncInProgress;
+  final bool awaitingSessionPermission;
+  final String? pendingSessionDeviceName;
+  final String? expirationWarning;
+  final int expiringDevicesCount;
 
   const P2PSyncState({
     this.status = P2PSyncStatus.idle,
@@ -79,6 +83,10 @@ class P2PSyncState {
     this.sentRecordsCount = 0,
     this.receivedRecordsCount = 0,
     this.largeSyncInProgress = false,
+    this.awaitingSessionPermission = false,
+    this.pendingSessionDeviceName,
+    this.expirationWarning,
+    this.expiringDevicesCount = 0,
   });
 
   double get syncProgressPercent {
@@ -113,6 +121,10 @@ class P2PSyncState {
     int? sentRecordsCount,
     int? receivedRecordsCount,
     bool? largeSyncInProgress,
+    bool? awaitingSessionPermission,
+    String? pendingSessionDeviceName,
+    String? expirationWarning,
+    int? expiringDevicesCount,
     bool clearError = false,
   }) {
     return P2PSyncState(
@@ -152,6 +164,14 @@ class P2PSyncState {
           receivedRecordsCount ?? this.receivedRecordsCount,
       largeSyncInProgress:
           largeSyncInProgress ?? this.largeSyncInProgress,
+      awaitingSessionPermission:
+          awaitingSessionPermission ?? this.awaitingSessionPermission,
+      pendingSessionDeviceName:
+          pendingSessionDeviceName ?? this.pendingSessionDeviceName,
+      expirationWarning:
+          expirationWarning ?? this.expirationWarning,
+      expiringDevicesCount:
+          expiringDevicesCount ?? this.expiringDevicesCount,
     );
   }
 }
@@ -245,6 +265,11 @@ class P2PSyncService {
   final Map<String, String> _endpointConnIdMap = {};
   final Set<String> _sessionConfirmedDevices = {};
   bool _restartingEndpoints = false;
+
+  bool _sessionSyncAllowed = false;
+
+  String? _sessionPairingNonce;
+  String? _remoteSessionPairingNonce;
   StreamSubscription<BoxEvent>? _hiveBoxesSub;
   final List<StreamSubscription<BoxEvent>> _boxSubscriptions = [];
   final List<StreamController<BoxEvent>> _boxControllers = [];
@@ -273,8 +298,40 @@ class P2PSyncService {
     final hasAssociations = await _security.hasValidAssociation();
     addLog('DEBUG', 'Associazioni valide trovate: $hasAssociations');
     if (hasAssociations) {
+      _checkExpiringAssociations();
       _startContinuousMode();
     }
+  }
+
+  Future<void> _checkExpiringAssociations() async {
+    try {
+      final associations = await _security.getAllAssociations();
+      int nearExpiryCount = 0;
+      String? earliestName;
+      int minDays = 30;
+
+      for (final assoc in associations) {
+        final days = assoc.daysRemaining;
+        if (days <= 5 && days > 0) {
+          nearExpiryCount++;
+          if (days < minDays) {
+            minDays = days;
+            earliestName = assoc.deviceName;
+          }
+        }
+      }
+
+      if (nearExpiryCount > 0 && earliestName != null) {
+        final warning = nearExpiryCount == 1
+            ? '$earliestName scade tra $minDays giorni'
+            : '$nearExpiryCount dispositivi scadono tra $minDays giorni';
+        _updateState(_state.copyWith(
+          expirationWarning: warning,
+          expiringDevicesCount: nearExpiryCount,
+        ));
+        addLog('WARN', warning);
+      }
+    } catch (_) {}
   }
 
   Future<void> _startContinuousMode() async {
@@ -318,10 +375,40 @@ class P2PSyncService {
     _endpointSyncPhase.clear();
     _endpointSessionKeys.clear();
     _isSyncing = false;
+    _sessionPairingNonce = null;
+    _remoteSessionPairingNonce = null;
     try {
       _nearby.stopAdvertising();
       _nearby.stopDiscovery();
     } catch (_) {}
+  }
+
+  void resetSessionPermission() {
+    _sessionSyncAllowed = false;
+    _updateState(_state.copyWith(
+      awaitingSessionPermission: false,
+      pendingSessionDeviceName: null,
+    ));
+  }
+
+  void grantSessionPermission() {
+    _sessionSyncAllowed = true;
+    addLog('INFO', 'Permesso sessione concesso');
+    _updateState(_state.copyWith(
+      awaitingSessionPermission: false,
+      pendingSessionDeviceName: null,
+    ));
+  }
+
+  void denySessionPermission() {
+    _sessionSyncAllowed = false;
+    addLog('INFO', 'Permesso sessione negato');
+    _updateState(_state.copyWith(
+      awaitingSessionPermission: false,
+      pendingSessionDeviceName: null,
+      isBackgroundSyncActive: false,
+    ));
+    _stopContinuousMode();
   }
 
   void _startPeriodicSync() {
@@ -405,6 +492,14 @@ class P2PSyncService {
 
             final assoc = await _security.getAssociation(deviceId);
             if (assoc != null && assoc.isValid) {
+              if (!_sessionSyncAllowed && _state.role == P2PSyncRole.altroCatechista) {
+                addLog('DEBUG', '  permesso sessione non concesso per $deviceId');
+                _updateState(_state.copyWith(
+                  awaitingSessionPermission: true,
+                  pendingSessionDeviceName: assoc.deviceName,
+                ));
+                return;
+              }
               addLog('DEBUG', '  associazione valida, richiedo connessione a $deviceId');
               await _nearby.requestConnection(
                 '$_syncPrefix${assoc.deviceId}',
@@ -469,6 +564,13 @@ class P2PSyncService {
 
       final assoc = await _security.getAssociation(deviceId);
       if (assoc != null && assoc.isValid) {
+        if (!_sessionSyncAllowed && _state.role == P2PSyncRole.altroCatechista) {
+          _updateState(_state.copyWith(
+            awaitingSessionPermission: true,
+            pendingSessionDeviceName: assoc.deviceName,
+          ));
+          continue;
+        }
         await _nearby.requestConnection(
           '$_syncPrefix${assoc.deviceId}',
           endpointId,
@@ -810,6 +912,9 @@ class P2PSyncService {
 
   Future<void> _sendHandshakePayload(String endpointId) async {
     try {
+      _sessionPairingNonce = P2PSecurityService.secureRandom(16)
+          .map((b) => b.toRadixString(16).padLeft(2, '0'))
+          .join();
       final qrPayload = await _security.generateQrPayload();
       final handshakeMsg = jsonEncode({
         'type': 'p2p_handshake',
@@ -817,14 +922,27 @@ class P2PSyncService {
         'timestamp':
             DateTime.now().millisecondsSinceEpoch ~/ 1000,
         'role': _state.role.name,
+        'sessionNonce': _sessionPairingNonce,
       });
-      addLog('DEBUG', 'Invio handshake a $endpointId');
+      addLog('DEBUG', 'Invio handshake a $endpointId (nonce: ${_sessionPairingNonce?.substring(0, 8)}...)');
       await _sendPayload(endpointId, handshakeMsg);
       _updateState(_state.copyWith(status: P2PSyncStatus.handshakeSent));
       addLog('DEBUG', 'Handshake inviato a $endpointId');
     } catch (e) {
       addLog('ERROR', 'Errore invio handshake: $e');
     }
+  }
+
+  /// Returns the agreed pairing nonce deterministically:
+  /// both sides sort the two nonces and pick the first.
+  String? _agreedPairingNonce() {
+    final a = _sessionPairingNonce;
+    final b = _remoteSessionPairingNonce;
+    if (a == null && b == null) return null;
+    if (a == null) return b;
+    if (b == null) return a;
+    final sorted = [a, b]..sort();
+    return sorted.first;
   }
 
   void _onPayloadReceived(String endpointId, Payload payload) {
@@ -847,7 +965,31 @@ class P2PSyncService {
     if (sessionKey != null) {
       try {
         final encrypted = P2PEncryptedPayload.decode(rawMessage);
-        return await _security.decryptPayload(encrypted, sessionKey);
+        final decrypted = await _security.decryptPayload(encrypted, sessionKey);
+        final wrapper = jsonDecode(decrypted);
+        if (wrapper is Map<String, dynamic>) {
+          final senderId = wrapper['senderId'] as String?;
+          final senderPublicKey = wrapper['senderPublicKey'] as String?;
+          final expectedDeviceId = _endpointConnIdMap[endpointId];
+          if (senderId != null && expectedDeviceId != null &&
+              senderId != expectedDeviceId) {
+            addLog('ERROR',
+                'Mittente non corrisponde: $senderId vs $expectedDeviceId');
+            return rawMessage;
+          }
+          if (senderPublicKey != null && expectedDeviceId != null) {
+            final assoc = await _security.getAssociation(expectedDeviceId);
+            if (assoc != null && !P2PSecurityService.publicKeyMatchesAssociation(
+                assoc, senderPublicKey)) {
+              addLog('ERROR',
+                  'Chiave pubblica mittente non corrisponde per $senderId');
+              return rawMessage;
+            }
+          }
+          final data = wrapper['data'] as String?;
+          if (data != null) return data;
+        }
+        return wrapper is String ? wrapper : decrypted;
       } catch (_) {}
     }
     return rawMessage;
@@ -982,6 +1124,7 @@ class P2PSyncService {
       return;
     }
 
+    _remoteSessionPairingNonce = message['sessionNonce'] as String?;
     _endpointConnIdMap[endpointId] = remoteIdentity.deviceId;
     _connectedEndpoints.add(endpointId);
 
@@ -990,6 +1133,7 @@ class P2PSyncService {
       'type': 'p2p_handshake_ack',
       'payload': localIdentity.encode(),
       'role': _state.role.name,
+      'sessionNonce': _sessionPairingNonce,
     });
 
     if (existingAssoc != null && !_state.isPairingMode) {
@@ -1016,23 +1160,16 @@ class P2PSyncService {
         addLog('DEBUG', 'Auth request inviata a $endpointId');
       }
     } else {
-      addLog('DEBUG', 'Handshake: calcolo pairing code');
-      final sharedSecret = await _security.computeStaticSharedSecret(
-        remoteIdentity.publicKeyBase64,
-      );
-      final code = P2PSecurityService.computePairingCode(sharedSecret);
-
+      addLog('DEBUG', 'Handshake: attesa ACK per calcolo pairing code');
       _pendingHandshakeIdentity = remoteIdentity;
       _pendingHandshakeRemoteRole = remoteRole;
       await _sendPayload(endpointId, ack);
 
       _updateState(_state.copyWith(
-        status: P2PSyncStatus.pairingVerification,
         connectedDeviceId: endpointId,
         connectedDeviceName: remoteIdentity.deviceName,
         connectedFingerprint: remoteIdentity.fingerprint,
         isSessionEncrypted: true,
-        pairingCode: code,
         remoteDeviceFingerprint: remoteIdentity.fingerprint,
       ));
       addLog('INFO', 'In attesa verifica codice pairing...');
@@ -1126,10 +1263,14 @@ class P2PSyncService {
         addLog('DEBUG', 'Auth request inviata a $endpointId');
       }
     } else {
+      _remoteSessionPairingNonce = message['sessionNonce'] as String? ?? _remoteSessionPairingNonce;
       final sharedSecret = await _security.computeStaticSharedSecret(
         remoteIdentity.publicKeyBase64,
       );
-      final code = P2PSecurityService.computePairingCode(sharedSecret);
+      final code = P2PSecurityService.computePairingCode(
+        sharedSecret,
+        sessionNonce: _agreedPairingNonce(),
+      );
 
       _pendingHandshakeIdentity = remoteIdentity;
       _pendingHandshakeRemoteRole = remoteRole;
@@ -1354,8 +1495,15 @@ class P2PSyncService {
       return;
     }
     try {
+      final localIdentity = await _security.getLocalIdentity();
+      final wrapped = jsonEncode({
+        'senderId': localIdentity.deviceId,
+        'senderFingerprint': localIdentity.fingerprint,
+        'senderPublicKey': localIdentity.publicKeyBase64,
+        'data': plainText,
+      });
       final encrypted =
-          await _security.encryptPayload(plainText, sessionKey);
+          await _security.encryptPayload(wrapped, sessionKey);
       final payloadStr = encrypted.encode();
       addLog('DEBUG', 'Invio payload cifrato a $endpointId (tipo: ${_extractType(plainText)})');
       await _sendPayload(endpointId, payloadStr);
@@ -1769,6 +1917,22 @@ class P2PSyncService {
     addLog('INFO', 'Sincronizzazione automatica disattivata');
     _stopContinuousMode();
     _updateState(_state.copyWith(isBackgroundSyncActive: false));
+  }
+
+  Future<void> removeAssociationAndCleanup(String deviceId) async {
+    addLog('INFO', 'Rimozione associazione e pulizia connessione per $deviceId');
+    for (final entry in _endpointConnIdMap.entries.toList()) {
+      if (entry.value == deviceId) {
+        await _cleanupEndpoint(entry.key);
+      }
+    }
+    if (_endpointConnIdMap.containsValue(deviceId)) {
+      _nearbyDiscoveredDevices.remove(deviceId);
+      _updateNearbyCount();
+    }
+    _sessionConfirmedDevices.remove(deviceId);
+    await _security.removeAssociation(deviceId);
+    addLog('INFO', 'Associazione rimossa per $deviceId');
   }
 
   Future<void> triggerManualSync() async {

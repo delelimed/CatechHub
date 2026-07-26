@@ -82,6 +82,22 @@ Future&lt;void&gt; main() async {
   if fails        if fails       recovery     recovery
     </pre>
 
+    <h2 id="hive">2. Hive Database Layer</h2>
+
+    <h3>2.1 Box e modelli</h3>
+    <p>I dati sono organizzati in 13 box Hive cifrati (<code>HiveAesCipher</code>), aperti sequenzialmente nel bootstrap. Ogni box contiene record serializzati come mappe JSON (<code>Map&lt;String, dynamic&gt;</code>). I modelli Dart espongono <code>toMap()</code>/<code>fromMap()</code> per la serializzazione.</p>
+
+    <h3>2.2 Identificatori</h3>
+    <p>Ogni record ha un <strong>id</strong> univoco (stringa, generata via <code>LocalDatabase.newId()</code>). La classe <code>SchoolClass</code> (anagrafica gruppo) possiede inoltre un <strong>uniqueCode</strong>: stringa di 40 cifre decimali, generata via <code>Random.secure()</code> e persistita nel box alla creazione della classe. Questo codice identifica la classe in modo stabile anche dopo un ripristino da backup o una sincronizzazione P2P, ed è utilizzato come riferimento nelle associazioni P2P tra catechisti.</p>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>Generazione: <code>generateClassUniqueCode()</code> in <code>class_model.dart</code> — 40 cifre da <code>Random.secure()</code>.</li>
+      <li>Backfill: <code>ClassesRepository.ensureUniqueCodes()</code> — assegna un codice a ogni classe che ne è sprovvista (classi precedenti all'introduzione del campo). Chiamato all'avvio dell'app dopo il login.</li>
+      <li>Persistenza: il campo <code>uniqueCode</code> è serializzato in <code>toMap()</code>/<code>fromMap()</code>; se assente nei dati esistenti (<code>null</code> o vuoto), <code>fromMap()</code> restituisce stringa vuota (nessuna auto-generazione al caricamento).</li>
+    </ul>
+
+    <h3>2.3 Indici di sincronizzazione</h3>
+    <p>Per ogni box syncabile, <code>HiveSyncEngine.buildLocalIndex()</code> costruisce un indice con timestamp di modifica e checksum SHA-256 per ogni record. L'indice viene serializzato come <code>SyncIndexEntry</code> e scambiato tra dispositivi durante il sync differenziale. Il campo <code>isDeleted</code> in <code>SyncIndexEntry</code> tiene traccia delle cancellazioni per la propagazione CRDT tra dispositivi.</p>
+
     <h3>3.4 HKDF — Session Key derivation</h3>
     <pre>
 final HKDF_INFO = 'CatechHub_SessionKey_v2';

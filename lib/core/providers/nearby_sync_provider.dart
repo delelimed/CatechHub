@@ -1,6 +1,8 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
-import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../widgets/sync_progress_overlay.dart';
@@ -47,6 +49,7 @@ class NearbySyncDaemonController extends StateNotifier<bool> {
     if (_isAppInForeground == isForeground) return;
     _isAppInForeground = isForeground;
     if (isForeground && state) {
+      _service.resetSessionPermission();
       _service.startBackgroundSync();
     } else if (!isForeground) {
       _service.stopBackgroundSync();
@@ -101,6 +104,8 @@ class _NearbySyncLifecycleManagerState
     extends ConsumerState<NearbySyncLifecycleManager>
     with WidgetsBindingObserver {
   bool _daemonStarted = false;
+  bool _expirationWarningShown = false;
+  StreamSubscription<P2PSyncState>? _stateSub;
 
   @override
   void initState() {
@@ -115,12 +120,46 @@ class _NearbySyncLifecycleManagerState
         });
       }
     });
+    final service = ref.read(nearbySyncServiceProvider);
+    _stateSub = service.onStateChanged.listen(_onSyncStateChanged);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _stateSub?.cancel();
     super.dispose();
+  }
+
+  void _onSyncStateChanged(P2PSyncState state) {
+    if (!mounted) return;
+    if (state.expirationWarning != null && !_expirationWarningShown) {
+      _expirationWarningShown = true;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange[700]),
+              const SizedBox(width: 8),
+              const Text('Connessione in scadenza'),
+            ],
+          ),
+          content: Text(
+            '${state.expirationWarning}.\n\n'
+            'Le connessioni hanno validità 30 giorni. '
+            'Per continuare a sincronizzare, associa nuovamente '
+            'i dispositivi prima della scadenza.',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Ho capito'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   @override
@@ -128,6 +167,7 @@ class _NearbySyncLifecycleManagerState
     final daemonController = ref.read(nearbySyncDaemonProvider.notifier);
     switch (state) {
       case AppLifecycleState.resumed:
+        _expirationWarningShown = false;
         daemonController.setAppForeground(true);
         break;
       case AppLifecycleState.paused:

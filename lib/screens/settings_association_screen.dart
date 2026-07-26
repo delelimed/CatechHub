@@ -67,9 +67,9 @@ class _SettingsAssociationScreenState
   }
 
   Future<void> _removeAssociation(P2PDeviceAssociation assoc) async {
-    await _security.removeAssociation(assoc.deviceId);
-    ref.read(nearbySyncServiceProvider).addLog(
-        'INFO', 'Dispositivo rimosso: ${assoc.deviceName}');
+    final syncService = ref.read(nearbySyncServiceProvider);
+    await syncService.removeAssociationAndCleanup(assoc.deviceId);
+    syncService.addLog('INFO', 'Dispositivo rimosso: ${assoc.deviceName}');
     await _refreshAssociations();
   }
 

@@ -24,6 +24,16 @@
 //   Sincronizzato via CRDT durante il sync P2P Bluetooth.
 // ══════════════════════════════════════════════════════════════════════════════
 
+import 'dart:math';
+
+/// Genera un codice univoco di 40 cifre decimali (invisibile all'utente).
+/// Usato per identificare una classe in modo probabilisticamente unico
+/// a livello globale, senza necessità di un server centrale.
+String generateClassUniqueCode() {
+  final random = Random.secure();
+  return List.generate(40, (_) => random.nextInt(10).toString()).join();
+}
+
 class SchoolClass {
   /// ID univoco (formato: "class_<microsecondsSinceEpoch>").
   final String id;
@@ -42,6 +52,14 @@ class SchoolClass {
   /// Nome del catechista che ha modificato per ultimo questo record.
   final String lastModifiedBy;
 
+  /// Codice univoco di 40 cifre (invisibile all'utente).
+  /// Identifica probabilisticamente la classe in tutto il mondo.
+  final String uniqueCode;
+
+  /// Se true, il nome della classe non può essere modificato da questo dispositivo.
+  /// Impostato a true per classi ricevute via sync (l'utente si è unito).
+  final bool nameLocked;
+
   /// Timestamp di creazione (UTC, ISO 8601).
   final DateTime createdAt;
 
@@ -54,6 +72,8 @@ class SchoolClass {
     required this.studentIds,
     required this.catechistIds,
     this.lastModifiedBy = '',
+    this.uniqueCode = '',
+    this.nameLocked = false,
     DateTime? createdAt,
     DateTime? updatedAt,
   })  : createdAt = createdAt ?? DateTime.now(),
@@ -65,6 +85,8 @@ class SchoolClass {
     List<String>? studentIds,
     List<String>? catechistIds,
     String? lastModifiedBy,
+    String? uniqueCode,
+    bool? nameLocked,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -74,12 +96,15 @@ class SchoolClass {
       studentIds: studentIds ?? this.studentIds,
       catechistIds: catechistIds ?? this.catechistIds,
       lastModifiedBy: lastModifiedBy ?? this.lastModifiedBy,
+      uniqueCode: uniqueCode ?? this.uniqueCode,
+      nameLocked: nameLocked ?? this.nameLocked,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
   factory SchoolClass.fromMap(String id, Map<String, dynamic> data) {
+    final raw = data['uniqueCode'] as String?;
     return SchoolClass(
       id: id,
       name: data['name'] ?? '',
@@ -90,6 +115,8 @@ class SchoolClass {
           .map((value) => value.toString())
           .toList(),
       lastModifiedBy: data['lastModifiedBy'] ?? '',
+      uniqueCode: (raw != null && raw.isNotEmpty) ? raw : '',
+      nameLocked: data['nameLocked'] == true,
       createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
       updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
     );
@@ -101,6 +128,8 @@ class SchoolClass {
       'studentIds': studentIds,
       'catechistIds': catechistIds,
       'lastModifiedBy': lastModifiedBy,
+      'uniqueCode': uniqueCode,
+      'nameLocked': nameLocked,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };

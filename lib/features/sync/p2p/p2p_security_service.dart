@@ -77,6 +77,8 @@ class P2PDeviceAssociation {
   final DateTime associatedAt;
   final String devicePrivateKeyBase64;
   final String devicePublicKeyBase64;
+  final String? localRole;
+  final String? remoteRole;
 
   const P2PDeviceAssociation({
     required this.deviceId,
@@ -87,6 +89,8 @@ class P2PDeviceAssociation {
     required this.associatedAt,
     required this.devicePrivateKeyBase64,
     required this.devicePublicKeyBase64,
+    this.localRole,
+    this.remoteRole,
   });
 
   bool get isValid => DateTime.now().difference(associatedAt).inDays < 30;
@@ -106,6 +110,8 @@ class P2PDeviceAssociation {
         'associatedAt': associatedAt.toUtc().toIso8601String(),
         'privKey': devicePrivateKeyBase64,
         'pubKey': devicePublicKeyBase64,
+        if (localRole != null) 'localRole': localRole,
+        if (remoteRole != null) 'remoteRole': remoteRole,
       };
 
   factory P2PDeviceAssociation.fromJson(Map<String, dynamic> json) =>
@@ -118,6 +124,8 @@ class P2PDeviceAssociation {
         associatedAt: DateTime.parse(json['associatedAt'] as String).toLocal(),
         devicePrivateKeyBase64: json['privKey'] as String? ?? '',
         devicePublicKeyBase64: json['pubKey'] as String? ?? '',
+        localRole: json['localRole'] as String?,
+        remoteRole: json['remoteRole'] as String?,
       );
 
   SimpleKeyPairData? get keyPair {
@@ -496,6 +504,8 @@ class P2PSecurityService {
     required String publicKeyBase64,
     required String fingerprint,
     required String sharedSecretBase64,
+    String? localRole,
+    String? remoteRole,
   }) async {
     final deviceKeyPair = await _generateDeviceKeyPair();
     final devicePubKey = await deviceKeyPair.extractPublicKey();
@@ -509,6 +519,8 @@ class P2PSecurityService {
       associatedAt: DateTime.now(),
       devicePrivateKeyBase64: base64Encode(deviceKeyPair.bytes),
       devicePublicKeyBase64: base64Encode(devicePubKey.bytes),
+      localRole: localRole,
+      remoteRole: remoteRole,
     );
     await saveAssociation(association);
     return deviceKeyPair;

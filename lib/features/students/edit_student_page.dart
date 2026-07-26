@@ -530,15 +530,17 @@ class _ParentCard extends StatelessWidget {
               Expanded(
                 child: _Field(phone, 'Telefono', enabled: editMode, keyboardType: TextInputType.phone, isDark: isDark, colorScheme: colorScheme),
               ),
-              const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.call, color: Colors.green),
-                onPressed: () => onCall(phone.text),
-              ),
-              IconButton(
-                icon: const Icon(Icons.chat, color: Colors.green),
-                onPressed: () => onWhatsapp(phone.text),
-              ),
+              if (phone.text.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.call, color: Colors.green),
+                  onPressed: () => onCall(phone.text),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chat, color: Colors.green),
+                  onPressed: () => onWhatsapp(phone.text),
+                ),
+              ],
             ],
           ),
         ],
@@ -662,15 +664,17 @@ class _PhoneRow extends StatelessWidget {
             colorScheme: colorScheme,
           ),
         ),
-        const SizedBox(width: 8),
-        IconButton(
-          icon: const Icon(Icons.call, color: Colors.green),
-          onPressed: () => onCall(controller.text),
-        ),
-        IconButton(
-          icon: const Icon(Icons.chat, color: Colors.green),
-          onPressed: () => onWhatsapp(controller.text),
-        ),
+        if (controller.text.isNotEmpty) ...[
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.call, color: Colors.green),
+            onPressed: () => onCall(controller.text),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chat, color: Colors.green),
+            onPressed: () => onWhatsapp(controller.text),
+          ),
+        ],
       ],
     );
   }

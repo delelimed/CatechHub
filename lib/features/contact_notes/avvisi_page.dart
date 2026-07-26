@@ -165,9 +165,25 @@ class AvvisiPage extends ConsumerWidget {
     );
   }
 
+  bool _hasStudentPlaceholders(String text) {
+    const studentPlaceholders = [
+      '{nome_ragazzo}',
+      '{cognome_ragazzo}',
+      '{nome_genitore}',
+      '{assenze_consecutive}',
+      '{ultima_presenza}',
+    ];
+    return studentPlaceholders.any((p) => text.contains(p));
+  }
+
   Future<void> _inviaTemplate(BuildContext context, WidgetRef ref, AvvisoTemplate template) async {
     if (!hasPlaceholders(template.text)) {
       _openWhatsAppForTemplate(context, ref, template, null, null, null);
+      return;
+    }
+
+    if (!_hasStudentPlaceholders(template.text)) {
+      openWhatsApp(null, template.text);
       return;
     }
 
@@ -475,7 +491,7 @@ class AvvisiPage extends ConsumerWidget {
                       Navigator.pop(ctx);
                       openWhatsApp(phone, finalMessage);
                       if (student != null) {
-                        _recordContactNote(ref, student, finalMessage, phone);
+                        _recordContactNote(ref, student, template.title, finalMessage, phone);
                       }
                     },
                   ),
@@ -512,13 +528,13 @@ class AvvisiPage extends ConsumerWidget {
     }
   }
 
-  void _recordContactNote(WidgetRef ref, Student student, String message, String? phone) {
+  void _recordContactNote(WidgetRef ref, Student student, String title, String message, String? phone) {
     final note = ContactNote(
       id: '',
       studentId: student.id,
       dateTime: DateTime.now(),
       medium: 'whatsapp',
-      notes: 'Inviato messaggio: "$message"${phone != null ? ' al $phone' : ''}',
+      notes: 'Inviato "$title"${phone != null ? ' al $phone' : ''}',
     );
     ref.read(contactNotesRepoProvider).addNote(note);
   }

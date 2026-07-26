@@ -15,6 +15,7 @@ import 'app/router.dart';
 import 'core/auth/auth_provider.dart';
 import 'core/auth/session_lifecycle_observer.dart';
 import 'core/navigation/back_button_handler.dart';
+import 'core/providers/nearby_sync_provider.dart';
 import 'core/providers/theme_provider.dart';
 import 'core/security/developer_options_warning_screen.dart';
 import 'core/security/hardware_security_exception.dart';
@@ -549,9 +550,13 @@ Future<void> main() async {
       // FASE 6 - AVVIO DELL'APPLICAZIONE FLUTTER
       //
       // Struttura del widget tree:
-      //   ProviderScope (Riverpod) → SessionLifecycleObserver → MyApp
+      //   ProviderScope (Riverpod) → NearbySyncLifecycleManager
+      //     → SessionLifecycleObserver → MyApp
       //
       // - ProviderScope: gestisce lo stato globale dell'app tramite Riverpod
+      // - NearbySyncLifecycleManager: monitora il ciclo di vita dell'app per
+      //   avviare/fermare la sincronizzazione Bluetooth in background,
+      //   caricando lo stato persistito da SharedPreferences
       // - SessionLifecycleObserver: monitora il ciclo di vita dell'app
       //   (pausa, ripresa) per gestire il blocco automatico della sessione
       //   dopo 120 secondi di inattività
@@ -562,7 +567,13 @@ Future<void> main() async {
       // viene inizializzata SOLO quando l'utente naviga alla pagina di sync,
       // all'interno di initState() protetto da try-catch.
       // ═══════════════════════════════════════════════════════════════════════
-      runApp(const ProviderScope(child: SessionLifecycleObserver(child: MyApp())));
+      runApp(
+        const ProviderScope(
+          child: NearbySyncLifecycleManager(
+            child: SessionLifecycleObserver(child: MyApp()),
+          ),
+        ),
+      );
     },
     // ─────────────────────────────────────────────────────────────────────────
     // CATCH GLOBALE DEL runZonedGuarded:

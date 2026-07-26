@@ -1,8 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter/widgets.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/sync/p2p/p2p_sync_service.dart';
+import '../services/bluetooth_permission_service.dart';
 
 final nearbySyncServiceProvider = Provider<P2PSyncService>((ref) {
   return P2PSyncService();
@@ -13,21 +15,51 @@ final nearbySyncStateProvider = StreamProvider<P2PSyncState>((ref) {
   return service.onStateChanged;
 });
 
+final syncLogsProvider = Provider<List<SyncLogEntry>>((ref) {
+  final service = ref.watch(nearbySyncServiceProvider);
+  return service.syncLogs;
+});
+
 class NearbySyncDaemonController extends StateNotifier<bool> {
   final P2PSyncService _service;
   bool _isAppInForeground = false;
+  bool _initialized = false;
+  static const _prefsKey = 'sync_permanently_enabled';
 
   NearbySyncDaemonController(this._service) : super(false);
+
+  Future<void> init() async {
+    if (_initialized) return;
+    _initialized = true;
+    final prefs = await SharedPreferences.getInstance();
+    final enabled = prefs.getBool(_prefsKey) ?? false;
+    if (enabled) {
+      state = true;
+    }
+  }
 
   void setAppForeground(bool isForeground) {
     if (_isAppInForeground == isForeground) return;
     _isAppInForeground = isForeground;
-    if (isForeground) {
+    if (isForeground && state) {
       _service.startBackgroundSync();
-      state = true;
+    } else if (!isForeground) {
+      _service.stopBackgroundSync();
+    }
+  }
+
+  Future<void> setSyncEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefsKey, enabled);
+    state = enabled;
+    if (enabled) {
+      final permResult =
+          await BluetoothPermissionService.checkAndRequestPermissions();
+      if (permResult.allGranted) {
+        _service.startBackgroundSync();
+      }
     } else {
       _service.stopBackgroundSync();
-      state = false;
     }
   }
 
@@ -73,7 +105,9 @@ class _NearbySyncLifecycleManagerState
       if (!_daemonStarted) {
         _daemonStarted = true;
         final daemonController = ref.read(nearbySyncDaemonProvider.notifier);
-        daemonController.setAppForeground(true);
+        daemonController.init().then((_) {
+          daemonController.setAppForeground(true);
+        });
       }
     });
   }

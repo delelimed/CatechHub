@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sync P2P Bluetooth — CatechHub</title>
-<meta name="description" content="Sincronizza i tuoi dati con altri catechisti via Bluetooth, senza internet, in modo sicuro e automatico.">
+<title>Sync P2P Bluetooth/WiFi — CatechHub</title>
+<meta name="description" content="Sincronizza i tuoi dati con altri catechisti via Bluetooth o WiFi Direct, senza internet, in modo sicuro e automatico.">
 <link rel="icon" href="../logo.png" type="image/png">
 <link rel="stylesheet" href="../style.css">
 <script src="../js/version.js" defer></script>
@@ -25,8 +25,8 @@
 
 <section class="page-header">
   <div class="container">
-    <h1>Sync P2P Bluetooth</h1>
-    <p>Sincronizza i dati tra catechisti senza bisogno di internet, server o cloud: solo Bluetooth e crittografia</p>
+    <h1>Sync P2P Bluetooth / WiFi Direct</h1>
+    <p>Sincronizza i dati tra catechisti senza bisogno di internet, server o cloud: solo Bluetooth o WiFi Direct con crittografia end-to-end</p>
   </div>
 </section>
 
@@ -74,7 +74,10 @@
 
     <h2>Sicurezza</h2>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
-      <li><strong>Crittografia end-to-end:</strong> i dati sono cifrati prima di essere trasmessi via Bluetooth</li>
+      <li><strong>Crittografia end-to-end:</strong> X25519 ECDH + HKDF + AES-256-GCM — i dati sono cifrati prima di essere trasmessi</li>
+      <li><strong>Pairing code anti-MitM:</strong> durante l'associazione, un codice a 6 cifre derivato dalla chiave condivisa permette di verificare che non ci siano intercettatori</li>
+      <li><strong>Key pinning:</strong> alla riconnessione, la chiave pubblica del dispositivo remoto viene verificata contro l'associazione salvata</li>
+      <li><strong>Forward secrecy:</strong> ogni sessione usa chiavi effimere — anche se una chiave viene compromessa, le sessioni passate restano sicure</li>
       <li><strong>Associazione tramite QR:</strong> solo i dispositivi che hanno scambiato il QR possono sincronizzarsi</li>
       <li><strong>Niente internet:</strong> i dati non passano mai da server esterni</li>
       <li><strong>Controllo totale:</strong> puoi decidere con chi e quando sincronizzarti</li>

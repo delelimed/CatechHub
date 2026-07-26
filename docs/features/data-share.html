@@ -71,8 +71,10 @@
 
     <h2>Sicurezza</h2>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
-      <li><strong>Crittografia end-to-end:</strong> i dati sono cifrati con AES-256-GCM</li>
-      <li><strong>Protezione PIN:</strong> anche se il QR viene fotografato, senza PIN i dati sono illeggibili</li>
+      <li><strong>Crittografia end-to-end:</strong> AES-256-GCM con derivazione chiave PBKDF2-HMAC-SHA256 (12.000 iterazioni per performance QR)</li>
+      <li><strong>Protezione PIN a 8 cifre:</strong> PIN generato via Random.secure(), valido 3 minuti</li>
+      <li><strong>Chunking automatico:</strong> payload diviso in chunk JSON da max 1200 caratteri, ognuno con checksum SHA-256</li>
+      <li><strong>Sync differenziale:</strong> trasferisce solo i record nuovi/modificati (confronto indice per modulo)</li>
       <li><strong>Niente internet:</strong> il trasferimento avviene solo tramite fotocamera, offline</li>
       <li><strong>Scegli cosa condividere:</strong> decidi tu esattamente quali dati inviare</li>
     </ul>

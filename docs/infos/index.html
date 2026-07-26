@@ -92,7 +92,7 @@
         <tr>
           <td>Art. 32</td>
           <td>Security of processing</td>
-          <td>AES-256-GCM a riposo, PBKDF2 per backup, ECDH + HKDF per sync, E2EE Bluetooth, AndroidKeyStore, sessione in RAM, timeout 120s, freeRASP anti-tamper.</td>
+          <td>AES-256-GCM a riposo con chiave in AndroidKeyStore (TEE/StrongBox), verifica hardware obbligatoria all'avvio, PBKDF2 210k iterazioni per backup, X25519 ECDH + HKDF + AES-256-GCM per sync P2P, pairing code a 6 cifre anti-MitM, key pinning per dispositivo, sessione in RAM, timeout 120s, freeRASP anti-tamper.</td>
         </tr>
         <tr>
           <td>Art. 35</td>
@@ -109,7 +109,7 @@
       <tbody>
         <tr><td>Furto dispositivo</td><td>Bassa</td><td>Alto</td><td>Crittografia AES-256-GCM, chiave in AndroidKeyStore, auth biometrica</td></tr>
         <tr><td>Accesso non autorizzato</td><td>Media</td><td>Alto</td><td>Autenticazione obbligatoria, timeout sessione 120s</td></tr>
-        <tr><td>Intercettazione sync</td><td>Bassa</td><td>Medio</td><td>E2EE con ECDH + HKDF + AES-256-GCM per pacchetto</td></tr>
+        <tr><td>Intercettazione sync</td><td>Bassa</td><td>Medio</td><td>E2EE con X25519 ECDH + HKDF + AES-256-GCM, pairing code anti-MitM, forward secrecy, key pinning</td></tr>
         <tr><td>Perdita dati</td><td>Media</td><td>Alto</td><td>Backup crittografato, export selettivo, merge import</td></tr>
         <tr><td>Malware/root</td><td>Bassa</td><td>Alto</td><td>freeRASP rilevamento root, hooking, emulatori</td></tr>
         <tr><td>Errore umano</td><td>Alta</td><td>Medio</td><td>Conferma eliminazione, cronologia modifiche, recovery corruzione Hive</td></tr>
@@ -140,6 +140,12 @@
       <a href="registro-trattamento.html" class="card" style="text-decoration:none;color:inherit;">
         <h3>&#128221; Registro Trattamento</h3>
         <p>Registro delle attività di trattamento ai sensi dell'Art. 30 GDPR</p>
+      </a>
+    </div>
+
+    <div style="text-align:center;margin-top:2rem;">
+      <a href="../index.html" class="card" style="display:inline-block;text-decoration:none;color:inherit;padding:0.75rem 1.5rem;">
+        &#8592; Torna alla Home
       </a>
     </div>
 

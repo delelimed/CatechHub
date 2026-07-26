@@ -137,12 +137,14 @@
       </thead>
       <tbody>
         <tr><td><strong>Accesso all'app</strong></td><td>Impronta digitale, riconoscimento facciale o PIN del telefono</td></tr>
-        <tr><td><strong>Dati sul telefono</strong></td><td>Cifrati con AES-256-GCM — illeggibili anche se il file viene copiato</td></tr>
-        <tr><td><strong>Dati in sincronizzazione</strong></td><td>Crittografati end-to-end con scambio di chiavi via QR code</td></tr>
+        <tr><td><strong>Blocco hardware</strong></td><td>Verifica TEE/StrongBox all'avvio — hardware di sicurezza obbligatorio, nessun fallback software</td></tr>
+        <tr><td><strong>Dati sul telefono</strong></td><td>Cifrati con AES-256-GCM — chiave master in AndroidKeyStore (TEE/StrongBox)</td></tr>
+        <tr><td><strong>Sync P2P Bluetooth/WiFi</strong></td><td>Crittografia end-to-end X25519 ECDH + HKDF + AES-256-GCM, pairing code a 6 cifre anti-MitM, key pinning per dispositivo, forward secrecy</td></tr>
+        <tr><td><strong>Condivisione QR</strong></td><td>AES-256-GCM con PIN a 8 cifre (valido 3 min), checksum SHA-256 per chunk, sync differenziale</td></tr>
         <tr><td><strong>Schermo</strong></td><td>Blocco screenshot e screen recording non autorizzati</td></tr>
-        <tr><td><strong>Protezione antifurto</strong></td><td>Rilevamento di root, emulatori e tentativi di manomissione</td></tr>
+        <tr><td><strong>Protezione runtime</strong></td><td>freeRASP: rilevamento root, emulatori, hooking, tampering</td></tr>
         <tr><td><strong>Sessione in background</strong></td><td>Blocco automatico dopo 2 minuti di inattività</td></tr>
-        <tr><td><strong>Backup</strong></td><td>Protetto da password con crittografia avanzata</td></tr>
+        <tr><td><strong>Backup</strong></td><td>Protetto da password con PBKDF2 (210.000 iterazioni) + AES-256-GCM</td></tr>
       </tbody>
     </table>
 
@@ -264,7 +266,7 @@
         <tr><td>Gestione stato</td><td>Riverpod</td></tr>
         <tr><td>Database locale</td><td>Hive (cifrato AES)</td></tr>
         <tr><td>Crittografia</td><td>AES-256-GCM, PBKDF2, ECDH, HKDF</td></tr>
-        <tr><td>Sincronizzazione</td><td>Bluetooth RFCOMM + CRDT</td></tr>
+        <tr><td>Sincronizzazione P2P</td><td>Google Nearby Connections (P2P_CLUSTER — Bluetooth/WiFi Direct) + sync differenziale</td></tr>
         <tr><td>Autenticazione</td><td>Biometria nativa Android</td></tr>
         <tr><td>QR Code</td><td>mobile_scanner, qr_flutter</td></tr>
         <tr><td>PDF</td><td>pdf, printing</td></tr>
@@ -295,7 +297,7 @@
 
     <div class="faq-item">
       <h3>Come faccio a sincronizzare con altri catechisti?</h3>
-      <p>La sincronizzazione avviene <strong>peer-to-peer via Bluetooth</strong>. Un catechista genera un QR code con la chiave di sincronizzazione, l'altro lo inquadra con la propria app, e i dati vengono scambiati in modo sicuro e crittografato. Nessun server centrale, nessun account. Decidi tu con chi condividere e quali dati.</p>
+      <p>La sincronizzazione avviene <strong>peer-to-peer via Bluetooth/WiFi Direct</strong> (Google Nearby Connections). I dati sono crittografati end-to-end con X25519 ECDH + HKDF + AES-256-GCM. Ogni dispositivo ha un'associazione con chiavi dedicate e, durante il pairing, un codice a 6 cifre derivato dalla chiave condivisa permette di verificare visivamente che non ci sia un attacco MitM. Nessun server centrale, nessun account. Decidi tu con chi condividere e quali dati.</p>
     </div>
 
     <div class="faq-item">

@@ -39,6 +39,7 @@ import '../features/data_share/data_share_selection_page.dart';
 import '../features/data_share/data_share_send_page.dart';
 import '../features/data_share/data_share_receive_page.dart';
 import '../screens/settings_association_screen.dart';
+import '../screens/sync_log_page.dart';
 import '../features/catechesi/catechesi_page.dart';
 import '../features/catechesi/catechesi_edit_page.dart';
 import '../features/catechesi/catechesi_detail_page.dart';
@@ -553,6 +554,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings/association',
         builder: (context, state) => const SettingsAssociationScreen(),
+      ),
+
+      /// Log di sincronizzazione Nearby.
+      GoRoute(
+        path: '/settings/sync-log',
+        builder: (context, state) => const SyncLogPage(),
       ),
 
       // ═══════════════════════════════════════════════════════════════════

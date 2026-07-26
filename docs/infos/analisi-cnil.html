@@ -7,6 +7,7 @@
 <link rel="icon" href="../logo.png" type="image/png">
 <link rel="stylesheet" href="../style.css">
 <script src="../js/version.js" defer></script>
+<script src="../js/nav.js" defer></script>
 </head>
 <body>
 
@@ -50,7 +51,7 @@
         <tr><td>Chiavi crittografiche</td><td>Materiale crittografico</td><td>Critico</td><td>AndroidKeyStore (hardware-backed)</td></tr>
         <tr><td>Dispositivo Android</td><td>Hardware</td><td>Critico</td><td>Protezione fisica + FLAG_SECURE</td></tr>
         <tr><td>Backup .catechhub</td><td>Archivio cifrato</td><td>Riservato</td><td>Filesystem esterno / cloud (a scelta utente)</td></tr>
-        <tr><td>Trusted Devices</td><td>Chiavi pubbliche ECDH</td><td>Sensibile</td><td>Box Hive cifrato</td></tr>
+        <tr><td>Trusted Devices</td><td>Chiavi pubbliche X25519 + chiavi per dispositivo</td><td>Sensibile</td><td>Box Hive cifrato + FlutterSecureStorage</td></tr>
       </tbody>
     </table>
 
@@ -76,9 +77,9 @@
       <tbody>
         <tr><td>RGS A1 — Authentification</td><td>BiometricPrompt con fallback PIN/Pattern. Sessione in RAM.</td><td>&#9989; Conforme</td></tr>
         <tr><td>RGS A2 — Intégrité</td><td>Tag GCM 128bit su tutti i dati. Checksum SHA-256 su backup.</td><td>&#9989; Conforme</td></tr>
-        <tr><td>RGS A3 — Confidentialité</td><td>AES-256-GCM a riposo e in transito. ECDH + HKDF per sync.</td><td>&#9989; Conforme</td></tr>
+        <tr><td>RGS A3 — Confidentialité</td><td>AES-256-GCM a riposo e in transito. X25519 ECDH + HKDF + AES-256-GCM per sync P2P.</td><td>&#9989; Conforme</td></tr>
         <tr><td>RGS A4 — Traçabilité</td><td>Non implementata (scelta di design per minimizzazione).</td><td>&#10060; Non conforme (consapevole)</td></tr>
-        <tr><td>ANSSI — Chiffrement fort</td><td>AES-256-GCM, PBKDF2 210k iterazioni, ECDH P-256, HKDF-SHA256.</td><td>&#9989; Conforme</td></tr>
+        <tr><td>ANSSI — Chiffrement fort</td><td>AES-256-GCM, PBKDF2 210k iterazioni, X25519 ECDH, HKDF-SHA256, pairing code anti-MitM.</td><td>&#9989; Conforme</td></tr>
         <tr><td>ANSSI — Gestion des clés</td><td>AndroidKeyStore (isolamento hardware). Chiavi mai esposte al livello Dart.</td><td>&#9989; Conforme</td></tr>
         <tr><td>ANSSI — Sécurité runtime</td><td>freeRASP: anti-root, anti-hooking, anti-emulator, app integrity.</td><td>&#9989; Conforme</td></tr>
         <tr><td>ANSSI — Chiffrement de sessions</td><td>Session key derivata con HKDF per ogni coppia di dispositivi.</td><td>&#9989; Conforme</td></tr>
@@ -123,6 +124,12 @@
       <p>Punti di attenzione: (1) assenza di logging di audit (traçabilité), scelta consapevole per minimizzare la superficie dati; (2) l'utente finale (catechista/parrocchia) rimane il responsabile della conformità; (3) si raccomanda una DPIA formale per parrocchie con trattamento su larga scala.</p>
     </div>
 
+    <div style="text-align:center;margin-top:2rem;">
+      <a href="../index.html" class="card" style="display:inline-block;text-decoration:none;color:inherit;padding:0.75rem 1.5rem;">
+        &#8592; Torna alla Home
+      </a>
+    </div>
+
   </div>
 </section>
 
@@ -148,5 +155,5 @@
   </div>
 </footer>
 
-<script src="../js/nav.js"></script></body>
+</body>
 </html>

@@ -790,16 +790,12 @@ class _QuickActionsGrid extends StatelessWidget {
             Icon(item.icon, color: iconColor),
             const SizedBox(width: 12),
             Expanded(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  item.title,
-                  softWrap: false,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: textColor,
-                  ),
+              child: Text(
+                item.title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
                 ),
               ),
             ),

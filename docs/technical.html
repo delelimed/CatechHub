@@ -40,7 +40,7 @@
         <li><a href="#bootstrap">Architettura del bootstrap</a></li>
         <li><a href="#hive">Hive Database Layer</a></li>
         <li><a href="#encryption">EncryptionService</a></li>
-        <li><a href="#sync">Sync Engine (ClassicSyncEngine)</a></li>
+        <li><a href="#sync">Sync Engine (P2P Sync)</a></li>
         <li><a href="#security">Security architecture</a></li>
         <li><a href="#riverpod">Riverpod State Architecture</a></li>
         <li><a href="#export">Data Export/Backup format</a></li>
@@ -138,17 +138,94 @@ final HKDF_INFO = 'CatechHub_SessionKey_v2';
   └─────────────────────────────────────────────────────────────────┘
     </pre>
 
+    <h2 id="sync">4. Sync Engine (P2P Sync)</h2>
+
+    <p>CatechHub implementa due canali di sincronizzazione paralleli: <strong>Nearby P2P</strong> (real-time via Bluetooth/WiFi Direct) e <strong>QR Code</strong> (offline/on-demand).</p>
+
+    <h3>4.1 Nearby P2P Sync</h3>
+    <p>Utilizza Google <strong>Nearby Connections API</strong> con <code>Strategy.P2P_CLUSTER</code>, garantendo che zero dati transitino su internet — solo Bluetooth o WiFi Direct. Il servizio è implementato in <code>P2PSyncService</code> (singleton) con un protocollo a 7 fasi:</p>
+
+    <pre>
+  Handshake Protocol (7 message types)
+  ┌────────────┐   ┌────────────┐   ┌────────────┐   ┌──────────────┐   ┌────────────┐   ┌────────────┐   ┌──────────┐
+  │ p2p_       │   │ p2p_       │   │ p2p_       │   │ p2p_         │   │ p2p_       │   │ p2p_       │   │ p2p_     │
+  │ handshake  │──▶│ handshake  │──▶│ auth_      │──▶│ auth_        │──▶│ sync_index │──▶│ sync_      │──▶│ sync_ack │
+  │            │   │ _ack       │   │ request    │   │ response     │   │            │   │ request    │   │          │
+  └────────────┘   └────────────┘   └────────────┘   └──────────────┘   └────────────┘   └────────────┘   └──────────┘
+       │                │               │                  │                 │                │               │
+       ▼                ▼               ▼                  ▼                 ▼                ▼               ▼
+  Identity          Reciprocal     Auth request      Accept/reject      Exchange of      Request         Confirm
+  exchange          identity       (initiator)       (user must         local record     specific        apply
+  (QR-encoded)      exchange                          confirm)          indices per     records by      success
+                                                                        box              composite key
+    </pre>
+
+    <p><strong>Sync differenziale:</strong> Entrambi i lati costruiscono un indice locale (<code>HiveSyncEngine.buildLocalIndex()</code>) con timestamp e checksum per record. Ogni dispositivo calcola cosa gli serve dal remoto e cosa il remoto necessita da esso. I record vengono scambiati in modo bidirezionale fino al completamento (tracciato da una macchina a stati: <code>idle → sentIndex → sendDone → receiveDone → complete</code>).</p>
+
+    <p><strong>Sync continua in background:</strong> All'avvio, se esistono associazioni, il servizio avvia advertising + discovery + sync periodico (ogni 60s). Ascolta le modifiche locali su Hive (debounce 500ms) e invia richieste di sync incrementali. Riconnessione automatica ogni 5 secondi per dispositivi noti. Un indicatore a pallino (8px) nell'app bar mostra lo stato (rosso=nessuna associazione, giallo=associazioni presenti, verde=sync in corso, ciano=dati aggiornati).</p>
+
+    <p><strong>Stati:</strong> 12 stati di sincronizzazione tracciati da <code>P2PSyncStatus</code> (idle, pairing, discovering, advertising, handshakeSent, handshakeReceived, <strong>pairingVerification</strong>, sessionEstablished, syncing, completed, error).</p>
+
+    <h3>4.2 QR Code Sync</h3>
+    <p>Canale alternativo per dispositivi senza Bluetooth o per trasferimenti one-shot. Implementato in <code>QRDataService</code>:</p>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li><strong>Cifratura:</strong> AES-256-GCM con PIN a 8 cifre generato via <code>Random.secure()</code>, valido 3 minuti. Derivazione chiave con PBKDF2-HMAC-SHA256 a 12.000 iterazioni (ridotto per performance QR).</li>
+      <li><strong>Chunking:</strong> Payload diviso in chunk JSON di max 1200 caratteri, ognuno con checksum SHA-256 (prime 4 cifre esadecimali).</li>
+      <li><strong>Integrità:</strong> Checksum SHA-256 dell'intero payload (prime 12 cifre hex) verificato dopo il riassemblaggio.</li>
+      <li><strong>Sync differenziale:</strong> <code>buildDatabaseIndex()</code> crea un indice per modulo. <code>computeDiffExport()</code> confronta l'indice locale con quello remoto e trasferisce solo i record nuovi/modificati (risoluzione conflitti: local wins).</li>
+      <li><strong>Moduli supportati:</strong> Anagrafica, Presenze, Programmazione, Documenti, Note contatto, Catechesi, Annotazioni giornaliere.</li>
+    </ul>
+
+    <h3>4.3 P2P Security Service</h3>
+    <p>Il modulo <code>P2PSecurityService</code> fornisce le fondamenta crittografiche per tutte le comunicazioni P2P:</p>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li><strong>Scambio chiavi:</strong> X25519 (Curve25519) tramite pacchetto <code>cryptography</code>. Ogni dispositivo genera una coppia di chiavi identità long-lived <strong>più una coppia per ogni dispositivo associato</strong> (chiavi per dispositivo salvate nell'associazione).</li>
+      <li><strong>Derivazione chiave di sessione:</strong> HKDF con HMAC-SHA256 (output 32 byte) combinando: shared secret statico + shared secret effimero ECDHE + nonce di handshake (32 byte). Info string: <code>"CatechHub_P2P_Session_v2"</code> + ID dispositivo remoto + ruolo (initiator/responder).</li>
+      <li><strong>Cifratura payload:</strong> AES-256-GCM con nonce 12 byte. Wrapper <code>P2PEncryptedPayload</code> con nonce, ciphertext, MAC (128-bit) e tag algoritmo (supporta <code>chacha20-poly1305</code> come opzione futura).</li>
+      <li><strong>Forward secrecy:</strong> Il componente ECDHE effimero è mescolato nell'input HKDF — la compromissione della chiave statica non compromette le chiavi di sessione passate.</li>
+      <li><strong>Pairing code:</strong> Codice a 6 cifre decimali derivato da SHA-256 dello shared secret ECDH calcolato da <code>computePairingCode()</code>. Entrambi i dispositivi calcolano lo stesso codice — l'utente verifica visivamente che i codici corrispondano prima di confermare il pairing, prevenendo attacchi Man-in-the-Middle.</li>
+      <li><strong>Key pinning:</strong> Alla riconnessione, la chiave pubblica remota deve corrispondere all'associazione salvata (<code>publicKeyMatchesAssociation()</code>). Se la chiave pubblica ricevuta via radio differisce da quella salvata, viene sollevato un allarme MitM e la connessione viene interrotta.</li>
+      <li><strong>Associazioni per dispositivo:</strong> Ogni associazione (<code>P2PDeviceAssociation</code>) contiene ora anche <code>devicePrivateKeyBase64</code> e <code>devicePublicKeyBase64</code>, permettendo chiavi crittografiche uniche per ogni coppia di dispositivi.</li>
+      <li><strong>Associazioni:</strong> Valide 30 giorni, salvate in FlutterSecureStorage con prefisso <code>p2p_assoc_</code>.</li>
+      <li><strong>Sessione:</strong> Valida max 30 minuti (<code>P2PSession.isValid</code>).</li>
+      <li><strong>Seed crittografico:</strong> <code>Random.secure()</code> di Dart per tutti i nonce e salt.</li>
+    </ul>
+
+    <h3>4.4 Sync Status Indicator</h3>
+    <p>Un indicatore visivo a pallino (8px) nell'app bar mostra lo stato della sincronizzazione P2P con codifica a colori:</p>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li><span style="color:red;">● Rosso</span> — nessuna associazione o sync non recente</li>
+      <li><span style="color:#FFC107;">● Giallo</span> — associazioni presenti ma dati non aggiornati</li>
+      <li><span style="color:green;">● Verde</span> — sync in corso</li>
+      <li><span style="color:#00BCD4;">● Ciano</span> — dati aggiornati e sync recente confermato</li>
+    </ul>
+
+    <h3>4.5 QR Code package format</h3>
+    <pre>
+{
+  "v": 2,
+  "encryptedData": "&lt;base64&gt;",
+  "totalChunks": N,
+  "checksum": "&lt;SHA-256 first 12 hex&gt;"
+}
+
+// Each chunk:
+{"i": 0, "t": 3, "d": "&lt;base64 data&gt;", "c": "&lt;chunk checksum 4 hex&gt;"}
+    </pre>
+    <p>I pacchetti QR usano un formato simile ma con chunking automatico. Ogni chunk contiene checksum individuale (prime 4 cifre SHA-256). Il PIN a 8 cifre ha validità 3 minuti. Derivazione chiave: PBKDF2-HMAC-SHA256 a 12.000 iterazioni (fast share).</p>
+
     <h2 id="security">5. Security architecture</h2>
 
-    <h3>5.1 Hardware-backed Master Key (AndroidKeyStore)</h3>
-    <p>A partire dalla versione 2.0, CatechHub richiede <strong>esclusivamente</strong> protezione hardware per la chiave master di cifratura Hive. Il modulo <code>SecurityManager</code>:</p>
+    <h3>5.1 Hardware-backed Master Key (AndroidKeyStore) — SecurityManager</h3>
+    <p>A partire dalla versione 2.0, CatechHub richiede <strong>esclusivamente</strong> protezione hardware per la chiave master di cifratura Hive. Il modulo <code>SecurityManager</code> (singleton in <code>lib/core/security/security_manager.dart</code>):</p>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
-      <li>Verifica la presenza di TEE (Trusted Execution Environment) o StrongBox all'avvio tramite <code>local_auth</code> e <code>FlutterSecureStorage</code></li>
+      <li>Verifica la presenza di TEE (Trusted Execution Environment) o StrongBox all'avvio tramite <code>local_auth</code> (biometria come proxy TEE) e <code>FlutterSecureStorage</code> (test scrittura/lettura Keystore)</li>
       <li>Genera la chiave master AES-256 tramite <code>Hive.generateSecureKey()</code> e la custodisce in AndroidKeyStore con <code>encryptedSharedPreferences=true</code></li>
-      <li>Se TEE/StrongBox non è disponibile, solleva <code>HardwareSecurityException</code> e blocca l'avvio con <code>SecurityBlockScreen</code></li>
+      <li>Se TEE/StrongBox non è disponibile, solleva <code>HardwareSecurityException</code> e blocca l'avvio con <code>SecurityBlockScreen</code> — l'app <strong>non si avvia</strong> su dispositivi senza hardware di sicurezza</li>
       <li><strong>Nessun fallback software</strong>: la chiave master non viene mai memorizzata in memoria volatile o storage non protetto</li>
+      <li>Flusso di inizializzazione: (1) verifica biometrica (local_auth) → proxy TEE, (2) test FlutterSecureStorage → verifica Keystore, (3) generazione/lettura Master Key, (4) creazione HiveAesCipher, (5) marcatura hardware come verificato</li>
     </ul>
-    <p>Configurazione Android (<code>flutter_secure_storage</code>): <code>encryptedSharedPreferences: true</code> forza l'uso di <code>KeyGenParameterSpec</code> con <code>setIsStrongBoxBacked(true)</code> su API 28+.</p>
+    <p>Configurazione Android (<code>flutter_secure_storage</code>): <code>encryptedSharedPreferences: true</code> forza l'uso di <code>KeyGenParameterSpec</code> con <code>setIsStrongBoxBacked(true)</code> su API 28+. StrongBox richiede hardware dedicato (Pixel 3+, Samsung S20+), TEE è presente su quasi tutti i dispositivi Android 10+ certificati.</p>
 
     <h3>5.2 freeRASP</h3>
     <p>Libreria di runtime application self-protection (RASP) che rileva 8 categorie di minacce:</p>
@@ -194,7 +271,7 @@ if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
   ┌─────────────────────────────────────────────────────────────────┐
   │  Layer 8: freeRASP (root, emulator, hooking, app integrity)    │
   ├─────────────────────────────────────────────────────────────────┤
-  │  Layer 7: E2EE Sync (ECDH P-256 + HKDF + AES-256-GCM)         │
+  │  Layer 7: E2EE Sync (X25519 ECDH + HKDF + AES-256-GCM)        │
   ├─────────────────────────────────────────────────────────────────┤
   │  Layer 6: Biometric Auth + Session in RAM (120s timeout)       │
   ├─────────────────────────────────────────────────────────────────┤

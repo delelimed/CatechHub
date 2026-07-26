@@ -5,6 +5,7 @@ import '../../shared/models/contact_note_model.dart';
 import '../../shared/models/planning_meeting.dart';
 import '../../shared/models/student_model.dart';
 import '../../core/storage/local_database.dart';
+import '../planning/planning_repository.dart';
 import '../students/students_repository.dart';
 import 'avvisi_repository.dart';
 import 'avvisi_utils.dart';
@@ -165,27 +166,22 @@ class AvvisiPage extends ConsumerWidget {
     );
   }
 
+  static const _personSpecificPlaceholders = [
+    '{nome_ragazzo}',
+    '{cognome_ragazzo}',
+    '{nome_genitore}',
+    '{assenze_consecutive}',
+    '{ultima_presenza}',
+  ];
+
   bool _hasStudentPlaceholders(String text) {
-    const studentPlaceholders = [
-      '{nome_ragazzo}',
-      '{cognome_ragazzo}',
-      '{nome_genitore}',
-      '{nome_gruppo}',
-      '{data_incontro}',
-      '{assenze_consecutive}',
-      '{ultima_presenza}',
-    ];
-    return studentPlaceholders.any((p) => text.contains(p));
+    return _personSpecificPlaceholders.any((p) => text.contains(p));
   }
 
   Future<void> _inviaTemplate(BuildContext context, WidgetRef ref, AvvisoTemplate template) async {
-    if (!hasPlaceholders(template.text)) {
-      _openWhatsAppForTemplate(context, ref, template, null, null, null);
-      return;
-    }
-
     if (!_hasStudentPlaceholders(template.text)) {
-      openWhatsApp(null, template.text);
+      final resolved = _resolveDateOnly(context, ref, template.text);
+      openWhatsApp(null, resolved);
       return;
     }
 
@@ -196,6 +192,30 @@ class AvvisiPage extends ConsumerWidget {
     if (parentInfo == null) return;
 
     _openWhatsAppForTemplate(context, ref, template, student, parentInfo.$1, parentInfo.$2);
+  }
+
+  String _resolveDateOnly(BuildContext context, WidgetRef ref, String text) {
+    if (!hasPlaceholders(text)) return text;
+    try {
+      final students = ref.read(studentsRepositoryProvider).getAllStudentsSync();
+      if (students.isEmpty) return text;
+      final student = students.first;
+      if (student.classId == null) return text;
+
+      String result = text;
+      final groupName = _getClassName(student.classId!);
+      final nextMeeting = _getNextMeeting(student.classId!);
+      if (groupName.isNotEmpty) {
+        result = result.replaceAll('{nome_gruppo}', groupName);
+      }
+      if (nextMeeting != null) {
+        final meetingDate = '${nextMeeting.date.day.toString().padLeft(2, '0')}/${nextMeeting.date.month.toString().padLeft(2, '0')}/${nextMeeting.date.year}';
+        result = result.replaceAll('{data_incontro}', meetingDate);
+      }
+      return result;
+    } catch (_) {
+      return text;
+    }
   }
 
   Future<Student?> _selectStudent(BuildContext context, WidgetRef ref) async {
@@ -331,6 +351,7 @@ class AvvisiPage extends ConsumerWidget {
   }
 
   String _getClassName(String classId) {
+    if (classId.isEmpty) return '';
     try {
       final data = LocalDatabase.classes().get(classId);
       if (data != null) {
@@ -540,17 +561,17 @@ class AvvisiPage extends ConsumerWidget {
   }
 
   PlanningMeeting? _getNextMeeting(String classId) {
+    if (classId.isEmpty) return null;
     try {
-      final box = LocalDatabase.planning();
+      final repo = PlanningRepository();
+      final meetings = repo.getMeetingsSync();
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
       PlanningMeeting? closest;
 
-      for (final key in box.keys) {
-        final data = LocalDatabase.toStringDynamicMap(box.get(key));
-        if (data['classId'] != classId) continue;
-        if (data['isReunion'] == true) continue;
-        final meeting = PlanningMeeting.fromMap(key.toString(), data);
+      for (final meeting in meetings) {
+        if (meeting.classId != classId) continue;
+        if (meeting.isReunion) continue;
         final meetingDate = DateTime(meeting.date.year, meeting.date.month, meeting.date.day);
         if (!meetingDate.isBefore(today)) {
           if (closest == null || meeting.date.isBefore(closest.date)) {

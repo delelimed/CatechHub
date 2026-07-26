@@ -317,6 +317,12 @@ class _AssociateDeviceScreenState
             if (service.currentState.status ==
                 P2PSyncStatus.pairingVerification) {
               await service.confirmPairingCode();
+            } else if (service.currentState.connectedDeviceId != null &&
+                _scannedDeviceId != null) {
+              await service.finalizeAssociation(
+                service.currentState.connectedDeviceId!,
+                _scannedDeviceId!,
+              );
             }
             setState(() {
               _currentStep = _AssociationStep.complete;

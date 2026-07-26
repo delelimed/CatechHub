@@ -16,6 +16,13 @@ import 'documents_repository.dart';
 class DocumentsPage extends ConsumerWidget {
   const DocumentsPage({super.key});
 
+  String _formatTimestamp(dynamic timestamp) {
+    final DateTime? date = DateTime.tryParse(timestamp?.toString() ?? '');
+    if (date == null) return '';
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} '
+        '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
   /// Mostra un dialog per la creazione di un nuovo documento.
   ///
   /// Richiede all'utente di inserire un titolo descrittivo (es. "Autorizzazione
@@ -221,14 +228,27 @@ class DocumentsPage extends ConsumerWidget {
                               doc['title']?.toString() ?? 'Documento',
                               style: const TextStyle(fontWeight: FontWeight.w600),
                             ),
-                            subtitle: Text(
-                              mancanti == 0
-                                  ? (esonerati > 0 ? 'Completato ($esonerati esonerati)' : 'Completato')
-                                  : '$mancanti mancanti${esonerati > 0 ? ', $esonerati esonerati' : ''}',
-                              style: TextStyle(
-                                color: mancanti == 0 ? Colors.green : Colors.orange.shade800,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  mancanti == 0
+                                      ? (esonerati > 0 ? 'Completato ($esonerati esonerati)' : 'Completato')
+                                      : '$mancanti mancanti${esonerati > 0 ? ', $esonerati esonerati' : ''}',
+                                  style: TextStyle(
+                                    color: mancanti == 0 ? Colors.green : Colors.orange.shade800,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                if (doc['updatedAt'] != null || doc['lastModifiedBy'] != null)
+                                  Text(
+                                    '${_formatTimestamp(doc['updatedAt'])}${doc['lastModifiedBy'] != null ? ' da ${doc['lastModifiedBy']}' : ''}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+                                    ),
+                                  ),
+                              ],
                             ),
                               trailing: PopupMenuButton<String>(
                               icon: const Icon(Icons.more_vert_rounded),

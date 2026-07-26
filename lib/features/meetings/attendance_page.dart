@@ -3,7 +3,7 @@
 /// In CateREG, questa schermata consente al catechista di selezionare una data
 /// di incontro e registrare la presenza di ogni ragazzo della propria classe.
 /// Ogni studente viene visualizzato con nome, cognome e un indicatore cromatico:
-/// - sfondo rosso se ha 2+ assenze consecutive consecutive
+/// - sfondo rosso se ha 2+ assenze consecutive
 /// - pulsanti "Presente" (verde) e "Assente" (rosso) per ogni studente
 /// - supporto a futuri swipe gesture per cambiare stato rapidamente
 /// Le presenze vengono salvate su Hive tramite [AttendanceRepository].
@@ -22,71 +22,80 @@ class _Student {
   final String id;
   final String name;
   final String surname;
-  final bool hasTwoConsecutiveAbsences;
+  final int consecutiveAbsences;
 
   _Student({
     required this.id,
     required this.name,
     required this.surname,
-    required this.hasTwoConsecutiveAbsences,
+    required this.consecutiveAbsences,
   });
 }
 
-final _studentsWithHistoryProvider =
-    StreamProvider.autoDispose.family<List<_Student>, String>((ref, currentMeetingId) {
-  final studentsRepo = ref.watch(studentsRepoProvider);
-  final attendanceRepo = AttendanceRepository();
+final _studentsWithHistoryProvider = StreamProvider.autoDispose
+    .family<List<_Student>, String>((ref, currentMeetingId) {
+      final studentsRepo = ref.watch(studentsRepoProvider);
+      final attendanceRepo = AttendanceRepository();
 
-  return studentsRepo.getAllStudents().map((students) {
-    final attendance = attendanceRepo.getAttendanceSync()
-      ..sort((a, b) {
-        final aDate = DateTime.tryParse(a['date']?.toString() ?? '') ??
-            DateTime.fromMillisecondsSinceEpoch(0);
-        final bDate = DateTime.tryParse(b['date']?.toString() ?? '') ??
-            DateTime.fromMillisecondsSinceEpoch(0);
-        return bDate.compareTo(aDate);
-      });
+      return studentsRepo.getAllStudents().map((students) {
+        final attendance = attendanceRepo.getAttendanceSync()
+          ..sort((a, b) {
+            final aDate =
+                DateTime.tryParse(a['date']?.toString() ?? '') ??
+                DateTime.fromMillisecondsSinceEpoch(0);
+            final bDate =
+                DateTime.tryParse(b['date']?.toString() ?? '') ??
+                DateTime.fromMillisecondsSinceEpoch(0);
+            return bDate.compareTo(aDate);
+          });
 
-    final studentHistory = <String, List<String>>{};
-    for (final record in attendance.where((a) => a['id'] != currentMeetingId)) {
-      final presenceMap = Map<String, dynamic>.from(record['presence'] as Map? ?? {});
-      presenceMap.forEach((studentId, value) {
-        studentHistory.putIfAbsent(studentId, () => []);
-        if (studentHistory[studentId]!.length < 2) {
-          studentHistory[studentId]!.add(value.toString());
+        final studentHistory = <String, List<String>>{};
+        for (final record in attendance.where(
+          (a) => a['id'] != currentMeetingId,
+        )) {
+          final presenceMap = Map<String, dynamic>.from(
+            record['presence'] as Map? ?? {},
+          );
+          presenceMap.forEach((studentId, value) {
+            studentHistory.putIfAbsent(studentId, () => []);
+            studentHistory[studentId]!.add(value.toString());
+          });
         }
+
+        final sorted = [...students]
+          ..sort((a, b) {
+            final bySurname = a.surname.toLowerCase().compareTo(
+              b.surname.toLowerCase(),
+            );
+            if (bySurname != 0) return bySurname;
+            return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+          });
+
+        return sorted.map((student) {
+          final history = studentHistory[student.id] ?? [];
+          var consecutive = 0;
+          for (final status in history) {
+            if (status == 'Assente') {
+              consecutive++;
+            } else {
+              break;
+            }
+          }
+
+          return _Student(
+            id: student.id,
+            name: student.name,
+            surname: student.surname,
+            consecutiveAbsences: consecutive,
+          );
+        }).toList();
       });
-    }
-
-    final sorted = [...students]..sort((a, b) {
-      final bySurname =
-          a.surname.toLowerCase().compareTo(b.surname.toLowerCase());
-      if (bySurname != 0) return bySurname;
-      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
     });
-
-    return sorted.map((student) {
-      final history = studentHistory[student.id] ?? [];
-      final hasTwoConsecutiveAbsences =
-          history.length >= 2 && history[0] == 'Assente' && history[1] == 'Assente';
-
-      return _Student(
-        id: student.id,
-        name: student.name,
-        surname: student.surname,
-        hasTwoConsecutiveAbsences: hasTwoConsecutiveAbsences,
-      );
-    }).toList();
-  });
-});
 
 class AttendancePage extends ConsumerStatefulWidget {
   final dynamic meeting;
 
-  const AttendancePage({
-    super.key,
-    required this.meeting,
-  });
+  const AttendancePage({super.key, required this.meeting});
 
   @override
   ConsumerState<AttendancePage> createState() => _AttendancePageState();
@@ -98,8 +107,9 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
   @override
   void initState() {
     super.initState();
-    final existing =
-        AttendanceRepository().getAttendanceForMeeting(widget.meeting?.id ?? '');
+    final existing = AttendanceRepository().getAttendanceForMeeting(
+      widget.meeting?.id ?? '',
+    );
     if (existing != null) {
       presence = Map<String, String>.from(existing['presence'] as Map? ?? {});
     }
@@ -116,9 +126,9 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
     );
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Presenze salvate')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Presenze salvate')));
       Navigator.pop(context);
     }
   }
@@ -151,8 +161,9 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
     }
 
     final classesAsync = ref.watch(classesStreamProvider);
-    final studentsWithHistoryAsync =
-        ref.watch(_studentsWithHistoryProvider(widget.meeting?.id ?? ''));
+    final studentsWithHistoryAsync = ref.watch(
+      _studentsWithHistoryProvider(widget.meeting?.id ?? ''),
+    );
     const uid = AuthService.localUserId;
 
     return AppScaffold(
@@ -164,142 +175,218 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
         label: const Text('Salva'),
         onPressed: _save,
       ),
-      child: classesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Errore nel caricamento classi: $e')),
-        data: (classes) {
-          final myClass = classes.firstWhere(
-            (c) => c.catechistIds.contains(uid),
-            orElse: () => SchoolClass(
-              id: '',
-              name: '',
-              studentIds: [],
-              catechistIds: [],
-            ),
-          );
-
-          if (myClass.id.isEmpty) {
-            return const Center(
-              child: Text('Nessun gruppo assegnato per questo profilo'),
-            );
-          }
-
-          return studentsWithHistoryAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('Errore nel caricamento studenti: $e')),
-            data: (allStudents) {
-              final students = allStudents
-                  .where((s) => myClass.studentIds.contains(s.id))
-                  .toList()
-                ..sort((a, b) {
-                  final bySurname =
-                      a.surname.toLowerCase().compareTo(b.surname.toLowerCase());
-                  if (bySurname != 0) return bySurname;
-                  return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-                });
-
-              if (students.isEmpty) {
-                return const Center(
-                  child: Text('Nessun ragazzo presente nel tuo gruppo'),
-                );
-              }
-
-              return ListView.separated(
-                padding: const EdgeInsets.only(bottom: 100),
-                itemCount: students.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final s = students[index];
-                  final value = presence[s.id];
-
-                  return Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: s.hasTwoConsecutiveAbsences
-                          ? (isDark ? Colors.red.shade900.withValues(alpha: 0.2) : Colors.red.shade50)
-                          : (isDark ? colorScheme.surfaceContainer : Colors.white),
-                      borderRadius: BorderRadius.circular(20),
-                      border: s.hasTwoConsecutiveAbsences
-                          ? Border.all(color: isDark ? Colors.red.shade700.withValues(alpha: 0.4) : Colors.red.shade200, width: 1)
-                          : null,
-                      boxShadow: [
-                        BoxShadow(
-                          color: isDark
-                              ? Colors.black.withValues(alpha: 0.3)
-                              : Colors.black.withValues(alpha: 0.04),
-                          blurRadius: 12,
-                          offset: const Offset(0, 6),
-                        )
-                      ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (meeting is PlanningMeeting)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.update_rounded,
+                    size: 14,
+                    color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Ultima modifica: ${meeting.updatedAt.day.toString().padLeft(2, '0')}/${meeting.updatedAt.month.toString().padLeft(2, '0')}/${meeting.updatedAt.year} '
+                      '${meeting.updatedAt.hour.toString().padLeft(2, '0')}:${meeting.updatedAt.minute.toString().padLeft(2, '0')}'
+                      '${meeting.lastModifiedBy.isNotEmpty ? ' da ${meeting.lastModifiedBy}' : ''}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark
+                            ? Colors.grey.shade500
+                            : Colors.grey.shade400,
+                      ),
                     ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: s.hasTwoConsecutiveAbsences
-                              ? (isDark ? Colors.red.shade800.withValues(alpha: 0.3) : Colors.red.shade100)
-                              : (isDark ? colorScheme.primaryContainer.withValues(alpha: 0.3) : Colors.blue.shade50),
-                          child: Icon(
-                            Icons.person,
-                            color: s.hasTwoConsecutiveAbsences
-                                ? (isDark ? Colors.red.shade300 : Colors.red.shade900)
-                                : (isDark ? colorScheme.primary : const Color(0xFF174A7E)),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${s.name} ${s.surname}',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: s.hasTwoConsecutiveAbsences
-                                      ? (isDark ? Colors.red.shade300 : Colors.red.shade900)
-                                      : (isDark ? colorScheme.onSurface : Colors.black87),
-                                ),
+                  ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: classesAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) =>
+                  Center(child: Text('Errore nel caricamento classi: $e')),
+              data: (classes) {
+                final myClass = classes.firstWhere(
+                  (c) => c.catechistIds.contains(uid),
+                  orElse: () => SchoolClass(
+                    id: '',
+                    name: '',
+                    studentIds: [],
+                    catechistIds: [],
+                  ),
+                );
+
+                if (myClass.id.isEmpty) {
+                  return const Center(
+                    child: Text('Nessun gruppo assegnato per questo profilo'),
+                  );
+                }
+
+                return studentsWithHistoryAsync.when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(
+                    child: Text('Errore nel caricamento studenti: $e'),
+                  ),
+                  data: (allStudents) {
+                    final students =
+                        allStudents
+                            .where((s) => myClass.studentIds.contains(s.id))
+                            .toList()
+                          ..sort((a, b) {
+                            final bySurname = a.surname.toLowerCase().compareTo(
+                              b.surname.toLowerCase(),
+                            );
+                            if (bySurname != 0) return bySurname;
+                            return a.name.toLowerCase().compareTo(
+                              b.name.toLowerCase(),
+                            );
+                          });
+
+                    if (students.isEmpty) {
+                      return const Center(
+                        child: Text('Nessun ragazzo presente nel tuo gruppo'),
+                      );
+                    }
+
+                    return ListView.separated(
+                      padding: const EdgeInsets.only(bottom: 100),
+                      itemCount: students.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final s = students[index];
+                        final value = presence[s.id];
+
+                        return Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: s.consecutiveAbsences >= 2
+                                ? (isDark
+                                      ? Colors.red.shade900.withValues(
+                                          alpha: 0.2,
+                                        )
+                                      : Colors.red.shade50)
+                                : (isDark
+                                      ? colorScheme.surfaceContainer
+                                      : Colors.white),
+                            borderRadius: BorderRadius.circular(20),
+                            border: s.consecutiveAbsences >= 2
+                                ? Border.all(
+                                    color: isDark
+                                        ? Colors.red.shade700.withValues(
+                                            alpha: 0.4,
+                                          )
+                                        : Colors.red.shade200,
+                                    width: 1,
+                                  )
+                                : null,
+                            boxShadow: [
+                              BoxShadow(
+                                color: isDark
+                                    ? Colors.black.withValues(alpha: 0.3)
+                                    : Colors.black.withValues(alpha: 0.04),
+                                blurRadius: 12,
+                                offset: const Offset(0, 6),
                               ),
-                              if (s.hasTwoConsecutiveAbsences)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2),
-                                  child: Text(
-                                    '2+ assenze consecutive!',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: isDark ? Colors.red.shade400 : Colors.red.shade700,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
                             ],
                           ),
-                        ),
-                        Row(
-                          children: [
-                            _PresenceButton(
-                              label: 'Presente',
-                              selected: value == 'Presente',
-                              color: Colors.green,
-                              onTap: () => setState(() => presence[s.id] = 'Presente'),
-                            ),
-                            const SizedBox(width: 8),
-                            _PresenceButton(
-                              label: 'Assente',
-                              selected: value == 'Assente',
-                              color: Colors.red,
-                              onTap: () => setState(() => presence[s.id] = 'Assente'),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              );
-            },
-          );
-        },
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                backgroundColor: s.consecutiveAbsences >= 2
+                                    ? (isDark
+                                          ? Colors.red.shade800.withValues(
+                                              alpha: 0.3,
+                                            )
+                                          : Colors.red.shade100)
+                                    : (isDark
+                                          ? colorScheme.primaryContainer
+                                                .withValues(alpha: 0.3)
+                                          : Colors.blue.shade50),
+                                child: Icon(
+                                  Icons.person,
+                                  color: s.consecutiveAbsences >= 2
+                                      ? (isDark
+                                            ? Colors.red.shade300
+                                            : Colors.red.shade900)
+                                      : (isDark
+                                            ? colorScheme.primary
+                                            : const Color(0xFF174A7E)),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${s.name} ${s.surname}',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        color: s.consecutiveAbsences >= 2
+                                            ? (isDark
+                                                  ? Colors.red.shade300
+                                                  : Colors.red.shade900)
+                                            : (isDark
+                                                  ? colorScheme.onSurface
+                                                  : Colors.black87),
+                                      ),
+                                    ),
+                                    if (s.consecutiveAbsences >= 2)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 2),
+                                        child: Text(
+                                          '${s.consecutiveAbsences} assenze consecutive!',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: isDark
+                                                ? Colors.red.shade400
+                                                : Colors.red.shade700,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  _PresenceButton(
+                                    label: 'Presente',
+                                    selected: value == 'Presente',
+                                    color: Colors.green,
+                                    onTap: () => setState(
+                                      () => presence[s.id] = 'Presente',
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _PresenceButton(
+                                    label: 'Assente',
+                                    selected: value == 'Assente',
+                                    color: Colors.red,
+                                    onTap: () => setState(
+                                      () => presence[s.id] = 'Assente',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

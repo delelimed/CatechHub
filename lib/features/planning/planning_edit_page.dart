@@ -243,6 +243,34 @@ class _PlanningEditPageState extends ConsumerState<PlanningEditPage> {
                     classId: classId,
                   ),
                 ],
+                if (_readOnly && widget.existing != null) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.update_rounded, size: 16, color: isDark ? Colors.grey.shade500 : Colors.grey.shade600),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Ultima modifica: ${widget.existing!.updatedAt.day.toString().padLeft(2, '0')}/${widget.existing!.updatedAt.month.toString().padLeft(2, '0')}/${widget.existing!.updatedAt.year} '
+                            '${widget.existing!.updatedAt.hour.toString().padLeft(2, '0')}:${widget.existing!.updatedAt.minute.toString().padLeft(2, '0')}'
+                            '${widget.existing!.lastModifiedBy.isNotEmpty ? ' da ${widget.existing!.lastModifiedBy}' : ''}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 18),
                 _ModernInputCard(
                   icon: Icons.title_rounded,

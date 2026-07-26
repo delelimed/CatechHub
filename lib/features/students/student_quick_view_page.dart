@@ -300,14 +300,23 @@ class _HeaderCard extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
+                      Text(
                   DateFormat('dd/MM/yyyy').format(student.birthDate),
                   style: TextStyle(
                     color: isDark
                         ? colorScheme.onPrimaryContainer.withValues(alpha: 0.7)
                         : Colors.white70,
                     fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${student.updatedAt.day.toString().padLeft(2, '0')}/${student.updatedAt.month.toString().padLeft(2, '0')}/${student.updatedAt.year} ${student.updatedAt.hour.toString().padLeft(2, '0')}:${student.updatedAt.minute.toString().padLeft(2, '0')}${student.lastModifiedBy.isNotEmpty ? ' da ${student.lastModifiedBy}' : ''}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark
+                        ? colorScheme.onPrimaryContainer.withValues(alpha: 0.5)
+                        : Colors.white60,
                   ),
                 ),
               ],

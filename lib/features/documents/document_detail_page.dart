@@ -27,7 +27,7 @@ class DocumentDetailPage extends ConsumerWidget {
       'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'
     ];
 
-    return '${date.day} ${mesi[date.month - 1]}';
+    return '${date.day} ${mesi[date.month - 1]} ${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 
   Future<int> _setDeliveredForToday() async {
@@ -151,7 +151,7 @@ class DocumentDetailPage extends ConsumerWidget {
             (s) => deliveries[s.id]?['exoneratedAt'] != null,
           ).length;
 
-          return ListView.builder(
+              return ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: students.length + 1,
             itemBuilder: (context, index) {
@@ -189,6 +189,22 @@ class DocumentDetailPage extends ConsumerWidget {
                           ],
                         ),
                       ],
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(Icons.update_rounded, size: 14, color: isDark ? Colors.grey.shade500 : Colors.grey.shade400),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '${_formatTimestamp(document['updatedAt'])}${document['lastModifiedBy'] != null ? ' da ${document['lastModifiedBy']}' : ''}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                     ],
                   );
                 }

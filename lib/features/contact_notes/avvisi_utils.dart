@@ -51,43 +51,63 @@ class AbsenceData {
 }
 
 AbsenceData computeAbsenceData(String studentId, String classId) {
+  if (classId.isEmpty || studentId.isEmpty) {
+    return AbsenceData(consecutiveAbsences: 0);
+  }
+
   final repo = AttendanceRepository();
   final attendances = repo.getAttendanceSync();
 
-  final classMeetings = attendances
-      .where((a) => a['classId'] == classId)
-      .toList()
-    ..sort((a, b) {
-      final aDate = DateTime.tryParse(a['date']?.toString() ?? '') ?? DateTime.now();
-      final bDate = DateTime.tryParse(b['date']?.toString() ?? '') ?? DateTime.now();
+  try {
+    final classMeetings = <Map<String, dynamic>>[];
+    for (final a in attendances) {
+      final aClassId = a['classId']?.toString();
+      if (aClassId == null || aClassId != classId) continue;
+      final dateStr = a['date']?.toString();
+      if (dateStr == null || dateStr.isEmpty) continue;
+      classMeetings.add(a);
+    }
+    classMeetings.sort((a, b) {
+      final aDate = DateTime.tryParse(a['date']?.toString() ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      final bDate = DateTime.tryParse(b['date']?.toString() ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
       return bDate.compareTo(aDate);
     });
 
-  int consecutive = 0;
-  String? lastPresence;
+    int consecutive = 0;
+    String? lastPresence;
 
-  for (final meeting in classMeetings) {
-    final presence = meeting['presence'] as Map<String, dynamic>? ?? {};
-    final status = presence[studentId]?.toString() ?? '';
+    for (final meeting in classMeetings) {
+      final presenceRaw = meeting['presence'];
+      if (presenceRaw == null) continue;
+      final presence = (presenceRaw is Map)
+          ? Map<String, dynamic>.from(presenceRaw)
+          : <String, dynamic>{};
+      final status = presence[studentId]?.toString() ?? '';
 
-    if (status == 'Presente') {
-      if (lastPresence == null) {
-        final meetingDate = DateTime.tryParse(meeting['date']?.toString() ?? '');
-        if (meetingDate != null) {
-          lastPresence =
-              '${meetingDate.day.toString().padLeft(2, '0')}/${meetingDate.month.toString().padLeft(2, '0')}/${meetingDate.year}';
+      if (status == 'Presente') {
+        if (lastPresence == null) {
+          final meetingDate =
+              DateTime.tryParse(meeting['date']?.toString() ?? '');
+          if (meetingDate != null) {
+            lastPresence =
+                '${meetingDate.day.toString().padLeft(2, '0')}/${meetingDate.month.toString().padLeft(2, '0')}/${meetingDate.year}';
+          }
         }
+        break;
+      } else if (status == 'Assente' || status == 'Giustificato') {
+        consecutive++;
       }
-      break;
-    } else if (status == 'Assente' || status == 'Giustificato') {
-      consecutive++;
     }
-  }
 
-  return AbsenceData(
-    consecutiveAbsences: consecutive,
-    lastPresenceDate: lastPresence,
-  );
+    return AbsenceData(
+      consecutiveAbsences: consecutive,
+      lastPresenceDate: lastPresence,
+    );
+  } catch (e) {
+    return AbsenceData(consecutiveAbsences: 0);
+  }
 }
 
 void openWhatsApp(String? phone, String message) async {

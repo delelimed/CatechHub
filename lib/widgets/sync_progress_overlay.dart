@@ -16,6 +16,7 @@ class SyncProgressOverlay extends ConsumerStatefulWidget {
 class _SyncProgressOverlayState extends ConsumerState<SyncProgressOverlay> {
   StreamSubscription<P2PSyncState>? _sub;
   bool _showingSheet = false;
+  bool _showingConfirmation = false;
 
   @override
   void initState() {
@@ -32,12 +33,53 @@ class _SyncProgressOverlayState extends ConsumerState<SyncProgressOverlay> {
 
   void _onStateChanged(P2PSyncState state) {
     if (!mounted) return;
+    if (state.awaitingConfirmation && !_showingConfirmation) {
+      _showingConfirmation = true;
+      _showSyncConfirmation(state);
+    }
     if (state.largeSyncInProgress &&
         state.totalRecordsToExchange > 0 &&
         !_showingSheet) {
       _showingSheet = true;
       _showProgressSheet(state);
     }
+  }
+
+  void _showSyncConfirmation(P2PSyncState state) {
+    final service = ref.read(nearbySyncServiceProvider);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Richiesta di sincronizzazione'),
+          content: Text(
+            '${state.pendingConfirmationDeviceName ?? "Dispositivo sconosciuto"} '
+            'vuole sincronizzare i dati.\n\n'
+            'Vuoi autorizzare la sincronizzazione?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _showingConfirmation = false;
+                service.rejectSync();
+              },
+              child: const Text('Rifiuta',
+                  style: TextStyle(color: Colors.red)),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _showingConfirmation = false;
+                service.confirmSync();
+              },
+              child: const Text('Autorizza sync'),
+            ),
+          ],
+        );
+      },
+    ).then((_) => _showingConfirmation = false);
   }
 
   void _showProgressSheet(P2PSyncState state) {

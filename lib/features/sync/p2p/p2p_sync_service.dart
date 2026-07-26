@@ -190,6 +190,7 @@ class P2PSyncService {
   final _stateController = StreamController<P2PSyncState>.broadcast();
   final _syncDataController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final _logController = StreamController<void>.broadcast();
 
   final List<SyncLogEntry> _syncLogs = [];
   static const int _maxLogEntries = 500;
@@ -205,6 +206,9 @@ class P2PSyncService {
     if (_syncLogs.length > _maxLogEntries) {
       _syncLogs.removeAt(0);
     }
+    if (!_logController.isClosed) {
+      _logController.add(null);
+    }
   }
 
   void clearLogs() {
@@ -214,6 +218,7 @@ class P2PSyncService {
 
   Stream<P2PSyncState> get onStateChanged => _stateController.stream;
   Stream<Map<String, dynamic>> get onSyncData => _syncDataController.stream;
+  Stream<void> get onLogChanged => _logController.stream;
 
   P2PSyncState _state = const P2PSyncState();
   P2PSyncState get currentState => _state;
@@ -237,9 +242,13 @@ class P2PSyncService {
   final Set<String> _connectedEndpoints = {};
   final Set<String> _nearbyDiscoveredDevices = {};
   final Map<String, String> _nearbyEndpointToDevice = {};
+  final Map<String, String> _endpointConnIdMap = {};
   final Set<String> _sessionConfirmedDevices = {};
   bool _restartingEndpoints = false;
   StreamSubscription<BoxEvent>? _hiveBoxesSub;
+  final List<StreamSubscription<BoxEvent>> _boxSubscriptions = [];
+  final List<StreamController<BoxEvent>> _boxControllers = [];
+  StreamController<BoxEvent>? _mergedController;
 
   static const Duration _pairingTimeout = Duration(seconds: 120);
   static const Duration _reconnectDelay = Duration(seconds: 5);
@@ -292,6 +301,16 @@ class P2PSyncService {
     _continuousModeActive = false;
     _hiveBoxesSub?.cancel();
     _hiveBoxesSub = null;
+    for (final sub in _boxSubscriptions) {
+      sub.cancel();
+    }
+    _boxSubscriptions.clear();
+    for (final ctrl in _boxControllers) {
+      ctrl.close();
+    }
+    _boxControllers.clear();
+    _mergedController?.close();
+    _mergedController = null;
     _periodicSyncTimer?.cancel();
     _periodicSyncTimer = null;
     _nearbyDiscoveredDevices.clear();
@@ -463,34 +482,45 @@ class P2PSyncService {
 
   void _watchLocalChanges() {
     _hiveBoxesSub?.cancel();
+    for (final sub in _boxSubscriptions) {
+      sub.cancel();
+    }
+    _boxSubscriptions.clear();
+    for (final ctrl in _boxControllers) {
+      ctrl.close();
+    }
+    _boxControllers.clear();
+    _mergedController?.close();
+    _mergedController = null;
+
     addLog('DEBUG', 'Avvio osservazione modifiche locali');
-    final controllers = <StreamController<BoxEvent>>[];
-    int watchedBoxes = 0;
     for (final boxName in HiveSyncEngine.syncableBoxes.keys) {
       try {
         final box = Hive.box<Map>(boxName);
         final ctrl = StreamController<BoxEvent>.broadcast();
-        box.watch().listen((event) {
+        _boxControllers.add(ctrl);
+        final sub = box.watch().listen((event) {
           if (!ctrl.isClosed) ctrl.add(event);
         });
-        controllers.add(ctrl);
-        watchedBoxes++;
+        _boxSubscriptions.add(sub);
       } catch (_) {}
     }
-    if (controllers.isEmpty) {
+    if (_boxControllers.isEmpty) {
       addLog('WARN', 'Nessun box Hive disponibile per watch');
       return;
     }
-    addLog('DEBUG', 'Watch attivato su $watchedBoxes box Hive');
+    addLog('DEBUG', 'Watch attivato su ${_boxControllers.length} box Hive');
 
     DateTime _lastChangeEmit = DateTime.now();
-    final mergedCtrl = StreamController<BoxEvent>.broadcast();
-    for (final ctrl in controllers) {
+    _mergedController = StreamController<BoxEvent>.broadcast();
+    for (final ctrl in _boxControllers) {
       ctrl.stream.listen((event) {
-        if (!mergedCtrl.isClosed) mergedCtrl.add(event);
+        if (_mergedController != null && !_mergedController!.isClosed) {
+          _mergedController!.add(event);
+        }
       });
     }
-    _hiveBoxesSub = mergedCtrl.stream.listen((event) {
+    _hiveBoxesSub = _mergedController!.stream.listen((event) {
       final now = DateTime.now();
       if (now.difference(_lastChangeEmit).inMilliseconds >= 500) {
         _lastChangeEmit = now;
@@ -614,6 +644,8 @@ class P2PSyncService {
         status: P2PSyncStatus.error,
         errorMessage: 'Errore avvio pairing: $e',
       ));
+    } finally {
+      _restartingEndpoints = false;
     }
   }
 
@@ -640,6 +672,8 @@ class P2PSyncService {
       });
     }
   }
+
+
 
   void _onEndpointFound(
       String endpointId, String endpointName, String serviceId) {
@@ -682,7 +716,12 @@ class P2PSyncService {
         return;
       }
     } else {
-      addLog('DEBUG', 'Modalità pairing: accetto connessione senza verifica associazione');
+      if (!info.endpointName.startsWith(_syncPrefix)) {
+        addLog('WARN', 'Rifiuto connessione pairing: prefisso non valido ${info.endpointName}');
+        await _nearby.rejectConnection(endpointId);
+        return;
+      }
+      addLog('DEBUG', 'Modalità pairing: accetto connessione da ${info.endpointName}');
     }
     _pendingEndpointId = endpointId;
 
@@ -695,6 +734,7 @@ class P2PSyncService {
   void _onConnectionResult(String endpointId, Status status) {
     if (status == Status.CONNECTED) {
       addLog('INFO', 'Dispositivo connesso: $endpointId');
+      _pendingEndpointId = null;
       _pairingCompleter?.complete();
       _connectedEndpoints.add(endpointId);
       _sendHandshakePayload(endpointId);
@@ -705,11 +745,16 @@ class P2PSyncService {
       ));
     } else {
       _pendingEndpointId = null;
-      addLog('ERROR', 'Connessione fallita per $endpointId: $status');
-      _updateState(_state.copyWith(
-        status: P2PSyncStatus.error,
-        errorMessage: 'Connessione fallita: $status',
-      ));
+      if (_state.isPairingMode && _connectedEndpoints.isNotEmpty) {
+        addLog('WARN',
+            'Doppia connessione rifiutata in pairing: $endpointId');
+      } else {
+        addLog('ERROR', 'Connessione fallita per $endpointId: $status');
+        _updateState(_state.copyWith(
+          status: P2PSyncStatus.error,
+          errorMessage: 'Connessione fallita: $status',
+        ));
+      }
     }
   }
 
@@ -733,7 +778,18 @@ class P2PSyncService {
     }
   }
 
-  final Map<String, String> _endpointConnIdMap = {};
+  Future<void> _cleanupEndpoint(String endpointId) async {
+    try {
+      await _nearby.disconnectFromEndpoint(endpointId);
+    } catch (_) {}
+    _connectedEndpoints.remove(endpointId);
+    _endpointConnIdMap.remove(endpointId);
+    _endpointSessionKeys.remove(endpointId);
+    _endpointSyncPhase.remove(endpointId);
+    if (_pendingEndpointId == endpointId) {
+      _pendingEndpointId = null;
+    }
+  }
 
   String? _extractDeviceId(String endpointName) {
     try {
@@ -852,12 +908,14 @@ class P2PSyncService {
     final rawPayload = message['payload'] as String?;
     if (rawPayload == null) {
       addLog('WARN', 'Handshake senza payload da $endpointId');
+      await _cleanupEndpoint(endpointId);
       return;
     }
 
     final remoteIdentity = P2PSecurityService.parseQrPayload(rawPayload);
     if (remoteIdentity == null) {
       addLog('WARN', 'Handshake: impossibile parsare identità remota');
+      await _cleanupEndpoint(endpointId);
       return;
     }
     addLog('DEBUG', 'Handshake da: ${remoteIdentity.deviceName} (${remoteIdentity.deviceId})');
@@ -1333,6 +1391,11 @@ class P2PSyncService {
   Future<void> _handleSyncIndex(
       String endpointId, Map<String, dynamic> message) async {
     final phase = _endpointSyncPhase[endpointId] ??= _SyncPhase2();
+    if (!phase.isIdle && !phase.complete) {
+      addLog('DEBUG', 'Sync index ignorato: sync già in corso per $endpointId');
+      return;
+    }
+    phase.reset();
     try {
       phase.indexSent = true;
       final engine = HiveSyncEngine();
@@ -1493,7 +1556,11 @@ class P2PSyncService {
 
   Future<void> _handleSyncAck(
       String endpointId, Map<String, dynamic> message) async {
-    final phase = _endpointSyncPhase[endpointId] ??= _SyncPhase2();
+    final phase = _endpointSyncPhase[endpointId];
+    if (phase == null) {
+      addLog('WARN', 'Sync ACK ignorato: nessuna sync attiva per $endpointId');
+      return;
+    }
     phase.sendDone = true;
     addLog('DEBUG', 'Sync ACK ricevuto per $endpointId, sendDone=true');
     _checkSyncComplete(endpointId);
@@ -1510,6 +1577,11 @@ class P2PSyncService {
       status: P2PSyncStatus.completed,
       authenticatedByRemote: true,
     ));
+
+    if (!_continuousModeActive) {
+      addLog('INFO', 'Avvio modalità continua dopo conferma remota');
+      _startContinuousMode();
+    }
 
     final localIdentity = await _security.getLocalIdentity();
     final ack = jsonEncode({
@@ -1536,6 +1608,12 @@ class P2PSyncService {
       status: P2PSyncStatus.completed,
       authenticatedByRemote: true,
     ));
+
+    if (!_continuousModeActive) {
+      addLog('INFO', 'Avvio modalità continua dopo finalizzazione');
+      _startContinuousMode();
+    }
+
     addLog('INFO', 'Associazione finalizzata con $remoteDeviceId');
   }
 
@@ -1571,13 +1649,6 @@ class P2PSyncService {
     await _ensureSessionKey(endpointId);
 
     final localIdentity = await _security.getLocalIdentity();
-    final authRequest = jsonEncode({
-      'type': 'p2p_auth_request',
-      'deviceId': localIdentity.deviceId,
-      'deviceName': localIdentity.deviceName,
-    });
-    await _sendEncryptedPayload(endpointId, authRequest);
-
     addLog('INFO', 'Codice pairing confermato, invio conferma associazione');
     final confirmed = jsonEncode({
       'type': 'p2p_association_confirmed',
@@ -1590,6 +1661,12 @@ class P2PSyncService {
       status: P2PSyncStatus.completed,
       authenticatedByRemote: true,
     ));
+
+    if (!_continuousModeActive) {
+      addLog('INFO', 'Avvio modalità continua dopo associazione');
+      _startContinuousMode();
+    }
+
     addLog('INFO', 'Associazione completata con successo');
   }
 
@@ -1700,17 +1777,37 @@ class P2PSyncService {
   Future<void> triggerManualSync() async {
     addLog('INFO', 'Sincronizzazione manuale richiesta');
     if (_connectedEndpoints.isEmpty) {
-      addLog('INFO', 'Nessun dispositivo connesso, ricerca in corso...');
-      _attemptKnownDeviceConnections();
-      for (int i = 0; i < 10; i++) {
+      addLog('INFO', 'Nessun dispositivo connesso, avvio discovery...');
+      if (!_continuousModeActive) {
+        _startContinuousMode();
+      }
+      for (int i = 0; i < 20; i++) {
         await Future.delayed(const Duration(milliseconds: 500));
         if (_connectedEndpoints.isNotEmpty) break;
       }
     }
     final endpoints = _connectedEndpoints.toList();
     if (endpoints.isNotEmpty) {
-      addLog('INFO', 'Avvio sincronizzazione con dispositivo connesso');
-      await _performBidirectionalSync(endpoints.first);
+      final endpointId = endpoints.first;
+      if (_state.status == P2PSyncStatus.sessionEstablished &&
+          _state.authenticatedByRemote) {
+        addLog('INFO', 'Avvio sincronizzazione con dispositivo connesso');
+        await _performBidirectionalSync(endpointId);
+      } else {
+        addLog('INFO',
+            'Connessione presente ma handshake/auth non completato, '
+            'attendere...');
+        for (int i = 0; i < 20; i++) {
+          await Future.delayed(const Duration(milliseconds: 500));
+          if (_state.status == P2PSyncStatus.sessionEstablished &&
+              _state.authenticatedByRemote) {
+            await _performBidirectionalSync(endpointId);
+            return;
+          }
+        }
+        addLog('WARN',
+            'Timeout attesa handshake/auth per $endpointId');
+      }
     } else {
       addLog('WARN', 'Nessun dispositivo trovato per la sincronizzazione');
     }
@@ -1731,6 +1828,7 @@ class P2PSyncService {
     _initialized = false;
     _stateController.close();
     _syncDataController.close();
+    _logController.close();
   }
 }
 

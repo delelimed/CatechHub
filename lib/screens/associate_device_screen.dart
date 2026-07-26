@@ -166,8 +166,11 @@ class _AssociateDeviceScreenState
     _startP2pPairing();
   }
 
+  bool _pairingDialogShown = false;
+
   void _watchP2pState() {
     _p2pStateSub?.cancel();
+    _pairingDialogShown = false;
     final service = ref.read(nearbySyncServiceProvider);
     _p2pStateSub = service.onStateChanged.listen((state) {
       if (!mounted) return;
@@ -214,11 +217,26 @@ class _AssociateDeviceScreenState
             _errorMessage = null;
             _isPairing = false;
           });
+        } else if (step == _AssociationStep.showQr && !_choseScanFirst && state.authenticatedByRemote) {
+          _p2pComplete = true;
+          setState(() {
+            _currentStep = _AssociationStep.complete;
+            _successMessage = _lastScannedDeviceName != null
+                ? 'Dispositivo associato: $_lastScannedDeviceName'
+                : 'Associazione completata!';
+            _errorMessage = null;
+            _isPairing = false;
+          });
         }
       } else if (state.status == P2PSyncStatus.pairingVerification) {
-        if (!_choseScanFirst && step == _AssociationStep.showQr) {
+        if (!_choseScanFirst && step == _AssociationStep.showQr && !_pairingDialogShown) {
+          _pairingDialogShown = true;
           _pairingTimeoutTimer?.cancel();
-          _autoSwitchToScanner();
+          if (state.pairingCode != null) {
+            _showPairingCodeDialog(service, state.pairingCode!);
+          } else {
+            _autoSwitchToScanner();
+          }
         }
       } else if (state.status == P2PSyncStatus.error) {
         if (!_p2pComplete && _isPairing) {
@@ -229,6 +247,69 @@ class _AssociateDeviceScreenState
         }
       }
     });
+  }
+
+  void _showPairingCodeDialog(P2PSyncService service, String code) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Verifica codice sicurezza'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Conferma che su entrambi i dispositivi\n'
+                'sia visualizzato lo STESSO codice:',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  code,
+                  style: TextStyle(
+                    fontSize: 36,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 6,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Se i codici NON corrispondono, annulla:\n'
+                'potrebbe esserci un tentativo di intrusione.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                service.rejectPairingCode();
+              },
+              child: const Text('Codici DIVERSI, Annulla',
+                  style: TextStyle(color: Colors.red)),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _autoSwitchToScanner();
+              },
+              child: const Text('Codici corrispondono'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _autoSwitchToScanner() {

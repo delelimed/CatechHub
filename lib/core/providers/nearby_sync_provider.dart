@@ -17,9 +17,12 @@ final nearbySyncStateProvider = StreamProvider<P2PSyncState>((ref) {
   return service.onStateChanged;
 });
 
-final syncLogsProvider = Provider<List<SyncLogEntry>>((ref) {
+final syncLogsProvider = StreamProvider<List<SyncLogEntry>>((ref) async* {
   final service = ref.watch(nearbySyncServiceProvider);
-  return service.syncLogs;
+  yield service.syncLogs;
+  await for (final _ in service.onLogChanged) {
+    yield service.syncLogs;
+  }
 });
 
 class NearbySyncDaemonController extends StateNotifier<bool> {

@@ -9,7 +9,8 @@ class SyncLogPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final logs = ref.watch(syncLogsProvider);
+    final asyncLogs = ref.watch(syncLogsProvider);
+    final logs = asyncLogs.asData?.value ?? [];
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 

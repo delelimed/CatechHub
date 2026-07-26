@@ -570,6 +570,7 @@ class AvvisiPage extends ConsumerWidget {
 
       for (final meeting in meetings) {
         if (meeting.isReunion) continue;
+        if (meeting.classId != classId) continue;
         final meetingDate = DateTime(meeting.date.year, meeting.date.month, meeting.date.day);
         if (!meetingDate.isBefore(today)) {
           if (closest == null || meeting.date.isBefore(closest.date)) {

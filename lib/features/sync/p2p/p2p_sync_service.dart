@@ -669,7 +669,7 @@ class P2PSyncService {
             DateTime.now().millisecondsSinceEpoch ~/ 1000,
         'role': _state.role.name,
       });
-      await _sendEncryptedPayload(endpointId, handshakeMsg);
+      await _sendPayload(endpointId, handshakeMsg);
       _updateState(_state.copyWith(status: P2PSyncStatus.handshakeSent));
     } catch (e) {
       debugPrint('[P2P] Handshake send error: $e');
@@ -843,7 +843,7 @@ class P2PSyncService {
 
       _pendingHandshakeIdentity = remoteIdentity;
       _pendingHandshakeRemoteRole = remoteRole;
-      await _sendEncryptedPayload(endpointId, ack);
+      await _sendPayload(endpointId, ack);
 
       _updateState(_state.copyWith(
         status: P2PSyncStatus.pairingVerification,
@@ -936,7 +936,6 @@ class P2PSyncService {
         await _sendEncryptedPayload(endpointId, authRequest);
       }
     } else {
-      final localIdentity = await _security.getLocalIdentity();
       final sharedSecret = await _security.computeStaticSharedSecret(
         remoteIdentity.publicKeyBase64,
         forDeviceId: remoteIdentity.deviceId,
@@ -953,17 +952,6 @@ class P2PSyncService {
         pairingCode: code,
         remoteDeviceFingerprint: remoteIdentity.fingerprint,
       ));
-
-      final iAmInitiator =
-          localIdentity.deviceId.compareTo(remoteIdentity.deviceId) < 0;
-      if (iAmInitiator) {
-        final authRequest = jsonEncode({
-          'type': 'p2p_auth_request',
-          'deviceId': localIdentity.deviceId,
-          'deviceName': localIdentity.deviceName,
-        });
-        await _sendEncryptedPayload(endpointId, authRequest);
-      }
     }
   }
 

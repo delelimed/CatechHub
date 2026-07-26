@@ -39,6 +39,7 @@ import '../features/data_share/data_share_selection_page.dart';
 import '../features/data_share/data_share_send_page.dart';
 import '../features/data_share/data_share_receive_page.dart';
 import '../screens/settings_association_screen.dart';
+import '../screens/associate_device_screen.dart';
 import '../screens/sync_log_page.dart';
 import '../features/catechesi/catechesi_page.dart';
 import '../features/catechesi/catechesi_edit_page.dart';
@@ -549,11 +550,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // ASSOCIATION - Associazione dispositivi (QR + Nearby Connections)
       // ═══════════════════════════════════════════════════════════════════
 
-      /// Schermata di associazione dispositivi tramite QR Code e
-      /// sincronizzazione tramite Google Nearby Connections.
+      /// Schermata di sincronizzazione dispositivi associati.
       GoRoute(
         path: '/settings/association',
         builder: (context, state) => const SettingsAssociationScreen(),
+      ),
+
+      /// Procedura guidata per associare un nuovo dispositivo.
+      GoRoute(
+        path: '/settings/associate-device',
+        builder: (context, state) => const AssociateDeviceScreen(),
       ),
 
       /// Log di sincronizzazione Nearby.

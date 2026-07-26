@@ -53,17 +53,9 @@ class AbsenceData {
 AbsenceData computeAbsenceData(String studentId, String classId) {
   final repo = AttendanceRepository();
   final attendances = repo.getAttendanceSync();
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
 
   final classMeetings = attendances
       .where((a) => a['classId'] == classId)
-      .where((a) {
-        final meetingDate = DateTime.tryParse(a['date']?.toString() ?? '');
-        if (meetingDate == null) return false;
-        final meetingDay = DateTime(meetingDate.year, meetingDate.month, meetingDate.day);
-        return !meetingDay.isAfter(today);
-      })
       .toList()
     ..sort((a, b) {
       final aDate = DateTime.tryParse(a['date']?.toString() ?? '') ?? DateTime.now();

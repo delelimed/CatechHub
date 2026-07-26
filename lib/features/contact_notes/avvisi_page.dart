@@ -170,6 +170,8 @@ class AvvisiPage extends ConsumerWidget {
       '{nome_ragazzo}',
       '{cognome_ragazzo}',
       '{nome_genitore}',
+      '{nome_gruppo}',
+      '{data_incontro}',
       '{assenze_consecutive}',
       '{ultima_presenza}',
     ];

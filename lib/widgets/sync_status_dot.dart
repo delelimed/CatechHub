@@ -45,9 +45,14 @@ class SyncStatusDot extends ConsumerWidget {
     final syncState = ref.watch(nearbySyncStateProvider);
 
     return syncState.when(
-      data: (state) => _Dot(color: _toMaterialColor(_resolveColor(state))),
-      loading: () => const _Dot(color: Colors.grey),
-      error: (_, __) => const _Dot(color: Colors.red),
+      data: (state) {
+        if (!state.isBackgroundSyncActive) {
+          return const SizedBox.shrink();
+        }
+        return _Dot(color: _toMaterialColor(_resolveColor(state)));
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
     );
   }
 }

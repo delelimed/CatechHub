@@ -47,6 +47,7 @@ class P2PSyncState {
   final String? pairingCode;
   final String? remotePairingCode;
   final String? remoteDeviceFingerprint;
+  final bool authenticatedByRemote;
 
   const P2PSyncState({
     this.status = P2PSyncStatus.idle,
@@ -69,9 +70,11 @@ class P2PSyncState {
     this.pairingCode,
     this.remotePairingCode,
     this.remoteDeviceFingerprint,
+    this.authenticatedByRemote = false,
   });
 
   P2PSyncState copyWith({
+    bool? authenticatedByRemote,
     P2PSyncStatus? status,
     P2PSyncRole? role,
     bool? isPairingMode,
@@ -122,6 +125,8 @@ class P2PSyncState {
       remotePairingCode: remotePairingCode ?? this.remotePairingCode,
       remoteDeviceFingerprint:
           remoteDeviceFingerprint ?? this.remoteDeviceFingerprint,
+      authenticatedByRemote:
+          authenticatedByRemote ?? this.authenticatedByRemote,
     );
   }
 }
@@ -1017,6 +1022,7 @@ class P2PSyncService {
         'deviceId': deviceId,
       });
       await _sendEncryptedPayload(endpointId, ack);
+      _updateState(_state.copyWith(authenticatedByRemote: true));
       return;
     }
 
@@ -1301,17 +1307,12 @@ class P2PSyncService {
     await _ensureSessionKey(endpointId);
 
     final localIdentity = await _security.getLocalIdentity();
-    final iAmInitiator =
-        localIdentity.deviceId.compareTo(remoteIdentity.deviceId) < 0;
-
-    if (iAmInitiator) {
-      final authRequest = jsonEncode({
-        'type': 'p2p_auth_request',
-        'deviceId': localIdentity.deviceId,
-        'deviceName': localIdentity.deviceName,
-      });
-      await _sendEncryptedPayload(endpointId, authRequest);
-    }
+    final authRequest = jsonEncode({
+      'type': 'p2p_auth_request',
+      'deviceId': localIdentity.deviceId,
+      'deviceName': localIdentity.deviceName,
+    });
+    await _sendEncryptedPayload(endpointId, authRequest);
   }
 
   Future<void> rejectPairingCode() async {

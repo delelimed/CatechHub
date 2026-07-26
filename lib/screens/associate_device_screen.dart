@@ -179,8 +179,15 @@ class _AssociateDeviceScreenState
           state.status == P2PSyncStatus.syncing) {
 
         if (_p2pComplete) return;
-        _p2pComplete = true;
         _pairingTimeoutTimer?.cancel();
+
+        if (_choseScanFirst &&
+            step == _AssociationStep.showQr &&
+            !state.authenticatedByRemote) {
+          return;
+        }
+
+        _p2pComplete = true;
 
         if (step == _AssociationStep.showQr && _choseScanFirst) {
           setState(() {

@@ -509,6 +509,7 @@ class AvvisiPage extends ConsumerWidget {
     try {
       final box = LocalDatabase.planning();
       final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
       PlanningMeeting? closest;
 
       for (final key in box.keys) {
@@ -516,7 +517,8 @@ class AvvisiPage extends ConsumerWidget {
         if (data['classId'] != classId) continue;
         if (data['isReunion'] == true) continue;
         final meeting = PlanningMeeting.fromMap(key.toString(), data);
-        if (!meeting.date.isBefore(now)) {
+        final meetingDate = DateTime(meeting.date.year, meeting.date.month, meeting.date.day);
+        if (!meetingDate.isBefore(today)) {
           if (closest == null || meeting.date.isBefore(closest.date)) {
             closest = meeting;
           }

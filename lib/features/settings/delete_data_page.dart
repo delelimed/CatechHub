@@ -14,8 +14,13 @@
 /// di altre classi presenti sul dispositivo non vengono toccati.
 /// Le associazioni dispositivi non appartengono a nessuna classe e vengono
 /// gestite globalmente.
+///
+/// In fondo alla pagina è presente anche il pulsante "Elimina tutto e
+/// ripristina" che cancella OGNI dato, chiave e associazione, riportando
+/// l'app allo stato di onboarding.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/storage/data_deletion_service.dart';
 import '../../core/storage/local_database.dart';
@@ -133,6 +138,73 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
     }
   }
 
+  bool _isResetting = false;
+
+  Future<void> _confirmAndResetAll() async {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? colorScheme.surface : Colors.white,
+        title: const Text(
+          'Eliminare TUTTO?',
+          style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'Questa operazione cancellerà IRREVERSIBILMENTE:\n\n'
+          '• Tutte le classi e i gruppi\n'
+          '• Tutti i ragazzi (anagrafica, presenze, note)\n'
+          '• Tutti gli allegati (foto, PDF)\n'
+          '• Tutte le catechesi e programmazioni\n'
+          '• Tutti i documenti e consegne\n'
+          '• Tutte le associazioni con altri dispositivi\n'
+          '• Tutte le chiavi crittografiche nello StrongBox/TEE\n'
+          '• I dati del profilo e dell\'account\n\n'
+          'L\'app tornerà alla configurazione iniziale (onboarding).\n\n'
+          'Questa azione NON può essere annullata.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annulla'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Elimina tutto',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isResetting = true);
+
+    try {
+      await ref.read(dataDeletionServiceProvider).deleteAllAndReset();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tutti i dati sono stati eliminati. Reindirizzamento...')),
+      );
+
+      await Future.delayed(const Duration(seconds: 1));
+      if (mounted) context.go('/');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isResetting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Errore durante il reset: $e')),
+      );
+    }
+  }
+
   String _labelFor(DataDeletionCategory c) {
     switch (c) {
       case DataDeletionCategory.anagrafica:
@@ -206,8 +278,20 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
 
     return AppScaffold(
       title: 'Cancella dati',
-      child: _isDeleting
-          ? const Center(child: CircularProgressIndicator())
+      child: _isDeleting || _isResetting
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(
+                    _isResetting ? 'Eliminazione totale in corso...' : 'Eliminazione in corso...',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            )
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -283,6 +367,69 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     onPressed: _confirmAndDelete,
+                  ),
+                ),
+
+                const SizedBox(height: 40),
+
+                // ─── RESET TOTALE ──────────────────────────────────
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.red.shade900.withValues(alpha: 0.2) : Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.red.shade300),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.warning_rounded, color: Colors.red.shade700, size: 24),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text(
+                              'Elimina tutto e ripristina',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Colors.red,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Cancella OGNI dato, classe, associazione, chiave crittografica '
+                        'e account. L\'app tornerà allo stato iniziale come appena installata.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? Colors.red.shade200 : Colors.red.shade900,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                            side: const BorderSide(color: Colors.red),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          icon: const Icon(Icons.delete_sweep_rounded),
+                          label: const Text(
+                            'Elimina tutto e ripristina',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          onPressed: _confirmAndResetAll,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

@@ -674,14 +674,6 @@ class P2PSyncService {
   }
 
   Future<void> setRole(P2PSyncRole role) async {
-    if (role == P2PSyncRole.responsabile) {
-      _updateState(_state.copyWith(
-        status: P2PSyncStatus.error,
-        errorMessage:
-            'Funzione Responsabile in fase di implementazione.',
-      ));
-      return;
-    }
     _updateState(_state.copyWith(role: role));
   }
 
@@ -905,10 +897,6 @@ class P2PSyncService {
   }
 
   bool _rolesAreCompatible(P2PSyncRole local, P2PSyncRole remote) {
-    if (local == P2PSyncRole.responsabile ||
-        remote == P2PSyncRole.responsabile) {
-      return false;
-    }
     return local == remote;
   }
 

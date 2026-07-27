@@ -237,6 +237,12 @@ class DataExportService {
       for (final item in incomingClasses) {
         final record = Map<String, dynamic>.from(item as Map);
         final id = record.remove('id') as String? ?? LocalDatabase.newId('class');
+        // Assicura che il catechista locale sia nella classe importata
+        final catechistIds = List<String>.from(record['catechistIds'] as List? ?? []);
+        if (!catechistIds.contains(AuthService.localUserId)) {
+          catechistIds.add(AuthService.localUserId);
+          record['catechistIds'] = catechistIds;
+        }
         await classesBox.put(id, record);
       }
     }

@@ -77,11 +77,9 @@ class ClassesPage extends ConsumerWidget {
                           ),
                         );
                       },
-                      onDelete: isActive
-                          ? null
-                          : () {
-                              ref.read(classesRepoProvider).deleteClass(c.id);
-                            },
+                      onDelete: () {
+                        ref.read(classesRepoProvider).deleteClass(c.id);
+                      },
                       classId: c.id,
                       className: c.name,
                       nameLocked: c.nameLocked,

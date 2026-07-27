@@ -591,6 +591,13 @@ class P2PSecurityService {
     }
   }
 
+  /// Resetta TUTTI i dati di sicurezza P2P: associazioni, identità locale,
+  /// chiavi crittografiche e sessioni. Usato per il reset totale dell'app.
+  Future<void> resetAllSecurityData() async {
+    await _assocBox.clear();
+    await _secureStorage.deleteAll();
+  }
+
   Future<P2PDeviceAssociation?> _migrateFromSecureStorage(
       String deviceId) async {
     final key = '$_storagePrefix$deviceId';

@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../../features/sync/p2p/p2p_security_service.dart';
 import '../../shared/models/attachment_model.dart';
 import '../../shared/models/attachment_parent_type.dart';
+import '../security/security_manager.dart';
 import 'encrypted_file_storage.dart';
 import 'local_database.dart';
 
@@ -388,5 +389,49 @@ class DataDeletionService {
       await EncryptedFileStorage.delete(id);
       await box.delete(id);
     }
+  }
+
+  /// CANCELLAZIONE TOTALE: elimina TUTTI i dati, le chiavi crittografiche,
+  /// le associazioni P2P, e resetta l'app allo stato di onboarding.
+  ///
+  /// Questa operazione:
+  /// 1. Svuota tutti i box Hive (classi, studenti, presenze, ecc.)
+  /// 2. Elimina tutti i file vault cifrati (allegati)
+  /// 3. Rimuove tutte le associazioni P2P e le chiavi di sincronizzazione
+  /// 4. Cancella i segreti e la chiave master dallo StrongBox/TEE
+  /// 5. Pulisce i dati di autenticazione e sessione
+  /// 6. Resetta il flag onboarding_completed per tornare all'onboarding
+  ///
+  /// Dopo questa chiamata, l'app DEVE essere reindirizzata alla home
+  /// per innescare il redirect verso l'onboarding.
+  Future<void> deleteAllAndReset() async {
+    // 1. Elimina tutti gli allegati (file vault + metadati)
+    await _deleteAllAttachments();
+
+    // 2. Svuota tutti i box dati (non auth)
+    await LocalDatabase.students().clear();
+    await LocalDatabase.classes().clear();
+    await LocalDatabase.planning().clear();
+    await LocalDatabase.attendance().clear();
+    await LocalDatabase.documents().clear();
+    await LocalDatabase.documentDeliveries().clear();
+    await LocalDatabase.contactNotes().clear();
+    await LocalDatabase.catechesi().clear();
+    await LocalDatabase.meetingCatechesi().clear();
+    await LocalDatabase.studentDailyNotes().clear();
+    await LocalDatabase.trustedDevices().clear();
+    await LocalDatabase.meetingNotifications().clear();
+    await LocalDatabase.avvisi().clear();
+
+    // 3. Rimuove tutte le associazioni P2P, identità locale e chiavi crittografiche
+    await P2PSecurityService().resetAllSecurityData();
+
+    // 4. Pulisce il box di autenticazione e resetta onboarding
+    await LocalDatabase.auth().clear();
+    await LocalDatabase.auth().put('onboarding_completed', false);
+
+    // 5. Cancella la chiave master dallo StrongBox/TEE (FlutterSecureStorage)
+    //    Questo forza la rigenerazione della chiave al prossimo avvio.
+    await SecurityManager.instance.resetForTesting();
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/auth/auth_provider.dart';
+import '../core/auth/auth_service.dart';
 import '../features/auth/login_page.dart';
 import '../features/classes/my_group_page.dart';
 import '../features/classes/group_management_page.dart';
@@ -27,6 +28,7 @@ import '../features/settings/commit_detail_page.dart';
 import '../features/settings/release_detail_page.dart';
 import '../features/settings/privacy.dart';
 import '../features/onboarding/presentation/screens/onboarding_page.dart';
+import '../features/onboarding/presentation/screens/onboarding_sync_page.dart';
 import '../core/storage/local_database.dart';
 import '../features/settings/backup_page.dart';
 import '../features/settings/delete_data_page.dart';
@@ -255,16 +257,28 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           if (user != null && isLoginPath) {
             // Se l'utente ha scelto "unisciti" durante l'onboarding e
             // non ha ancora classi, reindirizza all'associazione P2P.
-            try {
-              final setupMode =
-                  LocalDatabase.auth().get('setup_mode', defaultValue: 'create');
-              if (setupMode == 'join') {
-                final classesBox = LocalDatabase.classes();
-                if (classesBox.isEmpty) {
-                  return '/settings/associate-device';
+              try {
+                final setupMode =
+                    LocalDatabase.auth().get('setup_mode', defaultValue: 'create');
+                if (setupMode == 'join') {
+                  final classesBox = LocalDatabase.classes();
+                  const localId = AuthService.localUserId;
+                  bool userInClass = false;
+                  for (final key in classesBox.keys) {
+                    final data = LocalDatabase.toStringDynamicMap(classesBox.get(key));
+                    final ids = (data['catechistIds'] as List? ?? [])
+                        .map((e) => e.toString())
+                        .toList();
+                    if (ids.contains(localId)) {
+                      userInClass = true;
+                      break;
+                    }
+                  }
+                  if (!userInClass) {
+                    return '/onboarding-sync';
+                  }
                 }
-              }
-            } catch (_) {}
+              } catch (_) {}
             return '/';
           }
           return null;
@@ -297,6 +311,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/onboarding',
         builder: (context, state) => const OnboardingPage(),
+      ),
+
+      // ═══════════════════════════════════════════════════════════════════
+      // ONBOARDING SYNC - Sincronizzazione Bluetooth post-registrazione
+      // ═══════════════════════════════════════════════════════════════════
+      GoRoute(
+        path: '/onboarding-sync',
+        builder: (context, state) => const OnboardingSyncPage(),
       ),
 
       // ═══════════════════════════════════════════════════════════════════

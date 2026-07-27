@@ -31,24 +31,25 @@ class ClassesPage extends ConsumerWidget {
 
     return classesAsync.when(
       data: (classes) {
-        final isFirstUser = classes.length == 1 &&
-            classes[0].catechistIds.contains(AuthService.localUserId) &&
-            classes[0].catechistIds.length == 1;
+        final activeClassId = classes.isNotEmpty
+            ? classes.firstWhere(
+                (c) => c.catechistIds.contains(AuthService.localUserId),
+                orElse: () => classes.first,
+              ).id
+            : null;
 
         return AppScaffold(
           title: 'Gruppi',
-          floatingActionButton: isFirstUser
-              ? null
-              : FloatingActionButton.extended(
-                  backgroundColor: const Color(0xFF174A7E),
-                  foregroundColor: Colors.white,
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text(
-                    'Nuova classe',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  onPressed: () => _showAddClass(context, ref),
-                ),
+          floatingActionButton: FloatingActionButton.extended(
+            backgroundColor: const Color(0xFF174A7E),
+            foregroundColor: Colors.white,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text(
+              'Nuova classe',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            onPressed: () => _showAddClass(context, ref),
+          ),
           child: classes.isEmpty
               ? const _EmptyState(
                   icon: Icons.groups_rounded,
@@ -61,7 +62,7 @@ class ClassesPage extends ConsumerWidget {
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (_, index) {
                     final c = classes[index];
-                    final canEditOnly = isFirstUser && index == 0;
+                    final isActive = c.id == activeClassId;
 
                     return _ClassCard(
                       name: c.name,
@@ -76,16 +77,16 @@ class ClassesPage extends ConsumerWidget {
                           ),
                         );
                       },
-                      onDelete: canEditOnly
+                      onDelete: isActive
                           ? null
                           : () {
                               ref.read(classesRepoProvider).deleteClass(c.id);
                             },
-                      canEditOnly: canEditOnly,
                       classId: c.id,
                       className: c.name,
                       nameLocked: c.nameLocked,
-                      onEditName: canEditOnly && !c.nameLocked
+                      isActive: isActive,
+                      onEditName: !c.nameLocked
                           ? (newName) {
                               ref.read(classesRepoProvider).updateClass(
                                     c.id,
@@ -164,10 +165,10 @@ class _ClassCard extends StatelessWidget {
   final int catechists;
   final VoidCallback onTap;
   final VoidCallback? onDelete;
-  final bool canEditOnly;
   final String classId;
   final String className;
   final bool nameLocked;
+  final bool isActive;
   final Function(String)? onEditName;
 
   const _ClassCard({
@@ -176,10 +177,10 @@ class _ClassCard extends StatelessWidget {
     required this.catechists,
     required this.onTap,
     this.onDelete,
-    this.canEditOnly = false,
     required this.classId,
     required this.className,
     this.nameLocked = false,
+    this.isActive = false,
     this.onEditName,
   });
 
@@ -216,6 +217,39 @@ class _ClassCard extends StatelessWidget {
               Navigator.pop(context);
             },
             child: const Text('Salva'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: const Text('Elimina gruppo'),
+        content: Text(
+          'Sei sicuro di voler eliminare "$name"?\n\n'
+          'Verranno eliminati anche i piani di incontro e le presenze associati.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annulla'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              onDelete?.call();
+            },
+            child: const Text('Elimina'),
           ),
         ],
       ),
@@ -300,43 +334,32 @@ class _ClassCard extends StatelessWidget {
             ),
 
             /// MENU
-            if (canEditOnly)
-              PopupMenuButton<String>(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                onSelected: (value) {
-                  if (value == 'edit') {
-                    if (!nameLocked) {
-                      _showEditNameDialog(context);
-                    }
+            PopupMenuButton<String>(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              onSelected: (value) {
+                if (value == 'edit') {
+                  if (!nameLocked) {
+                    _showEditNameDialog(context);
                   }
-                },
-                itemBuilder: (_) => [
-                  if (!nameLocked)
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Text('Modifica nome'),
-                    ),
-                ],
-              )
-            else
-              PopupMenuButton<String>(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                onSelected: (value) {
-                  if (value == 'delete') {
-                    onDelete?.call();
-                  }
-                },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(
+                } else if (value == 'delete') {
+                  _showDeleteConfirmation(context);
+                }
+              },
+              itemBuilder: (_) => [
+                if (!nameLocked && onEditName != null)
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Text('Modifica nome'),
+                  ),
+                if (onDelete != null)
+                  const PopupMenuItem(
                     value: 'delete',
                     child: Text('Elimina'),
                   ),
-                ],
-              ),
+              ],
+            ),
           ],
         ),
       ),

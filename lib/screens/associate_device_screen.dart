@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hive/hive.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../core/providers/nearby_sync_provider.dart';
+import '../core/storage/local_database.dart';
 import '../features/sync/p2p/p2p_sync_service.dart';
 import '../features/sync/p2p/p2p_security_service.dart';
 
@@ -893,14 +893,14 @@ class _AssociateDeviceScreenState
                 Expanded(
                   child: FilledButton(
                     onPressed: () {
-                      // Se siamo in modalità onboarding (join), vai direttamente
-                      // alla dashboard invece di tornare indietro.
-                      final auth = Hive.box('auth');
+                      final auth = LocalDatabase.auth();
                       final setupMode = auth.get('setup_mode', defaultValue: 'create');
                       if (setupMode == 'join') {
                         context.go('/');
-                      } else {
+                      } else if (context.canPop()) {
                         context.pop();
+                      } else {
+                        context.go('/');
                       }
                     },
                     child: const Text('Torna alla sync'),

@@ -1501,6 +1501,8 @@ class P2PSyncService {
         }
       } catch (_) {}
 
+      _ensureLocalCatechistInClasses();
+
       _updateState(_state.copyWith(
         status: P2PSyncStatus.completed,
         lastSyncAt: DateTime.now(),
@@ -1509,6 +1511,27 @@ class P2PSyncService {
         receivedRecordsCount: 0,
         largeSyncInProgress: false,
       ));
+    }
+  }
+
+  void _ensureLocalCatechistInClasses() {
+    try {
+      final box = LocalDatabase.classes();
+      const localId = AuthService.localUserId;
+      for (final key in box.keys) {
+        final data = LocalDatabase.toStringDynamicMap(box.get(key));
+        final ids = (data['catechistIds'] as List? ?? [])
+            .map((e) => e.toString())
+            .toList();
+        if (!ids.contains(localId)) {
+          ids.add(localId);
+          data['catechistIds'] = ids;
+          box.put(key, data);
+          addLog('INFO', 'Aggiunto catechista locale alla classe ${data['name']}');
+        }
+      }
+    } catch (e) {
+      addLog('ERROR', 'Errore _ensureLocalCatechistInClasses: $e');
     }
   }
 

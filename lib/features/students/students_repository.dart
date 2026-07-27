@@ -28,7 +28,9 @@ class StudentsRepository {
     final id = student.id.isEmpty ? LocalDatabase.newId('student') : student.id;
     final catechistName = getCurrentCatechistName();
     final now = DateTime.now();
+    final code = student.classUniqueCode ?? _lookupClassUniqueCode(student.classId);
     await _box.put(id, _normalize(student).copyWith(
+      classUniqueCode: code,
       lastModifiedBy: catechistName,
       createdAt: now,
       updatedAt: now,
@@ -57,11 +59,15 @@ class StudentsRepository {
     final catechistName = getCurrentCatechistName();
     final existing = _box.get(id);
     DateTime? existingCreatedAt;
+    String? existingUniqueCode;
     if (existing != null) {
       final map = LocalDatabase.toStringDynamicMap(existing);
       existingCreatedAt = DateTime.tryParse(map['createdAt']?.toString() ?? '');
+      existingUniqueCode = map['classUniqueCode'];
     }
+    final code = student.classUniqueCode ?? existingUniqueCode ?? _lookupClassUniqueCode(student.classId);
     await _box.put(id, _normalize(student).copyWith(
+      classUniqueCode: code,
       lastModifiedBy: catechistName,
       createdAt: existingCreatedAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
@@ -75,6 +81,7 @@ class StudentsRepository {
       surname: NameFormatting.capitalizeWords(student.surname),
       birthDate: student.birthDate,
       classId: student.classId,
+      classUniqueCode: student.classUniqueCode,
       motherName: NameFormatting.capitalizeWords(student.motherName),
       motherSurname: NameFormatting.capitalizeWords(student.motherSurname),
       fatherName: NameFormatting.capitalizeWords(student.fatherName),
@@ -88,6 +95,15 @@ class StudentsRepository {
       autonomousExits: student.autonomousExits,
       notes: student.notes?.trim().isEmpty == true ? null : student.notes?.trim(),
     );
+  }
+
+  /// Cerca il codice univoco di 40 cifre a partire dal [classId].
+  String? _lookupClassUniqueCode(String? classId) {
+    if (classId == null || classId.isEmpty) return null;
+    final classData = LocalDatabase.classes().get(classId);
+    if (classData == null) return null;
+    final map = LocalDatabase.toStringDynamicMap(classData);
+    return map['uniqueCode'] as String?;
   }
 
   Future<void> deleteStudent(String id) async {

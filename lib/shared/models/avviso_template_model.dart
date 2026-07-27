@@ -1,5 +1,6 @@
 class AvvisoTemplate {
   final String id;
+  final String? classUniqueCode;
   final String title;
   final String text;
 
@@ -15,6 +16,7 @@ class AvvisoTemplate {
 
   const AvvisoTemplate({
     required this.id,
+    this.classUniqueCode,
     required this.title,
     required this.text,
   });
@@ -22,6 +24,7 @@ class AvvisoTemplate {
   factory AvvisoTemplate.fromMap(String id, Map<String, dynamic> data) {
     return AvvisoTemplate(
       id: id,
+      classUniqueCode: data['classUniqueCode'],
       title: data['title'] ?? '',
       text: data['text'] ?? '',
     );
@@ -29,6 +32,7 @@ class AvvisoTemplate {
 
   Map<String, dynamic> toMap() {
     return {
+      'classUniqueCode': classUniqueCode,
       'title': title,
       'text': text,
     };
@@ -36,11 +40,13 @@ class AvvisoTemplate {
 
   AvvisoTemplate copyWith({
     String? id,
+    String? classUniqueCode,
     String? title,
     String? text,
   }) {
     return AvvisoTemplate(
       id: id ?? this.id,
+      classUniqueCode: classUniqueCode ?? this.classUniqueCode,
       title: title ?? this.title,
       text: text ?? this.text,
     );

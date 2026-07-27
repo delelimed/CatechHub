@@ -144,6 +144,8 @@ class _SettingsAssociationScreenState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildBetaWarning(theme, colorScheme),
+                  const SizedBox(height: 12),
+                  _buildClassInfoBanner(theme, colorScheme),
                   const SizedBox(height: 16),
                   _buildStatusLegend(theme, colorScheme),
                   const SizedBox(height: 12),
@@ -219,6 +221,46 @@ class _SettingsAssociationScreenState
                   'Per scambiare dati in modo affidabile, utilizza la scansione QR '
                   'o esporta un file di backup dalle impostazioni.',
                   style: TextStyle(fontSize: 13, color: Colors.amber[900]),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClassInfoBanner(ThemeData theme, ColorScheme colorScheme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF174A7E).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF174A7E).withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.class_, color: const Color(0xFF174A7E), size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Sincronizzazione per classe',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF174A7E),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'La sincronizzazione Bluetooth avviene solo tra dispositivi '
+                  'della stessa classe. Le associazioni con dispositivi non '
+                  'appartengono a nessuna classe.',
+                  style: TextStyle(fontSize: 13, color: const Color(0xFF174A7E)),
                 ),
               ],
             ),

@@ -35,6 +35,10 @@ class PlanningMeeting {
   /// FK verso SchoolClass (gruppo a cui appartiene l'incontro).
   final String classId;
 
+  /// Codice univoco di 40 cifre della classe.
+  /// Copia ridondante di SchoolClass.uniqueCode per il sync multi-classe.
+  final String classUniqueCode;
+
   /// ID del catechista che ha creato l'incontro.
   final String createdBy;
 
@@ -71,6 +75,7 @@ class PlanningMeeting {
   PlanningMeeting({
     required this.id,
     required this.classId,
+    this.classUniqueCode = '',
     required this.createdBy,
     required this.date,
     this.time,
@@ -87,6 +92,7 @@ class PlanningMeeting {
   PlanningMeeting copyWith({
     String? id,
     String? classId,
+    String? classUniqueCode,
     String? createdBy,
     DateTime? date,
     String? time,
@@ -101,6 +107,7 @@ class PlanningMeeting {
     return PlanningMeeting(
       id: id ?? this.id,
       classId: classId ?? this.classId,
+      classUniqueCode: classUniqueCode ?? this.classUniqueCode,
       createdBy: createdBy ?? this.createdBy,
       date: date ?? this.date,
       time: time ?? this.time,
@@ -117,6 +124,7 @@ class PlanningMeeting {
   Map<String, dynamic> toMap() {
     return {
       'classId': classId,
+      'classUniqueCode': classUniqueCode,
       'createdBy': createdBy,
       'date': date.toIso8601String(),
       'time': time,
@@ -137,6 +145,7 @@ class PlanningMeeting {
     return PlanningMeeting(
       id: id,
       classId: data['classId'] ?? '',
+      classUniqueCode: data['classUniqueCode'] ?? '',
       createdBy: data['createdBy'] ?? '',
       date: date,
       time: data['time']?.toString(),

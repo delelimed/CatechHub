@@ -6,6 +6,7 @@ import '../core/auth/auth_provider.dart';
 import '../features/auth/login_page.dart';
 import '../features/classes/my_group_page.dart';
 import '../features/classes/group_management_page.dart';
+import '../features/classes/view_groups_page.dart';
 import '../features/dashboard/dashboard_page.dart';
 import '../features/students/students_page.dart';
 import '../shared/models/student_model.dart';
@@ -496,6 +497,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/group-management',
         builder: (context, state) => const GroupManagementPage(),
+      ),
+
+      /// Visualizzazione di tutti i gruppi a cui appartiene il catechista.
+      GoRoute(
+        path: '/view-groups',
+        builder: (context, state) => const ViewGroupsPage(),
       ),
 
       // ═══════════════════════════════════════════════════════════════════

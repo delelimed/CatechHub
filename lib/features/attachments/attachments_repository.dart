@@ -84,6 +84,7 @@ class AttachmentsRepository {
     required String mimeType,
     required Uint8List bytes,
     String? description,
+    String? classUniqueCode,
   }) async {
     if (bytes.isEmpty) {
       throw Exception('Il file selezionato è vuoto');
@@ -99,6 +100,7 @@ class AttachmentsRepository {
     await EncryptedFileStorage.write(id, optimized.bytes);
 
     final now = DateTime.now();
+    final code = classUniqueCode ?? _lookupClassUniqueCode(parentId, parentType);
     final attachment = Attachment(
       id: id,
       parentId: parentId,
@@ -109,12 +111,46 @@ class AttachmentsRepository {
       createdAt: now,
       updatedAt: now,
       fileHash: sha256.convert(optimized.bytes).toString(),
+      classUniqueCode: code,
       description: description,
       lastModifiedBy: getCurrentCatechistName(),
     );
 
     await _box.put(id, attachment.toMap());
     return attachment;
+  }
+
+  /// Ricava il classUniqueCode dal parentId+parentType.
+  String? _lookupClassUniqueCode(String parentId, String parentType) {
+    switch (parentType) {
+      case 'student':
+        final studentData = LocalDatabase.students().get(parentId);
+        if (studentData == null) return null;
+        final studentMap = LocalDatabase.toStringDynamicMap(studentData);
+        final classId = studentMap['classId'] as String?;
+        if (classId == null || classId.isEmpty) return null;
+        final classData = LocalDatabase.classes().get(classId);
+        if (classData == null) return null;
+        final classMap = LocalDatabase.toStringDynamicMap(classData);
+        return classMap['uniqueCode'] as String?;
+      case 'meeting':
+        final meetingData = LocalDatabase.planning().get(parentId);
+        if (meetingData == null) return null;
+        final meetingMap = LocalDatabase.toStringDynamicMap(meetingData);
+        final code = meetingMap['classUniqueCode'] as String?;
+        if (code != null && code.isNotEmpty) return code;
+        final classId = meetingMap['classId'] as String?;
+        if (classId == null || classId.isEmpty) return null;
+        final classData = LocalDatabase.classes().get(classId);
+        if (classData == null) return null;
+        final classMap = LocalDatabase.toStringDynamicMap(classData);
+        return classMap['uniqueCode'] as String?;
+      case 'catechesi':
+        // Le catechesi non hanno classId; classUniqueCode può essere passato
+        return null;
+      default:
+        return null;
+    }
   }
 
   Future<Attachment> addFromPath({
@@ -124,6 +160,7 @@ class AttachmentsRepository {
     required String name,
     required String mimeType,
     String? description,
+    String? classUniqueCode,
   }) async {
     final bytes = await File(filePath).readAsBytes();
     return addFromBytes(
@@ -133,6 +170,7 @@ class AttachmentsRepository {
       mimeType: mimeType,
       bytes: bytes,
       description: description,
+      classUniqueCode: classUniqueCode,
     );
   }
 

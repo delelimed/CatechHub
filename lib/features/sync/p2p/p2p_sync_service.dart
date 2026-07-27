@@ -6,7 +6,9 @@ import 'package:hive/hive.dart';
 import 'package:nearby_connections/nearby_connections.dart';
 import 'package:cryptography/cryptography.dart';
 
+import '../../../core/auth/auth_service.dart';
 import '../../../core/services/bluetooth_permission_service.dart';
+import '../../../core/storage/local_database.dart';
 import 'p2p_security_service.dart';
 import 'hive_sync_engine.dart';
 
@@ -910,6 +912,21 @@ class P2PSyncService {
     return local == remote;
   }
 
+  String _getCurrentClassId() {
+    try {
+      final box = LocalDatabase.classes();
+      const uid = AuthService.localUserId;
+      for (final key in box.keys) {
+        final data = Map<String, dynamic>.from(box.get(key) as Map);
+        final ids = (data['catechistIds'] as List? ?? []).map((e) => e.toString()).toList();
+        if (ids.contains(uid)) {
+          return key.toString();
+        }
+      }
+    } catch (_) {}
+    return '';
+  }
+
   Future<void> _sendHandshakePayload(String endpointId) async {
     try {
       _sessionPairingNonce = P2PSecurityService.secureRandom(16)
@@ -923,6 +940,7 @@ class P2PSyncService {
             DateTime.now().millisecondsSinceEpoch ~/ 1000,
         'role': _state.role.name,
         'sessionNonce': _sessionPairingNonce,
+        'classId': _getCurrentClassId(),
       });
       addLog('DEBUG', 'Invio handshake a $endpointId (nonce: ${_sessionPairingNonce?.substring(0, 8)}...)');
       await _sendPayload(endpointId, handshakeMsg);
@@ -1090,6 +1108,24 @@ class P2PSyncService {
     addLog('DEBUG',
         'Ruoli compatibili: ${_state.role.name} <-> ${remoteRole.name}');
 
+    final remoteClassId = message['classId'] as String? ?? '';
+    final localClassId = _getCurrentClassId();
+    if (remoteClassId.isNotEmpty && localClassId.isNotEmpty && remoteClassId != localClassId) {
+      addLog('ERROR',
+          'Classi diverse: locale=$localClassId remoto=$remoteClassId con ${remoteIdentity.deviceName}');
+      try {
+        await _nearby.disconnectFromEndpoint(endpointId);
+      } catch (_) {}
+      _connectedEndpoints.remove(endpointId);
+      _pendingEndpointId = null;
+      _updateState(_state.copyWith(
+        status: P2PSyncStatus.error,
+        errorMessage: 'Classi diverse: impossibile sincronizzare con ${remoteIdentity.deviceName}. '
+            'La sincronizzazione Bluetooth è consentita solo tra dispositivi della stessa classe.',
+      ));
+      return;
+    }
+
     final timestamp = message['timestamp'] as int? ?? 0;
     final age = (DateTime.now().millisecondsSinceEpoch ~/ 1000) - timestamp;
     if (age.abs() > 120) {
@@ -1134,6 +1170,7 @@ class P2PSyncService {
       'payload': localIdentity.encode(),
       'role': _state.role.name,
       'sessionNonce': _sessionPairingNonce,
+      'classId': _getCurrentClassId(),
     });
 
     if (existingAssoc != null && !_state.isPairingMode) {
@@ -1214,6 +1251,24 @@ class P2PSyncService {
         errorMessage: 'Ruoli incompatibili: i due dispositivi devono '
             'avere lo stesso ruolo. Entrambi "mioDispositivo" o '
             'entrambi "altroCatechista".',
+      ));
+      return;
+    }
+
+    final remoteClassId = message['classId'] as String? ?? '';
+    final localClassId = _getCurrentClassId();
+    if (remoteClassId.isNotEmpty && localClassId.isNotEmpty && remoteClassId != localClassId) {
+      addLog('ERROR',
+          'Classi diverse: locale=$localClassId remoto=$remoteClassId con ${remoteIdentity.deviceName}');
+      try {
+        await _nearby.disconnectFromEndpoint(endpointId);
+      } catch (_) {}
+      _connectedEndpoints.remove(endpointId);
+      _pendingEndpointId = null;
+      _updateState(_state.copyWith(
+        status: P2PSyncStatus.error,
+        errorMessage: 'Classi diverse: impossibile sincronizzare con ${remoteIdentity.deviceName}. '
+            'La sincronizzazione Bluetooth è consentita solo tra dispositivi della stessa classe.',
       ));
       return;
     }

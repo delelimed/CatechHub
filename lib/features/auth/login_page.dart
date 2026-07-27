@@ -108,6 +108,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   bool _checkedLockScreen = false;
   String? _errorMessage;
 
+  int _setupStep = 0; // 0: nome/cognome, 1: crea/unisciti, 2: nome gruppo (solo se crea)
+
   @override
   void initState() {
     super.initState();
@@ -158,7 +160,51 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
   }
 
-  Future<void> _handleSetupProfile() async {
+  void _nextStep() {
+    if (_setupStep == 0) {
+      final firstName = _firstNameController.text.trim();
+      final lastName = _lastNameController.text.trim();
+      if (firstName.isEmpty || lastName.isEmpty) {
+        setState(() => _errorMessage = 'Nome e cognome sono obbligatori.');
+        return;
+      }
+      setState(() {
+        _errorMessage = null;
+        _setupStep = 1;
+      });
+    }
+  }
+
+  void _previousStep() {
+    setState(() {
+      _errorMessage = null;
+      _setupStep = _setupStep - 1;
+      if (_setupStep == 1) _groupController.clear();
+    });
+  }
+
+  Future<void> _handleJoinClass() async {
+    HapticFeedback.mediumImpact();
+    setState(() => _errorMessage = null);
+
+    final firstName = _firstNameController.text.trim();
+    final lastName = _lastNameController.text.trim();
+
+    final auth = ref.read(authStateProvider.notifier);
+    final ok = await auth.setupInitialProfile(
+      firstName: firstName,
+      lastName: lastName,
+      createClass: false,
+    );
+
+    if (!ok && mounted) {
+      setState(
+        () => _errorMessage = 'Errore durante la configurazione. Riprova.',
+      );
+    }
+  }
+
+  Future<void> _handleCreateClass() async {
     HapticFeedback.mediumImpact();
     setState(() => _errorMessage = null);
 
@@ -166,10 +212,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final lastName = _lastNameController.text.trim();
     final groupName = _groupController.text.trim();
 
-    if (firstName.isEmpty || lastName.isEmpty || groupName.isEmpty) {
-      setState(
-        () => _errorMessage = 'Nome, cognome e gruppo sono obbligatori.',
-      );
+    if (groupName.isEmpty) {
+      setState(() => _errorMessage = 'Il nome del gruppo è obbligatorio.');
       return;
     }
 
@@ -178,6 +222,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       firstName: firstName,
       lastName: lastName,
       groupName: groupName,
+      createClass: true,
     );
 
     if (!ok && mounted) {
@@ -412,36 +457,155 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           style: TextStyle(fontSize: isLandscape ? 13 : 12, color: Colors.grey),
         ),
         const SizedBox(height: 24),
-        if (!isLoading) ...[
-          _buildTextField(_firstNameController, 'Nome', Icons.person, isLandscape),
-          const SizedBox(height: 12),
-          _buildTextField(_lastNameController, 'Cognome', Icons.person_outline, isLandscape),
-          const SizedBox(height: 12),
-          _buildTextField(
-            _groupController,
-            'Gruppo / Parrocchia',
-            Icons.groups,
-            isLandscape,
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: _handleSetupProfile,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF174A7E),
-              foregroundColor: Colors.white,
-              minimumSize: Size(double.infinity, isLandscape ? 56 : 50),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+        if (isLoading) ...[
+          const SizedBox(height: 8),
+          const CircularProgressIndicator(strokeWidth: 3),
+        ] else ...[
+          if (_errorMessage != null) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.red.shade700, fontSize: 14),
               ),
             ),
-            child: Text(
-              'Crea profilo e accedi',
+            const SizedBox(height: 16),
+          ],
+          if (_setupStep == 0) ...[
+            _buildTextField(_firstNameController, 'Nome', Icons.person, isLandscape),
+            const SizedBox(height: 12),
+            _buildTextField(_lastNameController, 'Cognome', Icons.person_outline, isLandscape),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _nextStep,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF174A7E),
+                foregroundColor: Colors.white,
+                minimumSize: Size(double.infinity, isLandscape ? 56 : 50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: Text(
+                'Avanti',
+                style: TextStyle(
+                  fontSize: isLandscape ? 17 : 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ] else if (_setupStep == 1) ...[
+            Text(
+              'Scegli come iniziare',
               style: TextStyle(
-                fontSize: isLandscape ? 17 : 16,
+                fontSize: isLandscape ? 16 : 15,
                 fontWeight: FontWeight.w600,
+                color: const Color(0xFF174A7E),
               ),
             ),
-          ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _setupStep = 2;
+                    _errorMessage = null;
+                  });
+                },
+                icon: const Icon(Icons.add_circle_outline),
+                label: const Text('Crea una nuova classe'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF174A7E),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _handleJoinClass,
+                icon: const Icon(Icons.people_outline),
+                label: const Text('Unisciti a una classe esistente'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFF174A7E),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  side: const BorderSide(color: Color(0xFF174A7E)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            TextButton(
+              onPressed: _previousStep,
+              child: Text(
+                'Indietro',
+                style: TextStyle(
+                  fontSize: isLandscape ? 14 : 13,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ),
+          ] else if (_setupStep == 2) ...[
+            _buildTextField(
+              _groupController,
+              'Nome della classe',
+              Icons.groups,
+              isLandscape,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Inserisci il nome del tuo gruppo di catechismo '
+              '(es. "Prima elementare", "Cresima 2026")',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: isLandscape ? 12 : 11, color: Colors.grey),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _handleCreateClass,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF174A7E),
+                foregroundColor: Colors.white,
+                minimumSize: Size(double.infinity, isLandscape ? 56 : 50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: Text(
+                'Crea profilo e accedi',
+                style: TextStyle(
+                  fontSize: isLandscape ? 17 : 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: _previousStep,
+              child: Text(
+                'Indietro',
+                style: TextStyle(
+                  fontSize: isLandscape ? 14 : 13,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ),
+          ],
         ],
       ],
     );

@@ -6,17 +6,11 @@
 ## In sviluppo
 
 - **Nearby Connections API** — Integrazione della sincronizzazione peer-to-peer tramite Nearby Connections di Google, attualmente presente ma non funzionante. Data la sua complessità, verrà corretta nel corso delle versioni.
-- **Preparatore di comunicazioni WhatsApp** - Genesi automatica di messaggi whatsapp da condividere con i genitori singolarmente o nel gruppo.
-
-
-## Pianificate
-v1.1.0
-
 - **Conteggio Rapido** - Possibilità di effettuare un conteggio rapido da confrontare con il numero di presenti del giorno, per verificare la completezza del gruppo senza dover ripetere l'appello.
 - **Export Completo** — Esportazione in PDF dell'intero database per archiviazione al termine dell'anno.
 
 
-## In valutazione
+## Pianificate
 
 Le seguenti funzionalità verranno introdotte nella versione 2.0 dell'app, prevista per il prossimo anno.
 
@@ -26,3 +20,8 @@ Le seguenti funzionalità verranno introdotte nella versione 2.0 dell'app, previ
 - **Gestione MultiGruppo** - Possibilità per il catechista di gestire più di un gruppo, anche di anni diversi
 - **Archivio Storico** - implementazione di un archivio per seguire il progresso del ragazzo nel percorso di preparazione.
 - **Supplenze** - possibilità per un catechista di assegnare momentaneamente la supplenza del proprio gruppo ad un altro catechista, manenendo requisiti di sicurezza elevati
+
+
+## In valutazione
+
+

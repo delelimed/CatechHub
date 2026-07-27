@@ -34,6 +34,10 @@ class ContactNote {
   /// FK verso Student (ragazzo di cui si è contattato il genitore).
   final String studentId;
 
+  /// Codice univoco di 40 cifre della classe dello studente.
+  /// Copia ridondante per identificare la classe anche via sync.
+  final String? classUniqueCode;
+
   /// Data e ora del contatto (ISO 8601).
   final DateTime dateTime;
 
@@ -55,6 +59,7 @@ class ContactNote {
   ContactNote({
     required this.id,
     required this.studentId,
+    this.classUniqueCode,
     required this.dateTime,
     required this.medium,
     required this.notes,
@@ -68,6 +73,7 @@ class ContactNote {
     return ContactNote(
       id: id,
       studentId: data['studentId'] ?? '',
+      classUniqueCode: data['classUniqueCode'],
       dateTime: DateTime.tryParse(data['dateTime']?.toString() ?? '') ??
           DateTime.now(),
       medium: data['medium'] ?? 'de_visu',
@@ -81,6 +87,7 @@ class ContactNote {
   Map<String, dynamic> toMap() {
     return {
       'studentId': studentId,
+      'classUniqueCode': classUniqueCode,
       'dateTime': dateTime.toIso8601String(),
       'medium': medium,
       'notes': notes,

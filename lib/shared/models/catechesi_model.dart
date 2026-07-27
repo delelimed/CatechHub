@@ -33,6 +33,10 @@ class Catechesi {
   /// ID univoco del contenuto catechetico.
   final String id;
 
+  /// Codice univoco di 40 cifre della classe associata (opzionale).
+  /// Permette di filtrare le catechesi per classe in contesto multi-classe.
+  final String? classUniqueCode;
+
   /// Titolo del contenuto (es. "La parabola del buon samaritano").
   final String title;
 
@@ -62,6 +66,7 @@ class Catechesi {
 
   Catechesi({
     required this.id,
+    this.classUniqueCode,
     required this.title,
     required this.tags,
     required this.biblicalReferences,
@@ -75,6 +80,7 @@ class Catechesi {
 
   Catechesi copyWith({
     String? id,
+    String? classUniqueCode,
     String? title,
     List<String>? tags,
     List<String>? biblicalReferences,
@@ -87,6 +93,7 @@ class Catechesi {
   }) {
     return Catechesi(
       id: id ?? this.id,
+      classUniqueCode: classUniqueCode ?? this.classUniqueCode,
       title: title ?? this.title,
       tags: tags ?? this.tags,
       biblicalReferences: biblicalReferences ?? this.biblicalReferences,
@@ -101,6 +108,7 @@ class Catechesi {
 
   Map<String, dynamic> toMap() {
     return {
+      'classUniqueCode': classUniqueCode,
       'title': title,
       'tags': tags,
       'biblicalReferences': biblicalReferences,
@@ -116,6 +124,7 @@ class Catechesi {
   factory Catechesi.fromMap(String id, Map<String, dynamic> data) {
     return Catechesi(
       id: id,
+      classUniqueCode: data['classUniqueCode'],
       title: data['title'] ?? '',
       tags: (data['tags'] as List<dynamic>?)?.cast<String>() ?? [],
       biblicalReferences: (data['biblicalReferences'] as List<dynamic>?)?.cast<String>() ?? [],

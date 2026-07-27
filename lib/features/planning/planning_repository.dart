@@ -61,7 +61,8 @@ class PlanningRepository {
     final id = m.id.isEmpty ? LocalDatabase.newId('meeting') : m.id;
     final catechistName = getCurrentCatechistName();
     final now = DateTime.now();
-    final data = m.toMap();
+    final code = m.classUniqueCode.isNotEmpty ? m.classUniqueCode : _lookupClassUniqueCode(m.classId);
+    final data = m.copyWith(classUniqueCode: code).toMap();
     data['lastModifiedBy'] = catechistName;
     data['createdAt'] = now.toIso8601String();
     data['updatedAt'] = now.toIso8601String();
@@ -84,11 +85,16 @@ class PlanningRepository {
 
     final existingData = _box.get(id);
     String? existingCreatedAt;
+    String? existingUniqueCode;
     if (existingData != null) {
       final map = LocalDatabase.toStringDynamicMap(existingData);
       existingCreatedAt = map['createdAt']?.toString();
+      existingUniqueCode = map['classUniqueCode'] as String?;
     }
-    final data = m.toMap();
+    final code = m.classUniqueCode.isNotEmpty
+        ? m.classUniqueCode
+        : (existingUniqueCode?.isNotEmpty == true ? existingUniqueCode! : _lookupClassUniqueCode(m.classId));
+    final data = m.copyWith(classUniqueCode: code).toMap();
     data['lastModifiedBy'] = getCurrentCatechistName();
     data['createdAt'] = existingCreatedAt ?? data['createdAt'];
     data['updatedAt'] = DateTime.now().toIso8601String();
@@ -125,6 +131,14 @@ class PlanningRepository {
 
     // Rimuovi la notifica programmata
     await MeetingNotificationService.removeMeeting(id);
+  }
+
+  /// Cerca il codice univoco di 40 cifre della classe a partire dal [classId].
+  String _lookupClassUniqueCode(String classId) {
+    final classData = LocalDatabase.classes().get(classId);
+    if (classData == null) return '';
+    final map = LocalDatabase.toStringDynamicMap(classData);
+    return map['uniqueCode'] as String? ?? '';
   }
 
   /// Restituisce il messaggio di errore localizzato per conflitto di data,

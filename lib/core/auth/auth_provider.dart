@@ -13,9 +13,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_service.dart';
-import '../../shared/models/class_model.dart';
 import '../../features/classes/classes_repository.dart';
-import '../storage/local_database.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
@@ -94,26 +92,6 @@ class LocalAuthNotifier extends AsyncNotifier<Map<String, dynamic>?> {
       if (!success) {
         state = AsyncValue.data(null);
         return false;
-      }
-
-      if (createClass) {
-        try {
-          final classBox = LocalDatabase.classes();
-          final classId = LocalDatabase.newId('class');
-          final newClass = SchoolClass(
-            id: classId,
-            name: groupName!,
-            studentIds: [],
-            catechistIds: [AuthService.localUserId],
-            uniqueCode: generateClassUniqueCode(),
-            nameLocked: false,
-          );
-          await classBox.put(classId, newClass.toMap());
-        } catch (e, stack) {
-          await _authService.signOut();
-          state = AsyncValue.error(e, stack);
-          return false;
-        }
       }
 
       state = AsyncValue.data(_authService.currentUser);

@@ -41,6 +41,11 @@ class Student {
   /// FK verso SchoolClass (null se non ancora assegnato a un gruppo).
   final String? classId;
 
+  /// Codice univoco di 40 cifre della classe di appartenenza.
+  /// Copia ridondante di SchoolClass.uniqueCode per identificare la classe
+  /// anche in assenza di relazione diretta (utile per sync multi-classe).
+  final String? classUniqueCode;
+
   /// Data di nascita (formato ISO 8601).
   final DateTime birthDate;
 
@@ -90,6 +95,7 @@ class Student {
     required this.fatherPhone,
     required this.studentPhone,
     this.classId,
+    this.classUniqueCode,
     this.allergies,
     this.autonomousExits,
     this.notes,
@@ -109,6 +115,7 @@ class Student {
       birthDate: DateTime.tryParse(data['birthDate']?.toString() ?? '') ??
           DateTime.now(),
       classId: data['classId'],
+      classUniqueCode: data['classUniqueCode'],
       motherName: data['motherName'] ?? '',
       motherSurname: data['motherSurname'] ?? '',
       fatherName: data['fatherName'] ?? '',
@@ -147,6 +154,7 @@ class Student {
     String? name,
     String? surname,
     String? classId,
+    String? classUniqueCode,
     DateTime? birthDate,
     String? motherName,
     String? motherSurname,
@@ -168,6 +176,7 @@ class Student {
       surname: surname ?? this.surname,
       birthDate: birthDate ?? this.birthDate,
       classId: classId ?? this.classId,
+      classUniqueCode: classUniqueCode ?? this.classUniqueCode,
       motherName: motherName ?? this.motherName,
       motherSurname: motherSurname ?? this.motherSurname,
       fatherName: fatherName ?? this.fatherName,
@@ -192,6 +201,7 @@ class Student {
       'surname': surname,
       'birthDate': birthDate.toIso8601String(),
       'classId': classId,
+      'classUniqueCode': classUniqueCode,
       'motherName': motherName,
       'motherSurname': motherSurname,
       'fatherName': fatherName,

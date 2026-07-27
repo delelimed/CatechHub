@@ -214,6 +214,16 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: 12),
 
               _SettingsItem(
+                icon: Icons.list_alt_rounded,
+                title: 'Visualizza Gruppi',
+                subtitle: 'Vedi tutti i gruppi di cui fai parte',
+                color: const Color(0xFF174A7E),
+                onTap: () => context.push('/view-groups'),
+              ),
+
+              const SizedBox(height: 12),
+
+              _SettingsItem(
                 icon: Icons.groups_rounded,
                 title: 'Gestione Gruppo',
                 subtitle: 'Gestisci il gruppo e i ragazzi',

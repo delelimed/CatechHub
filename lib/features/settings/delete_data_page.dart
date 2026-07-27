@@ -9,9 +9,16 @@
 /// Mostra il conteggio attuale per ogni categoria tramite [DataDeletionService].
 /// La cancellazione è definitiva e irreversibile sul dispositivo, previa
 /// conferma tramite dialog.
+///
+/// La cancellazione agisce SOLO sulla classe attualmente aperta. I dati
+/// di altre classi presenti sul dispositivo non vengono toccati.
+/// Le associazioni dispositivi non appartengono a nessuna classe e vengono
+/// gestite globalmente.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/auth/auth_service.dart';
 import '../../core/storage/data_deletion_service.dart';
+import '../../core/storage/local_database.dart';
 import '../../shared/widgets/app_scaffold.dart';
 
 final dataDeletionServiceProvider = Provider((_) => DataDeletionService());
@@ -27,16 +34,37 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
   final _selected = <DataDeletionCategory>{};
   bool _isDeleting = false;
   late DataDeletionCounts _counts;
+  String? _currentClassId;
+  String? _currentClassName;
 
   @override
   void initState() {
     super.initState();
-    _counts = DataDeletionService().getCounts();
+    _loadCurrentClass();
+    if (_currentClassId != null) {
+      _counts = DataDeletionService().getCounts(classId: _currentClassId);
+    } else {
+      _counts = DataDeletionService().getCounts();
+    }
+  }
+
+  void _loadCurrentClass() {
+    final classes = LocalDatabase.classes();
+    const uid = AuthService.localUserId;
+    for (final key in classes.keys) {
+      final data = Map<String, dynamic>.from(classes.get(key) as Map);
+      final ids = (data['catechistIds'] as List? ?? []).map((e) => e.toString()).toList();
+      if (ids.contains(uid)) {
+        _currentClassId = key.toString();
+        _currentClassName = data['name']?.toString() ?? 'Classe';
+        break;
+      }
+    }
   }
 
   void _refreshCounts() {
     setState(() {
-      _counts = ref.read(dataDeletionServiceProvider).getCounts();
+      _counts = ref.read(dataDeletionServiceProvider).getCounts(classId: _currentClassId);
     });
   }
 
@@ -52,12 +80,14 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final colorScheme = theme.colorScheme;
+    final className = _currentClassName ?? 'Classe corrente';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: isDark ? colorScheme.surface : Colors.white,
         title: const Text('Conferma cancellazione'),
         content: Text(
+          'Classe: $className\n\n'
           'Eliminare definitivamente:\n\n$labels\n\n'
           'L\'operazione non può essere annullata.',
         ),
@@ -82,7 +112,7 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
     setState(() => _isDeleting = true);
 
     try {
-      await ref.read(dataDeletionServiceProvider).deleteSelected(_selected);
+      await ref.read(dataDeletionServiceProvider).deleteSelected(_selected, classId: _currentClassId);
       if (!mounted) return;
 
       setState(() {
@@ -172,6 +202,8 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
+    final className = _currentClassName ?? 'Classe corrente';
+
     return AppScaffold(
       title: 'Cancella dati',
       child: _isDeleting
@@ -179,6 +211,31 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF174A7E).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF174A7E).withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.class_, color: const Color(0xFF174A7E)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Classe attiva: $className',
+                          style: const TextStyle(
+                            color: Color(0xFF174A7E),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -193,8 +250,8 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Scegli cosa eliminare. I dati non vengono inviati online: '
-                          'la cancellazione è definitiva sul dispositivo.',
+                          'La cancellazione agisce SOLO sulla classe "$className". '
+                          'I dati di altre classi sul dispositivo non vengono toccati.',
                           style: TextStyle(
                             color: isDark ? colorScheme.onErrorContainer : Colors.red.shade900,
                             height: 1.4,

@@ -277,6 +277,34 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
   Widget _buildIndexPhase() {
     return Column(
       children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF174A7E).withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF174A7E).withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.class_, color: const Color(0xFF174A7E), size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'I dati ricevuti verranno inseriti nella classe attualmente aperta.',
+                      style: TextStyle(fontSize: 13, color: const Color(0xFF174A7E)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
         _InfoBanner(
           icon: Icons.qr_code_2_rounded,
           message: 'Mostra questo QR code al mittente\nper consentirgli di confrontare i database',

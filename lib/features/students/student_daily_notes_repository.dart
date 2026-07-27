@@ -40,15 +40,53 @@ class StudentDailyNotesRepository {
     final id = note.id.isEmpty
         ? LocalDatabase.newId('student_daily_note')
         : note.id;
-    final data = note.toMap();
+    final code = note.classUniqueCode ?? _lookupClassUniqueCode(note);
+    final data = note.copyWith(classUniqueCode: code).toMap();
     data['lastModifiedBy'] = getCurrentCatechistName();
     await _box.put(id, data);
   }
 
   Future<void> updateNote(String id, StudentDailyNote note) async {
-    final data = note.toMap();
+    final existing = _box.get(id);
+    String? existingCode;
+    if (existing != null) {
+      final map = LocalDatabase.toStringDynamicMap(existing);
+      existingCode = map['classUniqueCode'];
+    }
+    final code = note.classUniqueCode ?? existingCode ?? _lookupClassUniqueCode(note);
+    final data = note.copyWith(classUniqueCode: code).toMap();
     data['lastModifiedBy'] = getCurrentCatechistName();
     await _box.put(id, data);
+  }
+
+  /// Cerca il classUniqueCode a partire dal meeting o dallo studente.
+  String? _lookupClassUniqueCode(StudentDailyNote note) {
+    // Prova dal meeting
+    final meetingData = LocalDatabase.planning().get(note.meetingId);
+    if (meetingData != null) {
+      final meetingMap = LocalDatabase.toStringDynamicMap(meetingData);
+      final meetingCode = meetingMap['classUniqueCode'] as String?;
+      if (meetingCode != null && meetingCode.isNotEmpty) return meetingCode;
+      final classId = meetingMap['classId'] as String?;
+      if (classId != null && classId.isNotEmpty) {
+        final classData = LocalDatabase.classes().get(classId);
+        if (classData != null) {
+          final classMap = LocalDatabase.toStringDynamicMap(classData);
+          final code = classMap['uniqueCode'] as String?;
+          if (code != null && code.isNotEmpty) return code;
+        }
+      }
+    }
+    // Fallback dallo studente
+    final studentData = LocalDatabase.students().get(note.studentId);
+    if (studentData == null) return null;
+    final studentMap = LocalDatabase.toStringDynamicMap(studentData);
+    final classId = studentMap['classId'] as String?;
+    if (classId == null || classId.isEmpty) return null;
+    final classData = LocalDatabase.classes().get(classId);
+    if (classData == null) return null;
+    final classMap = LocalDatabase.toStringDynamicMap(classData);
+    return classMap['uniqueCode'] as String?;
   }
 
   Future<void> deleteNote(String id) async {

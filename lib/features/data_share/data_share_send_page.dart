@@ -262,6 +262,34 @@ class _DataShareSendPageState extends ConsumerState<DataShareSendPage> {
 
     return Column(
       children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF174A7E).withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF174A7E).withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.class_, color: const Color(0xFF174A7E), size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'I dati inviati verranno inseriti nella classe attualmente aperta sul ricevente.',
+                      style: TextStyle(fontSize: 13, color: const Color(0xFF174A7E)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
         _InfoBanner(
           icon: Icons.camera_alt_rounded,
           message: 'Inquadra il QR code dell\'indice mostrato dal ricevente',

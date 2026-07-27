@@ -1,6 +1,8 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive/hive.dart';
 import '../core/providers/nearby_sync_provider.dart';
 import '../features/sync/p2p/p2p_sync_service.dart';
 
@@ -51,18 +53,66 @@ class _SyncProgressOverlayState extends ConsumerState<SyncProgressOverlay> {
     }
   }
 
+  String _getCurrentClassName() {
+    try {
+      final box = Hive.box<Map>('classes_box');
+      const uid = 'local_catechist_id';
+      for (final key in box.keys) {
+        final data = Map<String, dynamic>.from(box.get(key) as Map);
+        final ids = (data['catechistIds'] as List? ?? []).map((e) => e.toString()).toList();
+        if (ids.contains(uid)) {
+          return data['name']?.toString() ?? 'Classe';
+        }
+      }
+    } catch (_) {}
+    return 'Classe corrente';
+  }
+
   void _showSyncConfirmation(P2PSyncState state) {
     final service = ref.read(nearbySyncServiceProvider);
+    final className = _getCurrentClassName();
     showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
         return AlertDialog(
           title: const Text('Richiesta di sincronizzazione'),
-          content: Text(
-            '${state.pendingConfirmationDeviceName ?? "Dispositivo sconosciuto"} '
-            'vuole sincronizzare i dati.\n\n'
-            'Vuoi autorizzare la sincronizzazione?',
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${state.pendingConfirmationDeviceName ?? "Dispositivo sconosciuto"} '
+                'vuole sincronizzare i dati.\n\n'
+                'Vuoi autorizzare la sincronizzazione?',
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF174A7E).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.class_, size: 16, color: const Color(0xFF174A7E)),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        'Classe: $className',
+                        style: const TextStyle(fontSize: 13, color: Color(0xFF174A7E), fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'La sincronizzazione Bluetooth avviene solo tra dispositivi della stessa classe.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ],
           ),
           actions: [
             TextButton(
@@ -90,16 +140,49 @@ class _SyncProgressOverlayState extends ConsumerState<SyncProgressOverlay> {
 
   void _showSessionPermission(P2PSyncState state) {
     final service = ref.read(nearbySyncServiceProvider);
+    final className = _getCurrentClassName();
     showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
         return AlertDialog(
           title: const Text('Permesso sincronizzazione'),
-          content: Text(
-            '${state.pendingSessionDeviceName ?? "Un dispositivo"} è nelle vicinanze.\n\n'
-            'Autorizzi la sincronizzazione automatica per questa sessione?\n\n'
-            'Il permesso sarà valido fino alla chiusura dell\'app.',
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${state.pendingSessionDeviceName ?? "Un dispositivo"} è nelle vicinanze.\n\n'
+                'Autorizzi la sincronizzazione automatica per questa sessione?\n\n'
+                'Il permesso sarà valido fino alla chiusura dell\'app.',
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF174A7E).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.class_, size: 16, color: const Color(0xFF174A7E)),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        'Classe: $className',
+                        style: const TextStyle(fontSize: 13, color: Color(0xFF174A7E), fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'La sincronizzazione Bluetooth avviene solo tra dispositivi della stessa classe.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ],
           ),
           actions: [
             TextButton(

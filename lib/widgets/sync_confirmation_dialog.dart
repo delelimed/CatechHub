@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
 
 class SyncConfirmationDialog extends StatelessWidget {
   final String catechistName;
@@ -11,6 +12,21 @@ class SyncConfirmationDialog extends StatelessWidget {
     required this.onAccept,
     required this.onReject,
   });
+
+  static String _getCurrentClassName() {
+    try {
+      final box = Hive.box<Map>('classes_box');
+      const uid = 'local_catechist_id';
+      for (final key in box.keys) {
+        final data = Map<String, dynamic>.from(box.get(key) as Map);
+        final ids = (data['catechistIds'] as List? ?? []).map((e) => e.toString()).toList();
+        if (ids.contains(uid)) {
+          return data['name']?.toString() ?? 'Classe';
+        }
+      }
+    } catch (_) {}
+    return 'Classe corrente';
+  }
 
   static Future<bool?> show(
     BuildContext context, {
@@ -29,6 +45,7 @@ class SyncConfirmationDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final className = _getCurrentClassName();
     return AlertDialog(
       icon: Icon(
         Icons.sync_alt,
@@ -36,9 +53,41 @@ class SyncConfirmationDialog extends StatelessWidget {
         color: Theme.of(context).colorScheme.primary,
       ),
       title: const Text('Sincronizzazione richiesta'),
-      content: Text(
-        'Vuoi sincronizzare i dati con $catechistName?',
-        textAlign: TextAlign.center,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Vuoi sincronizzare i dati con $catechistName?',
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF174A7E).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.class_, size: 16, color: const Color(0xFF174A7E)),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    'Classe: $className',
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF174A7E), fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'La sincronizzazione Bluetooth avviene solo tra dispositivi della stessa classe.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          ),
+        ],
       ),
       actions: [
         TextButton(

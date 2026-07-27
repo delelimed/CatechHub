@@ -1890,6 +1890,14 @@ class P2PSyncService {
       _startContinuousMode();
     }
 
+    final iAmInitiator = localIdentity.deviceId.compareTo(remoteIdentity.deviceId) < 0;
+    if (iAmInitiator) {
+      addLog('INFO', 'Avvio sincronizzazione immediata dopo associazione');
+      await _performBidirectionalSync(endpointId);
+    }
+
+    _ensureLocalCatechistInClasses();
+
     addLog('INFO', 'Associazione completata con successo');
   }
 

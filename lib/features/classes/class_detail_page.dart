@@ -41,89 +41,178 @@ class ClassDetailPage extends ConsumerWidget {
     final studentsAsync = ref.watch(studentsStreamProvider); 
     final catechistsList = ref.watch(catechistsProvider);
 
-    return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF174A7E),
-        foregroundColor: Colors.white,
-        title: const Text('Dettaglio Gruppo'),
+    return classesAsync.when(
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
       ),
-      body: classesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Errore caricamento classi: $err')),
-        data: (classes) {
-          final currentClass = classes.firstWhere(
-            (e) => e.id == classId,
-            orElse: () => SchoolClass(id: '', name: 'Gruppo non trovato', studentIds: [], catechistIds: []),
-          );
+      error: (err, stack) => Scaffold(
+        body: Center(child: Text('Errore caricamento classi: $err')),
+      ),
+      data: (classes) {
+        final currentClass = classes.firstWhere(
+          (e) => e.id == classId,
+          orElse: () => SchoolClass(id: '', name: 'Gruppo non trovato', studentIds: [], catechistIds: []),
+        );
 
-          if (currentClass.id.isEmpty) {
-            return const Center(child: Text('Il gruppo richiesto non esiste più.'));
-          }
+        return Scaffold(
+          backgroundColor: Colors.grey.shade50,
+          appBar: AppBar(
+            backgroundColor: const Color(0xFF174A7E),
+            foregroundColor: Colors.white,
+            title: const Text('Dettaglio Gruppo'),
+            actions: [
+              if (currentClass.id.isNotEmpty)
+                PopupMenuButton<String>(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  onSelected: (value) async {
+                    if (value == 'edit') {
+                      _showEditNameDialog(context, ref, currentClass);
+                    } else if (value == 'delete') {
+                      _showDeleteConfirmation(context, ref, currentClass);
+                    }
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'edit', child: Text('Modifica nome')),
+                    PopupMenuItem(value: 'delete', child: Text('Elimina')),
+                  ],
+                ),
+            ],
+          ),
+          body: currentClass.id.isEmpty
+              ? const Center(child: Text('Il gruppo richiesto non esiste più.'))
+              : studentsAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (err, stack) => Center(child: Text('Errore caricamento ragazzi: $err')),
+                  data: (allStudents) {
+                    final assignedStudents = allStudents
+                        .where((s) => currentClass.studentIds.contains(s.id))
+                        .toList();
 
-          return studentsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (err, stack) => Center(child: Text('Errore caricamento ragazzi: $err')),
-            data: (allStudents) {
-              final assignedStudents = allStudents
-                  .where((s) => currentClass.studentIds.contains(s.id))
-                  .toList();
+                    final assignedCatechists = catechistsList
+                        .where((c) => currentClass.catechistIds.contains(c['id']))
+                        .toList();
 
-              final assignedCatechists = catechistsList
-                  .where((c) => currentClass.catechistIds.contains(c['id']))
-                  .toList();
+                    return ListView(
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        /// Intestazione Gruppo
+                        _HeaderCard(name: currentClass.name),
+                        const SizedBox(height: 20),
 
-              return ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  /// Intestazione Gruppo
-                  _HeaderCard(name: currentClass.name),
-                  const SizedBox(height: 20),
+                        /// Sezione Ragazzi
+                        _SectionTitle(title: 'Ragazzi', count: assignedStudents.length),
+                        const SizedBox(height: 8),
+                        if (assignedStudents.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8.0),
+                            child: Text('Nessun ragazzo assegnato', style: TextStyle(color: Colors.grey)),
+                          ),
+                        ...assignedStudents.map((s) => _PersonCard(title: '${s.name} ${s.surname}', icon: Icons.person)),
+                        const SizedBox(height: 20),
 
-                  /// Sezione Ragazzi
-                  _SectionTitle(title: 'Ragazzi', count: assignedStudents.length),
-                  const SizedBox(height: 8),
-                  if (assignedStudents.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8.0),
-                      child: Text('Nessun ragazzo assegnato', style: TextStyle(color: Colors.grey)),
-                    ),
-                  ...assignedStudents.map((s) => _PersonCard(title: '${s.name} ${s.surname}', icon: Icons.person)),
-                  const SizedBox(height: 20),
+                        /// Sezione Catechisti
+                        _SectionTitle(title: 'Catechisti', count: assignedCatechists.length),
+                        const SizedBox(height: 8),
+                        if (assignedCatechists.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8.0),
+                            child: Text('Nessun catechista assegnato', style: TextStyle(color: Colors.grey)),
+                          ),
+                        ...assignedCatechists.map((c) => _PersonCard(title: c['name'] ?? '', subtitle: c['email'] ?? '', icon: Icons.badge)),
+                        const SizedBox(height: 30),
 
-                  /// Sezione Catechisti
-                  _SectionTitle(title: 'Catechisti', count: assignedCatechists.length),
-                  const SizedBox(height: 8),
-                  if (assignedCatechists.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8.0),
-                      child: Text('Nessun catechista assegnato', style: TextStyle(color: Colors.grey)),
-                    ),
-                  ...assignedCatechists.map((c) => _PersonCard(title: c['name'] ?? '', subtitle: c['email'] ?? '', icon: Icons.badge)),
-                  const SizedBox(height: 30),
+                        /// Pulsante per aprire il BottomSheet di modifica
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF174A7E),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            icon: const Icon(Icons.edit),
+                            label: const Text("Modifica assegnazioni"),
+                            onPressed: () {
+                              _openAssignmentPanel(context, ref, currentClass, allStudents, catechistsList);
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+        );
+      },
+    );
+  }
 
-                  /// Pulsante per aprire il BottomSheet di modifica
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF174A7E),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      icon: const Icon(Icons.edit),
-                      label: const Text("Modifica assegnazioni"),
-                      onPressed: () {
-                        _openAssignmentPanel(context, ref, currentClass, allStudents, catechistsList);
-                      },
-                    ),
-                  ),
-                ],
-              );
+  void _showEditNameDialog(BuildContext context, WidgetRef ref, SchoolClass currentClass) {
+    final controller = TextEditingController(text: currentClass.name);
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Modifica nome gruppo'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: 'Nome gruppo'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annulla'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF174A7E),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              if (controller.text.isNotEmpty) {
+                ref.read(classesRepoProvider).updateClass(
+                      currentClass.id,
+                      currentClass.copyWith(name: controller.text),
+                    );
+              }
+              Navigator.pop(context);
             },
-          );
-        },
+            child: const Text('Salva'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(BuildContext context, WidgetRef ref, SchoolClass currentClass) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Elimina gruppo'),
+        content: Text(
+          'Sei sicuro di voler eliminare "${currentClass.name}"?\n\n'
+          'Verranno eliminati anche i piani di incontro e le presenze associati.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annulla'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              ref.read(classesRepoProvider).deleteClass(currentClass.id);
+              Navigator.pop(context);
+            },
+            child: const Text('Elimina'),
+          ),
+        ],
       ),
     );
   }

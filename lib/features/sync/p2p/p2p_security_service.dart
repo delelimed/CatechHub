@@ -12,30 +12,56 @@ import '../../../core/storage/local_database.dart';
 class P2PIdentity {
   final String deviceId;
   final String deviceName;
+  final String username;
   final String publicKeyBase64;
   final String fingerprint;
+  final String connectionEndpoint;
 
   const P2PIdentity({
     required this.deviceId,
     required this.deviceName,
+    required this.username,
     required this.publicKeyBase64,
     required this.fingerprint,
+    required this.connectionEndpoint,
   });
 
   Map<String, dynamic> toJson() => {
         'deviceId': deviceId,
         'deviceName': deviceName,
+        'username': username,
         'publicKey': publicKeyBase64,
         'fingerprint': fingerprint,
-        'v': 2,
+        'endpoint': connectionEndpoint,
+        'v': 3,
       };
 
-  factory P2PIdentity.fromJson(Map<String, dynamic> json) => P2PIdentity(
-        deviceId: json['deviceId'] as String,
-        deviceName: json['deviceName'] as String? ?? '',
-        publicKeyBase64: json['publicKey'] as String,
-        fingerprint: json['fingerprint'] as String,
-      );
+  factory P2PIdentity.fromJson(Map<String, dynamic> json) {
+    final ver = json['v'] as int? ?? 1;
+    String deviceId = json['deviceId'] as String;
+    String deviceName = json['deviceName'] as String? ?? '';
+    String username = json['username'] as String? ?? deviceName;
+    String publicKey = json['publicKey'] as String;
+    String fingerprint = json['fingerprint'] as String;
+    String endpoint = json['endpoint'] as String? ?? deviceId;
+
+    if (ver < 2) {
+      deviceName = json['deviceName'] as String? ?? '';
+      username = deviceName;
+    }
+    if (ver < 3) {
+      endpoint = deviceId;
+    }
+
+    return P2PIdentity(
+      deviceId: deviceId,
+      deviceName: deviceName,
+      username: username,
+      publicKeyBase64: publicKey,
+      fingerprint: fingerprint,
+      connectionEndpoint: endpoint,
+    );
+  }
 
   String encode() => base64Encode(utf8.encode(jsonEncode(toJson())));
 
@@ -267,17 +293,39 @@ class P2PSecurityService {
     final deviceId =
         'CH_${DateTime.now().microsecondsSinceEpoch}_${_randomHex(6)}';
     final deviceName = await _getDeviceDisplayName();
+    final username = await _getUsername();
     final fingerprint = await _computeFingerprint(publicKey);
 
     final identity = P2PIdentity(
       deviceId: deviceId,
       deviceName: deviceName,
+      username: username,
       publicKeyBase64: base64Encode(publicKey.bytes),
       fingerprint: fingerprint,
+      connectionEndpoint: deviceId,
     );
     await _secureStorage.write(
         key: _localIdentityKey, value: jsonEncode(identity.toJson()));
     return identity;
+  }
+
+  Future<String> _getUsername() async {
+    try {
+      final authBox = Hive.box('registroBox');
+      final name = authBox.get('local_user_name');
+      if (name != null && name.toString().trim().isNotEmpty) {
+        return name.toString().trim();
+      }
+    } catch (_) {}
+    try {
+      final authBox = Hive.box('registroBox');
+      final first = authBox.get('first_name');
+      final last = authBox.get('last_name');
+      if (first != null && last != null) {
+        return '$first $last';
+      }
+    } catch (_) {}
+    return '';
   }
 
   Future<String> _getDeviceDisplayName() async {
@@ -307,12 +355,15 @@ class P2PSecurityService {
     try {
       final identity = await getLocalIdentity();
       final newName = await _getDeviceDisplayName();
-      if (identity.deviceName != newName) {
+      final newUsername = await _getUsername();
+      if (identity.deviceName != newName || identity.username != newUsername) {
         final updated = P2PIdentity(
           deviceId: identity.deviceId,
           deviceName: newName,
+          username: newUsername,
           publicKeyBase64: identity.publicKeyBase64,
           fingerprint: identity.fingerprint,
+          connectionEndpoint: identity.deviceId,
         );
         await _secureStorage.write(
           key: _localIdentityKey,
@@ -320,6 +371,19 @@ class P2PSecurityService {
         );
       }
     } catch (_) {}
+  }
+
+  Future<String> generateQrPayload() async {
+    final identity = await getLocalIdentity();
+    final updated = P2PIdentity(
+      deviceId: identity.deviceId,
+      deviceName: identity.deviceName,
+      username: identity.username,
+      publicKeyBase64: identity.publicKeyBase64,
+      fingerprint: identity.fingerprint,
+      connectionEndpoint: identity.deviceId,
+    );
+    return updated.encode();
   }
 
   Future<String> getPublicKeyBase64() async {
@@ -331,11 +395,6 @@ class P2PSecurityService {
   Future<String> getFingerprint() async {
     final identity = await getLocalIdentity();
     return identity.fingerprint;
-  }
-
-  Future<String> generateQrPayload() async {
-    final identity = await getLocalIdentity();
-    return identity.encode();
   }
 
   static P2PIdentity? parseQrPayload(String raw) {

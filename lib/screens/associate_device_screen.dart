@@ -6,12 +6,43 @@ import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../core/auth/auth_service.dart';
 import '../core/providers/nearby_sync_provider.dart';
 import '../core/storage/local_database.dart';
 import '../features/sync/p2p/p2p_sync_service.dart';
 import '../features/sync/p2p/p2p_security_service.dart';
 
-enum _AssociationStep { roleChoice, actionChoice, scanQr, showQr, complete }
+class P2PIdentityWithConnection extends P2PIdentity {
+  const P2PIdentityWithConnection({
+    required super.deviceId,
+    required super.deviceName,
+    required super.username,
+    required super.publicKeyBase64,
+    required super.fingerprint,
+    required super.connectionEndpoint,
+  });
+
+  factory P2PIdentityWithConnection.fromIdentity(P2PIdentity id) =>
+      P2PIdentityWithConnection(
+        deviceId: id.deviceId,
+        deviceName: id.deviceName,
+        username: id.username,
+        publicKeyBase64: id.publicKeyBase64,
+        fingerprint: id.fingerprint,
+        connectionEndpoint: id.connectionEndpoint,
+      );
+}
+
+enum _AssociationStep {
+  roleChoice,
+  showQrAndWait,
+  scanFirstQr,
+  showSecondQr,
+  scanSecondQr,
+  pairingCodeVerification,
+  onboardingSync,
+  complete,
+}
 
 class AssociateDeviceScreen extends ConsumerStatefulWidget {
   const AssociateDeviceScreen({super.key});
@@ -27,23 +58,29 @@ class _AssociateDeviceScreenState
 
   _AssociationStep _currentStep = _AssociationStep.roleChoice;
 
-  P2PSyncRole _selectedRole = P2PSyncRole.mioDispositivo;
+  bool _isFirstToShowQr = false;
 
-  bool _choseScanFirst = false;
+  P2PSyncRole _selectedRole = P2PSyncRole.mioDispositivo;
+  bool _isOnboarding = true;
 
   String? _qrData;
   String? _errorMessage;
   String? _successMessage;
 
   MobileScannerController? _scannerController;
-  String? _lastScannedDeviceName;
-  String? _scannedDeviceId;
-  bool _qrScanned = false;
+
+  P2PIdentityWithConnection? _remoteIdentity;
+  P2PIdentityWithConnection? _localIdentity;
 
   bool _isPairing = false;
-  bool _p2pComplete = false;
+  bool _pairingComplete = false;
   Timer? _pairingTimeoutTimer;
   StreamSubscription<P2PSyncState>? _p2pStateSub;
+  bool _pairingDialogShown = false;
+
+  String? _pairingCode;
+
+  bool _awaitingVerification = false;
 
   @override
   void initState() {
@@ -62,9 +99,11 @@ class _AssociateDeviceScreenState
 
   Future<void> _initData() async {
     try {
+      final identity = await _security.getLocalIdentity();
       final qrData = await _generateQrData();
       if (mounted) {
         setState(() {
+          _localIdentity = P2PIdentityWithConnection.fromIdentity(identity);
           _qrData = qrData;
         });
       }
@@ -83,31 +122,30 @@ class _AssociateDeviceScreenState
     ref.read(nearbySyncServiceProvider).setRole(role);
   }
 
-  void _proceedToActionChoice() {
+  void _setOnboarding(bool onboarding) {
     setState(() {
-      _currentStep = _AssociationStep.actionChoice;
-      _errorMessage = null;
+      _isOnboarding = onboarding;
     });
-  }
-
-  void _chooseScanFirst() {
-    setState(() {
-      _choseScanFirst = true;
-      _currentStep = _AssociationStep.scanQr;
-      _errorMessage = null;
-      _successMessage = null;
-    });
-    _openScanner();
   }
 
   void _chooseShowQrFirst() {
+    _isFirstToShowQr = true;
     setState(() {
-      _choseScanFirst = false;
-      _currentStep = _AssociationStep.showQr;
       _errorMessage = null;
       _successMessage = null;
+      _currentStep = _AssociationStep.showQrAndWait;
     });
-    _startShowQrWithP2p();
+    _startAdvertiseOnly();
+  }
+
+  void _chooseScanFirst() {
+    _isFirstToShowQr = false;
+    setState(() {
+      _errorMessage = null;
+      _successMessage = null;
+      _currentStep = _AssociationStep.scanFirstQr;
+    });
+    _openScanner();
   }
 
   void _openScanner() {
@@ -138,11 +176,12 @@ class _AssociateDeviceScreenState
       _currentStep = _AssociationStep.roleChoice;
       _errorMessage = null;
       _successMessage = null;
-      _lastScannedDeviceName = null;
-      _scannedDeviceId = null;
-      _qrScanned = false;
+      _remoteIdentity = null;
       _isPairing = false;
-      _p2pComplete = false;
+      _pairingComplete = false;
+      _pairingCode = null;
+      _awaitingVerification = false;
+      _pairingDialogShown = false;
     });
   }
 
@@ -152,22 +191,34 @@ class _AssociateDeviceScreenState
     } catch (_) {}
   }
 
-  void _startShowQrWithP2p() {
-    _p2pComplete = false;
-    _isPairing = false;
-    _qrScanned = false;
-    _watchP2pState();
-    _startP2pPairing();
-  }
-
-  void _startScanFirstP2p() {
-    _p2pComplete = false;
+  void _startAdvertiseOnly() {
+    _pairingComplete = false;
     _isPairing = false;
     _watchP2pState();
-    _startP2pPairing();
+    _startP2pAdvertiseOnly();
   }
 
-  bool _pairingDialogShown = false;
+  void _startDiscoverOnly(String targetEndpoint) {
+    _pairingComplete = false;
+    _isPairing = false;
+    _watchP2pState();
+    ref.read(nearbySyncServiceProvider).startPairingDiscoverOnly(targetEndpoint);
+  }
+
+  void _startP2pAdvertiseOnly() {
+    if (_isPairing) return;
+    _isPairing = true;
+    ref.read(nearbySyncServiceProvider).startPairingAdvertiseOnly();
+    _pairingTimeoutTimer = Timer(const Duration(seconds: 120), () {
+      if (mounted && !_pairingComplete) {
+        setState(() {
+          _errorMessage = 'Tempo scaduto. Nessun dispositivo si è connesso.';
+          _isPairing = false;
+        });
+        _stopP2pPairing();
+      }
+    });
+  }
 
   void _watchP2pState() {
     _p2pStateSub?.cancel();
@@ -176,69 +227,52 @@ class _AssociateDeviceScreenState
     _p2pStateSub = service.onStateChanged.listen((state) {
       if (!mounted) return;
 
-      final step = _currentStep;
-
-      if (state.status == P2PSyncStatus.sessionEstablished ||
-          state.status == P2PSyncStatus.completed ||
-          state.status == P2PSyncStatus.syncing) {
-
-        if (_p2pComplete) return;
+      if (state.status == P2PSyncStatus.sessionEstablished) {
         _pairingTimeoutTimer?.cancel();
 
-        if (_choseScanFirst &&
-            step == _AssociationStep.showQr &&
-            !state.authenticatedByRemote) {
-          return;
+        if (_isFirstToShowQr &&
+            _currentStep == _AssociationStep.showQrAndWait) {
+          _onConnectionReceivedByQrHost();
+        } else if (!_isFirstToShowQr &&
+            _currentStep == _AssociationStep.scanFirstQr) {
+          _onConnectedByScanner();
         }
 
-        if (!_choseScanFirst &&
-            step == _AssociationStep.showQr &&
-            state.status == P2PSyncStatus.sessionEstablished &&
-            !state.authenticatedByRemote) {
-          return;
-        }
-
-        if (step == _AssociationStep.showQr && _choseScanFirst) {
-          _p2pComplete = true;
-          setState(() {
-            _currentStep = _AssociationStep.complete;
-            _successMessage = _lastScannedDeviceName != null
-                ? 'Dispositivo associato: $_lastScannedDeviceName'
-                : 'Associazione completata!';
-            _errorMessage = null;
-            _isPairing = false;
-          });
-        } else if (step == _AssociationStep.scanQr && !_choseScanFirst) {
-          _p2pComplete = true;
-          setState(() {
-            _currentStep = _AssociationStep.complete;
-            _successMessage = _lastScannedDeviceName != null
-                ? 'Dispositivo associato: $_lastScannedDeviceName'
-                : 'Associazione completata!';
-            _errorMessage = null;
-            _isPairing = false;
-          });
-        } else if (step == _AssociationStep.showQr && !_choseScanFirst && state.authenticatedByRemote) {
-          _p2pComplete = true;
-          setState(() {
-            _currentStep = _AssociationStep.complete;
-            _successMessage = _lastScannedDeviceName != null
-                ? 'Dispositivo associato: $_lastScannedDeviceName'
-                : 'Associazione completata!';
-            _errorMessage = null;
-            _isPairing = false;
-          });
+        if (_isFirstToShowQr &&
+            _currentStep == _AssociationStep.scanSecondQr &&
+            _awaitingVerification) {
+          _onSecondQrScannedComplete();
         }
       } else if (state.status == P2PSyncStatus.pairingVerification) {
-        if (step == _AssociationStep.showQr && !_pairingDialogShown) {
+        if (!_pairingDialogShown && !_pairingComplete) {
           _pairingDialogShown = true;
           _pairingTimeoutTimer?.cancel();
           if (state.pairingCode != null) {
-            _showPairingCodeDialog(service, state.pairingCode!);
+            setState(() {
+              _pairingCode = state.pairingCode;
+              _currentStep = _AssociationStep.pairingCodeVerification;
+            });
           }
         }
+      } else if (state.status == P2PSyncStatus.onboardingSync) {
+        if (_pairingComplete) return;
+        setState(() {
+          _currentStep = _AssociationStep.onboardingSync;
+          _successMessage = 'Sincronizzazione dati in corso...';
+        });
+      } else if (state.status == P2PSyncStatus.completed) {
+        if (_pairingComplete) return;
+        _pairingComplete = true;
+        setState(() {
+          _currentStep = _AssociationStep.complete;
+          _successMessage = _remoteIdentity != null
+              ? 'Associazione completata con ${_remoteIdentity!.username}'
+              : 'Associazione completata!';
+          _errorMessage = null;
+          _isPairing = false;
+        });
       } else if (state.status == P2PSyncStatus.error) {
-        if (!_p2pComplete && _isPairing) {
+        if (!_pairingComplete && _isPairing) {
           setState(() {
             _errorMessage = state.errorMessage ?? 'Errore di connessione.';
             _isPairing = false;
@@ -248,7 +282,139 @@ class _AssociateDeviceScreenState
     });
   }
 
-  void _showPairingCodeDialog(P2PSyncService service, String code) {
+  void _onConnectionReceivedByQrHost() {
+    addLog('INFO', 'Connessione ricevuta! Passo alla scansione del QR partner.');
+    setState(() {
+      _successMessage = 'Dispositivo connesso! Ora inquadra il QR del partner.';
+      _currentStep = _AssociationStep.scanSecondQr;
+    });
+    _openScanner();
+  }
+
+  void _onConnectedByScanner() {
+    addLog('INFO', 'Connessione stabilita! Mostro il mio QR per lo scambio chiavi.');
+    setState(() {
+      _successMessage = 'Connesso! Mostra questo QR al partner.';
+      _currentStep = _AssociationStep.showSecondQr;
+    });
+  }
+
+  Future<void> _onQrScanned(BarcodeCapture capture) async {
+    for (final barcode in capture.barcodes) {
+      final raw = barcode.rawValue;
+      if (raw == null || raw.isEmpty) continue;
+
+      final remoteIdentity = P2PSecurityService.parseQrPayload(raw);
+      if (remoteIdentity == null) {
+        setState(() => _errorMessage = 'QR code non valido.');
+        return;
+      }
+
+      if (_remoteIdentity != null &&
+          _remoteIdentity!.deviceId == remoteIdentity.deviceId) {
+        return;
+      }
+
+      final remoteWithConn =
+          P2PIdentityWithConnection.fromIdentity(remoteIdentity);
+
+      if (mounted) {
+        setState(() {
+          _remoteIdentity = remoteWithConn;
+          _errorMessage = null;
+        });
+      }
+
+      if (_isFirstToShowQr) {
+        await _onSecondQrScanned(remoteWithConn);
+      } else {
+        await _onFirstQrScanned(remoteWithConn);
+      }
+      return;
+    }
+  }
+
+  Future<void> _onFirstQrScanned(
+      P2PIdentityWithConnection remote) async {
+    addLog('INFO', 'Primo QR scansionato: ${remote.username} (${remote.deviceId})');
+
+    _stopScanner();
+
+    final existing = await _security.getAssociation(remote.deviceId);
+    if (existing != null && existing.isValid) {
+      if (mounted) {
+        setState(() => _errorMessage = 'Dispositivo già associato.');
+      }
+      return;
+    }
+
+    final remotePublicKey = remote.publicKeyBase64;
+    final sharedSecret =
+        await _security.computeStaticSharedSecret(remotePublicKey);
+
+    final service = ref.read(nearbySyncServiceProvider);
+    await service.storePendingAssociation(
+      deviceId: remote.deviceId,
+      deviceName: remote.deviceName,
+      publicKeyBase64: remotePublicKey,
+      fingerprint: remote.fingerprint,
+      sharedSecretBase64: sharedSecret,
+    );
+
+    if (mounted) {
+      setState(() {
+        _successMessage =
+            'QR scansionato! Mi connetto a ${remote.username}...';
+      });
+    }
+
+    _startDiscoverOnly(remote.connectionEndpoint);
+  }
+
+  Future<void> _onSecondQrScanned(
+      P2PIdentityWithConnection remote) async {
+    addLog('INFO',
+        'Secondo QR scansionato: ${remote.username} (${remote.deviceId})');
+
+    _stopScanner();
+
+    final existing = await _security.getAssociation(remote.deviceId);
+    if (existing != null && existing.isValid) {
+      if (mounted) {
+        setState(() => _errorMessage = 'Dispositivo già associato.');
+      }
+      return;
+    }
+
+    final remotePublicKey = remote.publicKeyBase64;
+    final sharedSecret =
+        await _security.computeStaticSharedSecret(remotePublicKey);
+
+    final service = ref.read(nearbySyncServiceProvider);
+    await service.storePendingAssociation(
+      deviceId: remote.deviceId,
+      deviceName: remote.deviceName,
+      publicKeyBase64: remotePublicKey,
+      fingerprint: remote.fingerprint,
+      sharedSecretBase64: sharedSecret,
+    );
+
+    if (mounted) {
+      setState(() {
+        _successMessage = 'QR scansionato! Codice di verifica in arrivo...';
+      });
+    }
+
+    _awaitingVerification = true;
+
+    await service.completePairingAfterQrScan(remote.deviceId);
+  }
+
+  void _onSecondQrScannedComplete() {
+    addLog('INFO', 'Secondo QR scan completato, attesa verifica pairing');
+  }
+
+  void _showPairingCodeDialog() {
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -265,13 +431,14 @@ class _AssociateDeviceScreenState
               ),
               const SizedBox(height: 20),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  code,
+                  _pairingCode ?? '',
                   style: TextStyle(
                     fontSize: 36,
                     fontWeight: FontWeight.bold,
@@ -293,24 +460,15 @@ class _AssociateDeviceScreenState
             TextButton(
               onPressed: () {
                 Navigator.of(ctx).pop();
-                service.rejectPairingCode();
+                _rejectPairing();
               },
               child: const Text('Codici DIVERSI, Annulla',
                   style: TextStyle(color: Colors.red)),
             ),
             FilledButton(
-              onPressed: () async {
+              onPressed: () {
                 Navigator.of(ctx).pop();
-                await service.confirmPairingCode();
-                if (_choseScanFirst) {
-                  if (mounted) {
-                    setState(() {
-                      _successMessage = 'Codice verificato! Mostra il QR per il partner.';
-                    });
-                  }
-                } else {
-                  _autoSwitchToScanner();
-                }
+                _confirmPairingCodeAndSync();
               },
               child: const Text('Codici corrispondono'),
             ),
@@ -320,132 +478,121 @@ class _AssociateDeviceScreenState
     );
   }
 
-  void _autoSwitchToScanner() {
+  Future<void> _confirmPairingCodeAndSync() async {
+    final service = ref.read(nearbySyncServiceProvider);
+
+    if (_pairingCode != null &&
+        service.currentState.status == P2PSyncStatus.pairingVerification) {
+      await service.confirmPairingCode();
+    }
+
+    setState(() {
+      _currentStep = _AssociationStep.onboardingSync;
+      _successMessage = 'Sincronizzazione dati classe in corso...';
+    });
+
+    addLog('INFO', 'Codice verificato, avvio onboarding sync');
+
+    if (_isOnboarding) {
+      await _performOnboardingSync();
+    } else {
+      await _registerCatechistInClass();
+    }
+
     if (mounted) {
       setState(() {
-        _currentStep = _AssociationStep.scanQr;
+        _currentStep = _AssociationStep.complete;
+        _pairingComplete = true;
+        _successMessage = _remoteIdentity != null
+            ? 'Associazione completata con ${_remoteIdentity!.username}'
+            : 'Associazione completata!';
         _errorMessage = null;
-        _successMessage = 'QR rilevato! Ora inquadra il QR partner.';
+        _isPairing = false;
       });
-      _openScanner();
     }
   }
 
-  void _startP2pPairing() {
-    if (_isPairing) return;
-    _isPairing = true;
-    ref.read(nearbySyncServiceProvider).startPairingMode();
-    _pairingTimeoutTimer = Timer(const Duration(seconds: 120), () {
-      if (mounted && !_p2pComplete) {
-        setState(() {
-          _errorMessage =
-              'Tempo scaduto. Assicurati che l\'altro dispositivo '
-              'abbia scansionato il tuo QR.';
-          _isPairing = false;
-        });
-        _stopP2pPairing();
-      }
-    });
+  Future<void> _rejectPairing() async {
+    final service = ref.read(nearbySyncServiceProvider);
+    await service.rejectPairingCode();
+    _resetWizard();
   }
 
-  Future<void> _onQrScanned(BarcodeCapture capture) async {
-    for (final barcode in capture.barcodes) {
-      final raw = barcode.rawValue;
-      if (raw == null || raw.isEmpty) continue;
+  Future<void> _performOnboardingSync() async {
+    addLog('INFO', 'Avvio download dati classe (onboarding)');
 
-      if (_scannedDeviceId != null) {
-        final sameDevice =
-            P2PSecurityService.parseQrPayload(raw)?.deviceId == _scannedDeviceId;
-        if (sameDevice) return;
-      }
+    final service = ref.read(nearbySyncServiceProvider);
 
-      final remoteIdentity = P2PSecurityService.parseQrPayload(raw);
-      if (remoteIdentity == null) {
-        setState(() => _errorMessage = 'QR code non valido.');
+    try {
+      final endpointId = service.currentState.connectedDeviceId;
+      if (endpointId == null) {
+        addLog('ERROR', 'Nessun endpoint connesso per onboarding sync');
         return;
       }
 
-      final existing =
-          await _security.getAssociation(remoteIdentity.deviceId);
+      await service.triggerManualSync();
 
-      if (mounted) {
-        setState(() {
-          _lastScannedDeviceName = remoteIdentity.deviceName;
-          _scannedDeviceId = remoteIdentity.deviceId;
-          _qrScanned = true;
-          _errorMessage = null;
-        });
+      for (int i = 0; i < 60; i++) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        final state = service.currentState;
+        if (state.status == P2PSyncStatus.completed) break;
       }
 
-      if (_choseScanFirst) {
-        _stopScanner();
-        if (mounted) {
-          setState(() {
-            _currentStep = _AssociationStep.showQr;
-          });
-          _startScanFirstP2p();
-        }
-      } else {
-        if (existing == null) {
-          try {
-            final syncService = ref.read(nearbySyncServiceProvider);
-            final localRole = syncService.currentState.role.name;
+      _ensureLocalCatechistInClass();
 
-            final sharedSecret = await _security.computeStaticSharedSecret(
-                remoteIdentity.publicKeyBase64);
-
-            await _security.registerAndSaveAssociation(
-              deviceId: remoteIdentity.deviceId,
-              deviceName: remoteIdentity.deviceName,
-              publicKeyBase64: remoteIdentity.publicKeyBase64,
-              fingerprint: remoteIdentity.fingerprint,
-              sharedSecretBase64: sharedSecret,
-              localRole: localRole,
-            );
-          } catch (e) {
-            if (mounted) {
-              setState(() => _errorMessage = 'Errore salvataggio associazione: $e');
-            }
-            return;
-          }
-        }
-
-        _stopScanner();
-
-        if (mounted) {
-          final service = ref.read(nearbySyncServiceProvider);
-          final currentState = service.currentState;
-          if (currentState.status ==
-              P2PSyncStatus.pairingVerification) {
-            await service.confirmPairingCode();
-          } else if (currentState.connectedDeviceId != null &&
-              _scannedDeviceId != null) {
-            await service.finalizeAssociation(
-              currentState.connectedDeviceId!,
-              _scannedDeviceId!,
-            );
-          } else {
-            service.addLog('WARN',
-                'Stato inatteso: ${currentState.status}, '
-                'connectedDeviceId=${currentState.connectedDeviceId}, '
-                'scannedDeviceId=$_scannedDeviceId');
-            if (currentState.connectedDeviceId != null) {
-              await service.finalizeAssociation(
-                currentState.connectedDeviceId!,
-                remoteIdentity.deviceId,
-              );
-            }
-          }
-          setState(() {
-            _currentStep = _AssociationStep.complete;
-            _successMessage =
-                'Dispositivo associato: ${remoteIdentity.deviceName}';
-          });
-        }
-      }
-
-      return;
+      addLog('INFO', 'Onboarding sync completato');
+    } catch (e) {
+      addLog('ERROR', 'Errore durante onboarding sync: $e');
     }
+  }
+
+  Future<void> _registerCatechistInClass() async {
+    addLog('INFO', 'Registro nuovo catechista nella classe');
+    _ensureLocalCatechistInClass();
+  }
+
+  void _ensureLocalCatechistInClass() {
+    try {
+      final box = LocalDatabase.classes();
+      const localId = AuthService.localUserId;
+      if (_remoteIdentity != null) {
+        final remoteDeviceId = _remoteIdentity!.deviceId;
+        for (final key in box.keys) {
+          final data = LocalDatabase.toStringDynamicMap(box.get(key));
+          final ids = (data['catechistIds'] as List? ?? [])
+              .map((e) => e.toString())
+              .toList();
+          if (!ids.contains(remoteDeviceId)) {
+            ids.add(remoteDeviceId);
+            data['catechistIds'] = ids;
+            box.put(key, data);
+            addLog('INFO',
+                'Aggiunto catechista remoto ${_remoteIdentity!.username} alla classe ${data['name']}');
+          }
+        }
+      }
+      for (final key in box.keys) {
+        final data = LocalDatabase.toStringDynamicMap(box.get(key));
+        final ids = (data['catechistIds'] as List? ?? [])
+            .map((e) => e.toString())
+            .toList();
+        if (!ids.contains(localId)) {
+          ids.add(localId);
+          data['catechistIds'] = ids;
+          box.put(key, data);
+          addLog('INFO',
+              'Aggiunto catechista locale alla classe ${data['name']}');
+        }
+      }
+    } catch (e) {
+      addLog('ERROR', 'Errore _ensureLocalCatechistInClass: $e');
+    }
+  }
+
+  void addLog(String level, String message) {
+    try {
+      ref.read(nearbySyncServiceProvider).addLog(level, message);
+    } catch (_) {}
   }
 
   @override
@@ -458,14 +605,12 @@ class _AssociateDeviceScreenState
         title: const Text('Associa Dispositivo',
             style: TextStyle(color: Colors.white)),
         backgroundColor: colorScheme.primary,
-        actions: [
-          if (_currentStep != _AssociationStep.roleChoice)
-            IconButton(
-              icon: const Icon(Icons.refresh, color: Colors.white),
-              onPressed: _resetWizard,
-              tooltip: 'Ricomincia',
-            ),
-        ],
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: _currentStep == _AssociationStep.roleChoice
+              ? () => Navigator.of(context).pop()
+              : _resetWizard,
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -489,25 +634,25 @@ class _AssociateDeviceScreenState
   }
 
   Widget _buildStepIndicator(ThemeData theme) {
-    final steps = [
-      _AssociationStep.roleChoice,
-      _AssociationStep.actionChoice,
-      _choseScanFirst
-          ? _AssociationStep.scanQr
-          : _AssociationStep.showQr,
-      _choseScanFirst
-          ? _AssociationStep.showQr
-          : _AssociationStep.scanQr,
-      _AssociationStep.complete,
-    ];
+    final steps = _isFirstToShowQr
+        ? [
+            _AssociationStep.showQrAndWait,
+            _AssociationStep.scanSecondQr,
+            _AssociationStep.pairingCodeVerification,
+            _AssociationStep.onboardingSync,
+            _AssociationStep.complete,
+          ]
+        : [
+            _AssociationStep.scanFirstQr,
+            _AssociationStep.showSecondQr,
+            _AssociationStep.pairingCodeVerification,
+            _AssociationStep.onboardingSync,
+            _AssociationStep.complete,
+          ];
 
-    final labels = [
-      'Ruolo',
-      'Azione',
-      _choseScanFirst ? 'Scansiona' : 'Mostra QR',
-      _choseScanFirst ? 'Mostra QR' : 'Scansiona',
-      'Completato',
-    ];
+    final labels = _isFirstToShowQr
+        ? ['Mostra QR', 'Scansiona', 'Verifica Codice', 'Sincronizza', 'Fatto']
+        : ['Scansiona', 'Mostra QR', 'Verifica Codice', 'Sincronizza', 'Fatto'];
 
     final currentIndex = steps.indexOf(_currentStep);
 
@@ -583,12 +728,18 @@ class _AssociateDeviceScreenState
     switch (_currentStep) {
       case _AssociationStep.roleChoice:
         return _buildRoleStep(theme, colorScheme);
-      case _AssociationStep.actionChoice:
-        return _buildActionStep(theme, colorScheme);
-      case _AssociationStep.scanQr:
-        return _buildScanStep(theme, colorScheme);
-      case _AssociationStep.showQr:
-        return _buildShowQrStep(theme, colorScheme);
+      case _AssociationStep.showQrAndWait:
+        return _buildShowQrAndWaitStep(theme, colorScheme);
+      case _AssociationStep.scanFirstQr:
+        return _buildScanFirstQrStep(theme, colorScheme);
+      case _AssociationStep.showSecondQr:
+        return _buildShowSecondQrStep(theme, colorScheme);
+      case _AssociationStep.scanSecondQr:
+        return _buildScanSecondQrStep(theme, colorScheme);
+      case _AssociationStep.pairingCodeVerification:
+        return _buildPairingVerificationStep(theme, colorScheme);
+      case _AssociationStep.onboardingSync:
+        return _buildOnboardingSyncStep(theme, colorScheme);
       case _AssociationStep.complete:
         return _buildCompleteStep(theme, colorScheme);
     }
@@ -606,7 +757,7 @@ class _AssociateDeviceScreenState
                 Icon(Icons.person_outline, color: colorScheme.primary, size: 24),
                 const SizedBox(width: 8),
                 Text(
-                  'Scegli il ruolo dei dispositivi',
+                  'Associazione dispositivo',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -615,7 +766,7 @@ class _AssociateDeviceScreenState
             ),
             const SizedBox(height: 4),
             Text(
-              'Entrambi i dispositivi devono avere lo STESSO ruolo.',
+              'Scegli il ruolo e se sei in fase di onboarding.',
               style: TextStyle(color: Colors.grey[600], fontSize: 13),
             ),
             const SizedBox(height: 16),
@@ -635,7 +786,8 @@ class _AssociateDeviceScreenState
                   ),
                   RadioListTile<P2PSyncRole>(
                     title: const Text('Altro Catechista'),
-                    subtitle: const Text('Richiede conferma prima di sincronizzare'),
+                    subtitle: const Text(
+                        'Richiede conferma prima di sincronizzare'),
                     secondary: const Icon(Icons.how_to_reg),
                     value: P2PSyncRole.altroCatechista,
                     contentPadding: EdgeInsets.zero,
@@ -643,14 +795,60 @@ class _AssociateDeviceScreenState
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.info_outline, size: 18, color: Colors.grey[500]),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Sei un nuovo catechista in onboarding?',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              title: const Text('Onboarding'),
+              subtitle: const Text(
+                  'Scarica i dati della classe dal dispositivo che stai associando'),
+              value: _isOnboarding,
+              onChanged: (val) => _setOnboarding(val),
+              contentPadding: EdgeInsets.zero,
+            ),
+            const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: _proceedToActionChoice,
-                icon: const Icon(Icons.arrow_forward),
-                label: const Text('Continua'),
+                onPressed: () {
+                  setState(() {
+                    _currentStep = _AssociationStep.showQrAndWait;
+                    _errorMessage = null;
+                  });
+                  _chooseShowQrFirst();
+                },
+                icon: const Icon(Icons.qr_code),
+                label: const Text('Mostra QR (attendere connessione)'),
                 style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _currentStep = _AssociationStep.scanFirstQr;
+                    _errorMessage = null;
+                  });
+                  _chooseScanFirst();
+                },
+                icon: const Icon(Icons.qr_code_scanner),
+                label: const Text('Scansiona QR partner'),
+                style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
               ),
@@ -661,148 +859,17 @@ class _AssociateDeviceScreenState
     );
   }
 
-  Widget _buildActionStep(ThemeData theme, ColorScheme colorScheme) {
+  Widget _buildShowQrAndWaitStep(ThemeData theme, ColorScheme colorScheme) {
     return Column(
       children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                Icon(Icons.sync_problem, size: 48, color: colorScheme.primary),
-                const SizedBox(height: 12),
-                Text(
-                  'Scegli come procedere',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Coordinati con l\'altro catechista:\n'
-                  'un dispositivo deve scegliere "Scansiona" e l\'altro "Mostra QR".',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Il passaggio da QR a scanner sarà automatico.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey[400], fontSize: 12),
-                ),
-              ],
-            ),
-          ),
+        _buildInfoCard(
+          icon: Icons.qr_code,
+          title: 'Mostra questo QR all\'altro dispositivo',
+          subtitle:
+              'Il tuo dispositivo è in attesa. Non invia richieste.\n'
+              'Quando l\'altro dispositivo scansionerà questo QR\ne si connetterà, potrai scansionare il suo QR.',
+          color: colorScheme.primary,
         ),
-        const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: _chooseScanFirst,
-            icon: const Icon(Icons.qr_code_scanner, size: 22),
-            label: const Text('Scansiona QR partner'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              backgroundColor: colorScheme.primary,
-              foregroundColor: colorScheme.onPrimary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: _chooseShowQrFirst,
-            icon: const Icon(Icons.qr_code, size: 22),
-            label: const Text('Mostra il mio QR'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              foregroundColor: colorScheme.primary,
-              side: BorderSide(color: colorScheme.primary, width: 1.5),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildScanStep(ThemeData theme, ColorScheme colorScheme) {
-    return Column(
-      children: [
-        if (_choseScanFirst) ...[
-          _buildInfoCard(
-            icon: Icons.qr_code_scanner,
-            title: 'Scansiona il QR dell\'altro dispositivo',
-            subtitle: 'Inquadra il QR code mostrato dall\'altro catechista',
-            color: colorScheme.primary,
-          ),
-        ] else ...[
-          _buildInfoCard(
-            icon: Icons.qr_code_scanner,
-            title: 'Ora scansiona il QR partner',
-            subtitle:
-                'Passaggio automatico dopo che l\'altro ha scansionato il tuo QR.',
-            color: Colors.orange,
-          ),
-        ],
-        const SizedBox(height: 16),
-        if (_scannerController != null)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: SizedBox(
-              height: 280,
-              child: MobileScanner(
-                controller: _scannerController!,
-                onDetect: _onQrScanned,
-              ),
-            ),
-          )
-        else
-          const SizedBox(
-            height: 280,
-            child: Center(child: CircularProgressIndicator()),
-          ),
-        if (_choseScanFirst && _qrScanned)
-          Padding(
-            padding: const EdgeInsets.only(top: 16),
-            child: Text(
-              'QR scansionato! Passaggio automatico in corso...',
-              style: TextStyle(color: Colors.green[600], fontSize: 13),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildShowQrStep(ThemeData theme, ColorScheme colorScheme) {
-    return Column(
-      children: [
-        if (_choseScanFirst) ...[
-          _buildInfoCard(
-            icon: Icons.info_outline,
-            title: 'Mostra questo QR all\'altro dispositivo',
-            subtitle: _lastScannedDeviceName != null
-                ? 'Hai già scansionato $_lastScannedDeviceName.\n'
-                    'Ora l\'altro catechista deve scansionare il tuo QR.'
-                : 'In attesa che l\'altro dispositivo scansion il tuo QR...',
-            color: Colors.green,
-          ),
-        ] else ...[
-          _buildInfoCard(
-            icon: Icons.qr_code,
-            title: 'Mostra il tuo QR',
-            subtitle:
-                'Quando l\'altro dispositivo lo scansionerà,\n'
-                'passerai automaticamente alla fotocamera.',
-            color: colorScheme.primary,
-          ),
-        ],
         const SizedBox(height: 16),
         if (_qrData != null)
           Center(
@@ -828,7 +895,25 @@ class _AssociateDeviceScreenState
             ),
           ),
         const SizedBox(height: 16),
-        if (_isPairing && !_p2pComplete) ...[
+        if (_localIdentity != null)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              children: [
+                Text('Utente: ${_localIdentity!.username}',
+                    style: const TextStyle(fontSize: 13)),
+                const SizedBox(height: 4),
+                Text('Dispositivo: ${_localIdentity!.deviceName}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+              ],
+            ),
+          ),
+        if (_isPairing && !_pairingComplete) ...[
+          const SizedBox(height: 16),
           const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -839,13 +924,266 @@ class _AssociateDeviceScreenState
               ),
               SizedBox(width: 10),
               Text(
-                'In attesa connessione...',
+                'In attesa connessione in entrata...',
                 style: TextStyle(color: Colors.grey, fontSize: 13),
               ),
             ],
           ),
         ],
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: _resetWizard,
+            child: const Text('Annulla e ricomincia'),
+          ),
+        ),
       ],
+    );
+  }
+
+  Widget _buildScanFirstQrStep(ThemeData theme, ColorScheme colorScheme) {
+    return Column(
+      children: [
+        _buildInfoCard(
+          icon: Icons.qr_code_scanner,
+          title: 'Scansiona il QR dell\'altro dispositivo',
+          subtitle:
+              'Inquadra il QR code mostrato dall\'altro catechista.\n'
+              'Il QR contiene il nome utente, la chiave pubblica\ne le coordinate per la connessione.',
+          color: colorScheme.primary,
+        ),
+        const SizedBox(height: 16),
+        if (_scannerController != null)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              height: 280,
+              child: MobileScanner(
+                controller: _scannerController!,
+                onDetect: _onQrScanned,
+              ),
+            ),
+          )
+        else
+          const SizedBox(
+            height: 280,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        if (_remoteIdentity != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green[200]!),
+              ),
+              child: Column(
+                children: [
+                  Text('QR scansionato!',
+                      style: TextStyle(
+                          color: Colors.green[700],
+                          fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text('Utente: ${_remoteIdentity!.username}',
+                      style: const TextStyle(fontSize: 13)),
+                  Text('Dispositivo: ${_remoteIdentity!.deviceName}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildShowSecondQrStep(ThemeData theme, ColorScheme colorScheme) {
+    return Column(
+      children: [
+        _buildInfoCard(
+          icon: Icons.qr_code,
+          title: 'Connesso! Mostra ora questo QR',
+          subtitle:
+              'L\'altro dispositivo deve inquadrare questo QR\n'
+              'per completare lo scambio delle chiavi pubbliche.',
+          color: Colors.green,
+        ),
+        const SizedBox(height: 16),
+        if (_qrData != null)
+          Center(
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: QrImageView(
+                data: _qrData!,
+                version: QrVersions.auto,
+                size: 220,
+                backgroundColor: Colors.white,
+              ),
+            ),
+          ),
+        const SizedBox(height: 16),
+        if (_isPairing && !_pairingComplete)
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: 10),
+              Text(
+                'In attesa che il partner scansioni il QR...',
+                style: TextStyle(color: Colors.grey, fontSize: 13),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  Widget _buildScanSecondQrStep(ThemeData theme, ColorScheme colorScheme) {
+    return Column(
+      children: [
+        _buildInfoCard(
+          icon: Icons.qr_code_scanner,
+          title: 'Ora scansiona il QR del partner',
+          subtitle:
+              'Il dispositivo si è connesso. Ora inquadra il QR\n'
+              'dell\'altro dispositivo per ricevere la sua chiave pubblica.',
+          color: Colors.orange,
+        ),
+        const SizedBox(height: 16),
+        if (_scannerController != null)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              height: 280,
+              child: MobileScanner(
+                controller: _scannerController!,
+                onDetect: _onQrScanned,
+              ),
+            ),
+          )
+        else
+          const SizedBox(
+            height: 280,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        if (_remoteIdentity != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green[200]!),
+              ),
+              child: Text('QR ricevuto: ${_remoteIdentity!.username}',
+                  style: TextStyle(color: Colors.green[700])),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildPairingVerificationStep(
+      ThemeData theme, ColorScheme colorScheme) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_pairingCode != null && !_pairingDialogShown) {
+        _pairingDialogShown = true;
+        _showPairingCodeDialog();
+      }
+    });
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            Icon(Icons.verified_user, size: 64, color: Colors.orange[400]),
+            const SizedBox(height: 16),
+            const Text(
+              'Verifica codice di sicurezza',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Confronta il codice con l\'altro dispositivo...',
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+            if (_pairingCode != null) ...[
+              const SizedBox(height: 20),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  _pairingCode!,
+                  style: TextStyle(
+                    fontSize: 42,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 8,
+                    color: colorScheme.onPrimaryContainer,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOnboardingSyncStep(ThemeData theme, ColorScheme colorScheme) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          children: [
+            const SizedBox(
+              width: 48,
+              height: 48,
+              child: CircularProgressIndicator(strokeWidth: 3),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              _isOnboarding
+                  ? 'Download dati classe in corso...'
+                  : 'Registrazione in corso...',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _isOnboarding
+                  ? 'Sto scaricando i dati della classe dal dispositivo\n'
+                      'e li decodifico con la chiave pubblica.'
+                  : 'Sto registrando il nuovo catechista nella classe.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey[600], fontSize: 14),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -866,19 +1204,29 @@ class _AssociateDeviceScreenState
               ),
             ),
             const SizedBox(height: 8),
+            if (_remoteIdentity != null) ...[
+              Text(
+                '${_remoteIdentity!.username}',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[800]),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _remoteIdentity!.deviceName,
+                style: TextStyle(color: Colors.grey[500], fontSize: 13),
+              ),
+            ],
+            const SizedBox(height: 12),
             Text(
-              _lastScannedDeviceName != null
-                  ? 'Dispositivo associato: $_lastScannedDeviceName'
-                  : 'I dispositivi sono stati associati con successo.',
+              _isOnboarding
+                  ? 'Dati della classe scaricati e decodificati.\n'
+                      'Ora puoi accedere a tutti i dati.'
+                  : 'Nuovo catechista registrato nella classe.\n'
+                      'La sincronizzazione continua è attiva.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey[600], fontSize: 14),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Ora puoi tornare alla pagina di sincronizzazione '
-              'per avviare la sincronizzazione dei dati.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey[500], fontSize: 13),
             ),
             const SizedBox(height: 24),
             Row(
@@ -893,17 +1241,13 @@ class _AssociateDeviceScreenState
                 Expanded(
                   child: FilledButton(
                     onPressed: () {
-                      final auth = LocalDatabase.auth();
-                      final setupMode = auth.get('setup_mode', defaultValue: 'create');
-                      if (setupMode == 'join') {
-                        context.go('/');
-                      } else if (context.canPop()) {
+                      if (context.canPop()) {
                         context.pop();
                       } else {
                         context.go('/');
                       }
                     },
-                    child: const Text('Torna alla sync'),
+                    child: const Text('Continua'),
                   ),
                 ),
               ],

@@ -133,13 +133,13 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
   void _startShowQrWithP2p() {
     _resetState();
     _watchP2pState();
-    _startP2pPairing();
+    _startP2pAdvertiseOnly();
   }
 
-  void _startScanFirstP2p() {
+  void _startDiscoverOnly(String targetEndpoint) {
     _resetState();
     _watchP2pState();
-    _startP2pPairing();
+    _startP2pDiscoverOnly(targetEndpoint);
   }
 
   void _resetState() {
@@ -149,10 +149,27 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
     _scannedDeviceId = null;
   }
 
-  void _startP2pPairing() {
+  void _startP2pAdvertiseOnly() {
     if (_isPairing) return;
     _isPairing = true;
-    ref.read(nearbySyncServiceProvider).startPairingMode();
+    ref.read(nearbySyncServiceProvider).startPairingAdvertiseOnly();
+    _pairingTimeoutTimer = Timer(const Duration(seconds: 120), () {
+      if (mounted && !_syncCompleted) {
+        setState(() {
+          _errorMessage = 'Tempo scaduto. Assicurati che l\'altro dispositivo '
+              'sia in modalità associazione.';
+          _isPairing = false;
+          _currentStep = _OnboardingStep.error;
+        });
+        _stopP2p();
+      }
+    });
+  }
+
+  void _startP2pDiscoverOnly(String targetEndpoint) {
+    if (_isPairing) return;
+    _isPairing = true;
+    ref.read(nearbySyncServiceProvider).startPairingDiscoverOnly(targetEndpoint);
     _pairingTimeoutTimer = Timer(const Duration(seconds: 120), () {
       if (mounted && !_syncCompleted) {
         setState(() {
@@ -277,28 +294,21 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
       }
 
       final existing = await _security.getAssociation(remoteIdentity.deviceId);
-
-      if (existing == null) {
-        try {
-          final syncService = ref.read(nearbySyncServiceProvider);
-          final localRole = syncService.currentState.role.name;
-          final sharedSecret = await _security.computeStaticSharedSecret(
-              remoteIdentity.publicKeyBase64);
-          await _security.registerAndSaveAssociation(
-            deviceId: remoteIdentity.deviceId,
-            deviceName: remoteIdentity.deviceName,
-            publicKeyBase64: remoteIdentity.publicKeyBase64,
-            fingerprint: remoteIdentity.fingerprint,
-            sharedSecretBase64: sharedSecret,
-            localRole: localRole,
-          );
-        } catch (e) {
-          if (mounted) {
-            setState(() => _errorMessage = 'Errore salvataggio associazione: $e');
-          }
-          return;
-        }
+      if (existing != null && existing.isValid) {
+        if (mounted) setState(() => _errorMessage = 'Dispositivo già associato.');
+        return;
       }
+
+      final sharedSecret = await _security.computeStaticSharedSecret(
+          remoteIdentity.publicKeyBase64);
+      final service = ref.read(nearbySyncServiceProvider);
+      await service.storePendingAssociation(
+        deviceId: remoteIdentity.deviceId,
+        deviceName: remoteIdentity.deviceName,
+        publicKeyBase64: remoteIdentity.publicKeyBase64,
+        fingerprint: remoteIdentity.fingerprint,
+        sharedSecretBase64: sharedSecret,
+      );
 
       _stopScanner();
       _scannedDeviceId = remoteIdentity.deviceId;
@@ -310,7 +320,10 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
           _errorMessage = null;
         });
         if (_choseScanFirst) {
-          _startScanFirstP2p();
+          _startDiscoverOnly(remoteIdentity.connectionEndpoint);
+        } else {
+          // Secondo QR scansionato (show-first path): completa pairing
+          await service.completePairingAfterQrScan(remoteIdentity.deviceId);
         }
       }
       return;

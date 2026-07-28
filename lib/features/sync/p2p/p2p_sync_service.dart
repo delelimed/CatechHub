@@ -19,11 +19,14 @@ enum P2PSyncStatus {
   pairing,
   discovering,
   advertising,
+  pairingAdvertiseOnly,
+  pairingDiscoverOnly,
   handshakeSent,
   handshakeReceived,
   pairingVerification,
   sessionEstablished,
   syncing,
+  onboardingSync,
   completed,
   error,
 }
@@ -195,6 +198,42 @@ class _SyncPhase2 {
   }
 }
 
+class _PendingHandshakeData {
+  final String endpointId;
+  final String remoteId;
+  final String remoteName;
+  final String remoteNonce;
+  final P2PSyncRole remoteRole;
+  final String? remoteClassId;
+
+  const _PendingHandshakeData({
+    required this.endpointId,
+    required this.remoteId,
+    required this.remoteName,
+    required this.remoteNonce,
+    required this.remoteRole,
+    this.remoteClassId,
+  });
+}
+
+/// In-memory association data computed from QR scan but not yet committed to Hive.
+/// Saved to Hive only after pairing code verification via confirmPairingCode().
+class _PendingAssociationData {
+  final String deviceId;
+  final String deviceName;
+  final String publicKeyBase64;
+  final String fingerprint;
+  final String sharedSecretBase64;
+
+  const _PendingAssociationData({
+    required this.deviceId,
+    required this.deviceName,
+    required this.publicKeyBase64,
+    required this.fingerprint,
+    required this.sharedSecretBase64,
+  });
+}
+
 class P2PSyncService {
   static final P2PSyncService _instance = P2PSyncService._();
   factory P2PSyncService() => _instance;
@@ -272,6 +311,9 @@ class P2PSyncService {
 
   String? _sessionPairingNonce;
   String? _remoteSessionPairingNonce;
+  final Map<String, _PendingHandshakeData> _pendingHandshakeData = {};
+  final Map<String, _PendingAssociationData> _pendingAssociations = {};
+
   StreamSubscription<BoxEvent>? _hiveBoxesSub;
   final List<StreamSubscription<BoxEvent>> _boxSubscriptions = [];
   final List<StreamController<BoxEvent>> _boxControllers = [];
@@ -745,6 +787,154 @@ class P2PSyncService {
     }
   }
 
+  /// Avvia solo advertising (nessun discovery).
+  /// Usato dal dispositivo che mostra il QR per primo.
+  /// Non invia richieste di connessione, attende solo richieste in entrata.
+  Future<void> startPairingAdvertiseOnly() async {
+    addLog('INFO', 'Modalità advertising-only avviata (mostra QR, attende)');
+    if (!_initialized) await init();
+
+    final permResult =
+        await BluetoothPermissionService.checkAndRequestPermissions();
+    if (!permResult.allGranted) {
+      _updateState(_state.copyWith(
+        status: P2PSyncStatus.error,
+        errorMessage: permResult.errorMessage ?? 'Permessi insufficienti.',
+      ));
+      return;
+    }
+
+    _restartingEndpoints = true;
+    try {
+      await _nearby.stopAdvertising();
+      await _nearby.stopDiscovery();
+    } catch (_) {}
+
+    _updateState(_state.copyWith(
+      isPairingMode: true,
+      status: P2PSyncStatus.pairingAdvertiseOnly,
+      clearError: true,
+      connectedDeviceId: null,
+      connectedDeviceName: null,
+    ));
+
+    try {
+      final identity = await _security.getLocalIdentity();
+      final displayName = '$_syncPrefix${identity.deviceId}';
+
+      await _nearby.startAdvertising(
+        displayName,
+        Strategy.P2P_CLUSTER,
+        onConnectionInitiated: _onConnectionInitiated,
+        onConnectionResult: _onConnectionResult,
+        onDisconnected: _onDisconnected,
+        serviceId: _serviceId,
+      );
+
+      addLog('DEBUG', 'Advertising-only avviato come $displayName');
+
+      _pairingTimeoutTimer = Timer(_pairingTimeout, () {
+        if (_state.isPairingMode) {
+          stopPairingMode();
+          _updateState(_state.copyWith(
+            status: P2PSyncStatus.error,
+            errorMessage: 'Tempo scaduto: nessun dispositivo si è connesso.',
+          ));
+        }
+      });
+    } catch (e) {
+      _updateState(_state.copyWith(
+        status: P2PSyncStatus.error,
+        errorMessage: 'Errore avvio advertising: $e',
+      ));
+    } finally {
+      _restartingEndpoints = false;
+    }
+  }
+
+  /// Avvia solo discovery per trovare il dispositivo target.
+  /// [targetEndpoint] è l'endpoint name (deviceId) ottenuto dal QR code scansionato.
+  /// Usato dal dispositivo che scansiona il QR per primo.
+  Future<void> startPairingDiscoverOnly(String targetEndpoint) async {
+    addLog('INFO', 'Modalità discover-only avviata per trovare $targetEndpoint');
+    if (!_initialized) await init();
+
+    final permResult =
+        await BluetoothPermissionService.checkAndRequestPermissions();
+    if (!permResult.allGranted) {
+      _updateState(_state.copyWith(
+        status: P2PSyncStatus.error,
+        errorMessage: permResult.errorMessage ?? 'Permessi insufficienti.',
+      ));
+      return;
+    }
+
+    _restartingEndpoints = true;
+    try {
+      await _nearby.stopAdvertising();
+      await _nearby.stopDiscovery();
+    } catch (_) {}
+
+    _updateState(_state.copyWith(
+      isPairingMode: true,
+      status: P2PSyncStatus.pairingDiscoverOnly,
+      clearError: true,
+      connectedDeviceId: null,
+      connectedDeviceName: null,
+    ));
+
+    final fullTargetName = '$_syncPrefix$targetEndpoint';
+
+    try {
+      await _nearby.startDiscovery(
+        _syncPrefix,
+        Strategy.P2P_CLUSTER,
+        onEndpointFound: (endpointId, name, serviceId) {
+          if (!name.startsWith(_syncPrefix)) return;
+          addLog('DEBUG', 'Trovato endpoint: $name ($endpointId)');
+          if (name != fullTargetName) {
+            addLog('DEBUG', 'Ignoro $name, cerco $fullTargetName');
+            return;
+          }
+          if (_pendingEndpointId != null) return;
+          _pendingEndpointId = endpointId;
+
+          addLog('INFO', 'Trovato dispositivo target $name, richiedo connessione');
+          _nearby.requestConnection(
+            '${_syncPrefix}${targetEndpoint}_conn',
+            endpointId,
+            onConnectionInitiated: _onConnectionInitiated,
+            onConnectionResult: _onConnectionResult,
+            onDisconnected: _onDisconnected,
+          );
+        },
+        onEndpointLost: (endpointId) {
+          addLog('DEBUG', 'Endpoint perso: $endpointId');
+        },
+        serviceId: _serviceId,
+      );
+
+      addLog('DEBUG', 'Discovery avviato per $fullTargetName');
+
+      _pairingTimeoutTimer = Timer(_pairingTimeout, () {
+        if (_state.isPairingMode) {
+          stopPairingMode();
+          _updateState(_state.copyWith(
+            status: P2PSyncStatus.error,
+            errorMessage: 'Tempo scaduto: dispositivo $targetEndpoint non trovato.',
+          ));
+        }
+      });
+    } catch (e) {
+      _updateState(_state.copyWith(
+        status: P2PSyncStatus.error,
+        errorMessage: 'Errore avvio discovery: $e',
+      ));
+    } finally {
+      _restartingEndpoints = false;
+    }
+  }
+
   Future<void> stopPairingMode() async {
     _pairingTimeoutTimer?.cancel();
     _pairingTimeoutTimer = null;
@@ -766,6 +956,8 @@ class P2PSyncService {
     _nearbyDiscoveredDevices.clear();
     _nearbyEndpointToDevice.clear();
     _sessionConfirmedDevices.clear();
+    _pendingHandshakeData.clear();
+    _pendingAssociations.clear();
     _restartingEndpoints = false;
 
     try {
@@ -1069,6 +1261,9 @@ class P2PSyncService {
           addLog('DEBUG', 'ACK associazione ricevuto dal remoto');
           _updateState(_state.copyWith(authenticatedByRemote: true));
           break;
+        case 'p2p_ready_for_verification':
+          await _handleReadyForVerification(endpointId, decoded);
+          break;
       }
     } catch (e) {
       addLog('ERROR', 'Errore gestione messaggio da $endpointId: $e');
@@ -1088,15 +1283,45 @@ class P2PSyncService {
       return;
     }
 
-    P2PDeviceAssociation? association;
-    for (int i = 0; i < 120; i++) {
-      association = await _security.getAssociation(remoteId);
-      if (association != null) break;
-      await Future.delayed(const Duration(milliseconds: 500));
+    final association = await _security.getAssociation(remoteId);
+
+    if (association == null && _state.isPairingMode) {
+      addLog('DEBUG',
+          'Handshake da $remoteName ($remoteId) in pairing mode, nessuna associazione ancora. '
+          'Attendo che l\'utente scansioni il QR.');
+
+      final remoteRoleStr = message['role'] as String?;
+      final remoteRole = remoteRoleStr != null
+          ? P2PSyncRole.values.firstWhere(
+              (r) => r.name == remoteRoleStr,
+              orElse: () => P2PSyncRole.mioDispositivo,
+            )
+          : P2PSyncRole.mioDispositivo;
+
+      _remoteSessionPairingNonce = message['sessionNonce'] as String?;
+      _endpointConnIdMap[endpointId] = remoteId;
+      _connectedEndpoints.add(endpointId);
+
+      _pendingHandshakeData[endpointId] = _PendingHandshakeData(
+        endpointId: endpointId,
+        remoteId: remoteId,
+        remoteName: remoteName,
+        remoteNonce: _remoteSessionPairingNonce ?? '',
+        remoteRole: remoteRole,
+        remoteClassId: message['classId'] as String?,
+      );
+
+      _updateState(_state.copyWith(
+        status: P2PSyncStatus.sessionEstablished,
+        connectedDeviceId: endpointId,
+        connectedDeviceName: remoteName,
+        isSessionEncrypted: false,
+      ));
+      return;
     }
 
     if (association == null) {
-      addLog('ERROR', 'Nessuna associazione trovata per $remoteId. QR non scansionato?');
+      addLog('ERROR', 'Nessuna associazione trovata per $remoteId.');
       try {
         await _nearby.disconnectFromEndpoint(endpointId);
       } catch (_) {}
@@ -1104,8 +1329,7 @@ class P2PSyncService {
       _pendingEndpointId = null;
       _updateState(_state.copyWith(
         status: P2PSyncStatus.error,
-        errorMessage: 'QR del dispositivo $remoteName non scansionato. '
-            'Assicurati di aver inquadrato il suo QR code prima della connessione.',
+        errorMessage: 'Nessuna associazione trovata per $remoteName.',
       ));
       return;
     }
@@ -1169,34 +1393,13 @@ class P2PSyncService {
       return;
     }
 
-    final existingAssoc = await _security.getAssociation(remoteId);
-    addLog('DEBUG',
-        'Associazione esistente per $remoteId: ${existingAssoc != null}');
-
-    if (existingAssoc != null &&
-        !P2PSecurityService.publicKeyMatchesAssociation(
-            existingAssoc, association.publicKeyBase64)) {
-      addLog('ERROR', 'MITM DETECTED: public key mismatch for $remoteId');
-      try {
-        await _nearby.disconnectFromEndpoint(endpointId);
-      } catch (_) {}
-      _connectedEndpoints.remove(endpointId);
-      _pendingEndpointId = null;
-      _updateState(_state.copyWith(
-        status: P2PSyncStatus.error,
-        errorMessage: 'MITM rilevato: la chiave pubblica del dispositivo '
-            '$remoteName non corrisponde a quella salvata.',
-      ));
-      return;
-    }
-
     _remoteSessionPairingNonce = message['sessionNonce'] as String?;
     _endpointConnIdMap[endpointId] = remoteId;
     _connectedEndpoints.add(endpointId);
 
     final localIdentity = await _security.getLocalIdentity();
 
-    if (existingAssoc != null && !_state.isPairingMode) {
+    if (!_state.isPairingMode) {
       addLog('DEBUG', 'Handshake: associazione esistente, invio ack cifrato');
       final ack = jsonEncode({
         'type': 'p2p_handshake_ack',
@@ -1228,7 +1431,8 @@ class P2PSyncService {
         addLog('DEBUG', 'Auth request inviata a $endpointId');
       }
     } else {
-      addLog('DEBUG', 'Handshake: calcolo pairing code e invio ACK');
+      addLog('DEBUG',
+          'Handshake: associazione trovata, calcolo pairing code');
 
       final sharedSecret = await _security.computeStaticSharedSecret(
           association.publicKeyBase64);
@@ -1243,29 +1447,41 @@ class P2PSyncService {
       });
       await _sendPayload(endpointId, ack);
 
-      final code = P2PSecurityService.computePairingCode(
-        sharedSecret,
-        sessionNonce: _agreedPairingNonce(),
-      );
+      if (_state.isPairingMode) {
+        final code = P2PSecurityService.computePairingCode(
+          sharedSecret,
+          sessionNonce: _agreedPairingNonce(),
+        );
 
-      _pendingHandshakeIdentity = P2PIdentity(
-        deviceId: remoteId,
-        deviceName: remoteName,
-        publicKeyBase64: association.publicKeyBase64,
-        fingerprint: association.fingerprint,
-      );
-      _pendingHandshakeRemoteRole = remoteRole;
+        _pendingHandshakeIdentity = P2PIdentity(
+          deviceId: remoteId,
+          deviceName: remoteName,
+          username: '',
+          publicKeyBase64: association.publicKeyBase64,
+          fingerprint: association.fingerprint,
+          connectionEndpoint: '',
+        );
+        _pendingHandshakeRemoteRole = remoteRole;
 
-      _updateState(_state.copyWith(
-        status: P2PSyncStatus.pairingVerification,
-        connectedDeviceId: endpointId,
-        connectedDeviceName: remoteName,
-        connectedFingerprint: association.fingerprint,
-        isSessionEncrypted: true,
-        pairingCode: code,
-        remoteDeviceFingerprint: association.fingerprint,
-      ));
-      addLog('INFO', 'Codice pairing generato per verifica');
+        addLog('INFO', 'Codice pairing calcolato ma attendo conferma remota');
+
+        _updateState(_state.copyWith(
+          status: P2PSyncStatus.sessionEstablished,
+          connectedDeviceId: endpointId,
+          connectedDeviceName: remoteName,
+          connectedFingerprint: association.fingerprint,
+          isSessionEncrypted: true,
+          pairingCode: code,
+        ));
+      } else {
+        _updateState(_state.copyWith(
+          status: P2PSyncStatus.sessionEstablished,
+          connectedDeviceId: endpointId,
+          connectedDeviceName: remoteName,
+          connectedFingerprint: association.fingerprint,
+          isSessionEncrypted: true,
+        ));
+      }
     }
   }
 
@@ -1281,11 +1497,35 @@ class P2PSyncService {
       return;
     }
 
-    P2PDeviceAssociation? association;
-    for (int i = 0; i < 120; i++) {
-      association = await _security.getAssociation(remoteId);
-      if (association != null) break;
-      await Future.delayed(const Duration(milliseconds: 500));
+    final association = await _security.getAssociation(remoteId);
+
+    if (association == null && _state.isPairingMode) {
+      addLog('DEBUG',
+          'Handshake ACK da $remoteName ($remoteId) in pairing mode, '
+          'nessuna associazione ancora. Attendo scansione QR.');
+
+      final remoteRoleStr = message['role'] as String?;
+      final remoteRole = remoteRoleStr != null
+          ? P2PSyncRole.values.firstWhere(
+              (r) => r.name == remoteRoleStr,
+              orElse: () => P2PSyncRole.mioDispositivo,
+            )
+          : P2PSyncRole.mioDispositivo;
+
+      _remoteSessionPairingNonce =
+          message['sessionNonce'] as String? ?? _remoteSessionPairingNonce;
+      _endpointConnIdMap[endpointId] = remoteId;
+      _connectedEndpoints.add(endpointId);
+
+      _pendingHandshakeData[endpointId] ??= _PendingHandshakeData(
+        endpointId: endpointId,
+        remoteId: remoteId,
+        remoteName: remoteName,
+        remoteNonce: _remoteSessionPairingNonce ?? '',
+        remoteRole: remoteRole,
+        remoteClassId: message['classId'] as String?,
+      );
+      return;
     }
 
     if (association == null) {
@@ -1297,8 +1537,7 @@ class P2PSyncService {
       _pendingEndpointId = null;
       _updateState(_state.copyWith(
         status: P2PSyncStatus.error,
-        errorMessage: 'QR del dispositivo $remoteName non scansionato. '
-            'Assicurati di aver inquadrato il suo QR code.',
+        errorMessage: 'Nessuna associazione trovata per $remoteName.',
       ));
       return;
     }
@@ -1349,28 +1588,10 @@ class P2PSyncService {
       return;
     }
 
-    final existingAssoc = await _security.getAssociation(remoteId);
-
-    if (existingAssoc != null &&
-        !P2PSecurityService.publicKeyMatchesAssociation(
-            existingAssoc, association.publicKeyBase64)) {
-      addLog('ERROR', 'MITM DETECTED in ack: chiave pubblica non corrispondente per $remoteId');
-      try {
-        await _nearby.disconnectFromEndpoint(endpointId);
-      } catch (_) {}
-      _connectedEndpoints.remove(endpointId);
-      _pendingEndpointId = null;
-      _updateState(_state.copyWith(
-        status: P2PSyncStatus.error,
-        errorMessage: 'MITM rilevato: chiave pubblica alterata per $remoteName.',
-      ));
-      return;
-    }
-
     _endpointConnIdMap[endpointId] = remoteId;
     _connectedEndpoints.add(endpointId);
 
-    if (existingAssoc != null && !_state.isPairingMode) {
+    if (!_state.isPairingMode) {
       _updateState(_state.copyWith(
         connectedFingerprint: association.fingerprint,
         connectedDeviceName: remoteName,
@@ -1391,7 +1612,8 @@ class P2PSyncService {
         addLog('DEBUG', 'Auth request inviata a $endpointId');
       }
     } else {
-      _remoteSessionPairingNonce = message['sessionNonce'] as String? ?? _remoteSessionPairingNonce;
+      _remoteSessionPairingNonce =
+          message['sessionNonce'] as String? ?? _remoteSessionPairingNonce;
       final sharedSecret = await _security.computeStaticSharedSecret(
         association.publicKeyBase64,
       );
@@ -1403,12 +1625,16 @@ class P2PSyncService {
       _pendingHandshakeIdentity = P2PIdentity(
         deviceId: remoteId,
         deviceName: remoteName,
+        username: '',
         publicKeyBase64: association.publicKeyBase64,
         fingerprint: association.fingerprint,
+        connectionEndpoint: '',
       );
       _pendingHandshakeRemoteRole = remoteRole;
+
+      addLog('INFO', 'Codice pairing calcolato in ACK ma attendo conferma remota');
       _updateState(_state.copyWith(
-        status: P2PSyncStatus.pairingVerification,
+        status: P2PSyncStatus.sessionEstablished,
         connectedFingerprint: association.fingerprint,
         connectedDeviceName: remoteName,
         isSessionEncrypted: true,
@@ -1465,6 +1691,152 @@ class P2PSyncService {
     } catch (e) {
       addLog('ERROR', 'Errore salvataggio associazione: $e');
     }
+  }
+
+  void readyForVerification(String endpointId) async {
+    addLog('INFO', 'Pronto per verifica pairing, invio notifica a $endpointId');
+    final localIdentity = await _security.getLocalIdentity();
+    final ready = jsonEncode({
+      'type': 'p2p_ready_for_verification',
+      'deviceId': localIdentity.deviceId,
+      'deviceName': localIdentity.deviceName,
+    });
+    await _sendPayload(endpointId, ready);
+  }
+
+  Future<void> _handleReadyForVerification(
+      String endpointId, Map<String, dynamic> message) async {
+    addLog('INFO', 'Notifica pronta per verifica ricevuta dal remoto');
+
+    _pendingHandshakeData.remove(endpointId);
+
+    final remoteId = _endpointConnIdMap[endpointId];
+    if (remoteId == null) {
+      addLog('WARN', 'Nessun remoteId mappato per $endpointId');
+      return;
+    }
+
+    String code;
+    if (_state.pairingCode != null && _state.status == P2PSyncStatus.sessionEstablished) {
+      code = _state.pairingCode!;
+      addLog('DEBUG', 'Uso pairing code già calcolato');
+    } else {
+      final assoc = await _security.getAssociation(remoteId);
+      if (assoc != null) {
+        code = P2PSecurityService.computePairingCode(
+          assoc.sharedSecretBase64,
+          sessionNonce: _agreedPairingNonce(),
+        );
+        addLog('DEBUG', 'Pairing code calcolato da associazione Hive');
+      } else {
+        final pendingAssoc = _pendingAssociations[remoteId];
+        if (pendingAssoc == null) {
+          addLog('ERROR', 'Nessuna associazione (né Hive né pending) trovata per $remoteId');
+          return;
+        }
+        code = P2PSecurityService.computePairingCode(
+          pendingAssoc.sharedSecretBase64,
+          sessionNonce: _agreedPairingNonce(),
+        );
+        addLog('DEBUG', 'Pairing code calcolato da associazione pendente');
+      }
+    }
+
+    _updateState(_state.copyWith(
+      status: P2PSyncStatus.pairingVerification,
+      connectedDeviceId: endpointId,
+      pairingCode: code,
+    ));
+    addLog('INFO', 'Passaggio a pairingVerification dopo notifica remota');
+  }
+
+  /// Memorizza i dati di un'associazione scansionata dal QR ma non ancora verificata.
+  /// L'associazione verrà salvata in Hive solo dopo confirmPairingCode().
+  Future<void> storePendingAssociation({
+    required String deviceId,
+    required String deviceName,
+    required String publicKeyBase64,
+    required String fingerprint,
+    required String sharedSecretBase64,
+  }) async {
+    addLog('INFO', 'storePendingAssociation per $deviceName ($deviceId)');
+    _pendingAssociations[deviceId] = _PendingAssociationData(
+      deviceId: deviceId,
+      deviceName: deviceName,
+      publicKeyBase64: publicKeyBase64,
+      fingerprint: fingerprint,
+      sharedSecretBase64: sharedSecretBase64,
+    );
+  }
+
+  /// Completa il pairing dopo che il secondo QR è stato scansionato.
+  /// Usa i dati in memoria (_pendingAssociations) invece di Hive,
+  /// perché l'associazione non è ancora stata salvata.
+  Future<void> completePairingAfterQrScan(String remoteDeviceId) async {
+    addLog('INFO', 'completePairingAfterQrScan per $remoteDeviceId');
+
+    String? endpointId;
+    String? remoteNonce;
+    for (final entry in _pendingHandshakeData.entries.toList()) {
+      if (entry.value.remoteId == remoteDeviceId) {
+        endpointId = entry.key;
+        remoteNonce = entry.value.remoteNonce;
+        break;
+      }
+    }
+
+    if (endpointId == null) {
+      for (final entry in _endpointConnIdMap.entries.toList()) {
+        if (entry.value == remoteDeviceId) {
+          endpointId = entry.key;
+          break;
+        }
+      }
+    }
+
+    if (endpointId == null) {
+      addLog('ERROR', 'Nessun endpoint trovato per $remoteDeviceId');
+      return;
+    }
+
+    final pendingAssoc = _pendingAssociations[remoteDeviceId];
+    if (pendingAssoc == null) {
+      addLog('ERROR', 'Nessun dato associazione pendente per $remoteDeviceId');
+      return;
+    }
+
+    if (remoteNonce != null) {
+      _remoteSessionPairingNonce = remoteNonce;
+    }
+
+    final code = P2PSecurityService.computePairingCode(
+      pendingAssoc.sharedSecretBase64,
+      sessionNonce: _agreedPairingNonce(),
+    );
+
+    _pendingHandshakeIdentity = P2PIdentity(
+      deviceId: remoteDeviceId,
+      deviceName: pendingAssoc.deviceName,
+      username: '',
+      publicKeyBase64: pendingAssoc.publicKeyBase64,
+      fingerprint: pendingAssoc.fingerprint,
+      connectionEndpoint: '',
+    );
+
+    _pendingHandshakeData.remove(endpointId);
+
+    _updateState(_state.copyWith(
+      status: P2PSyncStatus.pairingVerification,
+      connectedDeviceId: endpointId,
+      connectedDeviceName: pendingAssoc.deviceName,
+      connectedFingerprint: pendingAssoc.fingerprint,
+      isSessionEncrypted: true,
+      pairingCode: code,
+      remoteDeviceFingerprint: pendingAssoc.fingerprint,
+    ));
+    addLog('INFO', 'Codice pairing generato dopo scan secondo QR');
+
+    readyForVerification(endpointId);
   }
 
   Future<void> _handleAuthRequest(
@@ -1934,10 +2306,25 @@ class P2PSyncService {
 
     final existing = await _security.getAssociation(remoteIdentity.deviceId);
     if (existing == null) {
-      await _saveAssociationIfNeeded(remoteIdentity,
-          remoteRole: _pendingHandshakeRemoteRole);
+      final pending = _pendingAssociations[remoteIdentity.deviceId];
+      if (pending != null) {
+        await _security.registerAndSaveAssociation(
+          deviceId: pending.deviceId,
+          deviceName: pending.deviceName,
+          publicKeyBase64: pending.publicKeyBase64,
+          fingerprint: pending.fingerprint,
+          sharedSecretBase64: pending.sharedSecretBase64,
+          localRole: _state.role.name,
+          remoteRole: _pendingHandshakeRemoteRole?.name,
+        );
+        addLog('INFO', 'Associazione salvata in Hive dopo verifica per ${pending.deviceName}');
+      } else {
+        await _saveAssociationIfNeeded(remoteIdentity,
+            remoteRole: _pendingHandshakeRemoteRole);
+      }
     }
 
+    _pendingAssociations.remove(remoteIdentity.deviceId);
     _pendingHandshakeIdentity = null;
     _pendingHandshakeRemoteRole = null;
 
@@ -1994,6 +2381,7 @@ class P2PSyncService {
     _pendingEndpointId = null;
     _pendingHandshakeIdentity = null;
     _pendingHandshakeRemoteRole = null;
+    _pendingAssociations.clear();
 
     _updateState(_state.copyWith(
       status: P2PSyncStatus.idle,
@@ -2152,6 +2540,8 @@ class P2PSyncService {
     _nearbyEndpointToDevice.clear();
     _sessionConfirmedDevices.clear();
     _pendingHandshakeIdentity = null;
+    _pendingHandshakeData.clear();
+    _pendingAssociations.clear();
     _endpointSyncPhase.clear();
     _endpointSessionKeys.clear();
     _initialized = false;

@@ -8,8 +8,8 @@ import '../features/auth/login_page.dart';
 import '../features/classes/my_group_page.dart';
 import '../features/classes/group_management_page.dart';
 import '../features/classes/view_groups_page.dart';
-import '../features/classes/classes_page.dart';
 import '../features/dashboard/dashboard_page.dart';
+import '../features/dashboard/statistics_page.dart';
 import '../features/students/students_page.dart';
 import '../shared/models/student_model.dart';
 import '../features/students/student_detail_page.dart';
@@ -533,10 +533,23 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ViewGroupsPage(),
       ),
 
-      /// Gestione completa delle classi: creazione, modifica ed eliminazione.
+      // ═══════════════════════════════════════════════════════════════════
+      // STATISTICS - Statistiche del gruppo
+      // ═══════════════════════════════════════════════════════════════════
+
+      /// Pagina delle statistiche di presenza del gruppo.
+      /// I dati (className, classId) vengono passati tramite state.extra.
       GoRoute(
-        path: '/classes',
-        builder: (context, state) => const ClassesPage(),
+        path: '/statistics',
+        builder: (context, state) {
+          final extra = state.extra is Map<String, dynamic>
+              ? state.extra as Map<String, dynamic>
+              : <String, dynamic>{};
+          return StatisticsPage(
+            className: extra['className'] as String? ?? '',
+            classId: extra['classId'] as String? ?? '',
+          );
+        },
       ),
 
       // ═══════════════════════════════════════════════════════════════════

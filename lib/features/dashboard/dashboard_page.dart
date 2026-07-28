@@ -16,7 +16,7 @@ import '../documents/documents_repository.dart';
 import '../meetings/attendance_repository.dart';
 import '../planning/planning_provider.dart';
 import '../students/students_repository.dart';
-import 'statistics_page.dart';
+
 
 /// Pagina principale della dashboard di CateREG.
 ///
@@ -238,15 +238,10 @@ class DashboardPage extends ConsumerWidget {
                             currentClassId: currentClass.id,
                             currentClassName: currentClass.name,
                             onPresenceTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => StatisticsPage(
-                                    className: currentClass.name,
-                                    classId: currentClass.id,
-                                  ),
-                                ),
-                              );
+                              context.push('/statistics', extra: {
+                                'className': currentClass.name,
+                                'classId': currentClass.id,
+                              });
                             },
                           ),
                           const SizedBox(height: 24),

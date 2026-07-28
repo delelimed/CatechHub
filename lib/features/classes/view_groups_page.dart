@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_service.dart';
 import '../../shared/models/class_model.dart';
@@ -52,17 +51,25 @@ class ViewGroupsPage extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              ...myClasses.map((c) => _GroupCard(schoolClass: c)),
+              ...myClasses.map((c) => _GroupCard(
+                schoolClass: c,
+                onDelete: () async {
+                  try {
+                    await ref.read(classesRepoProvider).deleteClass(c.id);
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Errore durante l\'eliminazione: $e'),
+                          backgroundColor: Colors.red.shade700,
+                        ),
+                      );
+                    }
+                  }
+                },
+              )),
               const SizedBox(height: 24),
               _buildCreateButton(context, isDark, colorScheme),
-              const SizedBox(height: 12),
-              Center(
-                child: TextButton.icon(
-                  onPressed: () => context.push('/classes'),
-                  icon: const Icon(Icons.settings_rounded),
-                  label: const Text('Gestisci tutte le classi'),
-                ),
-              ),
               const SizedBox(height: 32),
             ],
           );
@@ -142,8 +149,40 @@ class ViewGroupsPage extends ConsumerWidget {
 
 class _GroupCard extends StatelessWidget {
   final SchoolClass schoolClass;
+  final VoidCallback? onDelete;
 
-  const _GroupCard({required this.schoolClass});
+  const _GroupCard({required this.schoolClass, this.onDelete});
+
+  void _showDeleteConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Elimina gruppo'),
+        content: Text(
+          'Sei sicuro di voler eliminare "${schoolClass.name}"?\n\n'
+          'Verranno eliminati anche i piani di incontro e le presenze associati.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annulla'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              onDelete?.call();
+            },
+            child: const Text('Elimina'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -199,24 +238,7 @@ class _GroupCard extends StatelessWidget {
                     color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(Icons.person, size: 14, color: Colors.grey.shade500),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        'Creato da: ${schoolClass.lastModifiedBy.isNotEmpty ? schoolClass.lastModifiedBy : 'Sconosciuto'}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDark ? Colors.grey.shade400 : Colors.grey,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 6),
                 Row(
                   children: [
                     Icon(Icons.people, size: 14, color: Colors.grey.shade500),
@@ -228,12 +250,38 @@ class _GroupCard extends StatelessWidget {
                         color: isDark ? Colors.grey.shade400 : Colors.grey,
                       ),
                     ),
+                    const SizedBox(width: 16),
+                    Icon(Icons.school, size: 14, color: Colors.grey.shade500),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${schoolClass.catechistIds.length} catechisti',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.grey.shade400 : Colors.grey,
+                      ),
+                    ),
                   ],
                 ),
               ],
             ),
           ),
-          Icon(Icons.chevron_right_rounded, color: isDark ? Colors.grey.shade500 : Colors.grey.shade400),
+          if (onDelete != null)
+            PopupMenuButton<String>(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              onSelected: (value) {
+                if (value == 'delete') {
+                  _showDeleteConfirmation(context);
+                }
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Text('Elimina'),
+                ),
+              ],
+            ),
         ],
       ),
     );

@@ -248,15 +248,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       final authState = ref.read(authStateProvider);
       final isLoginPath = location == '/login';
+      final isOnboardingSyncPath = location == '/onboarding-sync';
 
       return authState.when(
         loading: () => null,
         error: (_, __) => isLoginPath ? null : '/login',
         data: (user) {
           if (user == null && !isLoginPath) return '/login';
-          if (user != null && isLoginPath) {
+          if (user != null) {
             // Se l'utente ha scelto "unisciti" durante l'onboarding e
             // non ha ancora classi, reindirizza all'associazione P2P.
+            // Questo controllo vale per OGNI navigazione, non solo /login,
+            // per impedire di lasciare l'onboarding senza essere in una classe.
+            if (!isOnboardingSyncPath) {
               try {
                 final setupMode =
                     LocalDatabase.auth().get('setup_mode', defaultValue: 'create');
@@ -279,7 +283,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   }
                 }
               } catch (_) {}
-            return '/';
+            }
+            if (isLoginPath) return '/';
           }
           return null;
         },

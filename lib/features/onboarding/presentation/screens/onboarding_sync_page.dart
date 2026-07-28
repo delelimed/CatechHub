@@ -12,7 +12,7 @@ import '../../../../core/storage/local_database.dart';
 import '../../../../features/sync/p2p/p2p_sync_service.dart';
 import '../../../../features/sync/p2p/p2p_security_service.dart';
 
-enum _OnboardingStep { roleChoice, instructions, showQr, scanQr, syncing, complete, error }
+enum _OnboardingStep { roleChoice, actionChoice, showQr, scanQr, pairingVerification, syncing, complete, error }
 
 class OnboardingSyncPage extends ConsumerStatefulWidget {
   const OnboardingSyncPage({super.key});
@@ -27,16 +27,20 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
   _OnboardingStep _currentStep = _OnboardingStep.roleChoice;
 
   P2PSyncRole _selectedRole = P2PSyncRole.mioDispositivo;
+  bool _choseScanFirst = false;
 
   String? _qrData;
   String? _errorMessage;
   String? _successMessage;
   String? _syncedDeviceName;
+  String? _pairingCode;
 
   MobileScannerController? _scannerController;
 
   bool _isPairing = false;
   bool _syncCompleted = false;
+  bool _syncStarted = false;
+  String? _scannedDeviceId;
   Timer? _pairingTimeoutTimer;
   StreamSubscription<P2PSyncState>? _p2pStateSub;
 
@@ -79,28 +83,29 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
     ref.read(nearbySyncServiceProvider).setRole(role);
   }
 
-  void _proceedFromRoleChoice() {
+  void _proceedToActionChoice() {
     setState(() {
-      _currentStep = _OnboardingStep.instructions;
+      _currentStep = _OnboardingStep.actionChoice;
       _errorMessage = null;
     });
   }
 
-  void _startShowQr() {
+  void _chooseScanFirst() {
     setState(() {
-      _currentStep = _OnboardingStep.showQr;
-      _errorMessage = null;
-    });
-    _startP2p();
-  }
-
-  void _startScanQr() {
-    setState(() {
+      _choseScanFirst = true;
       _currentStep = _OnboardingStep.scanQr;
       _errorMessage = null;
     });
     _openScanner();
-    _startP2p();
+  }
+
+  void _chooseShowFirst() {
+    setState(() {
+      _choseScanFirst = false;
+      _currentStep = _OnboardingStep.showQr;
+      _errorMessage = null;
+    });
+    _startShowQrWithP2p();
   }
 
   void _openScanner() {
@@ -125,10 +130,28 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
     } catch (_) {}
   }
 
-  void _startP2p() {
+  void _startShowQrWithP2p() {
+    _resetState();
+    _watchP2pState();
+    _startP2pPairing();
+  }
+
+  void _startScanFirstP2p() {
+    _resetState();
+    _watchP2pState();
+    _startP2pPairing();
+  }
+
+  void _resetState() {
+    _syncCompleted = false;
+    _syncStarted = false;
+    _isPairing = false;
+    _scannedDeviceId = null;
+  }
+
+  void _startP2pPairing() {
     if (_isPairing) return;
     _isPairing = true;
-    _watchP2pState();
     ref.read(nearbySyncServiceProvider).startPairingMode();
     _pairingTimeoutTimer = Timer(const Duration(seconds: 120), () {
       if (mounted && !_syncCompleted) {
@@ -149,25 +172,35 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
     _p2pStateSub = service.onStateChanged.listen((state) {
       if (!mounted) return;
 
-      if (state.status == P2PSyncStatus.sessionEstablished ||
-          state.status == P2PSyncStatus.completed ||
-          state.status == P2PSyncStatus.syncing) {
+      if (state.status == P2PSyncStatus.pairingVerification) {
         _pairingTimeoutTimer?.cancel();
-
-        if (state.status == P2PSyncStatus.syncing) {
+        if (state.pairingCode != null && _currentStep != _OnboardingStep.pairingVerification) {
           setState(() {
-            _currentStep = _OnboardingStep.syncing;
-            _syncProgressTotal = state.totalRecordsToExchange;
-            _syncProgressCurrent = state.sentRecordsCount + state.receivedRecordsCount;
+            _currentStep = _OnboardingStep.pairingVerification;
+            _pairingCode = state.pairingCode;
             _syncedDeviceName = state.connectedDeviceName;
+            _errorMessage = null;
           });
         }
-
-        if (state.status == P2PSyncStatus.completed) {
+      } else if (state.status == P2PSyncStatus.syncing && !_syncCompleted) {
+        _pairingTimeoutTimer?.cancel();
+        _syncStarted = true;
+        setState(() {
+          _currentStep = _OnboardingStep.syncing;
+          _syncProgressTotal = state.totalRecordsToExchange;
+          _syncProgressCurrent = state.sentRecordsCount + state.receivedRecordsCount;
+          _syncedDeviceName = state.connectedDeviceName;
+        });
+      } else if (state.status == P2PSyncStatus.completed) {
+        _pairingTimeoutTimer?.cancel();
+        if (_syncStarted || _syncCompleted) {
           _onSyncCompleted(state);
         }
-      } else if (state.status == P2PSyncStatus.pairingVerification) {
-        _pairingTimeoutTimer?.cancel();
+      } else if (state.status == P2PSyncStatus.sessionEstablished) {
+        if (!_choseScanFirst && _currentStep == _OnboardingStep.showQr) {
+          _pairingTimeoutTimer?.cancel();
+          _autoSwitchToScanner();
+        }
       } else if (state.status == P2PSyncStatus.error) {
         if (!_syncCompleted) {
           setState(() {
@@ -180,9 +213,17 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
     });
   }
 
-  void _onSyncCompleted(P2PSyncState state) {
-    _syncCompleted = true;
+  void _autoSwitchToScanner() {
+    if (mounted && _currentStep != _OnboardingStep.scanQr) {
+      setState(() {
+        _currentStep = _OnboardingStep.scanQr;
+        _errorMessage = null;
+      });
+      _openScanner();
+    }
+  }
 
+  void _onSyncCompleted(P2PSyncState state) {
     try {
       final classesBox = LocalDatabase.classes();
       const localId = AuthService.localUserId;
@@ -209,14 +250,10 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
         return;
       }
     } catch (_) {
-      setState(() {
-        _errorMessage = 'Errore durante la verifica della classe.';
-        _currentStep = _OnboardingStep.error;
-        _isPairing = false;
-      });
       return;
     }
 
+    _syncCompleted = true;
     setState(() {
       _currentStep = _OnboardingStep.complete;
       _successMessage = 'Sei stato aggiunto alla classe '
@@ -227,6 +264,8 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
   }
 
   Future<void> _onQrScanned(BarcodeCapture capture) async {
+    if (_scannedDeviceId != null) return;
+
     for (final barcode in capture.barcodes) {
       final raw = barcode.rawValue;
       if (raw == null || raw.isEmpty) continue;
@@ -262,39 +301,49 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
       }
 
       _stopScanner();
+      _scannedDeviceId = remoteIdentity.deviceId;
+      _syncedDeviceName = remoteIdentity.deviceName;
 
       if (mounted) {
-        final service = ref.read(nearbySyncServiceProvider);
-        final currentState = service.currentState;
-        if (currentState.status == P2PSyncStatus.pairingVerification) {
-          await service.confirmPairingCode();
-        } else if (currentState.connectedDeviceId != null) {
-          await service.finalizeAssociation(
-            currentState.connectedDeviceId!,
-            remoteIdentity.deviceId,
-          );
+        setState(() {
+          _currentStep = _OnboardingStep.showQr;
+          _errorMessage = null;
+        });
+        if (_choseScanFirst) {
+          _startScanFirstP2p();
         }
       }
       return;
     }
   }
 
+  void _onConfirmPairingCode() async {
+    final service = ref.read(nearbySyncServiceProvider);
+    await service.confirmPairingCode();
+  }
+
+  void _onRejectPairingCode() {
+    final service = ref.read(nearbySyncServiceProvider);
+    service.rejectPairingCode();
+    setState(() {
+      _errorMessage = 'Codice di verifica non corrispondente. Associazione annullata.';
+      _currentStep = _OnboardingStep.error;
+      _isPairing = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Unisciti a una classe'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            _stopP2p();
-            _stopScanner();
-            context.go('/login');
-          },
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Unisciti a una classe'),
+          automaticallyImplyLeading: false,
         ),
-      ),
-      body: SafeArea(
-        child: _buildBody(),
+        body: SafeArea(
+          child: _buildBody(),
+        ),
       ),
     );
   }
@@ -303,12 +352,14 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
     switch (_currentStep) {
       case _OnboardingStep.roleChoice:
         return _buildRoleChoice();
-      case _OnboardingStep.instructions:
-        return _buildInstructions();
+      case _OnboardingStep.actionChoice:
+        return _buildActionChoice();
       case _OnboardingStep.showQr:
         return _buildShowQrStep();
       case _OnboardingStep.scanQr:
         return _buildScanQrStep();
+      case _OnboardingStep.pairingVerification:
+        return _buildPairingVerification();
       case _OnboardingStep.syncing:
         return _buildSyncingStep();
       case _OnboardingStep.complete:
@@ -374,7 +425,7 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
               icon: const Icon(Icons.arrow_forward_rounded),
               label: const Text('Continua',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              onPressed: _proceedFromRoleChoice,
+              onPressed: _proceedToActionChoice,
             ),
           ),
           const SizedBox(height: 20),
@@ -447,7 +498,7 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
     );
   }
 
-  Widget _buildInstructions() {
+  Widget _buildActionChoice() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -465,51 +516,15 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
           const SizedBox(height: 24),
           const Text(
             'Sincronizzazione con un catechista',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF174A7E),
-            ),
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Text(
-            'Per unirti a una classe esistente, devi sincronizzarti '
-            'con il catechista che ha già creato il gruppo.',
+            'Per unirti a una classe esistente, deve esserci uno scambio '
+            'di QR code tra i due dispositivi.\n\n'
+            'Uno dei due deve iniziare scansionando il QR dell\'altro.\n'
+            'Dopo la scansione, il passaggio sarà automatico.',
             style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.5),
-          ),
-          const SizedBox(height: 24),
-          _buildStepCard(
-            '1',
-            'Scegli come procedere',
-            'Puoi mostrare il tuo QR all\'altro catechista oppure '
-            'inquadrare il suo QR, a seconda di cosa è più comodo.',
-          ),
-          const SizedBox(height: 12),
-          _buildStepCard(
-            '2',
-            'Abbina i codici',
-            'Confronta il codice di sicurezza che appare su entrambi '
-            'i dispositivi per verificare che la connessione sia sicura.',
-          ),
-          const SizedBox(height: 12),
-          _buildStepCard(
-            '3',
-            'Sincronizzazione',
-            'I dati della classe verranno trasferiti automaticamente '
-            'sul tuo dispositivo in modo sicuro e cifrato.',
-          ),
-          const SizedBox(height: 12),
-          _buildStepCard(
-            '4',
-            'Pronto!',
-            'Una volta completata la sincronizzazione, potrai '
-            'accedere alla dashboard con i dati della classe.',
-          ),
-          const SizedBox(height: 32),
-          const Text(
-            'Entrambi i dispositivi devono avere lo STESSO ruolo: '
-            'entrambi "mioDispositivo" o entrambi "altroCatechista".',
-            style: TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic),
           ),
           const SizedBox(height: 24),
           SizedBox(
@@ -524,7 +539,7 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
               icon: const Icon(Icons.qr_code_scanner_rounded),
               label: const Text('Inquadra QR del partner',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              onPressed: _startScanQr,
+              onPressed: _chooseScanFirst,
             ),
           ),
           const SizedBox(height: 12),
@@ -540,7 +555,7 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
               icon: const Icon(Icons.qr_code_rounded),
               label: const Text('Mostra QR al partner',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              onPressed: _startShowQr,
+              onPressed: _chooseShowFirst,
             ),
           ),
           const SizedBox(height: 20),
@@ -561,47 +576,88 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
               color: Colors.blue.shade50,
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Icon(Icons.qr_code_rounded, size: 36, color: Color(0xFF174A7E)),
+            child: Icon(
+              _choseScanFirst || _scannedDeviceId == null
+                  ? Icons.qr_code_rounded
+                  : Icons.check_circle_rounded,
+              size: 36,
+              color: _choseScanFirst || _scannedDeviceId == null
+                  ? const Color(0xFF174A7E)
+                  : Colors.green,
+            ),
           ),
           const SizedBox(height: 20),
-          const Text(
-            'Mostra questo QR al partner',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
+          Text(
+            _choseScanFirst
+                ? 'Mostra questo QR al partner'
+                : _scannedDeviceId != null
+                    ? 'QR acquisito!'
+                    : 'Mostra il tuo QR',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
           ),
           const SizedBox(height: 8),
           Text(
-            'L\'altro catechista deve inquadrare questo codice '
-            'con la fotocamera di CatechHub.',
+            _choseScanFirst
+                ? 'Hai già scansionato il QR del partner.\n'
+                    'Ora l\'altro catechista deve scansionare il tuo QR.'
+                : _scannedDeviceId != null
+                    ? 'In attesa della verifica del codice di sicurezza...'
+                    : 'Quando l\'altro dispositivo lo scansionerà,\n'
+                        'passerai automaticamente alla fotocamera.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.4),
           ),
           const SizedBox(height: 24),
-          if (_qrData != null)
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.blue.shade100),
-              ),
-              child: QrImageView(
-                data: _qrData!,
-                size: 220,
-                backgroundColor: Colors.white,
-              ),
-            )
-          else
-            const CircularProgressIndicator(),
-          const SizedBox(height: 24),
-          if (_errorMessage != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+          if (_choseScanFirst || _scannedDeviceId == null) ...[
+            if (_qrData != null)
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.blue.shade100),
+                ),
+                child: QrImageView(
+                  data: _qrData!,
+                  size: 220,
+                  backgroundColor: Colors.white,
+                ),
+              )
+            else
+              const CircularProgressIndicator(),
+          ] else
+            const Column(
+              children: [
+                Icon(Icons.check_circle_outline_rounded, size: 48, color: Colors.green),
+                SizedBox(height: 8),
+                Text(
+                  'Scambio completato, attesa verifica...',
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+              ],
             ),
-          Text(
-            'In attesa che il partner inquadri il QR...',
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
-          ),
+          if (_isPairing && (_choseScanFirst || _scannedDeviceId == null)) ...[
+            const SizedBox(height: 20),
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                SizedBox(width: 10),
+                Text(
+                  'In attesa connessione...',
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+              ],
+            ),
+          ],
+          if (_errorMessage != null) ...[
+            const SizedBox(height: 12),
+            Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+          ],
         ],
       ),
     );
@@ -618,10 +674,11 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
         Expanded(
           child: Stack(
             children: [
-              MobileScanner(
-                controller: _scannerController,
-                onDetect: _onQrScanned,
-              ),
+              if (_scannerController != null)
+                MobileScanner(
+                  controller: _scannerController,
+                  onDetect: _onQrScanned,
+                ),
               Container(
                 alignment: Alignment.center,
                 child: Container(
@@ -640,14 +697,19 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              const Text(
-                'Inquadra il QR dell\'altro catechista',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              Text(
+                _choseScanFirst
+                    ? 'Inquadra il QR dell\'altro catechista'
+                    : 'Ora scansiona il QR del partner',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               Text(
-                'Il QR si trova nella schermata "Mostra QR" '
-                'dell\'altra app.',
+                _choseScanFirst
+                    ? 'Dopo la scansione passerai automaticamente\n'
+                        'alla schermata "Mostra QR".'
+                    : 'Il QR si trova nella schermata "Mostra QR"\n'
+                        'dell\'altra app.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
               ),
@@ -655,6 +717,97 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPairingVerification() {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const SizedBox(height: 20),
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: const Color(0xFF174A7E).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Icon(Icons.lock_rounded, size: 36, color: Color(0xFF174A7E)),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Verifica sicurezza',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Conferma che su entrambi i dispositivi\nsia visualizzato lo STESSO codice:',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.4),
+          ),
+          const SizedBox(height: 24),
+          if (_pairingCode != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF174A7E).withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF174A7E).withValues(alpha: 0.3)),
+              ),
+              child: Text(
+                _pairingCode!,
+                style: const TextStyle(
+                  fontSize: 42,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 8,
+                  color: Color(0xFF174A7E),
+                ),
+              ),
+            ),
+          const SizedBox(height: 16),
+          Text(
+            'Se i codici NON corrispondono, annulla:\n'
+            'potrebbe esserci un tentativo di intrusione.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+          ),
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              icon: const Icon(Icons.check_rounded),
+              label: const Text('Codici corrispondono, conferma',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              onPressed: _onConfirmPairingCode,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.red,
+                side: const BorderSide(color: Colors.red),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              icon: const Icon(Icons.close_rounded),
+              label: const Text('Codici DIVERSI, Annulla',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              onPressed: _onRejectPairingCode,
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
     );
   }
 
@@ -786,11 +939,6 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
               onPressed: _retry,
             ),
           ),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: () => context.go('/'),
-            child: const Text('Salta e vai alla home'),
-          ),
           const SizedBox(height: 20),
         ],
       ),
@@ -801,48 +949,14 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
     _stopP2p();
     _stopScanner();
     _syncCompleted = false;
+    _syncStarted = false;
     _isPairing = false;
+    _scannedDeviceId = null;
     _errorMessage = null;
     _successMessage = null;
+    _pairingCode = null;
     setState(() {
       _currentStep = _OnboardingStep.roleChoice;
     });
-  }
-
-  Widget _buildStepCard(String number, String title, String description) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 4))],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: const BoxDecoration(
-              color: Color(0xFF174A7E),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(number, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF174A7E))),
-                const SizedBox(height: 4),
-                Text(description, style: TextStyle(fontSize: 13, color: Colors.grey.shade700, height: 1.4)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

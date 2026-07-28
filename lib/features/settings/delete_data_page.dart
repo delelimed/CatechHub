@@ -22,6 +22,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/auth/auth_service.dart';
+import '../../core/auth/auth_provider.dart';
 import '../../core/storage/data_deletion_service.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/widgets/app_scaffold.dart';
@@ -188,6 +189,8 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
 
     try {
       await ref.read(dataDeletionServiceProvider).deleteAllAndReset();
+
+      await ref.read(authStateProvider.notifier).lock();
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

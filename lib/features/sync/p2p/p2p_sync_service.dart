@@ -920,10 +920,11 @@ class P2PSyncService {
       _sessionPairingNonce = P2PSecurityService.secureRandom(16)
           .map((b) => b.toRadixString(16).padLeft(2, '0'))
           .join();
-      final qrPayload = await _security.generateQrPayload();
+      final localIdentity = await _security.getLocalIdentity();
       final handshakeMsg = jsonEncode({
         'type': 'p2p_handshake',
-        'payload': qrPayload,
+        'senderId': localIdentity.deviceId,
+        'senderName': localIdentity.deviceName,
         'timestamp':
             DateTime.now().millisecondsSinceEpoch ~/ 1000,
         'role': _state.role.name,
@@ -1053,20 +1054,38 @@ class P2PSyncService {
   Future<void> _handleHandshake(
       String endpointId, Map<String, dynamic> message) async {
     addLog('DEBUG', 'Handshake ricevuto da $endpointId');
-    final rawPayload = message['payload'] as String?;
-    if (rawPayload == null) {
-      addLog('WARN', 'Handshake senza payload da $endpointId');
+
+    final remoteId = message['senderId'] as String?;
+    final remoteName = message['senderName'] as String? ?? 'Sconosciuto';
+
+    if (remoteId == null) {
+      addLog('WARN', 'Handshake senza senderId da $endpointId');
       await _cleanupEndpoint(endpointId);
       return;
     }
 
-    final remoteIdentity = P2PSecurityService.parseQrPayload(rawPayload);
-    if (remoteIdentity == null) {
-      addLog('WARN', 'Handshake: impossibile parsare identità remota');
-      await _cleanupEndpoint(endpointId);
+    P2PDeviceAssociation? association;
+    for (int i = 0; i < 120; i++) {
+      association = await _security.getAssociation(remoteId);
+      if (association != null) break;
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    if (association == null) {
+      addLog('ERROR', 'Nessuna associazione trovata per $remoteId. QR non scansionato?');
+      try {
+        await _nearby.disconnectFromEndpoint(endpointId);
+      } catch (_) {}
+      _connectedEndpoints.remove(endpointId);
+      _pendingEndpointId = null;
+      _updateState(_state.copyWith(
+        status: P2PSyncStatus.error,
+        errorMessage: 'QR del dispositivo $remoteName non scansionato. '
+            'Assicurati di aver inquadrato il suo QR code prima della connessione.',
+      ));
       return;
     }
-    addLog('DEBUG', 'Handshake da: ${remoteIdentity.deviceName} (${remoteIdentity.deviceId})');
+    addLog('DEBUG', 'Handshake da: $remoteName ($remoteId)');
 
     final remoteRoleStr = message['role'] as String?;
     final remoteRole = remoteRoleStr != null
@@ -1079,7 +1098,7 @@ class P2PSyncService {
     if (!_rolesAreCompatible(_state.role, remoteRole)) {
       addLog('ERROR',
           'Ruoli incompatibili: locale=${_state.role.name} '
-          'remoto=${remoteRole.name} con ${remoteIdentity.deviceName}');
+          'remoto=${remoteRole.name} con $remoteName');
       try {
         await _nearby.disconnectFromEndpoint(endpointId);
       } catch (_) {}
@@ -1100,7 +1119,7 @@ class P2PSyncService {
     final localClassId = _getCurrentClassId();
     if (remoteClassId.isNotEmpty && localClassId.isNotEmpty && remoteClassId != localClassId) {
       addLog('ERROR',
-          'Classi diverse: locale=$localClassId remoto=$remoteClassId con ${remoteIdentity.deviceName}');
+          'Classi diverse: locale=$localClassId remoto=$remoteClassId con $remoteName');
       try {
         await _nearby.disconnectFromEndpoint(endpointId);
       } catch (_) {}
@@ -1108,7 +1127,7 @@ class P2PSyncService {
       _pendingEndpointId = null;
       _updateState(_state.copyWith(
         status: P2PSyncStatus.error,
-        errorMessage: 'Classi diverse: impossibile sincronizzare con ${remoteIdentity.deviceName}. '
+        errorMessage: 'Classi diverse: impossibile sincronizzare con $remoteName. '
             'La sincronizzazione Bluetooth è consentita solo tra dispositivi della stessa classe.',
       ));
       return;
@@ -1126,15 +1145,14 @@ class P2PSyncService {
       return;
     }
 
-    final existingAssoc =
-        await _security.getAssociation(remoteIdentity.deviceId);
+    final existingAssoc = await _security.getAssociation(remoteId);
     addLog('DEBUG',
-        'Associazione esistente per ${remoteIdentity.deviceId}: ${existingAssoc != null}');
+        'Associazione esistente per $remoteId: ${existingAssoc != null}');
 
     if (existingAssoc != null &&
         !P2PSecurityService.publicKeyMatchesAssociation(
-            existingAssoc, remoteIdentity.publicKeyBase64)) {
-      addLog('ERROR', 'MITM DETECTED: public key mismatch for ${remoteIdentity.deviceId}');
+            existingAssoc, association.publicKeyBase64)) {
+      addLog('ERROR', 'MITM DETECTED: public key mismatch for $remoteId');
       try {
         await _nearby.disconnectFromEndpoint(endpointId);
       } catch (_) {}
@@ -1143,37 +1161,38 @@ class P2PSyncService {
       _updateState(_state.copyWith(
         status: P2PSyncStatus.error,
         errorMessage: 'MITM rilevato: la chiave pubblica del dispositivo '
-            '${remoteIdentity.deviceName} non corrisponde a quella salvata.',
+            '$remoteName non corrisponde a quella salvata.',
       ));
       return;
     }
 
     _remoteSessionPairingNonce = message['sessionNonce'] as String?;
-    _endpointConnIdMap[endpointId] = remoteIdentity.deviceId;
+    _endpointConnIdMap[endpointId] = remoteId;
     _connectedEndpoints.add(endpointId);
 
     final localIdentity = await _security.getLocalIdentity();
-    final ack = jsonEncode({
-      'type': 'p2p_handshake_ack',
-      'payload': localIdentity.encode(),
-      'role': _state.role.name,
-      'sessionNonce': _sessionPairingNonce,
-      'classId': _getCurrentClassId(),
-    });
 
     if (existingAssoc != null && !_state.isPairingMode) {
       addLog('DEBUG', 'Handshake: associazione esistente, invio ack cifrato');
+      final ack = jsonEncode({
+        'type': 'p2p_handshake_ack',
+        'senderId': localIdentity.deviceId,
+        'senderName': localIdentity.deviceName,
+        'role': _state.role.name,
+        'sessionNonce': _sessionPairingNonce ?? '',
+        'classId': _getCurrentClassId(),
+      });
       await _sendEncryptedPayload(endpointId, ack);
       _updateState(_state.copyWith(
         status: P2PSyncStatus.sessionEstablished,
         connectedDeviceId: endpointId,
-        connectedDeviceName: remoteIdentity.deviceName,
-        connectedFingerprint: remoteIdentity.fingerprint,
+        connectedDeviceName: remoteName,
+        connectedFingerprint: association.fingerprint,
         isSessionEncrypted: true,
       ));
 
       final iAmInitiator =
-          localIdentity.deviceId.compareTo(remoteIdentity.deviceId) < 0;
+          localIdentity.deviceId.compareTo(remoteId) < 0;
       addLog('DEBUG', 'Sono iniziatore: $iAmInitiator');
       if (iAmInitiator) {
         final authRequest = jsonEncode({
@@ -1185,37 +1204,82 @@ class P2PSyncService {
         addLog('DEBUG', 'Auth request inviata a $endpointId');
       }
     } else {
-      addLog('DEBUG', 'Handshake: attesa ACK per calcolo pairing code');
-      _pendingHandshakeIdentity = remoteIdentity;
-      _pendingHandshakeRemoteRole = remoteRole;
+      addLog('DEBUG', 'Handshake: calcolo pairing code e invio ACK');
+
+      final sharedSecret = await _security.computeStaticSharedSecret(
+          association.publicKeyBase64);
+
+      final ack = jsonEncode({
+        'type': 'p2p_handshake_ack',
+        'senderId': localIdentity.deviceId,
+        'senderName': localIdentity.deviceName,
+        'role': _state.role.name,
+        'sessionNonce': _sessionPairingNonce ?? '',
+        'classId': _getCurrentClassId(),
+      });
       await _sendPayload(endpointId, ack);
 
+      final code = P2PSecurityService.computePairingCode(
+        sharedSecret,
+        sessionNonce: _agreedPairingNonce(),
+      );
+
+      _pendingHandshakeIdentity = P2PIdentity(
+        deviceId: remoteId,
+        deviceName: remoteName,
+        publicKeyBase64: association.publicKeyBase64,
+        fingerprint: association.fingerprint,
+      );
+      _pendingHandshakeRemoteRole = remoteRole;
+
       _updateState(_state.copyWith(
+        status: P2PSyncStatus.pairingVerification,
         connectedDeviceId: endpointId,
-        connectedDeviceName: remoteIdentity.deviceName,
-        connectedFingerprint: remoteIdentity.fingerprint,
+        connectedDeviceName: remoteName,
+        connectedFingerprint: association.fingerprint,
         isSessionEncrypted: true,
-        remoteDeviceFingerprint: remoteIdentity.fingerprint,
+        pairingCode: code,
+        remoteDeviceFingerprint: association.fingerprint,
       ));
-      addLog('INFO', 'In attesa verifica codice pairing...');
+      addLog('INFO', 'Codice pairing generato per verifica');
     }
   }
 
   Future<void> _handleHandshakeAck(
       String endpointId, Map<String, dynamic> message) async {
     addLog('DEBUG', 'Handshake ACK ricevuto da $endpointId');
-    final rawPayload = message['payload'] as String?;
-    if (rawPayload == null) {
-      addLog('WARN', 'Handshake ACK senza payload da $endpointId');
+
+    final remoteId = message['senderId'] as String?;
+    final remoteName = message['senderName'] as String? ?? 'Sconosciuto';
+
+    if (remoteId == null) {
+      addLog('WARN', 'Handshake ACK senza senderId da $endpointId');
       return;
     }
-    final remoteIdentity = P2PSecurityService.parseQrPayload(rawPayload);
-    if (remoteIdentity == null) {
-      addLog('WARN', 'Handshake ACK: impossibile parsare identità remota');
+
+    P2PDeviceAssociation? association;
+    for (int i = 0; i < 120; i++) {
+      association = await _security.getAssociation(remoteId);
+      if (association != null) break;
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    if (association == null) {
+      addLog('ERROR', 'Nessuna associazione trovata per $remoteId in ACK');
+      try {
+        await _nearby.disconnectFromEndpoint(endpointId);
+      } catch (_) {}
+      _connectedEndpoints.remove(endpointId);
+      _pendingEndpointId = null;
+      _updateState(_state.copyWith(
+        status: P2PSyncStatus.error,
+        errorMessage: 'QR del dispositivo $remoteName non scansionato. '
+            'Assicurati di aver inquadrato il suo QR code.',
+      ));
       return;
     }
     addLog('DEBUG',
-        'Handshake ACK da: ${remoteIdentity.deviceName} (${remoteIdentity.deviceId})');
+        'Handshake ACK da: $remoteName ($remoteId)');
 
     final remoteRoleStr = message['role'] as String?;
     final remoteRole = remoteRoleStr != null
@@ -1228,7 +1292,7 @@ class P2PSyncService {
     if (!_rolesAreCompatible(_state.role, remoteRole)) {
       addLog('ERROR',
           'Ruoli incompatibili: entrambi ${_state.role.name} '
-          'con ${remoteIdentity.deviceName}');
+          'con $remoteName');
       try {
         await _nearby.disconnectFromEndpoint(endpointId);
       } catch (_) {}
@@ -1247,7 +1311,7 @@ class P2PSyncService {
     final localClassId = _getCurrentClassId();
     if (remoteClassId.isNotEmpty && localClassId.isNotEmpty && remoteClassId != localClassId) {
       addLog('ERROR',
-          'Classi diverse: locale=$localClassId remoto=$remoteClassId con ${remoteIdentity.deviceName}');
+          'Classi diverse: locale=$localClassId remoto=$remoteClassId con $remoteName');
       try {
         await _nearby.disconnectFromEndpoint(endpointId);
       } catch (_) {}
@@ -1255,19 +1319,18 @@ class P2PSyncService {
       _pendingEndpointId = null;
       _updateState(_state.copyWith(
         status: P2PSyncStatus.error,
-        errorMessage: 'Classi diverse: impossibile sincronizzare con ${remoteIdentity.deviceName}. '
+        errorMessage: 'Classi diverse: impossibile sincronizzare con $remoteName. '
             'La sincronizzazione Bluetooth è consentita solo tra dispositivi della stessa classe.',
       ));
       return;
     }
 
-    final existingAssoc =
-        await _security.getAssociation(remoteIdentity.deviceId);
+    final existingAssoc = await _security.getAssociation(remoteId);
 
     if (existingAssoc != null &&
         !P2PSecurityService.publicKeyMatchesAssociation(
-            existingAssoc, remoteIdentity.publicKeyBase64)) {
-      debugPrint('[P2P] MITM DETECTED in ack: public key mismatch for ${remoteIdentity.deviceId}');
+            existingAssoc, association.publicKeyBase64)) {
+      debugPrint('[P2P] MITM DETECTED in ack: public key mismatch for $remoteId');
       try {
         await _nearby.disconnectFromEndpoint(endpointId);
       } catch (_) {}
@@ -1275,26 +1338,24 @@ class P2PSyncService {
       _pendingEndpointId = null;
       _updateState(_state.copyWith(
         status: P2PSyncStatus.error,
-        errorMessage: 'MITM rilevato: chiave pubblica alterata per ${remoteIdentity.deviceName}.',
+        errorMessage: 'MITM rilevato: chiave pubblica alterata per $remoteName.',
       ));
       return;
     }
 
-    _endpointConnIdMap[endpointId] = remoteIdentity.deviceId;
+    _endpointConnIdMap[endpointId] = remoteId;
     _connectedEndpoints.add(endpointId);
 
     if (existingAssoc != null && !_state.isPairingMode) {
-      await _saveAssociationIfNeeded(remoteIdentity, remoteRole: remoteRole);
-
       _updateState(_state.copyWith(
-        connectedFingerprint: remoteIdentity.fingerprint,
-        connectedDeviceName: remoteIdentity.deviceName,
+        connectedFingerprint: association.fingerprint,
+        connectedDeviceName: remoteName,
         isSessionEncrypted: true,
       ));
 
       final localIdentity = await _security.getLocalIdentity();
       final iAmInitiator =
-          localIdentity.deviceId.compareTo(remoteIdentity.deviceId) < 0;
+          localIdentity.deviceId.compareTo(remoteId) < 0;
 
       if (iAmInitiator) {
         final authRequest = jsonEncode({
@@ -1308,22 +1369,27 @@ class P2PSyncService {
     } else {
       _remoteSessionPairingNonce = message['sessionNonce'] as String? ?? _remoteSessionPairingNonce;
       final sharedSecret = await _security.computeStaticSharedSecret(
-        remoteIdentity.publicKeyBase64,
+        association.publicKeyBase64,
       );
       final code = P2PSecurityService.computePairingCode(
         sharedSecret,
         sessionNonce: _agreedPairingNonce(),
       );
 
-      _pendingHandshakeIdentity = remoteIdentity;
+      _pendingHandshakeIdentity = P2PIdentity(
+        deviceId: remoteId,
+        deviceName: remoteName,
+        publicKeyBase64: association.publicKeyBase64,
+        fingerprint: association.fingerprint,
+      );
       _pendingHandshakeRemoteRole = remoteRole;
       _updateState(_state.copyWith(
         status: P2PSyncStatus.pairingVerification,
-        connectedFingerprint: remoteIdentity.fingerprint,
-        connectedDeviceName: remoteIdentity.deviceName,
+        connectedFingerprint: association.fingerprint,
+        connectedDeviceName: remoteName,
         isSessionEncrypted: true,
         pairingCode: code,
-        remoteDeviceFingerprint: remoteIdentity.fingerprint,
+        remoteDeviceFingerprint: association.fingerprint,
       ));
     }
   }

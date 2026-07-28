@@ -160,7 +160,12 @@ class ClassesRepository {
   /// Da chiamare all'avvio per backfillare classi create prima
   /// dell'introduzione del campo.
   Future<void> ensureUniqueCodes() async {
-    for (final key in _box.keys) {
+    // Pulisci eventuali entry con chiave vuota (da import backup con ID mancanti)
+    for (final key in _box.keys.toList()) {
+      if (key.toString().isEmpty) {
+        await _box.delete(key);
+        continue;
+      }
       final raw = _box.get(key);
       if (raw == null) continue;
       final data = LocalDatabase.toStringDynamicMap(raw);

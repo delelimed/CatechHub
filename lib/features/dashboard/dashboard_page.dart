@@ -16,6 +16,7 @@ import '../documents/documents_repository.dart';
 import '../meetings/attendance_repository.dart';
 import '../planning/planning_provider.dart';
 import '../students/students_repository.dart';
+import 'statistics_page.dart';
 
 /// Pagina principale della dashboard di CateREG.
 ///
@@ -234,6 +235,19 @@ class DashboardPage extends ConsumerWidget {
                             highAbsences: highAbsences,
                             compact: !isWide,
                             absenceThreshold: privacySettings.absenceThreshold,
+                            currentClassId: currentClass.id,
+                            currentClassName: currentClass.name,
+                            onPresenceTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => StatisticsPage(
+                                    className: currentClass.name,
+                                    classId: currentClass.id,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                           const SizedBox(height: 24),
                           _SectionTitle('Documenti in attesa'),
@@ -464,12 +478,18 @@ class _OverviewCard extends StatelessWidget {
   final List<_HighAbsenceStudent> highAbsences;
   final bool compact;
   final int absenceThreshold;
+  final String? currentClassId;
+  final String? currentClassName;
+  final VoidCallback? onPresenceTap;
 
   const _OverviewCard({
     required this.presenceRate,
     required this.highAbsences,
     required this.compact,
     required this.absenceThreshold,
+    this.currentClassId,
+    this.currentClassName,
+    this.onPresenceTap,
   });
 
   @override
@@ -479,6 +499,7 @@ class _OverviewCard extends StatelessWidget {
       label: 'Presenze medie',
       value: '${presenceRate.toStringAsFixed(0)}%',
       color: Colors.green,
+      onTap: onPresenceTap,
     );
 
     final absencesPanel = _HighAbsencePanel(
@@ -510,12 +531,14 @@ class _MetricPanel extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
+  final VoidCallback? onTap;
 
   const _MetricPanel({
     required this.icon,
     required this.label,
     required this.value,
     required this.color,
+    this.onTap,
   });
 
   @override
@@ -524,7 +547,7 @@ class _MetricPanel extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
     final labelColor = isDark ? Colors.grey.shade400 : Colors.black54;
 
-    return _Panel(
+    final panel = _Panel(
       child: Row(
         children: [
           Container(
@@ -553,9 +576,20 @@ class _MetricPanel extends StatelessWidget {
               ],
             ),
           ),
+          if (onTap != null)
+            Icon(Icons.chevron_right_rounded, color: color.withValues(alpha: 0.5)),
         ],
       ),
     );
+
+    if (onTap != null) {
+      return GestureDetector(
+        onTap: onTap,
+        child: panel,
+      );
+    }
+
+    return panel;
   }
 }
 

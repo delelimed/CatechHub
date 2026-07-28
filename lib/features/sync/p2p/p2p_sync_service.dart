@@ -1752,6 +1752,8 @@ class P2PSyncService {
       }
     }
 
+    await _ensureSessionKey(endpointId);
+
     _updateState(_state.copyWith(
       status: P2PSyncStatus.pairingVerification,
       connectedDeviceId: endpointId,
@@ -2047,12 +2049,37 @@ class P2PSyncService {
     if (_endpointSessionKeys.containsKey(endpointId)) return;
     final deviceId = _endpointConnIdMap[endpointId];
     if (deviceId == null) return;
-    try {
-      final key = await _deriveSessionKey(deviceId);
-      _endpointSessionKeys[endpointId] = key;
-    } catch (e) {
-      addLog('ERROR', 'Errore derivazione chiave sessione: $e');
+
+    final assoc = await _security.getAssociation(deviceId);
+    if (assoc != null) {
+      try {
+        final key = await _deriveSessionKey(deviceId);
+        _endpointSessionKeys[endpointId] = key;
+        return;
+      } catch (e) {
+        addLog('ERROR', 'Errore derivazione chiave sessione da associazione: $e');
+      }
     }
+
+    final pending = _pendingAssociations[deviceId];
+    if (pending != null) {
+      try {
+        final localIdentity = await _security.getLocalIdentity();
+        final isInitiator = localIdentity.deviceId.compareTo(deviceId) < 0;
+        final session = await _security.createEphemeralSession(
+          remoteDeviceId: deviceId,
+          remoteDeviceName: pending.deviceName,
+          remotePublicKeyBase64: pending.publicKeyBase64,
+          isInitiator: isInitiator,
+        );
+        _endpointSessionKeys[endpointId] = session.sessionKey;
+        return;
+      } catch (e) {
+        addLog('ERROR', 'Errore derivazione chiave sessione da pending: $e');
+      }
+    }
+
+    addLog('ERROR', 'Errore derivazione chiave sessione: associazione non trovata per $deviceId');
   }
 
   Future<void> _sendEncryptedPayload(

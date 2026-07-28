@@ -333,6 +333,13 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
   void _onConfirmPairingCode() async {
     final service = ref.read(nearbySyncServiceProvider);
     await service.confirmPairingCode();
+    addLog('INFO', 'Codice pairing confermato, attesa sincronizzazione dati');
+    if (mounted) {
+      setState(() {
+        _currentStep = _OnboardingStep.syncing;
+        _successMessage = 'Sincronizzazione dati classe in corso...';
+      });
+    }
   }
 
   void _onRejectPairingCode() {
@@ -956,6 +963,12 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
         ],
       ),
     );
+  }
+
+  void addLog(String level, String message) {
+    try {
+      ref.read(nearbySyncServiceProvider).addLog(level, message);
+    } catch (_) {}
   }
 
   void _retry() {

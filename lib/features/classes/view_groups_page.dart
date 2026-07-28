@@ -48,11 +48,14 @@ class ViewGroupsPage extends ConsumerWidget {
             );
           }
 
+          final activeGroupId = myClasses.isNotEmpty ? myClasses.first.id : '';
+
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
               ...myClasses.map((c) => _GroupCard(
                 schoolClass: c,
+                isActive: c.id == activeGroupId,
                 onDelete: () async {
                   try {
                     await ref.read(classesRepoProvider).deleteClass(c.id);
@@ -149,9 +152,10 @@ class ViewGroupsPage extends ConsumerWidget {
 
 class _GroupCard extends StatelessWidget {
   final SchoolClass schoolClass;
+  final bool isActive;
   final VoidCallback? onDelete;
 
-  const _GroupCard({required this.schoolClass, this.onDelete});
+  const _GroupCard({required this.schoolClass, this.isActive = false, this.onDelete});
 
   void _showDeleteConfirmation(BuildContext context) {
     showDialog(
@@ -265,7 +269,7 @@ class _GroupCard extends StatelessWidget {
               ],
             ),
           ),
-          if (onDelete != null)
+          if (onDelete != null && !isActive)
             PopupMenuButton<String>(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),

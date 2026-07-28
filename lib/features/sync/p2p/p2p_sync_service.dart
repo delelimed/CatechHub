@@ -1073,11 +1073,18 @@ class P2PSyncService {
   void _onDisconnected(String endpointId) {
     addLog('INFO', 'Dispositivo disconnesso');
     _connectedEndpoints.remove(endpointId);
-    _endpointConnIdMap.remove(endpointId);
+    final deviceId = _endpointConnIdMap.remove(endpointId);
     _endpointSessionKeys.remove(endpointId);
     _endpointSyncPhase.remove(endpointId);
     if (_pendingEndpointId == endpointId) {
       _pendingEndpointId = null;
+    }
+    if (_state.isPairingMode && deviceId != null) {
+      if (_pendingAssociations.containsKey(deviceId)) {
+        addLog('INFO', 'Associazione pendente rimossa per $deviceId (disconnessione)');
+        _pendingAssociations.remove(deviceId);
+      }
+      _pendingHandshakeData.remove(endpointId);
     }
     if (_state.connectedDeviceId == endpointId) {
       _updateState(_state.copyWith(
@@ -1263,6 +1270,9 @@ class P2PSyncService {
           break;
         case 'p2p_ready_for_verification':
           await _handleReadyForVerification(endpointId, decoded);
+          break;
+        case 'p2p_pairing_rejected':
+          await _handlePairingRejected(endpointId, decoded);
           break;
       }
     } catch (e) {
@@ -1748,6 +1758,37 @@ class P2PSyncService {
       pairingCode: code,
     ));
     addLog('INFO', 'Passaggio a pairingVerification dopo notifica remota');
+  }
+
+  Future<void> _handlePairingRejected(
+      String endpointId, Map<String, dynamic> message) async {
+    addLog('INFO', 'Pairing rifiutato dal dispositivo remoto');
+    final deviceId = _endpointConnIdMap[endpointId];
+    if (deviceId != null) {
+      _pendingAssociations.remove(deviceId);
+      addLog('INFO', 'Associazione pendente rimossa per $deviceId (rifiuto remoto)');
+    }
+    _pendingHandshakeData.remove(endpointId);
+    try {
+      await _nearby.disconnectFromEndpoint(endpointId);
+    } catch (_) {}
+    _connectedEndpoints.remove(endpointId);
+    _endpointConnIdMap.remove(endpointId);
+    _endpointSessionKeys.remove(endpointId);
+    _pendingEndpointId = null;
+    _pendingHandshakeIdentity = null;
+    _pendingHandshakeRemoteRole = null;
+    _updateState(_state.copyWith(
+      status: P2PSyncStatus.error,
+      isPairingMode: false,
+      connectedDeviceId: null,
+      connectedDeviceName: null,
+      connectedFingerprint: null,
+      isSessionEncrypted: false,
+      pairingCode: null,
+      remotePairingCode: null,
+      errorMessage: message['reason'] as String? ?? 'Associazione annullata dal remoto.',
+    ));
   }
 
   /// Memorizza i dati di un'associazione scansionata dal QR ma non ancora verificata.
@@ -2371,6 +2412,15 @@ class P2PSyncService {
     if (_state.connectedDeviceId == null) return;
 
     final endpointId = _state.connectedDeviceId!;
+
+    try {
+      final rejectMsg = jsonEncode({
+        'type': 'p2p_pairing_rejected',
+        'reason': 'Codice di verifica non corrispondente',
+      });
+      await _sendPayload(endpointId, rejectMsg);
+    } catch (_) {}
+
     try {
       await _nearby.disconnectFromEndpoint(endpointId);
     } catch (_) {}

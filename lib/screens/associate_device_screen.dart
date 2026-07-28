@@ -61,7 +61,7 @@ class _AssociateDeviceScreenState
   bool _isFirstToShowQr = false;
 
   P2PSyncRole _selectedRole = P2PSyncRole.mioDispositivo;
-  bool _isOnboarding = true;
+  bool _isOnboarding = false;
 
   String? _qrData;
   String? _errorMessage;
@@ -77,6 +77,7 @@ class _AssociateDeviceScreenState
   Timer? _pairingTimeoutTimer;
   StreamSubscription<P2PSyncState>? _p2pStateSub;
   bool _pairingDialogShown = false;
+  bool _isConfirmingPairing = false;
 
   String? _pairingCode;
 
@@ -120,12 +121,6 @@ class _AssociateDeviceScreenState
       _errorMessage = null;
     });
     ref.read(nearbySyncServiceProvider).setRole(role);
-  }
-
-  void _setOnboarding(bool onboarding) {
-    setState(() {
-      _isOnboarding = onboarding;
-    });
   }
 
   void _chooseShowQrFirst() {
@@ -181,7 +176,8 @@ class _AssociateDeviceScreenState
       _pairingComplete = false;
       _pairingCode = null;
       _awaitingVerification = false;
-      _pairingDialogShown = false;
+_pairingDialogShown = false;
+      _isConfirmingPairing = false;
     });
   }
 
@@ -245,7 +241,6 @@ class _AssociateDeviceScreenState
         }
       } else if (state.status == P2PSyncStatus.pairingVerification) {
         if (!_pairingDialogShown && !_pairingComplete) {
-          _pairingDialogShown = true;
           _pairingTimeoutTimer?.cancel();
           if (state.pairingCode != null) {
             setState(() {
@@ -261,7 +256,7 @@ class _AssociateDeviceScreenState
           _successMessage = 'Sincronizzazione dati in corso...';
         });
       } else if (state.status == P2PSyncStatus.completed) {
-        if (_pairingComplete) return;
+        if (_pairingComplete || _isConfirmingPairing) return;
         _pairingComplete = true;
         setState(() {
           _currentStep = _AssociationStep.complete;
@@ -272,7 +267,7 @@ class _AssociateDeviceScreenState
           _isPairing = false;
         });
       } else if (state.status == P2PSyncStatus.error) {
-        if (!_pairingComplete && _isPairing) {
+        if (!_pairingComplete && _isPairing && !_isConfirmingPairing) {
           setState(() {
             _errorMessage = state.errorMessage ?? 'Errore di connessione.';
             _isPairing = false;
@@ -483,7 +478,9 @@ class _AssociateDeviceScreenState
 
     if (_pairingCode != null &&
         service.currentState.status == P2PSyncStatus.pairingVerification) {
+      _isConfirmingPairing = true;
       await service.confirmPairingCode();
+      _isConfirmingPairing = false;
     }
 
     setState(() {
@@ -794,28 +791,6 @@ class _AssociateDeviceScreenState
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(Icons.info_outline, size: 18, color: Colors.grey[500]),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Sei un nuovo catechista in onboarding?',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            SwitchListTile(
-              title: const Text('Onboarding'),
-              subtitle: const Text(
-                  'Scarica i dati della classe dal dispositivo che stai associando'),
-              value: _isOnboarding,
-              onChanged: (val) => _setOnboarding(val),
-              contentPadding: EdgeInsets.zero,
             ),
             const SizedBox(height: 12),
             SizedBox(

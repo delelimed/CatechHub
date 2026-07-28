@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_service.dart';
 import '../../shared/models/class_model.dart';
@@ -54,6 +55,14 @@ class ViewGroupsPage extends ConsumerWidget {
               ...myClasses.map((c) => _GroupCard(schoolClass: c)),
               const SizedBox(height: 24),
               _buildCreateButton(context, isDark, colorScheme),
+              const SizedBox(height: 12),
+              Center(
+                child: TextButton.icon(
+                  onPressed: () => context.push('/classes'),
+                  icon: const Icon(Icons.settings_rounded),
+                  label: const Text('Gestisci tutte le classi'),
+                ),
+              ),
               const SizedBox(height: 32),
             ],
           );

@@ -946,6 +946,8 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
   }
 
   void _retry() {
+    _pairingTimeoutTimer?.cancel();
+    _p2pStateSub?.cancel();
     _stopP2p();
     _stopScanner();
     _syncCompleted = false;

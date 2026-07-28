@@ -12,6 +12,7 @@
 ///
 /// Integrazione CateREG: usato da [classesRepoProvider] e da tutte le
 /// pagine che necessitano di leggere o modificare i dati delle classi.
+import 'package:flutter/foundation.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/utils/auth_utils.dart';
@@ -82,30 +83,56 @@ class ClassesRepository {
   }
 
   Future<void> deleteClass(String id) async {
-    await _box.delete(id);
-
-    final planningBox = LocalDatabase.planning();
-    final attendanceBox = LocalDatabase.attendance();
-
-    final keysToDelete = <dynamic>[];
-    for (final key in planningBox.keys) {
-      final data = LocalDatabase.toStringDynamicMap(planningBox.get(key));
-      if (data['classId'] == id) keysToDelete.add(key);
+    try {
+      await _box.delete(id);
+    } catch (e) {
+      debugPrint('[ClassesRepository] Errore eliminazione classe $id: $e');
     }
 
-    for (final key in keysToDelete) {
-      await planningBox.delete(key);
-      await attendanceBox.delete(key);
-    }
+    try {
+      final planningBox = LocalDatabase.planning();
+      final attendanceBox = LocalDatabase.attendance();
 
-    final attendanceKeysToDelete = <dynamic>[];
-    for (final key in attendanceBox.keys) {
-      final data = LocalDatabase.toStringDynamicMap(attendanceBox.get(key));
-      if (data['classId'] == id) attendanceKeysToDelete.add(key);
-    }
+      final keysToDelete = <dynamic>[];
+      for (final key in planningBox.keys) {
+        try {
+          final raw = planningBox.get(key);
+          if (raw == null) continue;
+          final data = LocalDatabase.toStringDynamicMap(raw);
+          if (data['classId'] == id) keysToDelete.add(key);
+        } catch (_) {
+          continue;
+        }
+      }
 
-    for (final key in attendanceKeysToDelete) {
-      await attendanceBox.delete(key);
+      for (final key in keysToDelete) {
+        try {
+          await planningBox.delete(key);
+        } catch (_) {}
+        try {
+          await attendanceBox.delete(key);
+        } catch (_) {}
+      }
+
+      final attendanceKeysToDelete = <dynamic>[];
+      for (final key in attendanceBox.keys) {
+        try {
+          final raw = attendanceBox.get(key);
+          if (raw == null) continue;
+          final data = LocalDatabase.toStringDynamicMap(raw);
+          if (data['classId'] == id) attendanceKeysToDelete.add(key);
+        } catch (_) {
+          continue;
+        }
+      }
+
+      for (final key in attendanceKeysToDelete) {
+        try {
+          await attendanceBox.delete(key);
+        } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('[ClassesRepository] Errore durante cascata cancellazione classe $id: $e');
     }
   }
 

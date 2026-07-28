@@ -749,8 +749,25 @@ class P2PSyncService {
     _pairingTimeoutTimer?.cancel();
     _pairingTimeoutTimer = null;
     _pairingCompleter = null;
+
+    for (final endpointId in _connectedEndpoints.toList()) {
+      try {
+        await _nearby.disconnectFromEndpoint(endpointId);
+      } catch (_) {}
+    }
+
+    _connectedEndpoints.clear();
+    _endpointConnIdMap.clear();
+    _endpointSessionKeys.clear();
+    _endpointSyncPhase.clear();
     _pendingEndpointId = null;
+    _pendingHandshakeIdentity = null;
+    _pendingHandshakeRemoteRole = null;
+    _nearbyDiscoveredDevices.clear();
+    _nearbyEndpointToDevice.clear();
+    _sessionConfirmedDevices.clear();
     _restartingEndpoints = false;
+
     try {
       await _nearby.stopAdvertising();
       await _nearby.stopDiscovery();
@@ -759,6 +776,13 @@ class P2PSyncService {
     _updateState(_state.copyWith(
       isPairingMode: false,
       status: P2PSyncStatus.idle,
+      connectedDeviceId: null,
+      connectedDeviceName: null,
+      connectedFingerprint: null,
+      isSessionEncrypted: false,
+      pairingCode: null,
+      remotePairingCode: null,
+      errorMessage: null,
     ));
 
     if (_continuousModeActive) {
@@ -1047,7 +1071,7 @@ class P2PSyncService {
           break;
       }
     } catch (e) {
-      debugPrint('[P2P] Handle message error: $e');
+      addLog('ERROR', 'Errore gestione messaggio da $endpointId: $e');
     }
   }
 
@@ -1136,7 +1160,7 @@ class P2PSyncService {
     final timestamp = message['timestamp'] as int? ?? 0;
     final age = (DateTime.now().millisecondsSinceEpoch ~/ 1000) - timestamp;
     if (age.abs() > 120) {
-      debugPrint('[P2P] Handshake expired');
+      addLog('WARN', 'Handshake scaduto per $endpointId (età: ${age.abs()}s), disconnessione');
       try {
         await _nearby.disconnectFromEndpoint(endpointId);
       } catch (_) {}
@@ -1330,7 +1354,7 @@ class P2PSyncService {
     if (existingAssoc != null &&
         !P2PSecurityService.publicKeyMatchesAssociation(
             existingAssoc, association.publicKeyBase64)) {
-      debugPrint('[P2P] MITM DETECTED in ack: public key mismatch for $remoteId');
+      addLog('ERROR', 'MITM DETECTED in ack: chiave pubblica non corrispondente per $remoteId');
       try {
         await _nearby.disconnectFromEndpoint(endpointId);
       } catch (_) {}
@@ -1401,7 +1425,7 @@ class P2PSyncService {
       if (existing != null) {
         if (!P2PSecurityService.publicKeyMatchesAssociation(
             existing, remoteIdentity.publicKeyBase64)) {
-          debugPrint('[P2P] MITM detected in _saveAssociationIfNeeded: '
+          addLog('ERROR', 'MITM detected in _saveAssociationIfNeeded: '
               'key mismatch for ${remoteIdentity.deviceId}');
           return;
         }
@@ -1964,12 +1988,16 @@ class P2PSyncService {
       await _nearby.disconnectFromEndpoint(endpointId);
     } catch (_) {}
     _connectedEndpoints.remove(endpointId);
+    _endpointConnIdMap.remove(endpointId);
+    _endpointSessionKeys.remove(endpointId);
+    _endpointSyncPhase.remove(endpointId);
     _pendingEndpointId = null;
     _pendingHandshakeIdentity = null;
     _pendingHandshakeRemoteRole = null;
 
     _updateState(_state.copyWith(
       status: P2PSyncStatus.idle,
+      isPairingMode: false,
       connectedDeviceId: null,
       connectedDeviceName: null,
       connectedFingerprint: null,

@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../meetings/attendance_repository.dart';
+import '../students/students_repository.dart';
 
-class StatisticsPage extends StatelessWidget {
+class StatisticsPage extends StatefulWidget {
   final String className;
   final String classId;
 
@@ -15,46 +16,189 @@ class StatisticsPage extends StatelessWidget {
   });
 
   @override
+  State<StatisticsPage> createState() => _StatisticsPageState();
+}
+
+class _StatisticsPageState extends State<StatisticsPage> {
+  _StatsData? _stats;
+  bool _hasStudents = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  void _loadData() {
+    try {
+      final studentsRepo = StudentsRepository();
+      final allStudents = studentsRepo.getAllStudentsSync();
+      final classData = LocalDatabase.classes().get(widget.classId);
+      final classMap = LocalDatabase.toStringDynamicMap(classData);
+      final classStudentIds =
+          (classMap['studentIds'] as List? ?? []).map((e) => e.toString()).toList();
+      _hasStudents = allStudents
+          .any((s) => classStudentIds.contains(s.id));
+
+      final attendanceRepo = AttendanceRepository();
+      final allAttendance = attendanceRepo.getAttendanceSync();
+      final classAttendance = allAttendance
+          .where((record) => record['classId'] == widget.classId)
+          .toList();
+
+      _stats = _computeStats(classAttendance);
+      setState(() {});
+    } catch (e) {
+      _error = 'Errore nel caricamento delle statistiche: $e';
+      setState(() {});
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final attendanceRepo = AttendanceRepository();
-    final allAttendance = attendanceRepo.getAttendanceSync();
-    final classAttendance = allAttendance
-        .where((record) => record['classId'] == classId)
-        .toList();
-
-    final stats = _computeStats(classAttendance);
 
     return AppScaffold(
       title: 'Statistiche',
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text(
-            className,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : const Color(0xFF174A7E),
-            ),
+      child: _buildBody(context, isDark),
+    );
+  }
+
+  Widget _buildBody(BuildContext context, bool isDark) {
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, size: 48, color: Colors.red.shade300),
+              const SizedBox(height: 16),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isDark ? Colors.grey.shade300 : Colors.black87,
+                  fontSize: 14,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 20),
-          _StatGrid(stats: stats, isDark: isDark),
-          const SizedBox(height: 24),
-          _BestWorstCard(stats: stats, isDark: isDark),
-          const SizedBox(height: 24),
-          _AttendanceTrendChart(
-            stats: stats.perMeetingStats,
-            isDark: isDark,
+        ),
+      );
+    }
+
+    if (_stats == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (!_hasStudents) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.people_outline, size: 40, color: Colors.orange.shade700),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Nessun ragazzo registrato',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF174A7E),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Aggiungi dei ragazzi al gruppo per visualizzare le statistiche.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isDark ? Colors.grey.shade400 : Colors.black54,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-          _PerMeetingBreakdown(
-            stats: stats.perMeetingStats,
-            isDark: isDark,
+        ),
+      );
+    }
+
+    if (_stats!.perMeetingStats.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.event_busy_rounded, size: 40, color: Colors.orange.shade700),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Nessuna presenza registrata',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF174A7E),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Registra le presenze per visualizzare le statistiche.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isDark ? Colors.grey.shade400 : Colors.black54,
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      );
+    }
+
+    final stats = _stats!;
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text(
+          widget.className,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : const Color(0xFF174A7E),
+          ),
+        ),
+        const SizedBox(height: 20),
+        _StatGrid(stats: stats, isDark: isDark),
+        const SizedBox(height: 24),
+        _BestWorstCard(stats: stats, isDark: isDark),
+        const SizedBox(height: 24),
+        _AttendanceTrendChart(
+          stats: stats.perMeetingStats,
+          isDark: isDark,
+        ),
+        const SizedBox(height: 24),
+        _PerMeetingBreakdown(
+          stats: stats.perMeetingStats,
+          isDark: isDark,
+        ),
+      ],
     );
   }
 

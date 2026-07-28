@@ -343,7 +343,12 @@ class P2PSecurityService {
   }
 
   Future<String> computeStaticSharedSecret(String remotePublicKeyBase64, {String? forDeviceId}) async {
-    final remoteKeyBytes = base64Decode(remotePublicKeyBase64);
+    Uint8List remoteKeyBytes;
+    try {
+      remoteKeyBytes = base64Decode(remotePublicKeyBase64);
+    } catch (_) {
+      throw FormatException('Chiave pubblica remota non valida: formato base64 errato');
+    }
     final keyPair = forDeviceId != null
         ? await _getOrCreateAssociationKeyPair(forDeviceId)
         : await getOrCreateIdentityKeyPair();
@@ -372,7 +377,12 @@ class P2PSecurityService {
     required String remotePublicKeyBase64,
     bool isInitiator = false,
   }) async {
-    final remoteKeyBytes = base64Decode(remotePublicKeyBase64);
+    Uint8List remoteKeyBytes;
+    try {
+      remoteKeyBytes = base64Decode(remotePublicKeyBase64);
+    } catch (_) {
+      throw FormatException('Chiave pubblica remota non valida: formato base64 errato in createEphemeralSession');
+    }
     final identityKeyPair = await getOrCreateIdentityKeyPair();
 
     final sharedSecret = await _x25519.sharedSecretKey(

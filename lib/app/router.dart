@@ -8,6 +8,7 @@ import '../features/auth/login_page.dart';
 import '../features/classes/my_group_page.dart';
 import '../features/classes/group_management_page.dart';
 import '../features/classes/view_groups_page.dart';
+import '../features/classes/classes_page.dart';
 import '../features/dashboard/dashboard_page.dart';
 import '../features/students/students_page.dart';
 import '../shared/models/student_model.dart';
@@ -530,6 +531,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/view-groups',
         builder: (context, state) => const ViewGroupsPage(),
+      ),
+
+      /// Gestione completa delle classi: creazione, modifica ed eliminazione.
+      GoRoute(
+        path: '/classes',
+        builder: (context, state) => const ClassesPage(),
       ),
 
       // ═══════════════════════════════════════════════════════════════════

@@ -205,10 +205,21 @@ class ClassDetailPage extends ConsumerWidget {
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              ref.read(classesRepoProvider).deleteClass(currentClass.id);
-              Navigator.pop(context);
+              try {
+                await ref.read(classesRepoProvider).deleteClass(currentClass.id);
+                if (context.mounted) Navigator.pop(context);
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Errore durante l\'eliminazione: $e'),
+                      backgroundColor: Colors.red.shade700,
+                    ),
+                  );
+                }
+              }
             },
             child: const Text('Elimina'),
           ),

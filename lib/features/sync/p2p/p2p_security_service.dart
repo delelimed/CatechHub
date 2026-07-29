@@ -241,6 +241,10 @@ String _bytesToHex(List<int> bytes) {
   return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 }
 
+final _p2pAad = Uint8List.fromList(
+  utf8.encode('CatechHub_Context_P2P_v1'),
+);
+
 class P2PSecurityService {
   static const _storagePrefix = 'p2p_assoc_';
   static const _localKeyPairName = 'p2p_local_keypair';
@@ -520,6 +524,7 @@ class P2PSecurityService {
       utf8.encode(plainText),
       secretKey: sessionKey,
       nonce: nonce,
+      aad: _p2pAad,
     );
 
     return P2PEncryptedPayload(
@@ -543,6 +548,7 @@ class P2PSecurityService {
     final plainBytes = await AesGcm.with256bits().decrypt(
       secretBox,
       secretKey: sessionKey,
+      aad: _p2pAad,
     );
 
     return utf8.decode(plainBytes);
@@ -560,6 +566,7 @@ class P2PSecurityService {
       utf8.encode(plainText),
       secretKey: secretKey,
       nonce: nonce,
+      aad: _p2pAad,
     );
 
     final payload = P2PEncryptedPayload(
@@ -587,6 +594,7 @@ class P2PSecurityService {
     final plainBytes = await AesGcm.with256bits().decrypt(
       secretBox,
       secretKey: secretKey,
+      aad: _p2pAad,
     );
 
     return utf8.decode(plainBytes);

@@ -448,6 +448,28 @@ class P2PSyncService {
       awaitingSessionPermission: false,
       pendingSessionDeviceName: null,
     ));
+    _reevaluateDiscoveredDevices();
+  }
+
+  Future<void> _reevaluateDiscoveredDevices() async {
+    for (final entry in _nearbyEndpointToDevice.entries.toList()) {
+      final endpointId = entry.key;
+      final deviceId = entry.value;
+      if (_connectedEndpoints.contains(endpointId)) continue;
+      if (_endpointConnIdMap.containsValue(deviceId)) continue;
+      final assoc = await _security.getAssociation(deviceId);
+      if (assoc != null && assoc.isValid) {
+        final isLocalAltro = _state.role == P2PSyncRole.altroCatechista;
+        final isRemoteAltro = assoc.remoteRole == P2PSyncRole.altroCatechista.name;
+        if (isLocalAltro && isRemoteAltro) {
+          _updateState(_state.copyWith(
+            awaitingSessionPermission: true,
+            pendingSessionDeviceName: assoc.deviceName,
+          ));
+          return;
+        }
+      }
+    }
   }
 
   void grantSessionPermission() {
@@ -457,6 +479,7 @@ class P2PSyncService {
       awaitingSessionPermission: false,
       pendingSessionDeviceName: null,
     ));
+    _attemptKnownDeviceConnections();
   }
 
   void denySessionPermission() {

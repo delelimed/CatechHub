@@ -16,7 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/auth_service.dart';
-//import '../../core/storage/local_database.dart';
+import '../../shared/utils/auth_utils.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/models/class_model.dart';
 import 'classes_provider.dart';
@@ -95,7 +95,10 @@ class ClassesPage extends ConsumerWidget {
                       className: c.name,
                       nameLocked: c.nameLocked,
                       isActive: isActive,
-                      onEditName: !c.nameLocked
+                      canEdit: !c.nameLocked &&
+                          c.isCreator(AuthService.localUserId, getCurrentCatechistName()),
+                      onEditName: !c.nameLocked &&
+                              c.isCreator(AuthService.localUserId, getCurrentCatechistName())
                           ? (newName) {
                               ref.read(classesRepoProvider).updateClass(
                                     c.id,
@@ -178,6 +181,7 @@ class _ClassCard extends StatelessWidget {
   final String className;
   final bool nameLocked;
   final bool isActive;
+  final bool canEdit;
   final Function(String)? onEditName;
 
   const _ClassCard({
@@ -190,6 +194,7 @@ class _ClassCard extends StatelessWidget {
     required this.className,
     this.nameLocked = false,
     this.isActive = false,
+    this.canEdit = true,
     this.onEditName,
   });
 
@@ -386,7 +391,7 @@ class _ClassCard extends StatelessWidget {
                 ),
                 onSelected: (value) {
                   if (value == 'edit') {
-                    if (!nameLocked) {
+                    if (canEdit) {
                       _showEditNameDialog(context);
                     }
                   } else if (value == 'delete') {
@@ -394,7 +399,7 @@ class _ClassCard extends StatelessWidget {
                   }
                 },
                 itemBuilder: (_) => [
-                  if (!nameLocked && onEditName != null)
+                  if (canEdit && onEditName != null)
                     const PopupMenuItem(
                       value: 'edit',
                       child: Text('Modifica nome'),

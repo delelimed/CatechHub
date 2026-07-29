@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import '../../core/auth/auth_service.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/models/planning_meeting.dart';
-import '../../shared/widgets/last_modified_info.dart';
 import '../classes/classes_provider.dart';
 import 'planning_provider.dart';
 import 'planning_edit_page.dart';
@@ -398,12 +397,6 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                                                   fontWeight: FontWeight.bold,
                                                   color: accentColor,
                                                 ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          LastModifiedInfo(
-                                            updatedAt: m.updatedAt,
-                                            lastModifiedBy: m.lastModifiedBy,
-                                            compact: true,
                                           ),
                                         ],
                                       ),

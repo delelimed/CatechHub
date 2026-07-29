@@ -9,6 +9,10 @@ import 'package:hive/hive.dart';
 import '../../../core/storage/local_database.dart';
 import 'p2p_security_service.dart';
 
+final _syncAad = Uint8List.fromList(
+  utf8.encode('CatechHub_Context_Sync_v1'),
+);
+
 class SyncRecord {
   final String id;
   final String boxName;
@@ -463,6 +467,7 @@ class HiveSyncEngine {
       utf8.encode(plainText),
       secretKey: sessionKey,
       nonce: nonce,
+      aad: _syncAad,
     );
 
     final payload = P2PEncryptedPayload(
@@ -489,6 +494,7 @@ class HiveSyncEngine {
     final plainBytes = await AesGcm.with256bits().decrypt(
       secretBox,
       secretKey: sessionKey,
+      aad: _syncAad,
     );
 
     return utf8.decode(plainBytes);

@@ -14,8 +14,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/auth/auth_service.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/models/student_model.dart';
+import '../../shared/utils/auth_utils.dart';
 import '../classes/classes_provider.dart';
 import '../students/students_provider.dart';
 
@@ -72,7 +74,8 @@ class ClassDetailPage extends ConsumerWidget {
                     }
                   },
                   itemBuilder: (_) => [
-                    if (!currentClass.nameLocked)
+                    if (!currentClass.nameLocked &&
+                        currentClass.isCreator(AuthService.localUserId, getCurrentCatechistName()))
                       const PopupMenuItem(value: 'edit', child: Text('Modifica nome')),
                     const PopupMenuItem(value: 'delete', child: Text('Elimina')),
                   ],
@@ -134,9 +137,11 @@ class ClassDetailPage extends ConsumerWidget {
                             ),
                             icon: const Icon(Icons.edit),
                             label: const Text("Modifica assegnazioni"),
-                            onPressed: () {
-                              _openAssignmentPanel(context, ref, currentClass, allStudents, catechistsList);
-                            },
+                            onPressed: currentClass.isCreator(AuthService.localUserId, getCurrentCatechistName())
+                                ? () {
+                                    _openAssignmentPanel(context, ref, currentClass, allStudents, catechistsList);
+                                  }
+                                : null,
                           ),
                         ),
                       ],

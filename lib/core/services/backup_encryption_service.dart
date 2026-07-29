@@ -28,6 +28,10 @@ class BackupEncryptionService {
   static const int _tagLengthBits = 128;
   static const int _keyLength = 32; // AES-256
 
+  static final _aad = Uint8List.fromList(
+    utf8.encode('CatechHub_Context_Backup_v1'),
+  );
+
 /// Genera byte casuali crittograficamente sicuri.
   static Uint8List _secureRandomBytes(int length) {
     final random = pc.FortunaRandom()
@@ -56,7 +60,7 @@ class BackupEncryptionService {
     final cipher = pc.GCMBlockCipher(pc.AESEngine())
       ..init(
         true,
-        pc.AEADParameters(pc.KeyParameter(key), _tagLengthBits, nonce, Uint8List(0)),
+        pc.AEADParameters(pc.KeyParameter(key), _tagLengthBits, nonce, _aad),
       );
 
     final plaintext = utf8.encode(jsonData);
@@ -111,7 +115,7 @@ class BackupEncryptionService {
             pc.KeyParameter(key),
             _tagLengthBits,
             Uint8List.fromList(nonce),
-            Uint8List(0),
+            _aad,
           ),
         );
 

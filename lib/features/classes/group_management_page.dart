@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../../shared/utils/auth_utils.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/models/student_model.dart';
@@ -183,6 +184,8 @@ class _GroupHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
+    final canEdit = !schoolClass.nameLocked &&
+        schoolClass.isCreator(AuthService.localUserId, getCurrentCatechistName());
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -241,9 +244,11 @@ class _GroupHeader extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  schoolClass.nameLocked
-                      ? 'Nome sincronizzato — non modificabile'
-                      : 'Tap per modificare il nome',
+                  !canEdit
+                      ? 'Solo il creatore può modificare'
+                      : (schoolClass.nameLocked
+                          ? 'Nome sincronizzato — non modificabile'
+                          : 'Tap per modificare il nome'),
                   style: TextStyle(
                     fontSize: 12,
                     color: isDark ? Colors.grey.shade400 : Colors.grey,
@@ -254,9 +259,9 @@ class _GroupHeader extends ConsumerWidget {
           ),
           IconButton(
             icon: Icon(Icons.edit, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
-            onPressed: schoolClass.nameLocked
-                ? null
-                : () => _showEditNameDialog(context, ref),
+            onPressed: canEdit
+                ? () => _showEditNameDialog(context, ref)
+                : null,
           ),
         ],
       ),
@@ -276,23 +281,26 @@ class _CatechistButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
+    final canManage = myClass.isCreator(AuthService.localUserId, getCurrentCatechistName());
 
     return InkWell(
       borderRadius: BorderRadius.circular(22),
-      onTap: () {
-        try {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ManageCatechistsPage(schoolClass: myClass),
-            ),
-          ).then((_) => ref.refresh(classesStreamProvider));
-        } catch (_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Errore durante la navigazione')),
-          );
-        }
-      },
+      onTap: canManage
+          ? () {
+              try {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ManageCatechistsPage(schoolClass: myClass),
+                  ),
+                ).then((_) => ref.refresh(classesStreamProvider));
+              } catch (_) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Errore durante la navigazione')),
+                );
+              }
+            }
+          : null,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -347,9 +355,11 @@ class _CatechistButton extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    myClass.nameLocked
-                        ? '${myClass.catechistIds.length} catechist${myClass.catechistIds.length == 1 ? 'a' : 'i'} — sola lettura'
-                        : '${myClass.catechistIds.length} catechist${myClass.catechistIds.length == 1 ? 'a' : 'i'}',
+                    !canManage
+                        ? 'Solo il creatore può gestire i catechisti'
+                        : (myClass.nameLocked
+                            ? '${myClass.catechistIds.length} catechist${myClass.catechistIds.length == 1 ? 'a' : 'i'} — sola lettura'
+                            : '${myClass.catechistIds.length} catechist${myClass.catechistIds.length == 1 ? 'a' : 'i'}'),
                     style: TextStyle(
                       fontSize: 12,
                       color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,

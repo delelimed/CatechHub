@@ -253,6 +253,8 @@ class AuthService {
           lastModifiedBy: fullName,
           uniqueCode: generateClassUniqueCode(),
           nameLocked: false,
+          creatorId: localUserId,
+          creatorName: fullName,
         );
         await classBox.put(classId, newClass.toMap());
       } else {

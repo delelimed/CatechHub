@@ -13,6 +13,7 @@
 /// Integrazione CateREG: usato da [classesRepoProvider] e da tutte le
 /// pagine che necessitano di leggere o modificare i dati delle classi.
 import 'package:flutter/foundation.dart';
+import '../../core/auth/auth_service.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/utils/auth_utils.dart';
@@ -39,10 +40,14 @@ class ClassesRepository {
     final code = c.uniqueCode.isEmpty ? generateClassUniqueCode() : c.uniqueCode;
     final catechistName = getCurrentCatechistName();
     final now = DateTime.now();
+    final creatorId = c.creatorId.isEmpty ? AuthService.localUserId : c.creatorId;
+    final creatorName = c.creatorName.isEmpty ? catechistName : c.creatorName;
     await _box.put(id, c.copyWith(
       id: id,
       uniqueCode: code,
       lastModifiedBy: catechistName,
+      creatorId: creatorId,
+      creatorName: creatorName,
       createdAt: now,
       updatedAt: now,
     ).toMap());
@@ -50,14 +55,27 @@ class ClassesRepository {
 
   Future<void> updateClass(String id, SchoolClass c) async {
     final previous = _getClass(id);
+    if (previous == null) return;
+
+    final currentName = getCurrentCatechistName();
+    final isCreator = previous.isCreator(AuthService.localUserId, currentName);
+
+    SchoolClass toSave;
+    if (isCreator) {
+      toSave = c;
+    } else {
+      toSave = c.copyWith(
+        name: previous.name,
+        catechistIds: previous.catechistIds,
+      );
+    }
+
     final catechistName = getCurrentCatechistName();
-    await _box.put(id, c.copyWith(
+    await _box.put(id, toSave.copyWith(
       id: id,
       lastModifiedBy: catechistName,
       updatedAt: DateTime.now(),
     ).toMap());
-
-    if (previous == null) return;
 
     final removedStudentIds = previous.studentIds
         .where((studentId) => !c.studentIds.contains(studentId))

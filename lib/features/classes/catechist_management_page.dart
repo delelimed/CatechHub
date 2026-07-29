@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/auth/auth_service.dart';
 import '../../features/sync/p2p/p2p_security_service.dart';
 import '../../shared/models/class_model.dart';
+import '../../shared/utils/auth_utils.dart';
 import 'classes_provider.dart';
 
 class ManageCatechistsPage extends ConsumerStatefulWidget {
@@ -208,7 +209,8 @@ class _ManageCatechistsPageState extends ConsumerState<ManageCatechistsPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
 
-    final canManage = !_currentClass.nameLocked;
+    final canManage = !_currentClass.nameLocked &&
+        _currentClass.isCreator(AuthService.localUserId, getCurrentCatechistName());
 
     return Scaffold(
       backgroundColor: isDark ? colorScheme.surface : Colors.grey.shade50,

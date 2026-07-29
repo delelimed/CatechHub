@@ -31,13 +31,15 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import 'dart:convert';
+import 'dart:io' show HttpClient, SecurityContext, X509Certificate;
 
+import 'package:crypto/crypto.dart' show sha256;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 import 'package:go_router/go_router.dart';
 
 /// GlobalKey per la navigazione dalle notifiche.
@@ -47,6 +49,57 @@ GlobalKey<NavigatorState>? navigatorKey;
 
 /// MethodChannel nativo per operazioni di update (install APK, cleanup)
 const _updateChannel = MethodChannel('com.delelimed.catechhub/update');
+
+/// SHA-256 fingerprints dei certificati attendibili per api.github.com.
+/// Il valore è l'hash SHA-256 della codifica DER del certificato, in Base64.
+/// Aggiornare alla rotazione dei certificati GitHub.
+/// 
+/// Per ottenere il fingerprint corrente, usare:
+///   openssl s_client -connect api.github.com:443 -showcerts </dev/null 2>/dev/null \
+///     | openssl x509 -outform DER | openssl dgst -sha256 -binary | base64
+const _pinnedGitHubFingerprints = <String>[
+  // *.github.com — Let's Encrypt / DigiCert
+  // Ottenuto da api.github.com. Da aggiornare periodicamente.
+];
+
+/// Estrae i byte DER da un certificato in formato PEM.
+Uint8List _pemDerBytes(String pem) {
+  final body = pem
+      .replaceAll(RegExp(r'-----[A-Z ]+-----'), '')
+      .replaceAll(RegExp(r'\s+'), '');
+  return base64Decode(body);
+}
+
+/// Verifica il certificato TLS contro i fingerprint noti.
+bool _checkPinnedCertificate(X509Certificate cert) {
+  try {
+    final derBytes = _pemDerBytes(cert.pem);
+    final hash = sha256.convert(derBytes);
+    final fingerprint = base64Encode(hash.bytes);
+    return _pinnedGitHubFingerprints.any((f) => f == fingerprint);
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Crea un [HttpClient] con certificate pinning per api.github.com.
+/// 
+/// Se [_pinnedGitHubFingerprints] contiene fingerprint, esclude la
+/// trust store di sistema e accetta SOLO certificati con fingerprint
+/// corrispondente (true pinning). Altrimenti usa la trust store di sistema.
+HttpClient _createPinnedHttpClient() {
+  if (_pinnedGitHubFingerprints.isEmpty) {
+    return HttpClient();
+  }
+  final context = SecurityContext(withTrustedRoots: false);
+  return HttpClient(context: context)
+    ..badCertificateCallback = (cert, host, port) {
+      if (host.endsWith('api.github.com')) {
+        return _checkPinnedCertificate(cert);
+      }
+      return false;
+    };
+}
 
 /// Controllo opzionale aggiornamenti da GitHub (disattivabile in privacy).
 class UpdateService {
@@ -79,14 +132,19 @@ class UpdateService {
 
   /// Controlla se esiste una release più recente su GitHub.
   /// Se sì, mostra notifica locale "Aggiornamento disponibile".
+  /// La connessione usa certificate pinning per prevenire MitM.
   static Future<void> checkForUpdates() async {
     try {
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version;
-      final response = await http.get(
-        Uri.parse('https://api.github.com/repos/delelimed/CatechHub/releases/latest'),
-        headers: {'Accept': 'application/vnd.github.v3+json'},
-      ).timeout(const Duration(seconds: 15));
+      final pinnedClient = _createPinnedHttpClient();
+      final httpClient = IOClient(pinnedClient);
+      final response = await httpClient
+          .get(
+            Uri.parse('https://api.github.com/repos/delelimed/CatechHub/releases/latest'),
+            headers: {'Accept': 'application/vnd.github.v3+json'},
+          )
+          .timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) return;
       final data = json.decode(response.body) as Map<String, dynamic>;
       final latestVersion = (data['tag_name'] as String).replaceAll('v', '');

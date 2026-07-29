@@ -36,8 +36,27 @@ class AuthService {
   /// ID statico catechista locale (singolo utente per dispositivo).
   static const localUserId = 'local_catechist_id';
 
+  /// Chiave Hive per il catechistId persistente.
+  static const _catechistIdKey = 'catechist_id';
+
   /// Nome visualizzato di default.
   static const localUserName = 'Catechista Locale';
+
+  /// Restituisce (e genera se necessario) un identificatore stabile per il
+  /// catechista locale. Questo ID è condiviso tra tutti i dispositivi dello
+  /// stesso catechista (via sync) e permette di distinguere il creatore della
+  /// classe dagli altri catechisti associati.
+  static String getCatechistId() {
+    final box = LocalDatabase.auth();
+    final existing = box.get(_catechistIdKey) as String?;
+    if (existing != null && existing.isNotEmpty) return existing;
+    final newId = 'cat_${DateTime.now().microsecondsSinceEpoch}';
+    box.put(_catechistIdKey, newId);
+    return newId;
+  }
+
+  /// Getter di istanza per il catechistId corrente.
+  String get catechistId => getCatechistId();
 
   final _box = LocalDatabase.auth();
   final _localAuth = LocalAuthentication();
@@ -233,6 +252,8 @@ class AuthService {
     }
 
     try {
+      getCatechistId(); // Ensure catechistId exists before profile data
+
       await _box.put('first_name', firstName.trim());
       await _box.put('last_name', lastName.trim());
       await _box.put('setup_mode', createClass ? 'create' : 'join');
@@ -255,6 +276,8 @@ class AuthService {
           nameLocked: false,
           creatorId: localUserId,
           creatorName: fullName,
+          creatorCatechistId: getCatechistId(),
+          catechistDeviceCounts: {getCatechistId(): 1},
         );
         await classBox.put(classId, newClass.toMap());
       } else {

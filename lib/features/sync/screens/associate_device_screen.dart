@@ -56,6 +56,26 @@ class _AssociateDeviceScreenState
     extends ConsumerState<AssociateDeviceScreen> {
   final P2PSecurityService _security = P2PSecurityService();
 
+  bool get _isClassCreator {
+    try {
+      final box = LocalDatabase.classes();
+      const uid = AuthService.localUserId;
+      final localCatechistId = AuthService.getCatechistId();
+      for (final key in box.keys) {
+        final data = Map<String, dynamic>.from(box.get(key) as Map);
+        final ids = (data['catechistIds'] as List? ?? [])
+            .map((e) => e.toString())
+            .toList();
+        if (ids.contains(uid)) {
+          final creatorCatechistId = data['creatorCatechistId'] as String? ?? '';
+          if (creatorCatechistId.isEmpty) return true;
+          return creatorCatechistId == localCatechistId;
+        }
+      }
+    } catch (_) {}
+    return true;
+  }
+
   _AssociationStep _currentStep = _AssociationStep.roleChoice;
 
   bool _isFirstToShowQr = false;
@@ -781,14 +801,15 @@ _pairingDialogShown = false;
                     value: P2PSyncRole.mioDispositivo,
                     contentPadding: EdgeInsets.zero,
                   ),
-                  RadioListTile<P2PSyncRole>(
-                    title: const Text('Altro Catechista'),
-                    subtitle: const Text(
-                        'Richiede conferma prima di sincronizzare'),
-                    secondary: const Icon(Icons.how_to_reg),
-                    value: P2PSyncRole.altroCatechista,
-                    contentPadding: EdgeInsets.zero,
-                  ),
+                  if (_isClassCreator)
+                    RadioListTile<P2PSyncRole>(
+                      title: const Text('Altro Catechista'),
+                      subtitle: const Text(
+                          'Richiede conferma prima di sincronizzare'),
+                      secondary: const Icon(Icons.how_to_reg),
+                      value: P2PSyncRole.altroCatechista,
+                      contentPadding: EdgeInsets.zero,
+                    ),
                 ],
               ),
             ),

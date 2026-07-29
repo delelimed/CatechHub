@@ -107,6 +107,7 @@ class P2PDeviceAssociation {
   final String devicePublicKeyBase64;
   final String? localRole;
   final String? remoteRole;
+  final String? catechistId;
   final DateTime? lastSyncAt;
 
   const P2PDeviceAssociation({
@@ -120,6 +121,7 @@ class P2PDeviceAssociation {
     required this.devicePublicKeyBase64,
     this.localRole,
     this.remoteRole,
+    this.catechistId,
     this.lastSyncAt,
   });
 
@@ -131,7 +133,7 @@ class P2PDeviceAssociation {
     return remaining > 0 ? remaining : 0;
   }
 
-  P2PDeviceAssociation copyWith({DateTime? lastSyncAt}) {
+  P2PDeviceAssociation copyWith({DateTime? lastSyncAt, String? catechistId}) {
     return P2PDeviceAssociation(
       deviceId: deviceId,
       deviceName: deviceName,
@@ -143,6 +145,7 @@ class P2PDeviceAssociation {
       devicePublicKeyBase64: devicePublicKeyBase64,
       localRole: localRole,
       remoteRole: remoteRole,
+      catechistId: catechistId ?? this.catechistId,
       lastSyncAt: lastSyncAt ?? this.lastSyncAt,
     );
   }
@@ -158,6 +161,7 @@ class P2PDeviceAssociation {
         'pubKey': devicePublicKeyBase64,
         if (localRole != null) 'localRole': localRole,
         if (remoteRole != null) 'remoteRole': remoteRole,
+        if (catechistId != null) 'catechistId': catechistId,
         if (lastSyncAt != null) 'lastSyncAt': lastSyncAt!.toUtc().toIso8601String(),
       };
 
@@ -173,6 +177,7 @@ class P2PDeviceAssociation {
         devicePublicKeyBase64: json['pubKey'] as String? ?? '',
         localRole: json['localRole'] as String?,
         remoteRole: json['remoteRole'] as String?,
+        catechistId: json['catechistId'] as String?,
         lastSyncAt: json['lastSyncAt'] != null
             ? DateTime.parse(json['lastSyncAt'] as String).toLocal()
             : null,

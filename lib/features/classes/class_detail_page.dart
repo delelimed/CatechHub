@@ -74,8 +74,10 @@ class ClassDetailPage extends ConsumerWidget {
                     }
                   },
                   itemBuilder: (_) => [
-                    if (!currentClass.nameLocked &&
-                        currentClass.isCreator(AuthService.localUserId, getCurrentCatechistName()))
+                    if (currentClass.isCreator(AuthService.localUserId, getCurrentCatechistName(),
+                            catechistId: AuthService.getCatechistId()) &&
+                        (currentClass.creatorCatechistId.isNotEmpty ||
+                            !currentClass.nameLocked))
                       const PopupMenuItem(value: 'edit', child: Text('Modifica nome')),
                     const PopupMenuItem(value: 'delete', child: Text('Elimina')),
                   ],
@@ -137,7 +139,8 @@ class ClassDetailPage extends ConsumerWidget {
                             ),
                             icon: const Icon(Icons.edit),
                             label: const Text("Modifica assegnazioni"),
-                            onPressed: currentClass.isCreator(AuthService.localUserId, getCurrentCatechistName())
+                            onPressed: currentClass.isCreator(AuthService.localUserId, getCurrentCatechistName(),
+                                    catechistId: AuthService.getCatechistId())
                                 ? () {
                                     _openAssignmentPanel(context, ref, currentClass, allStudents, catechistsList);
                                   }

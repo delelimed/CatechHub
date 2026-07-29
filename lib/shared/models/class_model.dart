@@ -70,6 +70,19 @@ class SchoolClass {
   /// Impostato a true per classi ricevute via sync (l'utente si è unito).
   final bool nameLocked;
 
+  /// CatechistId del creatore della classe.
+  /// Permette di identificare il creatore indipendentemente dal dispositivo.
+  /// Vuoto per classi esistenti prima di questa feature.
+  final String creatorCatechistId;
+
+  /// Lista di catechistId degli altri catechisti associati alla classe.
+  /// Non include il creatore.
+  final List<String> associatedCatechistIds;
+
+  /// Mappa catechistId → numero di dispositivi.
+  /// Aggiornata durante il sync P2P.
+  final Map<String, int> catechistDeviceCounts;
+
   /// Timestamp di creazione (UTC, ISO 8601).
   final DateTime createdAt;
 
@@ -86,6 +99,9 @@ class SchoolClass {
     this.nameLocked = false,
     this.creatorId = '',
     this.creatorName = '',
+    this.creatorCatechistId = '',
+    this.associatedCatechistIds = const [],
+    this.catechistDeviceCounts = const {},
     DateTime? createdAt,
     DateTime? updatedAt,
   })  : createdAt = createdAt ?? DateTime.now(),
@@ -101,6 +117,9 @@ class SchoolClass {
     bool? nameLocked,
     String? creatorId,
     String? creatorName,
+    String? creatorCatechistId,
+    List<String>? associatedCatechistIds,
+    Map<String, int>? catechistDeviceCounts,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -114,6 +133,9 @@ class SchoolClass {
       nameLocked: nameLocked ?? this.nameLocked,
       creatorId: creatorId ?? this.creatorId,
       creatorName: creatorName ?? this.creatorName,
+      creatorCatechistId: creatorCatechistId ?? this.creatorCatechistId,
+      associatedCatechistIds: associatedCatechistIds ?? this.associatedCatechistIds,
+      catechistDeviceCounts: catechistDeviceCounts ?? this.catechistDeviceCounts,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -135,6 +157,12 @@ class SchoolClass {
       nameLocked: data['nameLocked'] == true,
       creatorId: data['creatorId'] ?? '',
       creatorName: data['creatorName'] ?? '',
+      creatorCatechistId: data['creatorCatechistId'] ?? '',
+      associatedCatechistIds: (data['associatedCatechistIds'] as List? ?? [])
+          .map((e) => e.toString())
+          .toList(),
+      catechistDeviceCounts: (data['catechistDeviceCounts'] as Map? ?? {})
+          .map((k, v) => MapEntry(k.toString(), (v as num).toInt())),
       createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
       updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
     );
@@ -145,15 +173,27 @@ class SchoolClass {
   ///
   /// La verifica viene fatta sia tramite [creatorId] (confronto esatto) sia
   /// tramite [creatorName] (confronto case‑insensitive e space‑insensitive).
-  /// Se almeno uno dei due corrisponde, l'utente è considerato il creatore.
+  /// Se [catechistId] è fornito e [creatorCatechistId] è impostato, il
+  /// confronto via catechistId ha la precedenza.
   ///
-  /// Le classi senza creatore ([creatorId] e [creatorName] entrambi vuoti)
-  /// sono modificabili da chiunque (ritorna `true`).
-  bool isCreator(String userId, String userName) {
+  /// Le classi senza creatore ([creatorId], [creatorName] e [creatorCatechistId]
+  /// tutti vuoti) sono modificabili da chiunque (ritorna `true`).
+  bool isCreator(String userId, String userName, {String? catechistId}) {
+    if (creatorCatechistId.isNotEmpty) {
+      return catechistId != null && creatorCatechistId == catechistId;
+    }
     final hasCreator = creatorId.isNotEmpty || creatorName.isNotEmpty;
     if (!hasCreator) return true;
     if (creatorId == userId) return true;
     return _normalize(creatorName) == _normalize(userName);
+  }
+
+  /// Verifica se il [catechistId] fornito corrisponde al creatore della classe.
+  /// Se [creatorCatechistId] è vuoto (dati preesistenti), ritorna `true` per
+  /// mantenere la retrocompatibilità.
+  bool isCreatorByCatechistId(String catechistId) {
+    if (creatorCatechistId.isEmpty) return true;
+    return creatorCatechistId == catechistId;
   }
 
   static String _normalize(String s) =>
@@ -169,6 +209,9 @@ class SchoolClass {
       'nameLocked': nameLocked,
       'creatorId': creatorId,
       'creatorName': creatorName,
+      'creatorCatechistId': creatorCatechistId,
+      'associatedCatechistIds': associatedCatechistIds,
+      'catechistDeviceCounts': catechistDeviceCounts,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };

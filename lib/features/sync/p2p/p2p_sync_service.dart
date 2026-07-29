@@ -205,6 +205,7 @@ class _PendingHandshakeData {
   final String remoteNonce;
   final P2PSyncRole remoteRole;
   final String? remoteClassId;
+  final String? remoteCatechistId;
 
   const _PendingHandshakeData({
     required this.endpointId,
@@ -213,6 +214,7 @@ class _PendingHandshakeData {
     required this.remoteNonce,
     required this.remoteRole,
     this.remoteClassId,
+    this.remoteCatechistId,
   });
 }
 
@@ -294,6 +296,7 @@ class P2PSyncService {
 
   P2PIdentity? _pendingHandshakeIdentity;
   P2PSyncRole? _pendingHandshakeRemoteRole;
+  String? _pendingHandshakeRemoteCatechistId;
 
   final Map<String, SecretKeyData> _endpointSessionKeys = {};
 
@@ -379,8 +382,6 @@ class P2PSyncService {
   Future<void> _startContinuousMode() async {
     if (_continuousModeActive) return;
     _continuousModeActive = true;
-
-    _sessionSyncAllowed = false;
 
     try {
       final associations = await _security.getAllAssociations();
@@ -1016,6 +1017,7 @@ Future<void> stopPairingMode() async {
       _pendingEndpointId = null;
       _pendingHandshakeIdentity = null;
       _pendingHandshakeRemoteRole = null;
+      _pendingHandshakeRemoteCatechistId = null;
       _sessionConfirmedDevices.clear();
       _pendingHandshakeData.clear();
       _pendingAssociations.clear();
@@ -1221,6 +1223,7 @@ void _onConnectionResult(String endpointId, Status status) {
         'role': _state.role.name,
         'sessionNonce': _sessionPairingNonce,
         'classId': _getCurrentClassId(),
+        'catechistId': AuthService.getCatechistId(),
       });
       addLog('DEBUG', 'Invio handshake a $endpointId (nonce: ${_sessionPairingNonce?.substring(0, 8)}...)');
       await _sendPayload(endpointId, handshakeMsg);
@@ -1428,6 +1431,7 @@ void _onConnectionResult(String endpointId, Status status) {
             )
           : P2PSyncRole.mioDispositivo;
 
+      final remoteCatechistId = message['catechistId'] as String?;
       _remoteSessionPairingNonce = message['sessionNonce'] as String?;
       _endpointConnIdMap[endpointId] = remoteId;
       _connectedEndpoints.add(endpointId);
@@ -1439,6 +1443,7 @@ void _onConnectionResult(String endpointId, Status status) {
         remoteNonce: _remoteSessionPairingNonce ?? '',
         remoteRole: remoteRole,
         remoteClassId: message['classId'] as String?,
+        remoteCatechistId: remoteCatechistId,
       );
 
       _updateState(_state.copyWith(
@@ -1538,6 +1543,7 @@ void _onConnectionResult(String endpointId, Status status) {
         'role': _state.role.name,
         'sessionNonce': _sessionPairingNonce ?? '',
         'classId': _getCurrentClassId(),
+        'catechistId': AuthService.getCatechistId(),
       });
       await _sendEncryptedPayload(endpointId, ack);
       _updateState(_state.copyWith(
@@ -1571,6 +1577,7 @@ void _onConnectionResult(String endpointId, Status status) {
         'role': _state.role.name,
         'sessionNonce': _sessionPairingNonce ?? '',
         'classId': _getCurrentClassId(),
+        'catechistId': AuthService.getCatechistId(),
       });
       await _sendPayload(endpointId, ack);
 
@@ -1590,6 +1597,7 @@ void _onConnectionResult(String endpointId, Status status) {
           connectionEndpoint: '',
         );
         _pendingHandshakeRemoteRole = remoteRole;
+        _pendingHandshakeRemoteCatechistId = message['catechistId'] as String?;
 
         addLog('INFO', 'Codice pairing calcolato ma attendo conferma remota');
 
@@ -1652,6 +1660,7 @@ void _onConnectionResult(String endpointId, Status status) {
         remoteNonce: _remoteSessionPairingNonce ?? '',
         remoteRole: remoteRole,
         remoteClassId: message['classId'] as String?,
+        remoteCatechistId: message['catechistId'] as String?,
       );
       return;
     }
@@ -1757,6 +1766,7 @@ void _onConnectionResult(String endpointId, Status status) {
         connectionEndpoint: '',
       );
       _pendingHandshakeRemoteRole = remoteRole;
+      _pendingHandshakeRemoteCatechistId = message['catechistId'] as String?;
 
       addLog('INFO', 'Codice pairing calcolato in ACK ma attendo conferma remota');
       _updateState(_state.copyWith(
@@ -1794,6 +1804,7 @@ void _onConnectionResult(String endpointId, Status status) {
             devicePublicKeyBase64: existing.devicePublicKeyBase64,
             localRole: existing.localRole,
             remoteRole: remoteRole?.name ?? existing.remoteRole,
+            catechistId: existing.catechistId,
             lastSyncAt: existing.lastSyncAt,
           );
           await _security.saveAssociation(updated);
@@ -1842,7 +1853,9 @@ void _onConnectionResult(String endpointId, Status status) {
     }
 
     if (_pendingHandshakeData.containsKey(endpointId)) {
-      _pendingHandshakeRemoteRole = _pendingHandshakeData[endpointId]!.remoteRole;
+      final hs = _pendingHandshakeData[endpointId]!;
+      _pendingHandshakeRemoteRole = hs.remoteRole;
+      _pendingHandshakeRemoteCatechistId = hs.remoteCatechistId;
     }
     _pendingHandshakeData.remove(endpointId);
 
@@ -1966,10 +1979,11 @@ void _onConnectionResult(String endpointId, Status status) {
       return;
     }
 
-    // Propaga il ruolo remoto da _pendingHandshakeData prima di rimuoverlo.
+    // Propaga il ruolo remoto e catechistId da _pendingHandshakeData prima di rimuoverlo.
     final handshakeData = _pendingHandshakeData[endpointId];
     if (handshakeData != null) {
       _pendingHandshakeRemoteRole = handshakeData.remoteRole;
+      _pendingHandshakeRemoteCatechistId = handshakeData.remoteCatechistId;
     }
 
     // Se il nonce remoto non è ancora disponibile dall'handshake,
@@ -2175,6 +2189,62 @@ void _onConnectionResult(String endpointId, Status status) {
         await _security.saveAssociation(assoc.copyWith(lastSyncAt: now));
       }
     } catch (_) {}
+  }
+
+  void _updateClassAfterPairing() {
+    try {
+      final box = LocalDatabase.classes();
+      const localId = AuthService.localUserId;
+      final localCatechistId = AuthService.getCatechistId();
+      final remoteCatechistId = _pendingHandshakeRemoteCatechistId;
+      final remoteRole = _pendingHandshakeRemoteRole;
+
+      for (final key in box.keys) {
+        final data = LocalDatabase.toStringDynamicMap(box.get(key));
+        final ids = (data['catechistIds'] as List? ?? [])
+            .map((e) => e.toString())
+            .toList();
+        if (!ids.contains(localId)) continue;
+
+        Map<String, int> counts = {};
+        if (data['catechistDeviceCounts'] is Map) {
+          counts = (data['catechistDeviceCounts'] as Map)
+              .map((k, v) => MapEntry(k.toString(), (v as num).toInt()));
+        }
+
+        List<String> associatedIds = [];
+        if (data['associatedCatechistIds'] is List) {
+          associatedIds = (data['associatedCatechistIds'] as List)
+              .map((e) => e.toString())
+              .toList();
+        }
+
+        if (remoteRole == P2PSyncRole.mioDispositivo) {
+          final current = counts[localCatechistId] ?? 1;
+          counts[localCatechistId] = current + 1;
+          addLog('INFO', 'Incrementato conteggio dispositivi per $localCatechistId a ${counts[localCatechistId]}');
+        } else if (remoteRole == P2PSyncRole.altroCatechista && remoteCatechistId != null) {
+          if (!associatedIds.contains(remoteCatechistId)) {
+            associatedIds.add(remoteCatechistId);
+          }
+          final current = counts[remoteCatechistId] ?? 0;
+          counts[remoteCatechistId] = current + 1;
+          addLog('INFO', 'Aggiunto catechista $remoteCatechistId');
+
+          if ((data['creatorCatechistId'] as String? ?? '').isEmpty) {
+            data['creatorCatechistId'] = localCatechistId;
+          }
+        }
+
+        data['catechistDeviceCounts'] = counts;
+        data['associatedCatechistIds'] = associatedIds;
+        box.put(key, data);
+        addLog('INFO', 'Classe aggiornata dopo pairing');
+        break;
+      }
+    } catch (e) {
+      addLog('ERROR', 'Errore aggiornamento classe dopo pairing: $e');
+    }
   }
 
   void _ensureLocalCatechistInClasses() {
@@ -2527,7 +2597,18 @@ void _onConnectionResult(String endpointId, Status status) {
               remoteRole: _pendingHandshakeRemoteRole);
         }
       }
+
+      // Aggiorna l'associazione con il catechistId remoto
+      if (_pendingHandshakeRemoteCatechistId != null) {
+        final saved = await _security.getAssociation(deviceId);
+        if (saved != null) {
+          await _security.saveAssociation(saved.copyWith(
+            catechistId: _pendingHandshakeRemoteCatechistId,
+          ));
+        }
+      }
     }
+    _updateClassAfterPairing();
     _updateState(_state.copyWith(
       status: P2PSyncStatus.completed,
       authenticatedByRemote: true,
@@ -2606,9 +2687,22 @@ void _onConnectionResult(String endpointId, Status status) {
       }
     }
 
+    // Aggiorna l'associazione con il catechistId remoto
+    if (_pendingHandshakeRemoteCatechistId != null) {
+      final saved = await _security.getAssociation(remoteIdentity.deviceId);
+      if (saved != null) {
+        await _security.saveAssociation(saved.copyWith(
+          catechistId: _pendingHandshakeRemoteCatechistId,
+        ));
+      }
+    }
+
+    _updateClassAfterPairing();
+
     _pendingAssociations.remove(remoteIdentity.deviceId);
     _pendingHandshakeIdentity = null;
     _pendingHandshakeRemoteRole = null;
+    _pendingHandshakeRemoteCatechistId = null;
 
     _updateState(_state.copyWith(
       status: P2PSyncStatus.sessionEstablished,
@@ -2677,6 +2771,7 @@ void _onConnectionResult(String endpointId, Status status) {
     _pendingEndpointId = null;
     _pendingHandshakeIdentity = null;
     _pendingHandshakeRemoteRole = null;
+    _pendingHandshakeRemoteCatechistId = null;
     _pendingAssociations.clear();
 
     _updateState(_state.copyWith(

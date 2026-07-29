@@ -184,9 +184,10 @@ class _GroupHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
-    final hasKnownCreator = schoolClass.creatorId.isNotEmpty || schoolClass.creatorName.isNotEmpty;
-    final canEdit = schoolClass.isCreator(AuthService.localUserId, getCurrentCatechistName()) &&
-        (!hasKnownCreator || !schoolClass.nameLocked);
+    final hasKnownCreator = schoolClass.creatorCatechistId.isNotEmpty || schoolClass.creatorId.isNotEmpty || schoolClass.creatorName.isNotEmpty;
+    final canEdit = schoolClass.isCreator(AuthService.localUserId, getCurrentCatechistName(),
+            catechistId: AuthService.getCatechistId()) &&
+        (!hasKnownCreator || schoolClass.creatorCatechistId.isNotEmpty || !schoolClass.nameLocked);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -282,7 +283,8 @@ class _CatechistButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
-    final canManage = myClass.isCreator(AuthService.localUserId, getCurrentCatechistName());
+    final canManage = myClass.isCreator(AuthService.localUserId, getCurrentCatechistName(),
+        catechistId: AuthService.getCatechistId());
 
     return InkWell(
       borderRadius: BorderRadius.circular(22),

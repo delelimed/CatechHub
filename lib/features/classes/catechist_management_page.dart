@@ -35,10 +35,15 @@ class _ManageCatechistsPageState extends ConsumerState<ManageCatechistsPage> {
 
   Future<void> _resolveNames() async {
     try {
+      final ids = _currentClass.catechistIds;
       final names = <String, String>{};
-      for (final id in _currentClass.catechistIds) {
+      for (final id in ids) {
         if (id == AuthService.localUserId) {
-          names[id] = '${AuthService.localUserName} (tu)';
+          try {
+            names[id] = '${AuthService.localUserName} (tu)';
+          } catch (_) {
+            names[id] = '${id} (tu)';
+          }
         } else {
           try {
             final assoc = await _security.getAssociation(id);
@@ -92,11 +97,13 @@ class _ManageCatechistsPageState extends ConsumerState<ManageCatechistsPage> {
 
     final canManage = !_currentClass.nameLocked;
 
+    final ids = _currentClass.catechistIds;
+
     return AppScaffold(
       title: 'Catechisti — ${_currentClass.name}',
       child: _loadingNames
           ? const Center(child: CircularProgressIndicator())
-          : _currentClass.catechistIds.isEmpty
+          : ids.isEmpty
               ? Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -124,8 +131,8 @@ class _ManageCatechistsPageState extends ConsumerState<ManageCatechistsPage> {
                       padding: const EdgeInsets.only(left: 4, bottom: 12),
                       child: Text(
                         canManage
-                            ? 'CATECHISTI (${_currentClass.catechistIds.length})'
-                            : 'CATECHISTI (${_currentClass.catechistIds.length}) — SOLA LETTURA',
+                            ? 'CATECHISTI (${ids.length})'
+                            : 'CATECHISTI (${ids.length}) — SOLA LETTURA',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
@@ -134,7 +141,7 @@ class _ManageCatechistsPageState extends ConsumerState<ManageCatechistsPage> {
                         ),
                       ),
                     ),
-                    ..._currentClass.catechistIds.map((id) => _CatechistCard(
+                    ...ids.map((id) => _CatechistCard(
                           catechistId: id,
                           displayName: _resolvedNames[id] ?? id,
                           isLocalUser: id == AuthService.localUserId,

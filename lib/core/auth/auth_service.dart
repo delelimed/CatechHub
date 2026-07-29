@@ -255,6 +255,8 @@ class AuthService {
           nameLocked: false,
         );
         await classBox.put(classId, newClass.toMap());
+      } else {
+        await _box.put('group_name', fullName);
       }
 
       await P2PSecurityService().refreshIdentityName();

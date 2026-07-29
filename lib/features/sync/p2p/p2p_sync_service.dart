@@ -543,8 +543,9 @@ class P2PSyncService {
                 return;
               }
               addLog('DEBUG', '  associazione valida, richiedo connessione a $deviceId');
+              final localIdentity = await _security.getLocalIdentity();
               await _nearby.requestConnection(
-                '$_syncPrefix${assoc.deviceId}',
+                '$_syncPrefix${localIdentity.deviceId}',
                 endpointId,
                 onConnectionInitiated: _onConnectionInitiated,
                 onConnectionResult: _onConnectionResult,
@@ -613,8 +614,9 @@ class P2PSyncService {
           ));
           continue;
         }
+        final localIdentity = await _security.getLocalIdentity();
         await _nearby.requestConnection(
-          '$_syncPrefix${assoc.deviceId}',
+          '$_syncPrefix${localIdentity.deviceId}',
           endpointId,
           onConnectionInitiated: _onConnectionInitiated,
           onConnectionResult: _onConnectionResult,

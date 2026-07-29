@@ -348,8 +348,8 @@ class _CatechistButton extends ConsumerWidget {
                   const SizedBox(height: 4),
                   Text(
                     myClass.nameLocked
-                        ? '${myClass.catechistIds.length} catechista${myClass.catechistIds.length == 1 ? '' : 'i'} — sola lettura'
-                        : '${myClass.catechistIds.length} catechista${myClass.catechistIds.length == 1 ? '' : 'i'}',
+                        ? '${myClass.catechistIds.length} catechist${myClass.catechistIds.length == 1 ? 'a' : 'i'} — sola lettura'
+                        : '${myClass.catechistIds.length} catechist${myClass.catechistIds.length == 1 ? 'a' : 'i'}',
                     style: TextStyle(
                       fontSize: 12,
                       color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,

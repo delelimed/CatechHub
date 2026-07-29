@@ -266,6 +266,8 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
         });
         return;
       }
+
+      LocalDatabase.auth().put('onboarding_completed', true);
     } catch (_) {
       return;
     }

@@ -98,4 +98,3 @@ flutter:
     - assets/images/logo.png
     - assets/images/logo_BG.png
     - assets/NOTICE.txt
-    - .env

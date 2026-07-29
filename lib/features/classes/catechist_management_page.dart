@@ -36,30 +36,21 @@ class _ManageCatechistsPageState extends ConsumerState<ManageCatechistsPage> {
   Future<void> _resolveNames() async {
     try {
       final ids = _currentClass.catechistIds;
-      final names = <String, String>{};
-      for (final id in ids) {
-        if (id == AuthService.localUserId) {
-          try {
-            names[id] = '${AuthService.localUserName} (tu)';
-          } catch (_) {
-            names[id] = '${id} (tu)';
-          }
-        } else {
-          try {
-            final assoc = await _security.getAssociation(id);
-            if (assoc != null && assoc.deviceName.isNotEmpty) {
-              names[id] = assoc.deviceName;
-            } else {
-              names[id] = id;
-            }
-          } catch (_) {
-            names[id] = id;
-          }
-        }
+      if (ids.isEmpty) {
+        if (mounted) setState(() => _loadingNames = false);
+        return;
       }
+
+      final results = await Future.wait(
+        ids.map((id) => _resolveSingleName(id)),
+        cleanUp: (_) {},
+      );
+
       if (mounted) {
         setState(() {
-          _resolvedNames.addAll(names);
+          for (final result in results) {
+            if (result != null) _resolvedNames.addAll(result);
+          }
           _loadingNames = false;
         });
       }
@@ -67,6 +58,33 @@ class _ManageCatechistsPageState extends ConsumerState<ManageCatechistsPage> {
       if (mounted) {
         setState(() => _loadingNames = false);
       }
+    }
+  }
+
+  Future<Map<String, String>?> _resolveSingleName(String id) async {
+    try {
+      if (id == AuthService.localUserId) {
+        try {
+          return {id: '${AuthService.localUserName} (tu)'};
+        } catch (_) {
+          return {id: '$id (tu)'};
+        }
+      } else {
+        try {
+          final assoc = await _security.getAssociation(id).timeout(
+            const Duration(seconds: 5),
+          );
+          if (assoc != null && assoc.deviceName.isNotEmpty) {
+            return {id: assoc.deviceName};
+          } else {
+            return {id: id};
+          }
+        } catch (_) {
+          return {id: id};
+        }
+      }
+    } catch (_) {
+      return {id: id};
     }
   }
 

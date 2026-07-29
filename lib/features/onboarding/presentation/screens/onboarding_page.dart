@@ -30,6 +30,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   bool _locationRequested = false;
   bool _bluetoothRequested = false;
 
+  bool _notificationPageAutoTriggered = false;
+
   String? _errorMessage;
 
   static const _totalPages = 9;
@@ -456,6 +458,13 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   // ─── PAGE 4: NOTIFICATION PERMISSION ───────────────────────────────
 
   Widget _buildNotificationPermissionPage() {
+    if (_currentPage == 3 && !_notificationRequested && !_notificationPageAutoTriggered) {
+      _notificationPageAutoTriggered = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _requestNotificationPermission();
+      });
+    }
+
     return _buildPageContainer(
       Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -506,11 +515,17 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             ),
           ),
           const SizedBox(height: 32),
-          if (!_notificationGranted)
+          if (!_notificationGranted && !_notificationRequested)
             _buildPermissionButton(
               'Attiva notifiche',
               _requestNotificationPermission,
-              _notificationRequested,
+              false,
+            )
+          else if (!_notificationGranted && _notificationRequested)
+            const SizedBox(
+              width: 52,
+              height: 52,
+              child: CircularProgressIndicator(),
             )
           else
             _buildGrantedBadge(),

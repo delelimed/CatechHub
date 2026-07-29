@@ -107,6 +107,7 @@ class P2PDeviceAssociation {
   final String devicePublicKeyBase64;
   final String? localRole;
   final String? remoteRole;
+  final DateTime? lastSyncAt;
 
   const P2PDeviceAssociation({
     required this.deviceId,
@@ -119,6 +120,7 @@ class P2PDeviceAssociation {
     required this.devicePublicKeyBase64,
     this.localRole,
     this.remoteRole,
+    this.lastSyncAt,
   });
 
   bool get isValid => DateTime.now().difference(associatedAt).inDays < 30;
@@ -127,6 +129,22 @@ class P2PDeviceAssociation {
     final elapsed = DateTime.now().difference(associatedAt).inDays;
     final remaining = 30 - elapsed;
     return remaining > 0 ? remaining : 0;
+  }
+
+  P2PDeviceAssociation copyWith({DateTime? lastSyncAt}) {
+    return P2PDeviceAssociation(
+      deviceId: deviceId,
+      deviceName: deviceName,
+      publicKeyBase64: publicKeyBase64,
+      fingerprint: fingerprint,
+      sharedSecretBase64: sharedSecretBase64,
+      associatedAt: associatedAt,
+      devicePrivateKeyBase64: devicePrivateKeyBase64,
+      devicePublicKeyBase64: devicePublicKeyBase64,
+      localRole: localRole,
+      remoteRole: remoteRole,
+      lastSyncAt: lastSyncAt ?? this.lastSyncAt,
+    );
   }
 
   Map<String, dynamic> toJson() => {
@@ -140,6 +158,7 @@ class P2PDeviceAssociation {
         'pubKey': devicePublicKeyBase64,
         if (localRole != null) 'localRole': localRole,
         if (remoteRole != null) 'remoteRole': remoteRole,
+        if (lastSyncAt != null) 'lastSyncAt': lastSyncAt!.toUtc().toIso8601String(),
       };
 
   factory P2PDeviceAssociation.fromJson(Map<String, dynamic> json) =>
@@ -154,6 +173,9 @@ class P2PDeviceAssociation {
         devicePublicKeyBase64: json['pubKey'] as String? ?? '',
         localRole: json['localRole'] as String?,
         remoteRole: json['remoteRole'] as String?,
+        lastSyncAt: json['lastSyncAt'] != null
+            ? DateTime.parse(json['lastSyncAt'] as String).toLocal()
+            : null,
       );
 
   SimpleKeyPairData? get keyPair {

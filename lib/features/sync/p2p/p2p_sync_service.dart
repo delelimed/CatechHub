@@ -1731,6 +1731,7 @@ void _onConnectionResult(String endpointId, Status status) {
             devicePublicKeyBase64: existing.devicePublicKeyBase64,
             localRole: existing.localRole,
             remoteRole: remoteRole?.name ?? existing.remoteRole,
+            lastSyncAt: existing.lastSyncAt,
           );
           await _security.saveAssociation(updated);
         }
@@ -2065,15 +2066,29 @@ void _onConnectionResult(String endpointId, Status status) {
 
       _ensureLocalCatechistInClasses();
 
+      final now = DateTime.now();
       _updateState(_state.copyWith(
         status: P2PSyncStatus.completed,
-        lastSyncAt: DateTime.now(),
+        lastSyncAt: now,
         totalRecordsToExchange: 0,
         sentRecordsCount: 0,
         receivedRecordsCount: 0,
         largeSyncInProgress: false,
       ));
+
+      _updateAssociationLastSync(endpointId, now);
     }
+  }
+
+  Future<void> _updateAssociationLastSync(String endpointId, DateTime now) async {
+    final deviceId = _endpointConnIdMap[endpointId];
+    if (deviceId == null) return;
+    try {
+      final assoc = await _security.getAssociation(deviceId);
+      if (assoc != null) {
+        await _security.saveAssociation(assoc.copyWith(lastSyncAt: now));
+      }
+    } catch (_) {}
   }
 
   void _ensureLocalCatechistInClasses() {

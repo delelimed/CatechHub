@@ -104,14 +104,30 @@ class _SettingsAssociationScreenState
     return DateFormat('dd/MM/yyyy').format(date);
   }
 
-  String _roleLabel(String? role) {
-    switch (role) {
+  String _formatDateTime(DateTime date) {
+    return DateFormat('dd/MM/yyyy HH:mm').format(date);
+  }
+
+  String _relativeTime(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inSeconds < 60) return 'Appena sincronizzato';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m fa';
+    if (diff.inHours < 24) return '${diff.inHours}h fa';
+    if (diff.inDays < 7) return '${diff.inDays}g fa';
+    return _formatDateTime(dt);
+  }
+
+  String _lastSyncLabel(P2PDeviceAssociation assoc) {
+    if (assoc.lastSyncAt != null) {
+      return 'Ultimo sync: ${_relativeTime(assoc.lastSyncAt!)}';
+    }
+    switch (assoc.remoteRole) {
       case 'mioDispositivo':
         return 'Registrato come: Mio Dispositivo';
       case 'altroCatechista':
         return 'Registrato come: Altro Catechista';
       default:
-        return 'In attesa di sincronizzazione...';
+        return 'In attesa del primo sync...';
     }
   }
 
@@ -655,13 +671,13 @@ class _SettingsAssociationScreenState
                   Row(
                     children: [
                       Icon(Icons.sync,
-                          size: 12, color: Colors.grey[500]),
+                          size: 12, color: assoc.lastSyncAt != null ? Colors.green[400] : Colors.grey[500]),
                       const SizedBox(width: 4),
                       Text(
-                        _roleLabel(assoc.remoteRole),
+                        _lastSyncLabel(assoc),
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[600],
+                          color: assoc.lastSyncAt != null ? Colors.green[700] : Colors.grey[600],
                         ),
                       ),
                     ],

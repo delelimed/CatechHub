@@ -8,6 +8,7 @@ import '../../shared/models/contact_note_model.dart';
 import '../../shared/models/planning_meeting.dart';
 import '../../shared/models/student_daily_note_model.dart';
 import '../../shared/models/student_model.dart';
+import '../../shared/widgets/last_modified_info.dart';
 import '../attachments/widgets/attachments_section.dart';
 import '../contact_notes/contact_notes_repository.dart';
 import '../contact_notes/student_contact_notes_page.dart';
@@ -309,15 +310,11 @@ class _HeaderCard extends StatelessWidget {
                     fontSize: 14,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${student.updatedAt.day.toString().padLeft(2, '0')}/${student.updatedAt.month.toString().padLeft(2, '0')}/${student.updatedAt.year} ${student.updatedAt.hour.toString().padLeft(2, '0')}:${student.updatedAt.minute.toString().padLeft(2, '0')}${student.lastModifiedBy.isNotEmpty ? ' da ${student.lastModifiedBy}' : ''}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark
-                        ? colorScheme.onPrimaryContainer.withValues(alpha: 0.5)
-                        : Colors.white60,
-                  ),
+                LastModifiedInfo(
+                  createdAt: student.createdAt,
+                  updatedAt: student.updatedAt,
+                  lastModifiedBy: student.lastModifiedBy,
+                  compact: true,
                 ),
               ],
             ),

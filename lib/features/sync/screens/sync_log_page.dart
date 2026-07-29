@@ -3,8 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import '../core/providers/nearby_sync_provider.dart';
-import '../features/sync/p2p/p2p_sync_service.dart';
+import '../../../core/providers/nearby_sync_provider.dart';
+import '../p2p/p2p_sync_service.dart';
 
 class SyncLogPage extends ConsumerStatefulWidget {
   const SyncLogPage({super.key});

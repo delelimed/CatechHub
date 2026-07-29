@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
-import '../core/providers/nearby_sync_provider.dart';
-import '../features/sync/p2p/p2p_sync_service.dart';
+import '../../../core/providers/nearby_sync_provider.dart';
+import '../p2p/p2p_sync_service.dart';
 
 class SyncProgressOverlay extends ConsumerStatefulWidget {
   final Widget child;
@@ -83,7 +83,9 @@ class _SyncProgressOverlayState extends ConsumerState<SyncProgressOverlay> {
               Text(
                 '${state.pendingConfirmationDeviceName ?? "Dispositivo sconosciuto"} '
                 'vuole sincronizzare i dati.\n\n'
-                'Vuoi autorizzare la sincronizzazione?',
+                'Vuoi autorizzare la sincronizzazione?\n\n'
+                'Nota: anche l\'altro catechista deve autorizzare la sincronizzazione '
+                'prima che lo scambio abbia inizio.',
               ),
               const SizedBox(height: 12),
               Container(
@@ -158,7 +160,9 @@ class _SyncProgressOverlayState extends ConsumerState<SyncProgressOverlay> {
             children: [
               Text(
                 'È stato rilevato il dispositivo del catechista $deviceName.\n\n'
-                'Vuoi procedere con la sincronizzazione?',
+                'Vuoi procedere con la sincronizzazione?\n\n'
+                'La sincronizzazione richiede l\'autorizzazione di entrambi i catechisti.\n'
+                'La connessione partirà solo dopo che entrambi avranno acconsentito.',
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),

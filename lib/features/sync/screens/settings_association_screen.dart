@@ -5,9 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../core/providers/nearby_sync_provider.dart';
-import '../features/sync/p2p/p2p_sync_service.dart';
-import '../features/sync/p2p/p2p_security_service.dart';
+import '../../../core/providers/nearby_sync_provider.dart';
+import '../p2p/p2p_sync_service.dart';
+import '../p2p/p2p_security_service.dart';
 
 class SettingsAssociationScreen extends ConsumerStatefulWidget {
   const SettingsAssociationScreen({super.key});
@@ -274,8 +274,7 @@ class _SettingsAssociationScreenState
                 const SizedBox(height: 4),
                 Text(
                   'La sincronizzazione Bluetooth avviene solo tra dispositivi '
-                  'della stessa classe. Le associazioni con dispositivi non '
-                  'appartengono a nessuna classe.',
+                  'della stessa classe.',
                   style: TextStyle(fontSize: 13, color: const Color(0xFF174A7E)),
                 ),
               ],

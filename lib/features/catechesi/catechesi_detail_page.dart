@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:intl/intl.dart';
-
 import '../../shared/models/attachment_parent_type.dart';
 import '../attachments/widgets/attachments_section.dart';
 import '../../shared/models/catechesi_model.dart';
+import '../../shared/widgets/last_modified_info.dart';
 import 'catechesi_repository.dart';
 
 class CatechesiDetailPage extends ConsumerStatefulWidget {
@@ -151,7 +150,6 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
   }
 
   Widget _buildReadOnlyView() {
-    final formatter = DateFormat("dd MMMM yyyy 'alle' HH:mm", 'it_IT');
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -169,16 +167,11 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
               color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
             ),
           ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Icon(Icons.update_rounded, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
-              const SizedBox(width: 4),
-              Text(
-                'Modificata ${formatter.format(_catechesi.updatedAt)}${_catechesi.lastModifiedBy.isNotEmpty ? ' da ${_catechesi.lastModifiedBy}' : ''}',
-                style: TextStyle(fontSize: 13, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
-              ),
-            ],
+          const SizedBox(height: 8),
+          LastModifiedInfo(
+            createdAt: _catechesi.createdAt,
+            updatedAt: _catechesi.updatedAt,
+            lastModifiedBy: _catechesi.lastModifiedBy,
           ),
           const SizedBox(height: 24),
           if (_catechesi.description.trim().isNotEmpty) ...[

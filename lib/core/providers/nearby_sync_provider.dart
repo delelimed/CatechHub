@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../widgets/sync_progress_overlay.dart';
+import '../../features/sync/widgets/sync_progress_overlay.dart';
 
 import '../../features/sync/p2p/p2p_sync_service.dart';
 import '../services/bluetooth_permission_service.dart';

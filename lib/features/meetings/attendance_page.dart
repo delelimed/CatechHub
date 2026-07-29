@@ -14,6 +14,7 @@ import '../../core/auth/auth_service.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/models/planning_meeting.dart';
 import '../../shared/widgets/app_scaffold.dart';
+import '../../shared/widgets/last_modified_info.dart';
 import '../classes/classes_provider.dart';
 import '../students/students_provider.dart';
 import 'attendance_repository.dart';
@@ -181,28 +182,10 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
           if (meeting is PlanningMeeting)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.update_rounded,
-                    size: 14,
-                    color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      'Ultima modifica: ${meeting.updatedAt.day.toString().padLeft(2, '0')}/${meeting.updatedAt.month.toString().padLeft(2, '0')}/${meeting.updatedAt.year} '
-                      '${meeting.updatedAt.hour.toString().padLeft(2, '0')}:${meeting.updatedAt.minute.toString().padLeft(2, '0')}'
-                      '${meeting.lastModifiedBy.isNotEmpty ? ' da ${meeting.lastModifiedBy}' : ''}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: isDark
-                            ? Colors.grey.shade500
-                            : Colors.grey.shade400,
-                      ),
-                    ),
-                  ),
-                ],
+              child: LastModifiedInfo(
+                updatedAt: meeting.updatedAt,
+                lastModifiedBy: meeting.lastModifiedBy,
+                compact: true,
               ),
             ),
           Expanded(

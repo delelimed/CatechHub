@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/widgets/app_scaffold.dart';
+import '../../shared/widgets/last_modified_info.dart';
 import '../../shared/models/student_model.dart';
 import '../documents/documents_provider.dart';
 import 'student_quick_view_page.dart';
@@ -219,6 +220,13 @@ class _StudentCard extends ConsumerWidget {
                       color: subtitleColor,
                       fontSize: 13,
                     ),
+                  ),
+                  const SizedBox(height: 4),
+                  LastModifiedInfo(
+                    createdAt: student.createdAt,
+                    updatedAt: student.updatedAt,
+                    lastModifiedBy: student.lastModifiedBy,
+                    compact: true,
                   ),
                 ],
               ),

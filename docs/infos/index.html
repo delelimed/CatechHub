@@ -57,7 +57,7 @@
         <tr>
           <td>Art. 6</td>
           <td>Lawfulness of processing</td>
-          <td>Base giuridica: consenso dell'interessato (Art. 6.1.a) e compito di interesse pubblico (Art. 6.1.e) — l'attività educativa catechistica. L'app non impone alcun trattamento senza base giuridica.</td>
+          <td>Base giuridica: consenso dell'interessato (Art. 6.1.a) e compito di interesse pubblico (Art. 6.1.e) — l'attività educativa catechistica. L'app non impone alcun trattamento senza base giuridica. La sincronizzazione P2P tra dispositivi "Altro Catechista" richiede il consenso esplicito di entrambi gli utenti (doppio consenso) prima del trasferimento dati.</td>
         </tr>
         <tr>
           <td>Art. 9</td>
@@ -92,7 +92,7 @@
         <tr>
           <td>Art. 32</td>
           <td>Security of processing</td>
-          <td>AES-256-GCM a riposo con chiave in AndroidKeyStore (TEE/StrongBox), verifica hardware obbligatoria all'avvio, PBKDF2 210k iterazioni per backup, X25519 ECDH + HKDF + AES-256-GCM per sync P2P, pairing code a 6 cifre anti-MitM, key pinning per dispositivo, sessione in RAM, timeout 120s, freeRASP anti-tamper.</td>
+          <td>AES-256-GCM a riposo con chiave in AndroidKeyStore (TEE/StrongBox), verifica hardware obbligatoria all'avvio, PBKDF2 210k iterazioni per backup, X25519 ECDH + HKDF + AES-256-GCM per sync P2P, pairing code a 6 cifre anti-MitM, key pinning per dispositivo, doppio consenso esplicito tra catechisti, sessione in RAM, timeout 120s, freeRASP anti-tamper.</td>
         </tr>
         <tr>
           <td>Art. 35</td>
@@ -116,6 +116,19 @@
         <tr><td>Violazione dati minori</td><td>Bassa</td><td>Molto alto</td><td>Minimizzazione dati, nessun cloud, FLAG_SECURE, dati sensibili cifrati</td></tr>
       </tbody>
     </table>
+
+    <h2>Tracciabilit&agrave; delle modifiche (Art. 5 GDPR)</h2>
+
+    <p>CatechHub implementa un sistema completo di tracciabilit&agrave; delle modifiche per garantire la conformit&agrave; ai principi di minimizzazione (Art. 5.1.c) e responsabilizzazione (Art. 5.2):</p>
+
+    <ul>
+      <li><strong>Campi di audit:</strong> Ogni record nell'app (studenti, programmazione, catechesi, note di contatto, ecc.) traccia automaticamente <code>createdAt</code>, <code>updatedAt</code> e <code>lastModifiedBy</code>.</li>
+      <li><strong>Visualizzazione:</strong> Questi campi sono visualizzati in tutte le schermate di dettaglio, consentendo all'utente di conoscere sempre chi ha creato o modificato un dato e quando.</li>
+      <li><strong>Presenze:</strong> Per le presenze, viene mostrata la data cumulativa dell'ultima modifica per giornata, non per singolo studente, bilanciando trasparenza e minimizzazione.</li>
+      <li><strong>Sync P2P &mdash; doppio consenso:</strong> Quando entrambi i dispositivi sono configurati come "Altro Catechista", entrambi gli utenti devono autorizzare esplicitamente la sincronizzazione, fornendo un consenso reciproco prima del trasferimento dei dati.</li>
+    </ul>
+
+    <p>Questa tracciabilit&agrave; fornisce una pista di audit chiara per il titolare del trattamento, in linea con il principio di responsabilizzazione (accountability) sancito dall'Art. 5.2 GDPR.</p>
 
     <h2>Disclaimer dello sviluppatore</h2>
     <div class="alert alert-warning" style="display:block;">

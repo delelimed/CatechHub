@@ -11,6 +11,7 @@ import '../catechesi/catechesi_repository.dart';
 import '../../shared/models/catechesi_model.dart';
 import '../classes/classes_provider.dart';
 import 'planning_provider.dart';
+import '../../shared/widgets/last_modified_info.dart';
 
 /// Schermata di creazione/modifica di un incontro o riunione in CateREG.
 ///
@@ -245,30 +246,10 @@ class _PlanningEditPageState extends ConsumerState<PlanningEditPage> {
                 ],
                 if (_readOnly && widget.existing != null) ...[
                   const SizedBox(height: 14),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.update_rounded, size: 16, color: isDark ? Colors.grey.shade500 : Colors.grey.shade600),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Ultima modifica: ${widget.existing!.updatedAt.day.toString().padLeft(2, '0')}/${widget.existing!.updatedAt.month.toString().padLeft(2, '0')}/${widget.existing!.updatedAt.year} '
-                            '${widget.existing!.updatedAt.hour.toString().padLeft(2, '0')}:${widget.existing!.updatedAt.minute.toString().padLeft(2, '0')}'
-                            '${widget.existing!.lastModifiedBy.isNotEmpty ? ' da ${widget.existing!.lastModifiedBy}' : ''}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                  LastModifiedInfo(
+                    createdAt: widget.existing!.createdAt,
+                    updatedAt: widget.existing!.updatedAt,
+                    lastModifiedBy: widget.existing!.lastModifiedBy,
                   ),
                 ],
                 const SizedBox(height: 18),

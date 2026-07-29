@@ -6,11 +6,11 @@ import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import '../core/auth/auth_service.dart';
-import '../core/providers/nearby_sync_provider.dart';
-import '../core/storage/local_database.dart';
-import '../features/sync/p2p/p2p_sync_service.dart';
-import '../features/sync/p2p/p2p_security_service.dart';
+import '../../../core/auth/auth_service.dart';
+import '../../../core/providers/nearby_sync_provider.dart';
+import '../../../core/storage/local_database.dart';
+import '../p2p/p2p_sync_service.dart';
+import '../p2p/p2p_security_service.dart';
 
 class P2PIdentityWithConnection extends P2PIdentity {
   const P2PIdentityWithConnection({

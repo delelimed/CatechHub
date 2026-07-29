@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../core/providers/nearby_sync_provider.dart';
-import '../features/sync/p2p/p2p_sync_service.dart';
+import '../../../core/providers/nearby_sync_provider.dart';
+import '../p2p/p2p_sync_service.dart';
 
 enum SyncDotColor { red, amber, green, cyan }
 

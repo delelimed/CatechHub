@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/auth/auth_service.dart';
 import '../../features/sync/p2p/p2p_security_service.dart';
 import '../../shared/models/class_model.dart';
-import '../../shared/widgets/app_scaffold.dart';
 import 'classes_provider.dart';
 
 class ManageCatechistsPage extends ConsumerStatefulWidget {
@@ -211,9 +210,14 @@ class _ManageCatechistsPageState extends ConsumerState<ManageCatechistsPage> {
 
     final canManage = !_currentClass.nameLocked;
 
-    return AppScaffold(
-      title: 'Catechisti — ${_currentClass.name}',
-      child: _loadingNames
+    return Scaffold(
+      backgroundColor: isDark ? colorScheme.surface : Colors.grey.shade50,
+      appBar: AppBar(
+        backgroundColor: isDark ? colorScheme.primaryContainer : const Color(0xFF174A7E),
+        foregroundColor: isDark ? colorScheme.onPrimaryContainer : Colors.white,
+        title: Text('Catechisti — ${_currentClass.name}'),
+      ),
+      body: _loadingNames
           ? const Center(child: CircularProgressIndicator())
           : _groups.isEmpty
               ? Center(

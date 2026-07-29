@@ -182,6 +182,26 @@ final HKDF_INFO = 'CatechHub_SessionKey_v2';
 
     <p><strong>Stati:</strong> 12 stati di sincronizzazione tracciati da <code>P2PSyncStatus</code> (idle, pairing, discovering, advertising, handshakeSent, handshakeReceived, <strong>pairingVerification</strong>, sessionEstablished, syncing, completed, error).</p>
 
+    <h4>4.1.6 Consent Protocol</h4>
+
+    <p><strong>Role-based auth flow.</strong> <code>P2PSyncRole</code> ha tre valori: <code>mioDispositivo</code>, <code>altroCatechista</code>, <code>responsabile</code>. Il flusso di autenticazione differisce in base al ruolo:</p>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li><code>mioDispositivo</code>: accetta automaticamente le richieste di autenticazione senza intervento dell'utente.</li>
+      <li><code>altroCatechista</code>: richiede una conferma esplicita dell'utente tramite dialogo prima che la connessione proceda.</li>
+      <li>Entrambi i dispositivi <code>altroCatechista</code>: richiedono un dialogo di permesso sessione su <strong>entrambi</strong> i dispositivi prima che la connessione venga accettata.</li>
+    </ul>
+
+    <p><strong>Protocollo di consenso (double opt-in).</strong> Quando entrambi i dispositivi hanno ruolo <code>altroCatechista</code>, <code>_onConnectionInitiated</code> verifica <code>_sessionSyncAllowed</code> prima di accettare la connessione in arrivo. Se il consenso non è stato concesso (l'utente non ha premuto "Procedi"), la connessione viene rifiutata con un messaggio di log. Questo garantisce che entrambi gli utenti debbano premere esplicitamente "Procedi" prima di qualsiasi scambio di dati, implementando un meccanismo di double opt-in.</p>
+
+    <p><strong>Correzione propagazione ruolo.</strong> <code>_pendingHandshakeRemoteRole</code> viene ora correttamente propagato da <code>_pendingHandshakeData</code> durante il flusso di associazione QR. Questa propagazione avviene in due punti chiave:</p>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li><code>completePairingAfterQrScan</code> — dopo la scansione e decodifica del QR, il ruolo remoto viene estratto dal payload di handshake e salvato nello stato pendente.</li>
+      <li><code>_handleReadyForVerification</code> — durante l'handshake di verifica dopo la conferma del pairing code, assicurando che <code>remoteRole</code> sia correttamente salvato nell'associazione <code>P2PDeviceAssociation</code>.</li>
+    </ul>
+    <p>Questa correzione garantisce che il ruolo del dispositivo remoto sia registrato accuratamente nel record di associazione, fondamentale per applicare correttamente l'autorizzazione basata sui ruoli nelle sessioni di sincronizzazione successive.</p>
+
+    <p><strong>Dialogo di conferma in <code>_handleAuthResponse</code>.</strong> Il dialogo di conferma per i dispositivi <code>altroCatechista</code> ora appare anche quando il dispositivo <code>altroCatechista</code> è l'<strong>iniziatore</strong> della sincronizzazione. In precedenza, il dialogo appariva solo quando il dispositivo <code>altroCatechista</code> era il ricevente. Questo garantisce un consenso simmetrico: indipendentemente da quale dispositivo avvia la connessione, entrambe le parti vengono invitate a confermare prima che la sessione proceda.</p>
+
     <h3>4.2 QR Code Sync</h3>
     <p>Canale alternativo per dispositivi senza Bluetooth o per trasferimenti one-shot. Implementato in <code>QRDataService</code>:</p>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">

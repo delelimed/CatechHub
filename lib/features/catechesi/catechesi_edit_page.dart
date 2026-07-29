@@ -5,6 +5,7 @@ import '../../shared/models/attachment_parent_type.dart';
 import '../../shared/models/catechesi_model.dart';
 import '../attachments/widgets/attachments_section.dart';
 import 'catechesi_repository.dart';
+import '../../shared/widgets/last_modified_info.dart';
 
 /// Pagina di creazione / modifica di una scheda catechesi.
 ///
@@ -175,6 +176,14 @@ class _CatechesiEditPageState extends ConsumerState<CatechesiEditPage> {
               parentType: AttachmentParentType.catechesi,
               title: 'Foto e Documenti',
             ),
+            if (widget.existing != null) ...[
+              const SizedBox(height: 20),
+              LastModifiedInfo(
+                createdAt: widget.existing!.createdAt,
+                updatedAt: widget.existing!.updatedAt,
+                lastModifiedBy: widget.existing!.lastModifiedBy,
+              ),
+            ],
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,

@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
-
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/models/catechesi_model.dart';
+import '../../shared/widgets/last_modified_info.dart';
 import 'catechesi_repository.dart';
 
 /// Pagina principale dell'applicazione CateREG per la gestione dell'archivio
@@ -184,7 +183,6 @@ class _CatechesiCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final formatter = DateFormat('dd MMMM yyyy', 'it_IT');
 
     return InkWell(
       borderRadius: BorderRadius.circular(20),
@@ -309,16 +307,11 @@ class _CatechesiCard extends StatelessWidget {
                     .toList(),
               ),
             ],
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(Icons.update_rounded, size: 14, color: isDark ? Colors.grey.shade500 : Colors.grey.shade500),
-                const SizedBox(width: 4),
-                Text(
-                  'Modificata ${formatter.format(catechesi.updatedAt)}',
-                  style: TextStyle(fontSize: 12, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
-                ),
-              ],
+            const SizedBox(height: 8),
+            LastModifiedInfo(
+              updatedAt: catechesi.updatedAt,
+              lastModifiedBy: catechesi.lastModifiedBy,
+              compact: true,
             ),
           ],
         ),

@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../shared/models/attachment_parent_type.dart';
 import '../../shared/models/student_model.dart';
+import '../../shared/widgets/last_modified_info.dart';
 import '../attachments/widgets/attachments_section.dart';
 import '../classes/classes_repository.dart';
 import 'students_repository.dart';
@@ -302,6 +303,14 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
             AttachmentsSection(
               parentId: widget.student.id,
               parentType: AttachmentParentType.student,
+            ),
+
+            const SizedBox(height: 16),
+
+            LastModifiedInfo(
+              createdAt: widget.student.createdAt,
+              updatedAt: widget.student.updatedAt,
+              lastModifiedBy: widget.student.lastModifiedBy,
             ),
 
             const SizedBox(height: 30),

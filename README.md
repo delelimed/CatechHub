@@ -40,7 +40,7 @@ CatechHub adotta un approccio **defense-in-depth**, dove ogni livello è progett
 | **Accesso all'app** | Solo con impronta digitale / riconoscimento facciale / PIN del telefono — nessuna password personalizzata, nessun account |
 | **Blocco hardware** | Verifica TEE/StrongBox all'avvio — se hardware di sicurezza assente, l'app NON si avvia (nessun fallback software) |
 | **Dati sul telefono** | Cifrati con **AES-256-GCM** — chiave master custodita in **AndroidKeyStore** (TEE/StrongBox hardware, nessun fallback software) |
-| **Sincronizzazione P2P BT/WiFi** | End-to-end encryption con **X25519 ECDH + HKDF + AES-256-GCM** — chiavi di dispositivo per associazione, chiavi effimere per sessione (forward secrecy), pairing code a 6 cifre anti-MitM, key pinning sulle riconnessioni |
+| **Sincronizzazione P2P BT/WiFi** | End-to-end encryption con **X25519 ECDH + HKDF + AES-256-GCM** — chiavi di dispositivo per associazione, chiavi effimere per sessione (forward secrecy), pairing code a 6 cifre anti-MitM, key pinning sulle riconnessioni, **doppio consenso** per dispositivi "Altro Catechista" |
 | **Condivisione QR** | Cifratura AES-256-GCM con PIN a 8 cifre (valido 3 minuti), checksum SHA-256 per chunk, chunking automatico, sync differenziale |
 | **Schermo** | Blocco screenshot e screen recording non autorizzati con FLAG_SECURE |
 | **Runtime** | freeRASP rileva e blocca root, emulatori, tampering e hacking |
@@ -48,6 +48,7 @@ CatechHub adotta un approccio **defense-in-depth**, dove ogni livello è progett
 | **Backup** | Protetto da password con derivazione PBKDF2 (210.000 iterazioni) |
 | **Hardware** | Verifica TEE/StrongBox all'avvio — chiave master mai in memoria volatile, SecurityManager con AndroidKeyStore |
 | **Associazioni P2P** | Chiavi X25519 per dispositivo salvate con l'associazione — chiave pubblica remota verificata ad ogni riconnessione (key pinning) |
+| **Tracciabilità** | Ogni registrazione memorizza data, ora e autore dell'ultima modifica; visualizzata in tutte le schermate di dettaglio per audit completo |
 
 > **Nessun dato personale lascia mai il tuo telefono** se non durante una sincronizzazione volontaria con un altro catechista di tua fiducia.
 
@@ -60,8 +61,9 @@ CatechHub adotta un approccio **defense-in-depth**, dove ogni livello è progett
 - **Note contatti** — Tieni traccia delle comunicazioni con le famiglie
 - **Condivisione QR** — Esporta e importa moduli selezionati in modo sicuro con PIN temporaneo e cifratura AES-256-GCM
 - **Backup crittografato** — Salva e ripristina tutto il database con un file `.catechub` protetto da password (PBKDF2 210.000 iterazioni)
-- **Sync P2P Nearby** — Sincronizzazione continua via Bluetooth/WiFi Direct con crittografia end-to-end (X25519 ECDH + HKDF + AES-256-GCM), pairing code a 6 cifre anti-MitM, key pinning per dispositivo, forward secrecy e sync differenziale
+- **Sync P2P Nearby** — Sincronizzazione continua via Bluetooth/WiFi Direct con crittografia end-to-end (X25519 ECDH + HKDF + AES-256-GCM), pairing code a 6 cifre anti-MitM, key pinning per dispositivo, forward secrecy e sync differenziale. **Doppio consenso**: se entrambi i dispositivi sono "Altro Catechista", la sincronizzazione richiede l'autorizzazione esplicita di entrambi i catechisti prima dello scambio dati.
 - **Comunicazioni automatiche** — Template WhatsApp con placeholders (nome ragazzo, assenze consecutive, data incontro, ecc.) e registrazione note di contatto
+- **Tracciabilità modifiche** — Ogni record mostra data, ora e autore dell'ultima modifica, garantendo piena trasparenza su chi ha modificato cosa e quando
 - **PDF e stampa** — Genera report presenze, statistiche assenze e liste gruppi
 - **Allergie e uscite autonome** — Gestisci informazioni sensibili con visibilità immediata
 

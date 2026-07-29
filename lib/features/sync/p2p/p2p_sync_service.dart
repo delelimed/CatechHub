@@ -480,6 +480,11 @@ class P2PSyncService {
   Future<void> _performPeriodicSync() async {
     if (_connectedEndpoints.isEmpty) return;
 
+    if (_state.awaitingConfirmation || !_state.authenticatedByRemote) {
+      addLog('DEBUG', 'Periodic sync saltato: attesa autenticazione');
+      return;
+    }
+
     for (final entry in _endpointSyncPhase.entries.toList()) {
       if (entry.value.indexSent && !entry.value.complete) {
         entry.value.reset();
@@ -1045,6 +1050,13 @@ Future<void> stopPairingMode() async {
         final association = await _security.getAssociation(deviceId);
         if (association == null || !association.isValid) {
           addLog('WARN', 'Rifiuto connessione: nessuna associazione valida per $deviceId');
+          await _nearby.rejectConnection(endpointId);
+          return;
+        }
+        if (_state.role == P2PSyncRole.altroCatechista &&
+            association.remoteRole == P2PSyncRole.altroCatechista.name &&
+            !_sessionSyncAllowed) {
+          addLog('WARN', 'Rifiuto connessione: permesso sessione non ancora concesso per $deviceId');
           await _nearby.rejectConnection(endpointId);
           return;
         }
@@ -1799,6 +1811,9 @@ void _onConnectionResult(String endpointId, Status status) {
       return;
     }
 
+    if (_pendingHandshakeData.containsKey(endpointId)) {
+      _pendingHandshakeRemoteRole = _pendingHandshakeData[endpointId]!.remoteRole;
+    }
     _pendingHandshakeData.remove(endpointId);
 
     String? code;
@@ -1921,6 +1936,12 @@ void _onConnectionResult(String endpointId, Status status) {
       return;
     }
 
+    // Propaga il ruolo remoto da _pendingHandshakeData prima di rimuoverlo.
+    final handshakeData = _pendingHandshakeData[endpointId];
+    if (handshakeData != null) {
+      _pendingHandshakeRemoteRole = handshakeData.remoteRole;
+    }
+
     // Se il nonce remoto non è ancora disponibile dall'handshake,
     // usa la variabile di istanza che viene aggiornata quando
     // il messaggio di handshake viene ricevuto.
@@ -2023,7 +2044,21 @@ void _onConnectionResult(String endpointId, Status status) {
       return;
     }
 
-    addLog('INFO', 'Autenticazione accettata dal remoto, avvio sync');
+    addLog('INFO', 'Autenticazione accettata dal remoto');
+
+    if (_state.role == P2PSyncRole.altroCatechista) {
+      final remoteId = _endpointConnIdMap[endpointId];
+      addLog('INFO', 'Richiesta conferma utente per sincronizzazione (initiator)');
+      _updateState(_state.copyWith(
+        authenticatedByRemote: true,
+        awaitingConfirmation: true,
+        pendingConfirmationDeviceName: _state.connectedDeviceName,
+        pendingConfirmationDeviceId: remoteId,
+        status: P2PSyncStatus.sessionEstablished,
+      ));
+      return;
+    }
+
     _updateState(_state.copyWith(authenticatedByRemote: true));
     await _performBidirectionalSync(endpointId);
   }
@@ -2643,20 +2678,28 @@ void _onConnectionResult(String endpointId, Status status) {
       addLog('DEBUG', 'Dispositivo $confirmedDeviceId aggiunto ai confermati');
     }
 
+    final alreadyAuthed = _state.authenticatedByRemote;
+
     _updateState(_state.copyWith(
       awaitingConfirmation: false,
+      authenticatedByRemote: true,
       pendingConfirmationDeviceName: null,
       pendingConfirmationDeviceId: null,
       status: P2PSyncStatus.sessionEstablished,
     ));
 
     if (endpointId != null) {
-      final ack = jsonEncode({
-        'type': 'p2p_auth_response',
-        'accepted': true,
-      });
-      await _sendEncryptedPayload(endpointId, ack);
-      addLog('DEBUG', 'Risposta auth positiva inviata a $endpointId');
+      if (alreadyAuthed) {
+        addLog('INFO', 'Avvio sincronizzazione dopo conferma utente (initiator)');
+        await _performBidirectionalSync(endpointId);
+      } else {
+        final ack = jsonEncode({
+          'type': 'p2p_auth_response',
+          'accepted': true,
+        });
+        await _sendEncryptedPayload(endpointId, ack);
+        addLog('DEBUG', 'Risposta auth positiva inviata a $endpointId');
+      }
     }
   }
 

@@ -34,7 +34,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../widgets/sync_status_dot.dart';
+import '../../features/sync/widgets/sync_status_dot.dart';
 import 'side_menu.dart';
 
 class AppScaffold extends StatelessWidget {

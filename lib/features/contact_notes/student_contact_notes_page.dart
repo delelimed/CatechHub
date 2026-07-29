@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/contact_note_model.dart';
 import '../../shared/models/student_model.dart';
+import '../../shared/widgets/last_modified_info.dart';
 import 'contact_notes_repository.dart';
 
 /// Provider che espone in tempo reale le [ContactNote] di uno specifico
@@ -298,6 +299,14 @@ class _ContactNoteCard extends StatelessWidget {
             child: Text(
               note.notes,
               style: TextStyle(fontSize: 14, height: 1.4, color: isDark ? colorScheme.onSurface : null),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: LastModifiedInfo(
+              updatedAt: note.updatedAt,
+              lastModifiedBy: note.lastModifiedBy,
+              compact: true,
             ),
           ),
         ],

@@ -71,9 +71,10 @@ class ClassDetailPage extends ConsumerWidget {
                       _showDeleteConfirmation(context, ref, currentClass);
                     }
                   },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'edit', child: Text('Modifica nome')),
-                    PopupMenuItem(value: 'delete', child: Text('Elimina')),
+                  itemBuilder: (_) => [
+                    if (!currentClass.nameLocked)
+                      const PopupMenuItem(value: 'edit', child: Text('Modifica nome')),
+                    const PopupMenuItem(value: 'delete', child: Text('Elimina')),
                   ],
                 ),
             ],

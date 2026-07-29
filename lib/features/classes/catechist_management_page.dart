@@ -26,49 +26,71 @@ class _ManageCatechistsPageState extends ConsumerState<ManageCatechistsPage> {
   void initState() {
     super.initState();
     _currentClass = widget.schoolClass;
-    _resolveNames();
+    _resolveNames().catchError((_) {
+      if (mounted) {
+        setState(() => _loadingNames = false);
+      }
+    });
   }
 
   Future<void> _resolveNames() async {
-    final names = <String, String>{};
-    for (final id in _currentClass.catechistIds) {
-      if (id == AuthService.localUserId) {
-        names[id] = '${AuthService.localUserName} (tu)';
-      } else {
-        try {
-          final assoc = await _security.getAssociation(id);
-          if (assoc != null && assoc.deviceName.isNotEmpty) {
-            names[id] = assoc.deviceName;
-          } else {
+    try {
+      final names = <String, String>{};
+      for (final id in _currentClass.catechistIds) {
+        if (id == AuthService.localUserId) {
+          names[id] = '${AuthService.localUserName} (tu)';
+        } else {
+          try {
+            final assoc = await _security.getAssociation(id);
+            if (assoc != null && assoc.deviceName.isNotEmpty) {
+              names[id] = assoc.deviceName;
+            } else {
+              names[id] = id;
+            }
+          } catch (_) {
             names[id] = id;
           }
-        } catch (_) {
-          names[id] = id;
         }
       }
-    }
-    if (mounted) {
-      setState(() {
-        _resolvedNames.addAll(names);
-        _loadingNames = false;
-      });
+      if (mounted) {
+        setState(() {
+          _resolvedNames.addAll(names);
+          _loadingNames = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loadingNames = false);
+      }
     }
   }
 
   Future<void> _removeCatechist(String catechistId) async {
-    final repo = ref.read(classesRepoProvider);
-    await repo.removeCatechistFromClass(_currentClass.id, catechistId);
-    setState(() {
-      _currentClass = _currentClass.copyWith(
-        catechistIds: _currentClass.catechistIds.where((id) => id != catechistId).toList(),
-      );
-    });
+    try {
+      final repo = ref.read(classesRepoProvider);
+      await repo.removeCatechistFromClass(_currentClass.id, catechistId);
+      if (mounted) {
+        setState(() {
+          _currentClass = _currentClass.copyWith(
+            catechistIds: _currentClass.catechistIds.where((id) => id != catechistId).toList(),
+          );
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Errore durante la rimozione del catechista')),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
+
+    final canManage = !_currentClass.nameLocked;
 
     return AppScaffold(
       title: 'Catechisti — ${_currentClass.name}',
@@ -101,7 +123,9 @@ class _ManageCatechistsPageState extends ConsumerState<ManageCatechistsPage> {
                     Padding(
                       padding: const EdgeInsets.only(left: 4, bottom: 12),
                       child: Text(
-                        'CATECHISTI (${_currentClass.catechistIds.length})',
+                        canManage
+                            ? 'CATECHISTI (${_currentClass.catechistIds.length})'
+                            : 'CATECHISTI (${_currentClass.catechistIds.length}) — SOLA LETTURA',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
@@ -116,9 +140,8 @@ class _ManageCatechistsPageState extends ConsumerState<ManageCatechistsPage> {
                           isLocalUser: id == AuthService.localUserId,
                           isDark: isDark,
                           colorScheme: colorScheme,
-                          onRemove: id == AuthService.localUserId
-                              ? null
-                              : () async {
+                          onRemove: canManage && id != AuthService.localUserId
+                              ? () async {
                                   final confirmed = await showDialog<bool>(
                                     context: context,
                                     builder: (ctx) => AlertDialog(
@@ -154,7 +177,8 @@ class _ManageCatechistsPageState extends ConsumerState<ManageCatechistsPage> {
                                   if (confirmed == true) {
                                     await _removeCatechist(id);
                                   }
-                                },
+                                }
+                              : null,
                         )),
                   ],
                 ),

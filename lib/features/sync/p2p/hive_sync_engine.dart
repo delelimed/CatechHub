@@ -344,39 +344,41 @@ class HiveSyncEngine {
           continue;
         }
 
-        if (remote.updatedAt.isAfter(localUpdatedAt)) {
-          if (remote.isDeleted) {
-            final merged = Map<String, dynamic>.from(localData);
-            merged['isDeleted'] = true;
-            merged['updatedAt'] = remote.updatedAt.toIso8601String();
-            await box.put(remote.id, merged);
-          } else {
-            final data = Map<String, dynamic>.from(remote.data);
-            if (isClassBox) {
-              data['nameLocked'] = localData['nameLocked'] ?? true;
+          if (remote.updatedAt.isAfter(localUpdatedAt)) {
+            if (remote.isDeleted) {
+              final merged = Map<String, dynamic>.from(localData);
+              merged['isDeleted'] = true;
+              merged['updatedAt'] = remote.updatedAt.toIso8601String();
+              await box.put(remote.id, merged);
+            } else {
+              final data = Map<String, dynamic>.from(remote.data);
+              if (isClassBox) {
+                data['nameLocked'] = data['nameLocked'] == true ||
+                    (localData['nameLocked'] ?? true);
+              }
+              await box.put(remote.id, data);
             }
-            await box.put(remote.id, data);
-          }
-          appliedCount++;
-        } else if (remote.updatedAt == localUpdatedAt) {
-          final merged = Map<String, dynamic>.from(localData);
-          bool changed = false;
-          remote.data.forEach((k, v) {
-            if (!merged.containsKey(k) || merged[k] != v) {
-              merged[k] = v;
-              changed = true;
-            }
-          });
-          if (isClassBox) {
-            merged['nameLocked'] = localData['nameLocked'] ?? true;
-          }
-          if (changed) {
-            merged['updatedAt'] = DateTime.now().toUtc().toIso8601String();
-            await box.put(remote.id, merged);
             appliedCount++;
-            conflictsResolved++;
+          } else if (remote.updatedAt == localUpdatedAt) {
+            final merged = Map<String, dynamic>.from(localData);
+            bool changed = false;
+            remote.data.forEach((k, v) {
+              if (!merged.containsKey(k) || merged[k] != v) {
+                merged[k] = v;
+                changed = true;
+              }
+            });
+            if (isClassBox) {
+              merged['nameLocked'] = (localData['nameLocked'] ?? true) ||
+                  remote.data['nameLocked'] == true;
+            }
+            if (changed) {
+              merged['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+              await box.put(remote.id, merged);
+              appliedCount++;
+              conflictsResolved++;
+            }
           }
-        }
       } catch (_) {}
     }
 

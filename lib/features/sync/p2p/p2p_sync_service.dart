@@ -2259,6 +2259,13 @@ void _onConnectionResult(String endpointId, Status status) {
         });
         await _sendEncryptedPayload(endpointId, recordsPayload);
         addLog('INFO', 'Invio completato: ${localRecords.length} record');
+      } else {
+        final emptyPayload = jsonEncode({
+          'type': 'p2p_sync_data',
+          'records': [],
+        });
+        await _sendEncryptedPayload(endpointId, emptyPayload);
+        addLog('DEBUG', 'Invio segnale sync_data vuoto (nessun record da inviare)');
       }
       phase.sendDone = true;
 
@@ -2271,7 +2278,12 @@ void _onConnectionResult(String endpointId, Status status) {
         });
         await _sendEncryptedPayload(endpointId, requestPayload);
       } else {
-        addLog('INFO', 'Nessun record necessario dal remoto');
+        addLog('INFO', 'Nessun record necessario dal remoto, invio segnale');
+        final emptyRequest = jsonEncode({
+          'type': 'p2p_sync_request',
+          'keys': [],
+        });
+        await _sendEncryptedPayload(endpointId, emptyRequest);
         phase.receiveDone = true;
         _checkSyncComplete(endpointId);
       }
@@ -2388,6 +2400,30 @@ void _onConnectionResult(String endpointId, Status status) {
     final deviceId = message['deviceId'] as String?;
     if (deviceId != null) {
       _sessionConfirmedDevices.add(deviceId);
+      final pending = _pendingAssociations[deviceId];
+      if (pending != null) {
+        final existing = await _security.getAssociation(deviceId);
+        if (existing == null) {
+          await _security.registerAndSaveAssociation(
+            deviceId: pending.deviceId,
+            deviceName: pending.deviceName,
+            publicKeyBase64: pending.publicKeyBase64,
+            fingerprint: pending.fingerprint,
+            sharedSecretBase64: pending.sharedSecretBase64,
+            localRole: _state.role.name,
+            remoteRole: _pendingHandshakeRemoteRole?.name,
+          );
+          addLog('INFO', 'Associazione salvata in Hive su conferma remota per ${pending.deviceName}');
+        }
+        _pendingAssociations.remove(deviceId);
+      } else {
+        addLog('WARN', 'Nessuna associazione pendente per $deviceId in _handleAssociationConfirmed');
+        final remoteIdentity = _pendingHandshakeIdentity;
+        if (remoteIdentity != null) {
+          await _saveAssociationIfNeeded(remoteIdentity,
+              remoteRole: _pendingHandshakeRemoteRole);
+        }
+      }
     }
     _updateState(_state.copyWith(
       status: P2PSyncStatus.completed,

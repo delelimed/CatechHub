@@ -256,6 +256,12 @@ class _StatisticsPageState extends State<StatisticsPage> {
             perMeetingStats.length
         : 0.0;
 
+    final avgStudentsPerMeeting = perMeetingStats.isNotEmpty
+        ? (perMeetingStats.map((s) => s.present).reduce((a, b) => a + b) /
+                perMeetingStats.length)
+            .round()
+        : 0;
+
     final best = perMeetingStats.isEmpty
         ? null
         : perMeetingStats.reduce(
@@ -269,6 +275,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
       overallPresentRate: overallPresentRate,
       overallAbsentRate: overallAbsentRate,
       avgPresentPerMeeting: avgPresentPerMeeting,
+      avgStudentsPerMeeting: avgStudentsPerMeeting,
       totalMeetings: perMeetingStats.length,
       totalStudents: totalStudents,
       bestMeeting: best,
@@ -291,6 +298,7 @@ class _StatsData {
   final double overallPresentRate;
   final double overallAbsentRate;
   final double avgPresentPerMeeting;
+  final int avgStudentsPerMeeting;
   final int totalMeetings;
   final int totalStudents;
   final _PerMeetingStat? bestMeeting;
@@ -301,6 +309,7 @@ class _StatsData {
     required this.overallPresentRate,
     required this.overallAbsentRate,
     required this.avgPresentPerMeeting,
+    required this.avgStudentsPerMeeting,
     required this.totalMeetings,
     required this.totalStudents,
     this.bestMeeting,
@@ -388,13 +397,12 @@ class _StatGrid extends StatelessWidget {
             ),
           ],
         ),
-        if (stats.totalStudents > 0) ...[
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _StatCard(
-                  label: 'Studenti nel gruppo',
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _StatCard(
+                  label: 'Ragazzi nel gruppo',
                   value: '${stats.totalStudents}',
                   icon: Icons.people_rounded,
                   color: Colors.purple,
@@ -402,10 +410,17 @@ class _StatGrid extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              Expanded(child: const SizedBox()),
-            ],
-          ),
-        ],
+              Expanded(
+                child: _StatCard(
+                  label: 'Media ragazzi per incontro',
+                value: '${stats.avgStudentsPerMeeting}',
+                icon: Icons.person_rounded,
+                color: Colors.teal,
+                isDark: isDark,
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }

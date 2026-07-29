@@ -279,12 +279,20 @@ class _CatechistButton extends ConsumerWidget {
 
     return InkWell(
       borderRadius: BorderRadius.circular(22),
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ManageCatechistsPage(schoolClass: myClass),
-        ),
-      ).then((_) => ref.refresh(classesStreamProvider)),
+      onTap: () {
+        try {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ManageCatechistsPage(schoolClass: myClass),
+            ),
+          ).then((_) => ref.refresh(classesStreamProvider));
+        } catch (_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Errore durante la navigazione')),
+          );
+        }
+      },
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -339,7 +347,9 @@ class _CatechistButton extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${myClass.catechistIds.length} catechista${myClass.catechistIds.length == 1 ? '' : 'i'}',
+                    myClass.nameLocked
+                        ? '${myClass.catechistIds.length} catechista${myClass.catechistIds.length == 1 ? '' : 'i'} — sola lettura'
+                        : '${myClass.catechistIds.length} catechista${myClass.catechistIds.length == 1 ? '' : 'i'}',
                     style: TextStyle(
                       fontSize: 12,
                       color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,

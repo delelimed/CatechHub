@@ -143,7 +143,6 @@ class HiveSyncEngine {
     LocalDatabase.catechesiBox: 'catechesi',
     LocalDatabase.meetingCatechesiBox: 'meeting_catechesi',
     LocalDatabase.studentDailyNotesBox: 'student_daily_notes',
-    LocalDatabase.trustedDevicesBox: 'trusted_devices',
   };
 
   static const _lastSyncKey = 'p2p_last_sync_timestamp';

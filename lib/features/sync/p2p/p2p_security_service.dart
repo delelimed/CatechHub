@@ -435,6 +435,7 @@ class P2PSecurityService {
     required String remoteDeviceName,
     required String remotePublicKeyBase64,
     bool isInitiator = false,
+    String? sessionNonce,
   }) async {
     Uint8List remoteKeyBytes;
     try {
@@ -450,8 +451,17 @@ class P2PSecurityService {
     );
     final sharedBytes = await sharedSecret.extractBytes();
 
-    final hkdfInput = sha256.convert(sharedBytes).bytes;
-    final handshakeNonce = Uint8List.fromList(hkdfInput.sublist(0, 32));
+    // Utilizza un nonce unico per sessione derivato dai nonces scambiati
+    // durante l'handshake, invece di un hash deterministico del shared secret.
+    // Questo garantisce che ogni sessione usi una chiave diversa.
+    final Uint8List handshakeNonce;
+    if (sessionNonce != null && sessionNonce.isNotEmpty) {
+      final nonceHash = sha256.convert(utf8.encode(sessionNonce));
+      handshakeNonce = Uint8List.fromList(nonceHash.bytes.sublist(0, 32));
+    } else {
+      final hkdfInput = sha256.convert(sharedBytes).bytes;
+      handshakeNonce = Uint8List.fromList(hkdfInput.sublist(0, 32));
+    }
 
     final hkdf = Hkdf(
       hmac: Hmac(_sha256Algo),
@@ -461,7 +471,7 @@ class P2PSecurityService {
     final localIdentity = await getLocalIdentity();
     final ids = [localIdentity.deviceId, remoteDeviceId]..sort();
     final info = utf8.encode(
-        'CatechHub_P2P_Session_v2:${ids[0]}:${ids[1]}');
+        'CatechHub_P2P_Session_v3:${ids[0]}:${ids[1]}');
 
     final sessionKeyData = await hkdf.deriveKey(
       secretKey: SecretKey(Uint8List.fromList(sharedBytes)),

@@ -22,7 +22,7 @@ import '../students/students_repository.dart';
 import '../students/students_add_page.dart' hide classesRepoProvider;
 import '../students/edit_student_page.dart' hide classesRepoProvider;
 import 'classes_provider.dart';
-//import 'classes_repository.dart';
+import 'catechist_management_page.dart';
 
 class GroupManagementPage extends ConsumerWidget {
   const GroupManagementPage({super.key});
@@ -88,6 +88,8 @@ class GroupManagementPage extends ConsumerWidget {
                   ref.refresh(classesStreamProvider);
                 },
               ),
+              const SizedBox(height: 20),
+              _CatechistButton(myClass: myClass),
               const SizedBox(height: 20),
               _StudentsList(
                 classId: myClass.id,
@@ -257,6 +259,101 @@ class _GroupHeader extends ConsumerWidget {
                 : () => _showEditNameDialog(context, ref),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// =========================
+/// CATECHIST BUTTON
+/// =========================
+class _CatechistButton extends ConsumerWidget {
+  final SchoolClass myClass;
+
+  const _CatechistButton({required this.myClass});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(22),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ManageCatechistsPage(schoolClass: myClass),
+        ),
+      ).then((_) => ref.refresh(classesStreamProvider)),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isDark
+                ? [
+                    colorScheme.surfaceContainer,
+                    colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                  ]
+                : [
+                    Colors.white,
+                    Colors.green.shade50.withValues(alpha: 0.35),
+                  ],
+          ),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.green.shade200,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.3)
+                  : Colors.black.withValues(alpha: 0.04),
+              blurRadius: 14,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: Colors.green,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(Icons.person, color: Colors.white),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Gestisci Catechisti',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${myClass.catechistIds.length} catechista${myClass.catechistIds.length == 1 ? '' : 'i'}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+            ),
+          ],
+        ),
       ),
     );
   }

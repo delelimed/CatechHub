@@ -295,8 +295,6 @@ class P2PSyncService {
   P2PIdentity? _pendingHandshakeIdentity;
   P2PSyncRole? _pendingHandshakeRemoteRole;
 
-  Completer<void>? _pairingCompleter;
-
   final Map<String, SecretKeyData> _endpointSessionKeys = {};
 
   bool _continuousModeActive = false;
@@ -738,6 +736,7 @@ class P2PSyncService {
     try {
       await _nearby.stopAdvertising();
       await _nearby.stopDiscovery();
+      await Future.delayed(const Duration(milliseconds: 200));
     } catch (_) {}
 
     _updateState(_state.copyWith(
@@ -790,67 +789,71 @@ class P2PSyncService {
   /// Avvia solo advertising (nessun discovery).
   /// Usato dal dispositivo che mostra il QR per primo.
   /// Non invia richieste di connessione, attende solo richieste in entrata.
-  Future<void> startPairingAdvertiseOnly() async {
-    addLog('INFO', 'Modalità advertising-only avviata (mostra QR, attende)');
-    if (!_initialized) await init();
+Future<void> startPairingAdvertiseOnly() async {
+     addLog('INFO', 'Modalità advertising-only avviata (mostra QR, attende)');
+     if (!_initialized) await init();
 
-    final permResult =
-        await BluetoothPermissionService.checkAndRequestPermissions();
-    if (!permResult.allGranted) {
-      _updateState(_state.copyWith(
-        status: P2PSyncStatus.error,
-        errorMessage: permResult.errorMessage ?? 'Permessi insufficienti.',
-      ));
-      return;
-    }
+     final permResult =
+         await BluetoothPermissionService.checkAndRequestPermissions();
+     if (!permResult.allGranted) {
+       _updateState(_state.copyWith(
+         status: P2PSyncStatus.error,
+         errorMessage: permResult.errorMessage ?? 'Permessi insufficienti.',
+       ));
+       return;
+     }
 
-    _restartingEndpoints = true;
-    try {
-      await _nearby.stopAdvertising();
-      await _nearby.stopDiscovery();
-    } catch (_) {}
+     _restartingEndpoints = true;
+     try {
+       await _nearby.stopAdvertising();
+       await _nearby.stopDiscovery();
+       await Future.delayed(const Duration(milliseconds: 200));
+     } catch (_) {}
 
-    _updateState(_state.copyWith(
-      isPairingMode: true,
-      status: P2PSyncStatus.pairingAdvertiseOnly,
-      clearError: true,
-      connectedDeviceId: null,
-      connectedDeviceName: null,
-    ));
+     _updateState(_state.copyWith(
+       isPairingMode: true,
+       status: P2PSyncStatus.pairingAdvertiseOnly,
+       clearError: true,
+       connectedDeviceId: null,
+       connectedDeviceName: null,
+       pairingCode: null,
+       remotePairingCode: null,
+       isSessionEncrypted: false,
+     ));
 
-    try {
-      final identity = await _security.getLocalIdentity();
-      final displayName = '$_syncPrefix${identity.deviceId}';
+     try {
+       final identity = await _security.getLocalIdentity();
+       final displayName = '$_syncPrefix${identity.deviceId}';
 
-      await _nearby.startAdvertising(
-        displayName,
-        Strategy.P2P_CLUSTER,
-        onConnectionInitiated: _onConnectionInitiated,
-        onConnectionResult: _onConnectionResult,
-        onDisconnected: _onDisconnected,
-        serviceId: _serviceId,
-      );
+       await _nearby.startAdvertising(
+         displayName,
+         Strategy.P2P_CLUSTER,
+         onConnectionInitiated: _onConnectionInitiated,
+         onConnectionResult: _onConnectionResult,
+         onDisconnected: _onDisconnected,
+         serviceId: _serviceId,
+       );
 
-      addLog('DEBUG', 'Advertising-only avviato come $displayName');
+       addLog('DEBUG', 'Advertising-only avviato come $displayName');
 
-      _pairingTimeoutTimer = Timer(_pairingTimeout, () {
-        if (_state.isPairingMode) {
-          stopPairingMode();
-          _updateState(_state.copyWith(
-            status: P2PSyncStatus.error,
-            errorMessage: 'Tempo scaduto: nessun dispositivo si è connesso.',
-          ));
-        }
-      });
-    } catch (e) {
-      _updateState(_state.copyWith(
-        status: P2PSyncStatus.error,
-        errorMessage: 'Errore avvio advertising: $e',
-      ));
-    } finally {
-      _restartingEndpoints = false;
-    }
-  }
+       _pairingTimeoutTimer = Timer(_pairingTimeout, () {
+         if (_state.isPairingMode) {
+           stopPairingMode();
+           _updateState(_state.copyWith(
+             status: P2PSyncStatus.error,
+             errorMessage: 'Tempo scaduto: nessun dispositivo si è connesso.',
+           ));
+         }
+       });
+     } catch (e) {
+       _updateState(_state.copyWith(
+         status: P2PSyncStatus.error,
+         errorMessage: 'Errore avvio advertising: $e',
+       ));
+     } finally {
+       _restartingEndpoints = false;
+     }
+   }
 
   /// Avvia solo discovery per trovare il dispositivo target.
   /// [targetEndpoint] è l'endpoint name (deviceId) ottenuto dal QR code scansionato.
@@ -873,6 +876,7 @@ class P2PSyncService {
     try {
       await _nearby.stopAdvertising();
       await _nearby.stopDiscovery();
+      await Future.delayed(const Duration(milliseconds: 200));
     } catch (_) {}
 
     _updateState(_state.copyWith(
@@ -881,6 +885,9 @@ class P2PSyncService {
       clearError: true,
       connectedDeviceId: null,
       connectedDeviceName: null,
+      pairingCode: null,
+      remotePairingCode: null,
+      isSessionEncrypted: false,
     ));
 
     final fullTargetName = '$_syncPrefix$targetEndpoint';
@@ -935,55 +942,52 @@ class P2PSyncService {
     }
   }
 
-  Future<void> stopPairingMode() async {
-    _pairingTimeoutTimer?.cancel();
-    _pairingTimeoutTimer = null;
-    _pairingCompleter = null;
-
-    for (final endpointId in _connectedEndpoints.toList()) {
+Future<void> stopPairingMode() async {
+      _pairingTimeoutTimer?.cancel();
+      _pairingTimeoutTimer = null;
+      _pendingEndpointId = null;
       try {
-        await _nearby.disconnectFromEndpoint(endpointId);
+        await _nearby.stopAdvertising();
+        await _nearby.stopDiscovery();
+        await _nearby.stopAllEndpoints();
       } catch (_) {}
+
+      _connectedEndpoints.clear();
+      _endpointConnIdMap.clear();
+      _endpointSessionKeys.clear();
+      _endpointSyncPhase.clear();
+      _pendingEndpointId = null;
+      _pendingHandshakeIdentity = null;
+      _pendingHandshakeRemoteRole = null;
+      _sessionConfirmedDevices.clear();
+      _pendingHandshakeData.clear();
+      _pendingAssociations.clear();
+      _restartingEndpoints = false;
+      _isSyncing = false;
+      _sessionPairingNonce = null;
+      _remoteSessionPairingNonce = null;
+
+      _updateState(_state.copyWith(
+        isPairingMode: false,
+        status: P2PSyncStatus.idle,
+        connectedDeviceId: null,
+        connectedDeviceName: null,
+        connectedFingerprint: null,
+        isSessionEncrypted: false,
+        pairingCode: null,
+        remotePairingCode: null,
+        errorMessage: null,
+      ));
+
+      if (_continuousModeActive) {
+        Future.delayed(const Duration(milliseconds: 800), () {
+          if (_continuousModeActive && !_state.isPairingMode) {
+            _startAdvertising();
+            _startDiscovery();
+          }
+        });
+      }
     }
-
-    _connectedEndpoints.clear();
-    _endpointConnIdMap.clear();
-    _endpointSessionKeys.clear();
-    _endpointSyncPhase.clear();
-    _pendingEndpointId = null;
-    _pendingHandshakeIdentity = null;
-    _pendingHandshakeRemoteRole = null;
-    _nearbyDiscoveredDevices.clear();
-    _nearbyEndpointToDevice.clear();
-    _sessionConfirmedDevices.clear();
-    _pendingHandshakeData.clear();
-    _pendingAssociations.clear();
-    _restartingEndpoints = false;
-
-    try {
-      await _nearby.stopAdvertising();
-      await _nearby.stopDiscovery();
-    } catch (_) {}
-
-    _updateState(_state.copyWith(
-      isPairingMode: false,
-      status: P2PSyncStatus.idle,
-      connectedDeviceId: null,
-      connectedDeviceName: null,
-      connectedFingerprint: null,
-      isSessionEncrypted: false,
-      pairingCode: null,
-      remotePairingCode: null,
-      errorMessage: null,
-    ));
-
-    if (_continuousModeActive) {
-      Future.delayed(const Duration(milliseconds: 500), () {
-        _startAdvertising();
-        _startDiscovery();
-      });
-    }
-  }
 
 
 
@@ -1043,12 +1047,11 @@ class P2PSyncService {
     );
   }
 
-  void _onConnectionResult(String endpointId, Status status) {
-    if (status == Status.CONNECTED) {
-      addLog('INFO', 'Dispositivo connesso: $endpointId');
-      _pendingEndpointId = null;
-      _pairingCompleter?.complete();
-      _connectedEndpoints.add(endpointId);
+void _onConnectionResult(String endpointId, Status status) {
+     if (status == Status.CONNECTED) {
+       addLog('INFO', 'Dispositivo connesso: $endpointId');
+       _pendingEndpointId = null;
+       _connectedEndpoints.add(endpointId);
       _sendHandshakePayload(endpointId);
       _updateState(_state.copyWith(
         status: P2PSyncStatus.sessionEstablished,
@@ -1163,16 +1166,68 @@ class P2PSyncService {
     }
   }
 
-  /// Returns the agreed pairing nonce deterministically:
-  /// both sides sort the two nonces and pick the first.
-  String? _agreedPairingNonce() {
-    final a = _sessionPairingNonce;
-    final b = _remoteSessionPairingNonce;
-    if (a == null && b == null) return null;
-    if (a == null) return b;
-    if (b == null) return a;
-    final sorted = [a, b]..sort();
-    return sorted.first;
+  /// Deriva il pairing code dal shared secret e dai nonces concordati.
+  /// Entrambi i dispositivi devono usare lo stesso nonce concordato per
+  /// garantire che i codice di verifica corrispondano. Se un nonce è
+  /// mancante, si aspetta fino a 3 secondi per riceverlo prima di procedere.
+  Future<String?> _computePairingCode({
+    required String remoteId,
+    required String? localNonce,
+    required String? remoteNonce,
+  }) async {
+    addLog('INFO', '_computePairingCode: remote=$remoteId, localNonce present=${localNonce != null}, remoteNonce present=${remoteNonce != null}');
+
+    final effectiveLocalNonce = localNonce ?? _sessionPairingNonce;
+    final effectiveRemoteNonce = remoteNonce ?? _remoteSessionPairingNonce;
+
+    // Attendi fino a 3 secondi che entrambi i nonce siano disponibili.
+    // Questo evita race condition in cui un dispositivo riceve la richiesta
+    // di verifica prima di aver generato il proprio nonce di sessione.
+    if (effectiveLocalNonce == null || effectiveRemoteNonce == null) {
+      addLog('WARN', 'Nonce mancante, attesa 3s per sincronizzazione...');
+      for (int i = 0; i < 10; i++) {
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (effectiveLocalNonce == null && _sessionPairingNonce != null) {
+          addLog('DEBUG', 'Nonce locale ricevuto dopo attesa');
+          break;
+        }
+        if (effectiveRemoteNonce == null && _remoteSessionPairingNonce != null) {
+          addLog('DEBUG', 'Nonce remoto ricevuto dopo attesa');
+          break;
+        }
+      }
+    }
+
+    final finalLocalNonce = localNonce ?? _sessionPairingNonce;
+    final finalRemoteNonce = remoteNonce ?? _remoteSessionPairingNonce;
+
+    String? agreedNonce;
+
+    if (finalLocalNonce != null && finalRemoteNonce != null) {
+      final sorted = <String>[finalLocalNonce, finalRemoteNonce]..sort();
+      agreedNonce = '${sorted[0]}${sorted[1]}';
+      addLog('DEBUG', 'Nonce concordati (combinazione deterministica di entrambi)');
+    } else if (finalLocalNonce != null) {
+      agreedNonce = finalLocalNonce;
+      addLog('WARN', 'Solo nonce locale disponibile, codice non univoco');
+    } else if (finalRemoteNonce != null) {
+      agreedNonce = finalRemoteNonce;
+      addLog('WARN', 'Solo nonce remoto disponibile, codice non univoco');
+    } else {
+      addLog('WARN', 'Nessun nonce disponibile, pairing code senza nonce');
+    }
+
+    final association = _pendingAssociations[remoteId];
+    if (association == null) {
+      addLog('WARN', 'Nessun shared secret trovato per $remoteId');
+      return null;
+    }
+
+    final sharedSecret = association.sharedSecretBase64;
+    addLog('DEBUG', 'Calcolo codice con agreedNonce present=${agreedNonce != null}, sharedSecret present');
+    final code = P2PSecurityService.computePairingCode(sharedSecret, sessionNonce: agreedNonce);
+    addLog('DEBUG', 'Codice pairing calcolato: $code');
+    return code;
   }
 
   void _onPayloadReceived(String endpointId, Payload payload) {
@@ -1440,14 +1495,11 @@ class P2PSyncService {
         await _sendEncryptedPayload(endpointId, authRequest);
         addLog('DEBUG', 'Auth request inviata a $endpointId');
       }
-    } else {
-      addLog('DEBUG',
-          'Handshake: associazione trovata, calcolo pairing code');
+} else {
+       addLog('DEBUG',
+           'Handshake: associazione trovata, calcolo pairing code');
 
-      final sharedSecret = await _security.computeStaticSharedSecret(
-          association.publicKeyBase64);
-
-      final ack = jsonEncode({
+       final ack = jsonEncode({
         'type': 'p2p_handshake_ack',
         'senderId': localIdentity.deviceId,
         'senderName': localIdentity.deviceName,
@@ -1458,9 +1510,10 @@ class P2PSyncService {
       await _sendPayload(endpointId, ack);
 
       if (_state.isPairingMode) {
-        final code = P2PSecurityService.computePairingCode(
-          sharedSecret,
-          sessionNonce: _agreedPairingNonce(),
+        final code = await _computePairingCode(
+          remoteId: remoteId,
+          localNonce: _sessionPairingNonce,
+          remoteNonce: _remoteSessionPairingNonce,
         );
 
         _pendingHandshakeIdentity = P2PIdentity(
@@ -1624,12 +1677,10 @@ class P2PSyncService {
     } else {
       _remoteSessionPairingNonce =
           message['sessionNonce'] as String? ?? _remoteSessionPairingNonce;
-      final sharedSecret = await _security.computeStaticSharedSecret(
-        association.publicKeyBase64,
-      );
-      final code = P2PSecurityService.computePairingCode(
-        sharedSecret,
-        sessionNonce: _agreedPairingNonce(),
+      final code = await _computePairingCode(
+        remoteId: remoteId,
+        localNonce: _sessionPairingNonce,
+        remoteNonce: _remoteSessionPairingNonce,
       );
 
       _pendingHandshakeIdentity = P2PIdentity(
@@ -1718,38 +1769,29 @@ class P2PSyncService {
       String endpointId, Map<String, dynamic> message) async {
     addLog('INFO', 'Notifica pronta per verifica ricevuta dal remoto');
 
-    _pendingHandshakeData.remove(endpointId);
-
     final remoteId = _endpointConnIdMap[endpointId];
     if (remoteId == null) {
       addLog('WARN', 'Nessun remoteId mappato per $endpointId');
       return;
     }
 
-    String code;
+    _pendingHandshakeData.remove(endpointId);
+
+    String? code;
     if (_state.pairingCode != null && _state.status == P2PSyncStatus.sessionEstablished) {
       code = _state.pairingCode!;
       addLog('DEBUG', 'Uso pairing code già calcolato');
     } else {
-      final assoc = await _security.getAssociation(remoteId);
-      if (assoc != null) {
-        code = P2PSecurityService.computePairingCode(
-          assoc.sharedSecretBase64,
-          sessionNonce: _agreedPairingNonce(),
-        );
-        addLog('DEBUG', 'Pairing code calcolato da associazione Hive');
-      } else {
-        final pendingAssoc = _pendingAssociations[remoteId];
-        if (pendingAssoc == null) {
-          addLog('ERROR', 'Nessuna associazione (né Hive né pending) trovata per $remoteId');
-          return;
-        }
-        code = P2PSecurityService.computePairingCode(
-          pendingAssoc.sharedSecretBase64,
-          sessionNonce: _agreedPairingNonce(),
-        );
-        addLog('DEBUG', 'Pairing code calcolato da associazione pendente');
+      code = await _computePairingCode(
+        remoteId: remoteId,
+        localNonce: _sessionPairingNonce,
+        remoteNonce: _remoteSessionPairingNonce,
+      );
+      if (code == null) {
+        addLog('ERROR', 'Impossibile calcolare il codice di pairing per $remoteId');
+        return;
       }
+      addLog('DEBUG', 'Pairing code calcolato');
     }
 
     await _ensureSessionKey(endpointId);
@@ -1824,6 +1866,7 @@ class P2PSyncService {
       if (entry.value.remoteId == remoteDeviceId) {
         endpointId = entry.key;
         remoteNonce = entry.value.remoteNonce;
+        addLog('DEBUG', 'Trovato in _pendingHandshakeData: endpoint=$endpointId');
         break;
       }
     }
@@ -1832,14 +1875,20 @@ class P2PSyncService {
       for (final entry in _endpointConnIdMap.entries.toList()) {
         if (entry.value == remoteDeviceId) {
           endpointId = entry.key;
+          addLog('DEBUG', 'Trovato in _endpointConnIdMap: $endpointId');
           break;
         }
       }
     }
 
     if (endpointId == null) {
-      addLog('ERROR', 'Nessun endpoint trovato per $remoteDeviceId');
-      return;
+      if (_connectedEndpoints.isNotEmpty) {
+        endpointId = _connectedEndpoints.first;
+        addLog('WARN', 'Usato primo endpoint connesso come fallback: $endpointId');
+      } else {
+        addLog('ERROR', 'Nessun endpoint trovato per $remoteDeviceId');
+        return;
+      }
     }
 
     final pendingAssoc = _pendingAssociations[remoteDeviceId];
@@ -1848,13 +1897,31 @@ class P2PSyncService {
       return;
     }
 
+    // Se il nonce remoto non è ancora disponibile dall'handshake,
+    // usa la variabile di istanza che viene aggiornata quando
+    // il messaggio di handshake viene ricevuto.
+    if (remoteNonce == null) {
+      remoteNonce = _remoteSessionPairingNonce?.isNotEmpty == true
+          ? _remoteSessionPairingNonce
+          : null;
+    }
     if (remoteNonce != null) {
       _remoteSessionPairingNonce = remoteNonce;
     }
 
-    final code = P2PSecurityService.computePairingCode(
-      pendingAssoc.sharedSecretBase64,
-      sessionNonce: _agreedPairingNonce(),
+    // Attendi brevemente se il nonce remoto non è ancora disponibile,
+    // per garantire che entrambi i dispositivi usino lo stesso
+    // nonce concordato nel calcolo del codice di pairing.
+    if (remoteNonce == null && _remoteSessionPairingNonce == null) {
+      addLog('WARN', 'Nonce remoto non ancora disponibile, attesa 1s');
+      await Future.delayed(const Duration(seconds: 1));
+      remoteNonce = _remoteSessionPairingNonce;
+    }
+
+    final code = await _computePairingCode(
+      remoteId: remoteDeviceId,
+      localNonce: _sessionPairingNonce,
+      remoteNonce: remoteNonce,
     );
 
     _pendingHandshakeIdentity = P2PIdentity(
@@ -2028,6 +2095,16 @@ class P2PSyncService {
     }
   }
 
+  String _getCombinedSessionNonce() {
+    final local = _sessionPairingNonce;
+    final remote = _remoteSessionPairingNonce;
+    if (local != null && remote != null) {
+      final sorted = <String>[local, remote]..sort();
+      return '${sorted[0]}${sorted[1]}';
+    }
+    return local ?? remote ?? '';
+  }
+
   Future<SecretKeyData> _deriveSessionKey(String deviceId) async {
     final assoc = await _security.getAssociation(deviceId);
     if (assoc == null) {
@@ -2041,6 +2118,7 @@ class P2PSyncService {
       remoteDeviceName: assoc.deviceName,
       remotePublicKeyBase64: assoc.publicKeyBase64,
       isInitiator: isInitiator,
+      sessionNonce: _getCombinedSessionNonce(),
     );
     return session.sessionKey;
   }
@@ -2071,6 +2149,7 @@ class P2PSyncService {
           remoteDeviceName: pending.deviceName,
           remotePublicKeyBase64: pending.publicKeyBase64,
           isInitiator: isInitiator,
+          sessionNonce: _getCombinedSessionNonce(),
         );
         _endpointSessionKeys[endpointId] = session.sessionKey;
         return;
@@ -2088,24 +2167,20 @@ class P2PSyncService {
     final sessionKey = _endpointSessionKeys[endpointId];
     if (sessionKey == null) {
       addLog('ERROR', 'Nessuna chiave di sessione per $endpointId');
-      return;
+      throw Exception('Nessuna chiave di sessione per $endpointId');
     }
-    try {
-      final localIdentity = await _security.getLocalIdentity();
-      final wrapped = jsonEncode({
-        'senderId': localIdentity.deviceId,
-        'senderFingerprint': localIdentity.fingerprint,
-        'senderPublicKey': localIdentity.publicKeyBase64,
-        'data': plainText,
-      });
-      final encrypted =
-          await _security.encryptPayload(wrapped, sessionKey);
-      final payloadStr = encrypted.encode();
-      addLog('DEBUG', 'Invio payload cifrato a $endpointId (tipo: ${_extractType(plainText)})');
-      await _sendPayload(endpointId, payloadStr);
-    } catch (e) {
-      addLog('ERROR', 'Errore cifratura payload: $e');
-    }
+    final localIdentity = await _security.getLocalIdentity();
+    final wrapped = jsonEncode({
+      'senderId': localIdentity.deviceId,
+      'senderFingerprint': localIdentity.fingerprint,
+      'senderPublicKey': localIdentity.publicKeyBase64,
+      'data': plainText,
+    });
+    final encrypted =
+        await _security.encryptPayload(wrapped, sessionKey);
+    final payloadStr = encrypted.encode();
+    addLog('DEBUG', 'Invio payload cifrato a $endpointId (tipo: ${_extractType(plainText)})');
+    await _sendPayload(endpointId, payloadStr);
   }
 
   String _extractType(String plainText) {
@@ -2330,8 +2405,8 @@ class P2PSyncService {
       'deviceId': localIdentity.deviceId,
       'deviceName': localIdentity.deviceName,
     });
-    await _sendEncryptedPayload(endpointId, ack);
-    addLog('INFO', 'Conferma associazione inviata al dispositivo remoto');
+    await _sendPayload(endpointId, ack);
+    addLog('DEBUG', 'ACK associazione inviato (non cifrato)');
   }
 
   Future<void> finalizeAssociation(String endpointId, String remoteDeviceId) async {
@@ -2403,15 +2478,20 @@ class P2PSyncService {
     ));
 
     await _ensureSessionKey(endpointId);
-
-    final localIdentity = await _security.getLocalIdentity();
     addLog('INFO', 'Codice pairing confermato, invio conferma associazione');
+    final localIdentity = await _security.getLocalIdentity();
     final confirmed = jsonEncode({
       'type': 'p2p_association_confirmed',
       'deviceId': localIdentity.deviceId,
       'deviceName': localIdentity.deviceName,
     });
+
+    final iAmInitiator = localIdentity.deviceId.compareTo(remoteIdentity.deviceId) < 0;
+
     await _sendEncryptedPayload(endpointId, confirmed);
+    addLog('DEBUG', 'Conferma associazione inviata (cifrata)');
+
+    await Future.delayed(const Duration(milliseconds: 500));
 
     _updateState(_state.copyWith(
       status: P2PSyncStatus.completed,
@@ -2423,8 +2503,8 @@ class P2PSyncService {
       _startContinuousMode();
     }
 
-    final iAmInitiator = localIdentity.deviceId.compareTo(remoteIdentity.deviceId) < 0;
     if (iAmInitiator) {
+      await Future.delayed(const Duration(seconds: 2));
       addLog('INFO', 'Avvio sincronizzazione immediata dopo associazione');
       await _performBidirectionalSync(endpointId);
     }
@@ -2583,7 +2663,10 @@ class P2PSyncService {
     final endpoints = _connectedEndpoints.toList();
     if (endpoints.isNotEmpty) {
       final endpointId = endpoints.first;
-      if (_state.status == P2PSyncStatus.sessionEstablished &&
+      if (_state.status == P2PSyncStatus.completed) {
+        addLog('INFO', 'Sessione già completata, avvio nuova sincronizzazione');
+        await _performBidirectionalSync(endpointId);
+      } else if (_state.status == P2PSyncStatus.sessionEstablished &&
           _state.authenticatedByRemote) {
         addLog('INFO', 'Avvio sincronizzazione con dispositivo connesso');
         await _performBidirectionalSync(endpointId);
@@ -2595,6 +2678,9 @@ class P2PSyncService {
           await Future.delayed(const Duration(milliseconds: 500));
           if (_state.status == P2PSyncStatus.sessionEstablished &&
               _state.authenticatedByRemote) {
+            await _performBidirectionalSync(endpointId);
+            return;
+          } else if (_state.status == P2PSyncStatus.completed) {
             await _performBidirectionalSync(endpointId);
             return;
           }

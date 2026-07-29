@@ -16,24 +16,38 @@ class ManageCatechistsPage extends ConsumerStatefulWidget {
   ConsumerState<ManageCatechistsPage> createState() => _ManageCatechistsPageState();
 }
 
+class _CatechistGroup {
+  final String displayName;
+  final int deviceCount;
+  final bool isLocalUser;
+  final List<String> deviceIds;
+
+  const _CatechistGroup({
+    required this.displayName,
+    required this.deviceCount,
+    required this.isLocalUser,
+    required this.deviceIds,
+  });
+}
+
 class _ManageCatechistsPageState extends ConsumerState<ManageCatechistsPage> {
   late SchoolClass _currentClass;
   final _security = P2PSecurityService();
-  final Map<String, String> _resolvedNames = {};
+  List<_CatechistGroup> _groups = [];
   bool _loadingNames = true;
 
   @override
   void initState() {
     super.initState();
     _currentClass = widget.schoolClass;
-    _resolveNames().catchError((_) {
+    _resolveGroups().catchError((_) {
       if (mounted) {
         setState(() => _loadingNames = false);
       }
     });
   }
 
-  Future<void> _resolveNames() async {
+  Future<void> _resolveGroups() async {
     try {
       final ids = _currentClass.catechistIds;
       if (ids.isEmpty) {
@@ -42,15 +56,13 @@ class _ManageCatechistsPageState extends ConsumerState<ManageCatechistsPage> {
       }
 
       final results = await Future.wait(
-        ids.map((id) => _resolveSingleName(id)),
+        ids.map((id) => _resolveDeviceInfo(id)),
         cleanUp: (_) {},
       );
 
       if (mounted) {
         setState(() {
-          for (final result in results) {
-            if (result != null) _resolvedNames.addAll(result);
-          }
+          _groups = _buildGroups(results);
           _loadingNames = false;
         });
       }
@@ -61,42 +73,126 @@ class _ManageCatechistsPageState extends ConsumerState<ManageCatechistsPage> {
     }
   }
 
-  Future<Map<String, String>?> _resolveSingleName(String id) async {
+  Future<_DeviceInfo> _resolveDeviceInfo(String id) async {
     try {
       if (id == AuthService.localUserId) {
-        try {
-          return {id: '${AuthService.localUserName} (tu)'};
-        } catch (_) {
-          return {id: '$id (tu)'};
-        }
-      } else {
-        try {
-          final assoc = await _security.getAssociation(id).timeout(
-            const Duration(seconds: 5),
-          );
-          if (assoc != null && assoc.deviceName.isNotEmpty) {
-            return {id: assoc.deviceName};
-          } else {
-            return {id: id};
-          }
-        } catch (_) {
-          return {id: id};
-        }
+        return _DeviceInfo(
+          id: id,
+          displayName: AuthService.localUserName,
+          isLocalUser: true,
+          isMioDispositivo: false,
+        );
       }
     } catch (_) {
-      return {id: id};
+      // fall through
     }
+    try {
+      final assoc = await _security.getAssociation(id).timeout(
+        const Duration(seconds: 5),
+      );
+      if (assoc != null && assoc.remoteRole == 'mioDispositivo') {
+        return _DeviceInfo(
+          id: id,
+          displayName: assoc.deviceName.isNotEmpty ? assoc.deviceName : id,
+          isLocalUser: false,
+          isMioDispositivo: true,
+        );
+      }
+      if (assoc != null && assoc.deviceName.isNotEmpty) {
+        return _DeviceInfo(
+          id: id,
+          displayName: assoc.deviceName,
+          isLocalUser: false,
+          isMioDispositivo: false,
+        );
+      }
+    } catch (_) {
+      // fall through
+    }
+    return _DeviceInfo(
+      id: id,
+      displayName: id,
+      isLocalUser: false,
+      isMioDispositivo: false,
+    );
   }
 
-  Future<void> _removeCatechist(String catechistId) async {
+  List<_CatechistGroup> _buildGroups(List<_DeviceInfo> devices) {
+    final mioDispositivo = <_DeviceInfo>[];
+    final altri = <_DeviceInfo>[];
+
+    for (final d in devices) {
+      if (d.isLocalUser) {
+        altri.add(d);
+      } else if (d.isMioDispositivo) {
+        mioDispositivo.add(d);
+      } else {
+        altri.add(d);
+      }
+    }
+
+    final groups = <_CatechistGroup>[];
+    final grouped = <String, List<_DeviceInfo>>{};
+
+    for (final d in altri) {
+      grouped.putIfAbsent(d.displayName, () => []).add(d);
+    }
+
+    var hasLocalUser = false;
+
+    for (final entry in grouped.entries) {
+      final devs = entry.value;
+      final isLocal = devs.any((d) => d.isLocalUser);
+      final allIds = devs.map((d) => d.id).toList();
+
+      if (isLocal) hasLocalUser = true;
+
+      int extraDeviceCount = 0;
+      if (isLocal) {
+        extraDeviceCount = mioDispositivo.length;
+      }
+
+      final displayName = isLocal
+          ? '${AuthService.localUserName} (tu)'
+          : entry.key;
+
+      groups.add(_CatechistGroup(
+        displayName: displayName,
+        deviceCount: devs.length + extraDeviceCount,
+        isLocalUser: isLocal,
+        deviceIds: allIds,
+      ));
+    }
+
+    if (!hasLocalUser) {
+      for (final d in mioDispositivo) {
+        groups.add(_CatechistGroup(
+          displayName: d.displayName,
+          deviceCount: 1,
+          isLocalUser: false,
+          deviceIds: [d.id],
+        ));
+      }
+    }
+
+    return groups;
+  }
+
+  Future<void> _removeGroup(_CatechistGroup group) async {
+    final repo = ref.read(classesRepoProvider);
+    var updatedIds = List<String>.from(_currentClass.catechistIds);
+    for (final id in group.deviceIds) {
+      updatedIds.remove(id);
+    }
     try {
-      final repo = ref.read(classesRepoProvider);
-      await repo.removeCatechistFromClass(_currentClass.id, catechistId);
+      await repo.updateClass(
+        _currentClass.id,
+        _currentClass.copyWith(catechistIds: updatedIds),
+      );
       if (mounted) {
         setState(() {
-          _currentClass = _currentClass.copyWith(
-            catechistIds: _currentClass.catechistIds.where((id) => id != catechistId).toList(),
-          );
+          _currentClass = _currentClass.copyWith(catechistIds: updatedIds);
+          _groups = _groups.where((g) => g != group).toList();
         });
       }
     } catch (_) {
@@ -115,13 +211,11 @@ class _ManageCatechistsPageState extends ConsumerState<ManageCatechistsPage> {
 
     final canManage = !_currentClass.nameLocked;
 
-    final ids = _currentClass.catechistIds;
-
     return AppScaffold(
       title: 'Catechisti — ${_currentClass.name}',
       child: _loadingNames
           ? const Center(child: CircularProgressIndicator())
-          : ids.isEmpty
+          : _groups.isEmpty
               ? Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -149,8 +243,8 @@ class _ManageCatechistsPageState extends ConsumerState<ManageCatechistsPage> {
                       padding: const EdgeInsets.only(left: 4, bottom: 12),
                       child: Text(
                         canManage
-                            ? 'CATECHISTI (${ids.length})'
-                            : 'CATECHISTI (${ids.length}) — SOLA LETTURA',
+                            ? 'CATECHISTI (${_groups.length})'
+                            : 'CATECHISTI (${_groups.length}) — SOLA LETTURA',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
@@ -159,14 +253,17 @@ class _ManageCatechistsPageState extends ConsumerState<ManageCatechistsPage> {
                         ),
                       ),
                     ),
-                    ...ids.map((id) => _CatechistCard(
-                          catechistId: id,
-                          displayName: _resolvedNames[id] ?? id,
-                          isLocalUser: id == AuthService.localUserId,
+                    ..._groups.map((group) => _CatechistCard(
+                          displayName: group.displayName,
+                          deviceCount: group.deviceCount,
+                          isLocalUser: group.isLocalUser,
                           isDark: isDark,
                           colorScheme: colorScheme,
-                          onRemove: canManage && id != AuthService.localUserId
+                          onRemove: canManage && !group.isLocalUser
                               ? () async {
+                                  final label = group.deviceCount > 1
+                                      ? '${group.displayName} (${group.deviceCount} dispositivi)'
+                                      : group.displayName;
                                   final confirmed = await showDialog<bool>(
                                     context: context,
                                     builder: (ctx) => AlertDialog(
@@ -174,15 +271,8 @@ class _ManageCatechistsPageState extends ConsumerState<ManageCatechistsPage> {
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(20),
                                       ),
-                                      title: Text(
-                                        'Rimuovere catechista?',
-                                        style: TextStyle(
-                                          color: isDark ? colorScheme.onSurface : Colors.black87,
-                                        ),
-                                      ),
-                                      content: Text(
-                                        'Rimuovere "${_resolvedNames[id] ?? id}" da questo gruppo?',
-                                      ),
+                                      title: const Text('Rimuovere catechista?'),
+                                      content: Text('Rimuovere $label da questo gruppo?'),
                                       actions: [
                                         TextButton(
                                           onPressed: () => Navigator.pop(ctx, false),
@@ -200,7 +290,7 @@ class _ManageCatechistsPageState extends ConsumerState<ManageCatechistsPage> {
                                     ),
                                   );
                                   if (confirmed == true) {
-                                    await _removeCatechist(id);
+                                    await _removeGroup(group);
                                   }
                                 }
                               : null,
@@ -211,17 +301,31 @@ class _ManageCatechistsPageState extends ConsumerState<ManageCatechistsPage> {
   }
 }
 
-class _CatechistCard extends StatelessWidget {
-  final String catechistId;
+class _DeviceInfo {
+  final String id;
   final String displayName;
+  final bool isLocalUser;
+  final bool isMioDispositivo;
+
+  const _DeviceInfo({
+    required this.id,
+    required this.displayName,
+    required this.isLocalUser,
+    required this.isMioDispositivo,
+  });
+}
+
+class _CatechistCard extends StatelessWidget {
+  final String displayName;
+  final int deviceCount;
   final bool isLocalUser;
   final bool isDark;
   final ColorScheme colorScheme;
   final VoidCallback? onRemove;
 
   const _CatechistCard({
-    required this.catechistId,
     required this.displayName,
+    required this.deviceCount,
     required this.isLocalUser,
     required this.isDark,
     required this.colorScheme,
@@ -287,7 +391,17 @@ class _CatechistCard extends StatelessWidget {
                 ),
                 if (isLocalUser)
                   Text(
-                    'Sei tu',
+                    deviceCount > 1
+                        ? 'Sei tu — $deviceCount dispositivi'
+                        : 'Sei tu',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
+                    ),
+                  )
+                else if (deviceCount > 1)
+                  Text(
+                    '$deviceCount dispositivi',
                     style: TextStyle(
                       fontSize: 12,
                       color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,

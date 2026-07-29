@@ -141,19 +141,25 @@ class _SyncProgressOverlayState extends ConsumerState<SyncProgressOverlay> {
   void _showSessionPermission(P2PSyncState state) {
     final service = ref.read(nearbySyncServiceProvider);
     final className = _getCurrentClassName();
+    final deviceName = state.pendingSessionDeviceName ?? 'Dispositivo sconosciuto';
     showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('Permesso sincronizzazione'),
+          icon: Icon(
+            Icons.person_search,
+            size: 48,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          title: const Text('Dispositivo rilevato'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '${state.pendingSessionDeviceName ?? "Un dispositivo"} è nelle vicinanze.\n\n'
-                'Autorizzi la sincronizzazione automatica per questa sessione?\n\n'
-                'Il permesso sarà valido fino alla chiusura dell\'app.',
+                'È stato rilevato il dispositivo del catechista $deviceName.\n\n'
+                'Vuoi procedere con la sincronizzazione?',
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
               Container(
@@ -191,7 +197,7 @@ class _SyncProgressOverlayState extends ConsumerState<SyncProgressOverlay> {
                 _showingSessionPermission = false;
                 service.denySessionPermission();
               },
-              child: const Text('Rifiuta',
+              child: const Text('Annulla',
                   style: TextStyle(color: Colors.red)),
             ),
             FilledButton(
@@ -201,7 +207,7 @@ class _SyncProgressOverlayState extends ConsumerState<SyncProgressOverlay> {
                 service.grantSessionPermission();
                 service.startBackgroundSync();
               },
-              child: const Text('Autorizza'),
+              child: const Text('Procedi'),
             ),
           ],
         );

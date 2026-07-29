@@ -380,6 +380,23 @@ class P2PSyncService {
     if (_continuousModeActive) return;
     _continuousModeActive = true;
 
+    _sessionSyncAllowed = false;
+
+    try {
+      final associations = await _security.getAllAssociations();
+      if (associations.isNotEmpty) {
+        final storedRole = associations.first.localRole;
+        if (storedRole != null) {
+          _updateState(_state.copyWith(
+            role: P2PSyncRole.values.firstWhere(
+              (r) => r.name == storedRole,
+              orElse: () => P2PSyncRole.mioDispositivo,
+            ),
+          ));
+        }
+      }
+    } catch (_) {}
+
     final permResult =
         await BluetoothPermissionService.checkAndRequestPermissions();
     if (!permResult.allGranted) return;
@@ -534,7 +551,9 @@ class P2PSyncService {
 
             final assoc = await _security.getAssociation(deviceId);
             if (assoc != null && assoc.isValid) {
-              if (!_sessionSyncAllowed && _state.role == P2PSyncRole.altroCatechista) {
+              final isLocalAltro = _state.role == P2PSyncRole.altroCatechista;
+              final isRemoteAltro = assoc.remoteRole == P2PSyncRole.altroCatechista.name;
+              if (!_sessionSyncAllowed && isLocalAltro && isRemoteAltro) {
                 addLog('DEBUG', '  permesso sessione non concesso per $deviceId');
                 _updateState(_state.copyWith(
                   awaitingSessionPermission: true,
@@ -607,7 +626,9 @@ class P2PSyncService {
 
       final assoc = await _security.getAssociation(deviceId);
       if (assoc != null && assoc.isValid) {
-        if (!_sessionSyncAllowed && _state.role == P2PSyncRole.altroCatechista) {
+        final isLocalAltro = _state.role == P2PSyncRole.altroCatechista;
+        final isRemoteAltro = assoc.remoteRole == P2PSyncRole.altroCatechista.name;
+        if (!_sessionSyncAllowed && isLocalAltro && isRemoteAltro) {
           _updateState(_state.copyWith(
             awaitingSessionPermission: true,
             pendingSessionDeviceName: assoc.deviceName,

@@ -95,10 +95,10 @@ class ClassesPage extends ConsumerWidget {
                       className: c.name,
                       nameLocked: c.nameLocked,
                       isActive: isActive,
-                      canEdit: !c.nameLocked &&
-                          c.isCreator(AuthService.localUserId, getCurrentCatechistName()),
-                      onEditName: !c.nameLocked &&
-                              c.isCreator(AuthService.localUserId, getCurrentCatechistName())
+                      canEdit: c.isCreator(AuthService.localUserId, getCurrentCatechistName()) &&
+                          (c.creatorId.isEmpty && c.creatorName.isEmpty || !c.nameLocked),
+                      onEditName: c.isCreator(AuthService.localUserId, getCurrentCatechistName()) &&
+                              (c.creatorId.isEmpty && c.creatorName.isEmpty || !c.nameLocked)
                           ? (newName) {
                               ref.read(classesRepoProvider).updateClass(
                                     c.id,

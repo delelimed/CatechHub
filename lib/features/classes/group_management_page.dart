@@ -184,8 +184,9 @@ class _GroupHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
-    final canEdit = !schoolClass.nameLocked &&
-        schoolClass.isCreator(AuthService.localUserId, getCurrentCatechistName());
+    final hasKnownCreator = schoolClass.creatorId.isNotEmpty || schoolClass.creatorName.isNotEmpty;
+    final canEdit = schoolClass.isCreator(AuthService.localUserId, getCurrentCatechistName()) &&
+        (!hasKnownCreator || !schoolClass.nameLocked);
 
     return Container(
       padding: const EdgeInsets.all(20),

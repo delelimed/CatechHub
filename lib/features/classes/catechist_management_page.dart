@@ -209,8 +209,9 @@ class _ManageCatechistsPageState extends ConsumerState<ManageCatechistsPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
 
-    final canManage = !_currentClass.nameLocked &&
-        _currentClass.isCreator(AuthService.localUserId, getCurrentCatechistName());
+    final hasKnownCreator = _currentClass.creatorId.isNotEmpty || _currentClass.creatorName.isNotEmpty;
+    final canManage = _currentClass.isCreator(AuthService.localUserId, getCurrentCatechistName()) &&
+        (!hasKnownCreator || !_currentClass.nameLocked);
 
     return Scaffold(
       backgroundColor: isDark ? colorScheme.surface : Colors.grey.shade50,

@@ -533,6 +533,9 @@ class P2PSyncService {
   Future<void> _startAdvertising() async {
     if (!_continuousModeActive) return;
     try {
+      await _nearby.stopAdvertising();
+    } catch (_) {}
+    try {
       final identity = await _security.getLocalIdentity();
       addLog('DEBUG', 'Avvio advertising come ${identity.deviceId}');
       await _nearby.startAdvertising(
@@ -552,6 +555,9 @@ class P2PSyncService {
 
   Future<void> _startDiscovery() async {
     if (!_continuousModeActive) return;
+    try {
+      await _nearby.stopDiscovery();
+    } catch (_) {}
     try {
       addLog('DEBUG', 'Avvio discovery per $_syncPrefix');
       await _nearby.startDiscovery(
@@ -1137,6 +1143,7 @@ void _onConnectionResult(String endpointId, Status status) {
     final deviceId = _endpointConnIdMap.remove(endpointId);
     _endpointSessionKeys.remove(endpointId);
     _endpointSyncPhase.remove(endpointId);
+    _isSyncing = false;
     if (_pendingEndpointId == endpointId) {
       _pendingEndpointId = null;
     }

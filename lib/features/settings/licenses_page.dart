@@ -69,7 +69,6 @@ SOFTWARE.
     {'name': 'cupertino_icons', 'version': '^1.0.8', 'license': 'MIT'},
     {'name': 'collection', 'version': '^1.18.0', 'license': 'BSD-3-Clause'},
     {'name': 'wiredash', 'version': '^2.6.1', 'license': 'AAL'},
-    {'name': 'flutter_dotenv', 'version': '^6.0.1', 'license': 'MIT'},
     {'name': 'image_picker', 'version': '^1.2.2', 'license': 'Apache-2.0'},
     {'name': 'path_provider', 'version': '^2.1.0', 'license': 'BSD-3-Clause'},
     {'name': 'image', 'version': '^4.9.0', 'license': 'MIT'},

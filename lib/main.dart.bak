@@ -166,15 +166,6 @@ Future<void> main() async {
       WidgetsFlutterBinding.ensureInitialized();
 
       // ══════════════════════════════════════════════════════════════════════
-      // FASE 0.1 - CARICAMENTO CONFIGURAZIONE .ENV (flutter_dotenv)
-      //
-      // Carica il file .env incluso negli assets PRIMA di inizializzare
-      // freeRASP e Wiredash, così da leggere FREERASP_* e WIREDASH_*
-      // direttamente dal file invece che da --dart-define.
-      // ══════════════════════════════════════════════════════════════════════
-      await EnvConfig.load();
-
-      // ══════════════════════════════════════════════════════════════════════
       // FASE 0.5 - INIZIALIZZAZIONE FREERASP (SICUREZZA RUNTIME)
       //
       // DEVE avvenire DOPO ensureInitialized() e PRIMA di qualsiasi altra

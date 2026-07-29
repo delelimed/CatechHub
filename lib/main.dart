@@ -167,15 +167,6 @@ Future<void> main() async {
       WidgetsFlutterBinding.ensureInitialized();
 
       // ══════════════════════════════════════════════════════════════════════
-      // FASE 0.1 - CARICAMENTO CONFIGURAZIONE .ENV (flutter_dotenv)
-      //
-      // Carica il file .env incluso negli assets PRIMA di inizializzare
-      // freeRASP e Wiredash, così da leggere FREERASP_* e WIREDASH_*
-      // direttamente dal file invece che da --dart-define.
-      // ══════════════════════════════════════════════════════════════════════
-      await EnvConfig.load();
-
-      // ══════════════════════════════════════════════════════════════════════
       // FASE 0.5 - INIZIALIZZAZIONE FREERASP (SICUREZZA RUNTIME)
       //
       // DEVE avvenire DOPO ensureInitialized() e PRIMA di qualsiasi altra
@@ -183,7 +174,7 @@ Future<void> main() async {
       // dell'app e rileva root, emulator, hooking (Frida), tampering,
       // debug USB attivo, debugger connesso, opzioni sviluppatore attive.
       //
-      // La configurazione viene letta da .env (caricato sopra) tramite EnvConfig:
+      // La configurazione viene letta da --dart-define tramite EnvConfig:
       //   - FREERASP_PACKAGE_NAME (es. com.delelimed.catechhub)
       //   - FREERASP_RELEASE_HASH (SHA-256 del certificato in Base64)
       //
@@ -547,10 +538,8 @@ Future<void> main() async {
 class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
-  /// Project ID Wiredash per il feedback utente (letto da .env via EnvConfig).
   static String get _wiredashProjectId => EnvConfig.wiredashProjectId;
 
-  /// Secret key Wiredash per l'autenticazione API (letto da .env via EnvConfig).
   static String get _wiredashSecret => EnvConfig.wiredashApiSecret;
 
   /// Flag per garantire che l'inizializzazione sequenziale venga eseguita

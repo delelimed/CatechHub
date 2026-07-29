@@ -71,7 +71,6 @@ dependencies:
   cupertino_icons: ^1.0.8
   collection: ^1.18.0
   wiredash: ^2.6.1
-  flutter_dotenv: ^6.0.1
   image_picker: ^1.2.2
   path_provider: ^2.1.0
   image: ^4.9.0

@@ -290,6 +290,16 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: 12),
 
               _SettingsItem(
+                icon: Icons.list_alt_rounded,
+                title: 'Visualizza Gruppi',
+                subtitle: 'Vedi tutti i gruppi di cui fai parte',
+                color: const Color(0xFF174A7E),
+                onTap: () => context.push('/view-groups'),
+              ),
+
+              const SizedBox(height: 12),
+
+              _SettingsItem(
                 icon: Icons.groups_rounded,
                 title: 'Gestione Gruppo',
                 subtitle: 'Gestisci il gruppo e i ragazzi',
@@ -312,10 +322,17 @@ class SettingsPage extends ConsumerWidget {
               _SettingsItem(
                 icon: Icons.delete_forever_rounded,
                 title: 'Cancella dati salvati',
+<<<<<<< HEAD
                 subtitle: 'Elimina anagrafica, presenze, giornate o allegati',
                 color: Colors.red,
                 isDestructive: true,
                 onTap: () => _showDeleteDataDialog(context, ref),
+=======
+                subtitle: 'Elimina selettivamente anagrafiche, presenze, documenti, calendario, catechesi o allegati',
+                color: Colors.red,
+                isDestructive: true,
+                onTap: () => context.push('/delete-data'),
+>>>>>>> feature/comunicazioni
               ),
 
               const SizedBox(height: 12),

@@ -41,6 +41,10 @@ class Attachment {
   /// Valori: AttachmentParentType.student / meeting / catechesi.
   final String parentType;
 
+  /// Codice univoco di 40 cifre della classe associata (se parent è
+  /// class-scoped). Copia ridondante per sync multi-classe.
+  final String? classUniqueCode;
+
   /// Nome visualizzato del file (es. "certificato_battesimo.jpg").
   final String name;
 
@@ -61,6 +65,12 @@ class Attachment {
   /// Descrizione opzionale dell'allegato (testo libero).
   final String? description;
 
+  /// Timestamp dell'ultima modifica (UTC, ISO 8601).
+  final DateTime updatedAt;
+
+  /// Nome del catechista che ha modificato per ultimo questo record.
+  final String lastModifiedBy;
+
   Attachment({
     required this.id,
     required this.parentId,
@@ -70,8 +80,11 @@ class Attachment {
     required this.size,
     required this.createdAt,
     required this.fileHash,
+    this.classUniqueCode,
     this.description,
-  });
+    DateTime? updatedAt,
+    this.lastModifiedBy = '',
+  }) : updatedAt = updatedAt ?? createdAt;
 
   factory Attachment.fromMap(String id, Map<String, dynamic> data) {
     return Attachment(
@@ -84,7 +97,10 @@ class Attachment {
       createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ??
           DateTime.now(),
       fileHash: data['fileHash'] ?? '',
+      classUniqueCode: data['classUniqueCode'],
       description: data['description'],
+      updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+      lastModifiedBy: data['lastModifiedBy'] ?? '',
     );
   }
 
@@ -97,7 +113,10 @@ class Attachment {
       'size': size,
       'createdAt': createdAt.toIso8601String(),
       'fileHash': fileHash,
+      'classUniqueCode': classUniqueCode,
       'description': description,
+      'updatedAt': updatedAt.toIso8601String(),
+      'lastModifiedBy': lastModifiedBy,
     };
   }
 

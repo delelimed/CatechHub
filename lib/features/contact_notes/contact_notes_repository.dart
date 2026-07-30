@@ -43,9 +43,34 @@ class ContactNotesRepository {
   /// Se l'ID è vuoto, ne genera uno automaticamente.
   Future<void> addNote(ContactNote note) async {
     final id = note.id.isEmpty ? LocalDatabase.newId('contact_note') : note.id;
+    final catechistName = getCurrentCatechistName();
+    final now = DateTime.now();
+    final code = note.classUniqueCode ?? _lookupClassUniqueCodeForStudent(note.studentId);
+    final existing = _box.get(id);
+    String? existingCreatedAt;
+    if (existing != null) {
+      final map = LocalDatabase.toStringDynamicMap(existing);
+      existingCreatedAt = map['createdAt']?.toString();
+    }
     final data = note.toMap();
-    data['lastModifiedBy'] = getCurrentCatechistName();
+    data['classUniqueCode'] = code;
+    data['lastModifiedBy'] = catechistName;
+    data['createdAt'] = existingCreatedAt ?? now.toIso8601String();
+    data['updatedAt'] = now.toIso8601String();
     await _box.put(id, data);
+  }
+
+  /// Cerca il classUniqueCode a partire dallo studente.
+  String? _lookupClassUniqueCodeForStudent(String studentId) {
+    final studentData = LocalDatabase.students().get(studentId);
+    if (studentData == null) return null;
+    final studentMap = LocalDatabase.toStringDynamicMap(studentData);
+    final classId = studentMap['classId'] as String?;
+    if (classId == null || classId.isEmpty) return null;
+    final classData = LocalDatabase.classes().get(classId);
+    if (classData == null) return null;
+    final classMap = LocalDatabase.toStringDynamicMap(classData);
+    return classMap['uniqueCode'] as String?;
   }
 
   /// Elimina una singola nota di contatto dal database tramite ID.

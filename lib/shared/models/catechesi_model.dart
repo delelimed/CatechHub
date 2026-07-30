@@ -33,6 +33,10 @@ class Catechesi {
   /// ID univoco del contenuto catechetico.
   final String id;
 
+  /// Codice univoco di 40 cifre della classe associata (opzionale).
+  /// Permette di filtrare le catechesi per classe in contesto multi-classe.
+  final String? classUniqueCode;
+
   /// Titolo del contenuto (es. "La parabola del buon samaritano").
   final String title;
 
@@ -57,8 +61,12 @@ class Catechesi {
   /// Timestamp dell'ultima modifica (UTC, ISO 8601).
   final DateTime updatedAt;
 
+  /// Nome del catechista che ha modificato per ultimo questo record.
+  final String lastModifiedBy;
+
   Catechesi({
     required this.id,
+    this.classUniqueCode,
     required this.title,
     required this.tags,
     required this.biblicalReferences,
@@ -67,10 +75,12 @@ class Catechesi {
     required this.description,
     required this.createdAt,
     required this.updatedAt,
+    this.lastModifiedBy = '',
   });
 
   Catechesi copyWith({
     String? id,
+    String? classUniqueCode,
     String? title,
     List<String>? tags,
     List<String>? biblicalReferences,
@@ -79,9 +89,11 @@ class Catechesi {
     String? description,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? lastModifiedBy,
   }) {
     return Catechesi(
       id: id ?? this.id,
+      classUniqueCode: classUniqueCode ?? this.classUniqueCode,
       title: title ?? this.title,
       tags: tags ?? this.tags,
       biblicalReferences: biblicalReferences ?? this.biblicalReferences,
@@ -90,11 +102,13 @@ class Catechesi {
       description: description ?? this.description,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      lastModifiedBy: lastModifiedBy ?? this.lastModifiedBy,
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
+      'classUniqueCode': classUniqueCode,
       'title': title,
       'tags': tags,
       'biblicalReferences': biblicalReferences,
@@ -103,12 +117,14 @@ class Catechesi {
       'description': description,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
+      'lastModifiedBy': lastModifiedBy,
     };
   }
 
   factory Catechesi.fromMap(String id, Map<String, dynamic> data) {
     return Catechesi(
       id: id,
+      classUniqueCode: data['classUniqueCode'],
       title: data['title'] ?? '',
       tags: (data['tags'] as List<dynamic>?)?.cast<String>() ?? [],
       biblicalReferences: (data['biblicalReferences'] as List<dynamic>?)?.cast<String>() ?? [],
@@ -117,6 +133,7 @@ class Catechesi {
       description: data['description'] ?? '',
       createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
       updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+      lastModifiedBy: data['lastModifiedBy'] ?? '',
     );
   }
 }

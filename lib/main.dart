@@ -15,6 +15,7 @@ import 'app/router.dart';
 import 'core/auth/auth_provider.dart';
 import 'core/auth/session_lifecycle_observer.dart';
 import 'core/navigation/back_button_handler.dart';
+import 'core/providers/nearby_sync_provider.dart';
 import 'core/providers/theme_provider.dart';
 import 'core/security/developer_options_warning_screen.dart';
 import 'core/security/hardware_security_exception.dart';
@@ -167,15 +168,6 @@ Future<void> main() async {
       WidgetsFlutterBinding.ensureInitialized();
 
       // ══════════════════════════════════════════════════════════════════════
-      // FASE 0.1 - CARICAMENTO CONFIGURAZIONE .ENV (flutter_dotenv)
-      //
-      // Carica il file .env incluso negli assets PRIMA di inizializzare
-      // freeRASP e Wiredash, così da leggere FREERASP_* e WIREDASH_*
-      // direttamente dal file invece che da --dart-define.
-      // ══════════════════════════════════════════════════════════════════════
-      await EnvConfig.load();
-
-      // ══════════════════════════════════════════════════════════════════════
       // FASE 0.5 - INIZIALIZZAZIONE FREERASP (SICUREZZA RUNTIME)
       //
       // DEVE avvenire DOPO ensureInitialized() e PRIMA di qualsiasi altra
@@ -183,7 +175,7 @@ Future<void> main() async {
       // dell'app e rileva root, emulator, hooking (Frida), tampering,
       // debug USB attivo, debugger connesso, opzioni sviluppatore attive.
       //
-      // La configurazione viene letta da .env (caricato sopra) tramite EnvConfig:
+      // La configurazione viene letta da --dart-define tramite EnvConfig:
       //   - FREERASP_PACKAGE_NAME (es. com.delelimed.catechhub)
       //   - FREERASP_RELEASE_HASH (SHA-256 del certificato in Base64)
       //
@@ -349,138 +341,8 @@ Future<void> main() async {
       // (LocalDatabase.init potrebbe essere chiamato anche da altri punti).
       LocalDatabase.markHiveInitialized();
 
-      // ═══════════════════════════════════════════════════════════════════════
-      // FASE 2.5 - INIZIALIZZAZIONE SECURITY MANAGER (HARDWARE-BACKED OR BLOCK)
-      //
-      // Verifica che il dispositivo supporti protezione hardware (TEE/StrongBox)
-      // e inizializza la Master Key AES-256 per la cifratura dei Box Hive.
-      //
-      // REQUISITO FONDAMENTALE: HARDWARE-ONLY, NO FALLBACK SOFTWARE.
-      // Se il dispositivo non ha TEE/StrongBox/Keymaster hardware-backed:
-      //   - SecurityManager.initialize() solleva HardwareSecurityException
-      //   - L'eccezione viene intercettata qui sotto
-      //   - Viene mostrata SecurityBlockScreen ("Dispositivo non conforme...")
-      //   - L'app NON prosegue l'avvio
-      //
-      // SOLO se l'inizializzazione ha successo:
-      //   - Viene generata/ripristinata la Master Key AES-256
-      //   - Viene creato HiveAesCipher per proteggere tutti i Box
-      //   - Il cipher viene passato a LocalDatabase.init()
-      // ═══════════════════════════════════════════════════════════════════════
-      late final HiveAesCipher hiveCipher;
       try {
-        await SecurityManager.instance.initialize();
-        hiveCipher = SecurityManager.instance.hiveCipher;
-        debugPrint('[MAIN] SecurityManager inizializzato: hardware-backed OK');
-      } on HardwareSecurityException catch (e) {
-        // ─────────────────────────────────────────────────────────────────────
-        // BLOCCO SICUREZZA: DISPOSITIVO NON CONFORME
-        //
-        // Se HardwareSecurityException viene sollevata, significa che:
-        // - Manca TEE/StrongBox/Keymaster hardware-backed
-        // - O FlutterSecureStorage non può usare Android Keystore
-        // - O la Master Key non può essere generata/letta
-        //
-        // REQUISITO: NESSUN FALLBACK SOFTWARE. L'app DEVE bloccarsi.
-        // ─────────────────────────────────────────────────────────────────────
-        debugPrint('[MAIN] BLOCCO SICUREZZA HARDWARE: $e');
-        runApp(MaterialApp(
-          debugShowCheckedModeBanner: false,
-          home: SecurityBlockScreen(
-            message: 'Impossibile avviare l\'applicazione.\n\n'
-                '${e.userMessage}\n\n'
-                'Dopo aver configurato un metodo di sblocco, riavvia l\'app.',
-          ),
-        ));
-        return;
-      } catch (e) {
-        // Qualsiasi altro errore imprevisto durante l'inizializzazione sicurezza
-        debugPrint('[MAIN] Errore imprevisto inizializzazione sicurezza: $e');
-        runApp(_FatalErrorApp(
-          message: 'Errore di inizializzazione sicurezza imprevisto.\n'
-              'Dettaglio: $e\n\n'
-              'Contattare l\'amministratore o reinstallare l\'app.',
-        ));
-        return;
-      }
-
-      // ═══════════════════════════════════════════════════════════════════════
-      // FASE 2.6 - MIGRAZIONE ZERO DATA LOSS (Legacy → Hardware-Backed AES-256)
-      //
-      // Esegue la migrazione atomica dei Box legacy (in chiaro o con cifratura debole/software)
-      // verso nuovi Box cifrati con AES-256 via Hardware KeyStore (TEE/StrongBox).
-      // Poi ERADICA DEFINITIVAMENTE i vecchi storage non sicuri dal disco.
-      //
-      // REQUISITI:
-      // - Autenticazione biometrica/PIN OBBLIGATORIA prima di toccare i dati
-      // - Algoritmo atomico per Box: legacy → temp cifrato → verifica → eradica legacy → definitivo
-      // - Rollback garantito: se qualsiasi passo fallisce, vecchio Box intatto, temp eliminato
-      // - Flag migrazione scritto SOLO se TUTTI i Box migrano con successo
-      // ═══════════════════════════════════════════════════════════════════════
-      try {
-        debugPrint('[MAIN] Avvio migrazione Zero Data Loss...');
-        await MigrationManager.instance.migrateOldDataIfNeeded();
-        debugPrint('[MAIN] Migrazione Zero Data Loss completata/skippata');
-      } on MigrationBlockException catch (e) {
-        // ─────────────────────────────────────────────────────────────────────
-        // BLOCCO MIGRAZIONE: AUTENTICAZIONE FALLITA O ANNULLATA
-        //
-        // L'utente non ha completato l'autenticazione biometrica/PIN.
-        // NESSUN DATO È STATO TOCCATO (roll back garantito).
-        // Mostra schermata di blocco sicurezza.
-        // ─────────────────────────────────────────────────────────────────────
-        debugPrint('[MAIN] BLOCCO MIGRAZIONE: $e');
-        runApp(MaterialApp(
-          debugShowCheckedModeBanner: false,
-          home: SecurityBlockScreen(
-            message: 'Autenticazione richiesta per migrazione dati sicura.\n\n'
-                '${e.userMessage}\n\n'
-                'Senza autenticazione non è possibile migrare i dati sensibili '
-                'verso il nuovo storage cifrato hardware-backed.\n\n'
-                'Riavvia l\'app e completa l\'autenticazione.',
-          ),
-        ));
-        return;
-      } on MigrationBoxException catch (e) {
-        // ─────────────────────────────────────────────────────────────────────
-        // ERRORE MIGRAZIONE SINGOLO BOX (Rollback già eseguito internamente)
-        //
-        // Il vecchio Box è intatto, il Box temporaneo è stato eliminato.
-        // Mostra errore bloccante per impedire avvio con dati inconsistenti.
-        // ─────────────────────────────────────────────────────────────────────
-        debugPrint('[MAIN] ERRORE MIGRAZIONE BOX: $e');
-        runApp(_FatalErrorApp(
-          message: 'Errore durante la migrazione dei dati (Box: ${e.boxName}).\n'
-              'I dati originali sono intatti (rollback eseguito).\n\n'
-              'Dettaglio: ${e.message}\n\n'
-              'Contattare l\'amministratore per assistenza.',
-        ));
-        return;
-      } catch (e) {
-        // ─────────────────────────────────────────────────────────────────────
-        // ERRORE IMPREVISTO DURANTE MIGRAZIONE
-        // ─────────────────────────────────────────────────────────────────────
-        debugPrint('[MAIN] Errore imprevisto migrazione: $e');
-        runApp(_FatalErrorApp(
-          message: 'Errore imprevisto durante la migrazione dati.\n'
-              'Dettaglio: $e\n\n'
-              'Contattare l\'amministratore o reinstallare l\'app.',
-        ));
-        return;
-      }
-
-      // ═══════════════════════════════════════════════════════════════════════
-      // FASE 3 - DATABASE LOCALE HIVE (apertura Box con corruption recovery)
-      //
-      // LocalDatabase.init() apre ogni Box in un try-catch atomico
-      // INDIVIDUALE usando il cipher hardware-backed da SecurityManager.
-      //
-      // Se un Box è corrotto, viene eliminato da disco con
-      // Hive.deleteBoxFromDisk() e ricreato vuoto SENZA coinvolgere gli
-      // altri Box.
-      // ═══════════════════════════════════════════════════════════════════════
-      try {
-        await LocalDatabase.init(cipher: hiveCipher);
+        await LocalDatabase.init();
       } catch (e) {
         // ─────────────────────────────────────────────────────────────────────
         // ERRORE FATALE: NESSUN RECOVERY POSSIBILE.
@@ -549,9 +411,13 @@ Future<void> main() async {
       // FASE 6 - AVVIO DELL'APPLICAZIONE FLUTTER
       //
       // Struttura del widget tree:
-      //   ProviderScope (Riverpod) → SessionLifecycleObserver → MyApp
+      //   ProviderScope (Riverpod) → NearbySyncLifecycleManager
+      //     → SessionLifecycleObserver → MyApp
       //
       // - ProviderScope: gestisce lo stato globale dell'app tramite Riverpod
+      // - NearbySyncLifecycleManager: monitora il ciclo di vita dell'app per
+      //   avviare/fermare la sincronizzazione Bluetooth in background,
+      //   caricando lo stato persistito da SharedPreferences
       // - SessionLifecycleObserver: monitora il ciclo di vita dell'app
       //   (pausa, ripresa) per gestire il blocco automatico della sessione
       //   dopo 120 secondi di inattività
@@ -562,7 +428,13 @@ Future<void> main() async {
       // viene inizializzata SOLO quando l'utente naviga alla pagina di sync,
       // all'interno di initState() protetto da try-catch.
       // ═══════════════════════════════════════════════════════════════════════
-      runApp(const ProviderScope(child: SessionLifecycleObserver(child: MyApp())));
+      runApp(
+        const ProviderScope(
+          child: NearbySyncLifecycleManager(
+            child: SessionLifecycleObserver(child: MyApp()),
+          ),
+        ),
+      );
     },
     // ─────────────────────────────────────────────────────────────────────────
     // CATCH GLOBALE DEL runZonedGuarded:
@@ -602,10 +474,8 @@ Future<void> main() async {
 class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
-  /// Project ID Wiredash per il feedback utente (letto da .env via EnvConfig).
   static String get _wiredashProjectId => EnvConfig.wiredashProjectId;
 
-  /// Secret key Wiredash per l'autenticazione API (letto da .env via EnvConfig).
   static String get _wiredashSecret => EnvConfig.wiredashApiSecret;
 
   /// Flag per garantire che l'inizializzazione sequenziale venga eseguita

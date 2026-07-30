@@ -52,12 +52,15 @@ class DocumentsRepository {
   /// Crea un nuovo documento con il titolo indicato e lo persiste su Hive.
   /// Viene generato un ID univoco (formato 'document_xxx') e il timestamp
   /// corrente viene salvato come 'createdAt'.
-  Future<void> addDocument(String title) async {
+  Future<void> addDocument(String title, {String? classUniqueCode}) async {
     final id = LocalDatabase.newId('document');
     final catechistName = getCurrentCatechistName();
+    final now = DateTime.now();
     await _documentsBox.put(id, {
       'title': title,
-      'createdAt': DateTime.now().toIso8601String(),
+      'classUniqueCode': classUniqueCode,
+      'createdAt': now.toIso8601String(),
+      'updatedAt': now.toIso8601String(),
       'lastModifiedBy': catechistName,
     });
   }
@@ -69,6 +72,7 @@ class DocumentsRepository {
       final updated = Map<String, dynamic>.from(data);
       updated['title'] = newTitle;
       updated['lastModifiedBy'] = getCurrentCatechistName();
+      updated['updatedAt'] = DateTime.now().toIso8601String();
       await _documentsBox.put(id, updated);
     }
   }

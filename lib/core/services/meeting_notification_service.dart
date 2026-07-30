@@ -19,6 +19,10 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 
+<<<<<<< HEAD
+=======
+import 'package:flutter/services.dart';
+>>>>>>> feature/comunicazioni
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -297,6 +301,7 @@ class MeetingNotificationService {
 
     const details = NotificationDetails(android: androidDetails);
 
+<<<<<<< HEAD
     await _notificationsPlugin.zonedSchedule(
       id: id,
       title: title,
@@ -307,6 +312,38 @@ class MeetingNotificationService {
       matchDateTimeComponents: null,
       payload: payload,
     );
+=======
+    try {
+      await _notificationsPlugin.zonedSchedule(
+        id: id,
+        title: title,
+        body: body,
+        scheduledDate: _toTZDateTime(scheduledDate),
+        notificationDetails: details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        matchDateTimeComponents: null,
+        payload: payload,
+      );
+    } on PlatformException catch (e) {
+      if (e.code == 'exact_alarms_not_permitted') {
+        print(
+          'Permesso SCHEDULE_EXACT_ALARM non concesso, uso modalità inesatta',
+        );
+        await _notificationsPlugin.zonedSchedule(
+          id: id,
+          title: title,
+          body: body,
+          scheduledDate: _toTZDateTime(scheduledDate),
+          notificationDetails: details,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          matchDateTimeComponents: null,
+          payload: payload,
+        );
+      } else {
+        rethrow;
+      }
+    }
+>>>>>>> feature/comunicazioni
   }
 
   /// Annulla la notifica per un meeting specifico.

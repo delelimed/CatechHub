@@ -11,6 +11,7 @@ import '../catechesi/catechesi_repository.dart';
 import '../../shared/models/catechesi_model.dart';
 import '../classes/classes_provider.dart';
 import 'planning_provider.dart';
+import '../../shared/widgets/last_modified_info.dart';
 
 /// Schermata di creazione/modifica di un incontro o riunione in CateREG.
 ///
@@ -243,6 +244,14 @@ class _PlanningEditPageState extends ConsumerState<PlanningEditPage> {
                     classId: classId,
                   ),
                 ],
+                if (_readOnly && widget.existing != null) ...[
+                  const SizedBox(height: 14),
+                  LastModifiedInfo(
+                    createdAt: widget.existing!.createdAt,
+                    updatedAt: widget.existing!.updatedAt,
+                    lastModifiedBy: widget.existing!.lastModifiedBy,
+                  ),
+                ],
                 const SizedBox(height: 18),
                 _ModernInputCard(
                   icon: Icons.title_rounded,
@@ -292,14 +301,16 @@ class _PlanningEditPageState extends ConsumerState<PlanningEditPage> {
                   title: 'Foto e PDF dell\'incontro',
                   readOnly: _readOnly,
                 ),
-                const SizedBox(height: 20),
-                _CatechesiAssociationSection(
-                  associatedIds: associatedCatechesiIds,
-                  onChanged: (ids) {
-                    setState(() => associatedCatechesiIds = ids);
-                  },
-                  readOnly: _readOnly,
-                ),
+                if (!isReunion) ...[
+                  const SizedBox(height: 20),
+                  _CatechesiAssociationSection(
+                    associatedIds: associatedCatechesiIds,
+                    onChanged: (ids) {
+                      setState(() => associatedCatechesiIds = ids);
+                    },
+                    readOnly: _readOnly,
+                  ),
+                ],
                 const SizedBox(height: 24),
                 if (!_readOnly)
                   SizedBox(

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/auth/auth_service.dart';
 import '../../shared/widgets/app_scaffold.dart';
+import '../../shared/widgets/last_modified_info.dart';
 import '../classes/classes_provider.dart';
 import '../planning/planning_provider.dart';
 import 'attendance_repository.dart';
@@ -16,12 +17,32 @@ class AttendanceMeetingsPage extends ConsumerStatefulWidget {
   ConsumerState<AttendanceMeetingsPage> createState() => _AttendanceMeetingsPageState();
 }
 
+class _AttendanceInfo {
+  final bool exists;
+  final DateTime? updatedAt;
+  final String lastModifiedBy;
+
+  const _AttendanceInfo({
+    required this.exists,
+    this.updatedAt,
+    this.lastModifiedBy = '',
+  });
+}
+
 class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage> {
   bool _showPast = false;
 
-  Stream<Map<String, bool>> _getAttendanceStatus() {
+  Stream<Map<String, _AttendanceInfo>> _getAttendanceStatus() {
     return AttendanceRepository().getAttendance().map((records) {
-      return {for (final record in records) record['id'].toString(): true};
+      return {
+        for (final record in records)
+          record['id'].toString(): _AttendanceInfo(
+            exists: true,
+            updatedAt:
+                DateTime.tryParse(record['updatedAt']?.toString() ?? ''),
+            lastModifiedBy: record['lastModifiedBy']?.toString() ?? '',
+          ),
+      };
     });
   }
 
@@ -94,7 +115,7 @@ class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage>
                 );
               }
 
-              return StreamBuilder<Map<String, bool>>(
+              return StreamBuilder<Map<String, _AttendanceInfo>>(
                 stream: _getAttendanceStatus(),
                 builder: (context, attendanceSnapshot) {
                   final attendanceMap = attendanceSnapshot.data ?? {};
@@ -120,7 +141,8 @@ class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage>
                         );
                       }
                       final m = meetings[index - 1];
-                      final exists = attendanceMap[m.id] ?? false;
+                      final attInfo = attendanceMap[m.id];
+                      final exists = attInfo?.exists ?? false;
 
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 6),
@@ -154,8 +176,11 @@ class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage>
                                 ),
                               ],
                             ),
-                            child: Row(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
+<<<<<<< HEAD
                                 Container(
                                   width: 56,
                                   padding: const EdgeInsets.symmetric(vertical: 8),
@@ -211,26 +236,105 @@ class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage>
                                             borderRadius: BorderRadius.circular(12),
                                             border: Border.all(
                                               color: Colors.green.withValues(alpha: 0.4),
+=======
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 56,
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            DateFormat('dd').format(m.date),
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 17,
+                                              fontWeight: FontWeight.bold,
+>>>>>>> feature/comunicazioni
                                             ),
                                           ),
-                                          child: const Text(
-                                            'Presenza già registrata',
-                                            style: TextStyle(
-                                              fontSize: 11,
+                                          Text(
+                                            DateFormat('MMM', 'it_IT')
+                                                .format(m.date)
+                                                .toUpperCase(),
+                                            style: const TextStyle(
+                                              color: Colors.white70,
                                               fontWeight: FontWeight.w600,
-                                              color: Colors.green,
+                                              fontSize: 10,
                                             ),
                                           ),
-                                        ),
-                                      ],
-                                    ],
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            m.title,
+                                            style: theme.textTheme.titleMedium?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                              color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                                            ),
+                                          ),
+                                          if (exists) ...[
+                                            const SizedBox(height: 8),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 10,
+                                                vertical: 4,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.green.withValues(alpha: 0.1),
+                                                borderRadius: BorderRadius.circular(12),
+                                                border: Border.all(
+                                                  color: Colors.green.withValues(alpha: 0.4),
+                                                ),
+                                              ),
+                                              child: const Text(
+                                                'Presenza già registrata',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.green,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    Icon(
+                                      Icons.arrow_forward_ios_rounded,
+                                      size: 16,
+                                      color: isDark ? Colors.grey.shade500 : Colors.grey,
+                                    ),
+                                  ],
+                                ),
+                                if (attInfo != null && attInfo.updatedAt != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: LastModifiedInfo(
+                                      updatedAt: attInfo.updatedAt!,
+                                      lastModifiedBy: attInfo.lastModifiedBy,
+                                      compact: true,
+                                    ),
                                   ),
+<<<<<<< HEAD
                                 ),
                                 Icon(
                                   Icons.arrow_forward_ios_rounded,
                                   size: 16,
                                   color: isDark ? Colors.grey.shade500 : Colors.grey,
                                 ),
+=======
+>>>>>>> feature/comunicazioni
                               ],
                             ),
                           ),

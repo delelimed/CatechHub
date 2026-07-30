@@ -221,14 +221,19 @@ class DocumentsPage extends ConsumerWidget {
                               doc['title']?.toString() ?? 'Documento',
                               style: const TextStyle(fontWeight: FontWeight.w600),
                             ),
-                            subtitle: Text(
-                              mancanti == 0
-                                  ? (esonerati > 0 ? 'Completato ($esonerati esonerati)' : 'Completato')
-                                  : '$mancanti mancanti${esonerati > 0 ? ', $esonerati esonerati' : ''}',
-                              style: TextStyle(
-                                color: mancanti == 0 ? Colors.green : Colors.orange.shade800,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  mancanti == 0
+                                      ? (esonerati > 0 ? 'Completato ($esonerati esonerati)' : 'Completato')
+                                      : '$mancanti mancanti${esonerati > 0 ? ', $esonerati esonerati' : ''}',
+                                  style: TextStyle(
+                                    color: mancanti == 0 ? Colors.green : Colors.orange.shade800,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
                               trailing: PopupMenuButton<String>(
                               icon: const Icon(Icons.more_vert_rounded),

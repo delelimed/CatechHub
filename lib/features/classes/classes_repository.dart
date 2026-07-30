@@ -12,6 +12,8 @@
 ///
 /// Integrazione CateREG: usato da [classesRepoProvider] e da tutte le
 /// pagine che necessitano di leggere o modificare i dati delle classi.
+import 'package:flutter/foundation.dart';
+import '../../core/auth/auth_service.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/utils/auth_utils.dart';
@@ -35,16 +37,45 @@ class ClassesRepository {
 
   Future<void> addClass(SchoolClass c) async {
     final id = c.id.isEmpty ? LocalDatabase.newId('class') : c.id;
+    final code = c.uniqueCode.isEmpty ? generateClassUniqueCode() : c.uniqueCode;
     final catechistName = getCurrentCatechistName();
-    await _box.put(id, c.copyWith(id: id, lastModifiedBy: catechistName).toMap());
+    final now = DateTime.now();
+    final creatorId = c.creatorId.isEmpty ? AuthService.localUserId : c.creatorId;
+    final creatorName = c.creatorName.isEmpty ? catechistName : c.creatorName;
+    await _box.put(id, c.copyWith(
+      id: id,
+      uniqueCode: code,
+      lastModifiedBy: catechistName,
+      creatorId: creatorId,
+      creatorName: creatorName,
+      createdAt: now,
+      updatedAt: now,
+    ).toMap());
   }
 
   Future<void> updateClass(String id, SchoolClass c) async {
     final previous = _getClass(id);
-    final catechistName = getCurrentCatechistName();
-    await _box.put(id, c.copyWith(id: id, lastModifiedBy: catechistName).toMap());
-
     if (previous == null) return;
+
+    final currentName = getCurrentCatechistName();
+    final isCreator = previous.isCreator(AuthService.localUserId, currentName, catechistId: AuthService.getCatechistId());
+
+    SchoolClass toSave;
+    if (isCreator) {
+      toSave = c;
+    } else {
+      toSave = c.copyWith(
+        name: previous.name,
+        catechistIds: previous.catechistIds,
+      );
+    }
+
+    final catechistName = getCurrentCatechistName();
+    await _box.put(id, toSave.copyWith(
+      id: id,
+      lastModifiedBy: catechistName,
+      updatedAt: DateTime.now(),
+    ).toMap());
 
     final removedStudentIds = previous.studentIds
         .where((studentId) => !c.studentIds.contains(studentId))
@@ -70,30 +101,56 @@ class ClassesRepository {
   }
 
   Future<void> deleteClass(String id) async {
-    await _box.delete(id);
-
-    final planningBox = LocalDatabase.planning();
-    final attendanceBox = LocalDatabase.attendance();
-
-    final keysToDelete = <dynamic>[];
-    for (final key in planningBox.keys) {
-      final data = LocalDatabase.toStringDynamicMap(planningBox.get(key));
-      if (data['classId'] == id) keysToDelete.add(key);
+    try {
+      await _box.delete(id);
+    } catch (e) {
+      debugPrint('[ClassesRepository] Errore eliminazione classe $id: $e');
     }
 
-    for (final key in keysToDelete) {
-      await planningBox.delete(key);
-      await attendanceBox.delete(key);
-    }
+    try {
+      final planningBox = LocalDatabase.planning();
+      final attendanceBox = LocalDatabase.attendance();
 
-    final attendanceKeysToDelete = <dynamic>[];
-    for (final key in attendanceBox.keys) {
-      final data = LocalDatabase.toStringDynamicMap(attendanceBox.get(key));
-      if (data['classId'] == id) attendanceKeysToDelete.add(key);
-    }
+      final keysToDelete = <dynamic>[];
+      for (final key in planningBox.keys) {
+        try {
+          final raw = planningBox.get(key);
+          if (raw == null) continue;
+          final data = LocalDatabase.toStringDynamicMap(raw);
+          if (data['classId'] == id) keysToDelete.add(key);
+        } catch (_) {
+          continue;
+        }
+      }
 
-    for (final key in attendanceKeysToDelete) {
-      await attendanceBox.delete(key);
+      for (final key in keysToDelete) {
+        try {
+          await planningBox.delete(key);
+        } catch (_) {}
+        try {
+          await attendanceBox.delete(key);
+        } catch (_) {}
+      }
+
+      final attendanceKeysToDelete = <dynamic>[];
+      for (final key in attendanceBox.keys) {
+        try {
+          final raw = attendanceBox.get(key);
+          if (raw == null) continue;
+          final data = LocalDatabase.toStringDynamicMap(raw);
+          if (data['classId'] == id) attendanceKeysToDelete.add(key);
+        } catch (_) {
+          continue;
+        }
+      }
+
+      for (final key in attendanceKeysToDelete) {
+        try {
+          await attendanceBox.delete(key);
+        } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('[ClassesRepository] Errore durante cascata cancellazione classe $id: $e');
     }
   }
 
@@ -142,5 +199,26 @@ class ClassesRepository {
     final data = _box.get(id);
     if (data == null) return null;
     return SchoolClass.fromMap(id, LocalDatabase.toStringDynamicMap(data));
+  }
+
+  /// Assicura che tutte le classi abbiano un [uniqueCode].
+  /// Da chiamare all'avvio per backfillare classi create prima
+  /// dell'introduzione del campo.
+  Future<void> ensureUniqueCodes() async {
+    // Pulisci eventuali entry con chiave vuota (da import backup con ID mancanti)
+    for (final key in _box.keys.toList()) {
+      if (key.toString().isEmpty) {
+        await _box.delete(key);
+        continue;
+      }
+      final raw = _box.get(key);
+      if (raw == null) continue;
+      final data = LocalDatabase.toStringDynamicMap(raw);
+      if (data['uniqueCode'] == null || (data['uniqueCode'] as String).isEmpty) {
+        data['uniqueCode'] = generateClassUniqueCode();
+        data['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+        await _box.put(key, data);
+      }
+    }
   }
 }

@@ -34,6 +34,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/sync/widgets/sync_status_dot.dart';
 import 'side_menu.dart';
 
 class AppScaffold extends StatelessWidget {
@@ -151,7 +152,7 @@ class AppScaffold extends StatelessWidget {
         ? colorScheme.outline.withValues(alpha: 0.2)
         : Colors.grey.shade200;
 
-    return Scaffold(
+    final scaffold = Scaffold(
       backgroundColor: scaffoldBg,
       floatingActionButton: floatingActionButton,
 
@@ -323,45 +324,67 @@ class AppScaffold extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(26),
-                child: NavigationBar(
-                  height: 72,
-                  backgroundColor: navBarBg,
-                  selectedIndex: currentIndex,
-                  indicatorColor:
-                      theme.colorScheme.primary.withValues(alpha: 0.15),
-                  onDestinationSelected: (index) {
-                    context.go(_routeFromIndex(index));
-                  },
-                  destinations: const [
-                    NavigationDestination(
-                      icon: Icon(Icons.dashboard_rounded),
-                      selectedIcon: Icon(Icons.dashboard),
-                      label: 'Home',
+                child: NavigationBarTheme(
+                  data: NavigationBarThemeData(
+                    labelTextStyle: WidgetStatePropertyAll(
+                      TextStyle(
+                        fontSize: MediaQuery.of(context).size.width < 360 ? 10 : 11,
+                        fontWeight: FontWeight.w600,
+                        overflow: TextOverflow.clip,
+                      ),
                     ),
-                    NavigationDestination(
-                      icon: Icon(Icons.groups_rounded),
-                      selectedIcon: Icon(Icons.groups),
-                      label: 'Gruppo',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.calendar_month_outlined),
-                      selectedIcon: Icon(Icons.calendar_month),
-                      label: 'Programma',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.description_outlined),
-                      selectedIcon: Icon(Icons.description),
-                      label: 'Documenti',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.settings_outlined),
-                      selectedIcon: Icon(Icons.settings),
-                      label: 'Impostazioni',
-                    ),
-                  ],
+                  ),
+                  child: NavigationBar(
+                    height: 72,
+                    backgroundColor: navBarBg,
+                    selectedIndex: currentIndex,
+                    indicatorColor:
+                        theme.colorScheme.primary.withValues(alpha: 0.15),
+                    onDestinationSelected: (index) {
+                      context.go(_routeFromIndex(index));
+                    },
+                    destinations: const [
+                      NavigationDestination(
+                        icon: Icon(Icons.dashboard_rounded),
+                        selectedIcon: Icon(Icons.dashboard),
+                        label: 'Home',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.groups_rounded),
+                        selectedIcon: Icon(Icons.groups),
+                        label: 'Gruppo',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.calendar_month_outlined),
+                        selectedIcon: Icon(Icons.calendar_month),
+                        label: 'Programma',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.description_outlined),
+                        selectedIcon: Icon(Icons.description),
+                        label: 'Documenti',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.settings_outlined),
+                        selectedIcon: Icon(Icons.settings),
+                        label: 'Impostazioni',
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
+    );
+
+    return Stack(
+      children: [
+        scaffold,
+        Positioned(
+          bottom: isDesktop ? 16 : 80,
+          right: isDesktop ? 16 : 28,
+          child: const SyncStatusDot(),
+        ),
+      ],
     );
   }
 }

@@ -13,6 +13,14 @@ class EncryptionService {
   static const int nonceLength = 12;
   static const int tagLengthBits = 128;
 
+  /// AAD (Additional Authenticated Data) context strings per operazione.
+  /// Prevengono attacchi di ciphertext substitution legando il ciphertext
+  /// al contesto d'uso specifico.
+  static final Uint8List _aadPasswordData =
+      Uint8List.fromList(utf8.encode('CatechHub_Context_PasswordData_v1'));
+  static final Uint8List _aadQrShare =
+      Uint8List.fromList(utf8.encode('CatechHub_Context_QRShare_v1'));
+
   static Uint8List secureRandomBytes(int length) {
     final random = Random.secure();
     return Uint8List.fromList(
@@ -106,8 +114,11 @@ class EncryptionService {
     final key = derivePasswordKeyBytes(password, salt, iterations: iterations);
     final jsonData = jsonEncode(data);
 
+    final isFastShare = iterations == fastShareIterations;
+    final aad = isFastShare ? _aadQrShare : _aadPasswordData;
+
     final cipher = pc.GCMBlockCipher(pc.AESEngine())
-      ..init(true, pc.AEADParameters(pc.KeyParameter(key), tagLengthBits, nonce, Uint8List(0)));
+      ..init(true, pc.AEADParameters(pc.KeyParameter(key), tagLengthBits, nonce, aad));
 
     final input = Uint8List.fromList(utf8.encode(jsonData));
     final out = Uint8List(cipher.getOutputSize(input.length));
@@ -139,8 +150,11 @@ class EncryptionService {
 
       final key = derivePasswordKeyBytes(password, Uint8List.fromList(salt), iterations: iterations);
 
+      final isFastShare = iterations == fastShareIterations;
+      final aad = isFastShare ? _aadQrShare : _aadPasswordData;
+
       final cipher = pc.GCMBlockCipher(pc.AESEngine())
-        ..init(false, pc.AEADParameters(pc.KeyParameter(key), tagLengthBits, Uint8List.fromList(nonce), Uint8List(0)));
+        ..init(false, pc.AEADParameters(pc.KeyParameter(key), tagLengthBits, Uint8List.fromList(nonce), aad));
 
       final input = base64Decode(dataBase64);
       final out = Uint8List(cipher.getOutputSize(input.length));
@@ -213,15 +227,34 @@ class EncryptionService {
 
 class _DartSecureRandom implements pc.SecureRandom {
   final Random _random = Random.secure();
+  final _entropyPool = <int>[];
 
   @override
   String get algorithmName => 'DartSecureRandom';
 
   @override
-  void seed(pc.CipherParameters params) {}
+  void seed(pc.CipherParameters params) {
+    if (params is pc.KeyParameter) {
+      _entropyPool.addAll(params.key);
+    } else if (params is pc.ParametersWithIV) {
+      _entropyPool.addAll(params.iv);
+    } else if (params is pc.ECKeyGeneratorParameters) {
+      final domainSeed = params.domainParameters.toString();
+      _entropyPool.addAll(utf8.encode(domainSeed));
+    }
+    if (_entropyPool.length > 256) {
+      _entropyPool.removeRange(0, _entropyPool.length - 256);
+    }
+  }
 
   @override
-  int nextUint8() => _random.nextInt(256);
+  int nextUint8() {
+    if (_entropyPool.isNotEmpty) {
+      final mix = _entropyPool.removeAt(0) ^ _random.nextInt(256);
+      return mix;
+    }
+    return _random.nextInt(256);
+  }
 
   @override
   int nextUint16() {

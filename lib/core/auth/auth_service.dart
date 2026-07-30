@@ -14,6 +14,7 @@ import 'package:local_auth_darwin/local_auth_darwin.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../storage/local_database.dart';
+import '../../features/sync/p2p/p2p_security_service.dart';
 import '../../shared/models/class_model.dart';
 
 /// Servizio di autenticazione basato ESCLUSIVAMENTE su biometrica nativa Android
@@ -35,8 +36,27 @@ class AuthService {
   /// ID statico catechista locale (singolo utente per dispositivo).
   static const localUserId = 'local_catechist_id';
 
+  /// Chiave Hive per il catechistId persistente.
+  static const _catechistIdKey = 'catechist_id';
+
   /// Nome visualizzato di default.
   static const localUserName = 'Catechista Locale';
+
+  /// Restituisce (e genera se necessario) un identificatore stabile per il
+  /// catechista locale. Questo ID è condiviso tra tutti i dispositivi dello
+  /// stesso catechista (via sync) e permette di distinguere il creatore della
+  /// classe dagli altri catechisti associati.
+  static String getCatechistId() {
+    final box = LocalDatabase.auth();
+    final existing = box.get(_catechistIdKey) as String?;
+    if (existing != null && existing.isNotEmpty) return existing;
+    final newId = 'cat_${DateTime.now().microsecondsSinceEpoch}';
+    box.put(_catechistIdKey, newId);
+    return newId;
+  }
+
+  /// Getter di istanza per il catechistId corrente.
+  String get catechistId => getCatechistId();
 
   final _box = LocalDatabase.auth();
   final _localAuth = LocalAuthentication();
@@ -212,38 +232,59 @@ class AuthService {
   }
 
   /// Configurazione profilo iniziale (onboarding).
-  /// Salva nome, cognome, gruppo. NESSUN PIN app.
+  /// Salva nome, cognome. Se [createClass] è true, salva anche [groupName]
+  /// e crea la classe iniziale. Se false, salva solo nome/cognome e l'utente
+  /// si unirà a una classe esistente via P2P sync.
   /// Sblocca automaticamente la sessione.
   Future<bool> setupInitialProfile({
     required String firstName,
     required String lastName,
-    required String groupName,
+    String? groupName,
+    bool createClass = true,
   }) async {
-    if (firstName.trim().isEmpty ||
-        lastName.trim().isEmpty ||
-        groupName.trim().isEmpty) {
+    if (firstName.trim().isEmpty || lastName.trim().isEmpty) {
       dev.log('Campi profilo vuoti');
+      return false;
+    }
+    if (createClass && (groupName == null || groupName.trim().isEmpty)) {
+      dev.log('Nome gruppo richiesto per creazione classe');
       return false;
     }
 
     try {
+      getCatechistId(); // Ensure catechistId exists before profile data
+
       await _box.put('first_name', firstName.trim());
       await _box.put('last_name', lastName.trim());
-      await _box.put('group_name', groupName.trim());
-      await _box.put('local_user_name', '${firstName.trim()} ${lastName.trim()}');
+      await _box.put('setup_mode', createClass ? 'create' : 'join');
+      final fullName = '${firstName.trim()} ${lastName.trim()}';
+      await _box.put('local_user_name', fullName);
 
-      // Crea automaticamente la classe/gruppo iniziale
-      final classBox = LocalDatabase.classes();
-      final classId = LocalDatabase.newId('class');
-      final catechistName = '${firstName.trim()} ${lastName.trim()}';
-      final newClass = SchoolClass(
-        id: classId,
-        name: groupName.trim(),
-        studentIds: [],
-        catechistIds: [localUserId],
-        lastModifiedBy: catechistName,
-      );
-      await classBox.put(classId, newClass.toMap());
+      if (createClass) {
+        await _box.put('group_name', groupName!.trim());
+
+        // Crea automaticamente la classe/gruppo iniziale
+        final classBox = LocalDatabase.classes();
+        final classId = LocalDatabase.newId('class');
+        final newClass = SchoolClass(
+          id: classId,
+          name: groupName.trim(),
+          studentIds: [],
+          catechistIds: [localUserId],
+          lastModifiedBy: fullName,
+          uniqueCode: generateClassUniqueCode(),
+          nameLocked: false,
+          creatorId: localUserId,
+          creatorName: fullName,
+          creatorCatechistId: getCatechistId(),
+          catechistDeviceCounts: {getCatechistId(): 1},
+        );
+        await classBox.put(classId, newClass.toMap());
+      } else {
+        await _box.put('group_name', fullName);
+      }
+
+      await P2PSecurityService().refreshIdentityName();
 
       _sessionUnlocked = true;
       _cachedUser = null;
@@ -277,6 +318,7 @@ class AuthService {
         final ln = lastName ?? _box.get('last_name', defaultValue: '');
         await _box.put('local_user_name', '$fn $ln'.trim());
       }
+      await P2PSecurityService().refreshIdentityName();
       _cachedUser = null;
       return true;
     } catch (e) {

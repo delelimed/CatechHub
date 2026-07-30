@@ -9,6 +9,13 @@ import 'package:hive/hive.dart';
 import '../../../core/storage/local_database.dart';
 import 'p2p_security_service.dart';
 
+<<<<<<< HEAD
+=======
+final _syncAad = Uint8List.fromList(
+  utf8.encode('CatechHub_Context_Sync_v1'),
+);
+
+>>>>>>> feature/comunicazioni
 class SyncRecord {
   final String id;
   final String boxName;
@@ -75,12 +82,20 @@ class SyncIndexEntry {
   final String boxName;
   final DateTime updatedAt;
   final String checksum;
+<<<<<<< HEAD
+=======
+  final bool isDeleted;
+>>>>>>> feature/comunicazioni
 
   SyncIndexEntry({
     required this.id,
     required this.boxName,
     required this.updatedAt,
     required this.checksum,
+<<<<<<< HEAD
+=======
+    this.isDeleted = false,
+>>>>>>> feature/comunicazioni
   });
 
   Map<String, dynamic> toJson() => {
@@ -88,6 +103,10 @@ class SyncIndexEntry {
         'box': boxName,
         'updatedAt': updatedAt.toUtc().toIso8601String(),
         'checksum': checksum,
+<<<<<<< HEAD
+=======
+        'isDeleted': isDeleted,
+>>>>>>> feature/comunicazioni
       };
 
   factory SyncIndexEntry.fromJson(Map<String, dynamic> json) =>
@@ -96,6 +115,10 @@ class SyncIndexEntry {
         boxName: json['box'] as String,
         updatedAt: DateTime.parse(json['updatedAt'] as String).toUtc(),
         checksum: json['checksum'] as String? ?? '',
+<<<<<<< HEAD
+=======
+        isDeleted: json['isDeleted'] == true,
+>>>>>>> feature/comunicazioni
       );
 }
 
@@ -127,7 +150,11 @@ class HiveSyncEngine {
   factory HiveSyncEngine() => _instance;
   HiveSyncEngine._();
 
+<<<<<<< HEAD
   static const _syncableBoxes = {
+=======
+  static const syncableBoxes = {
+>>>>>>> feature/comunicazioni
     LocalDatabase.studentsBox: 'students',
     LocalDatabase.classesBox: 'classes',
     LocalDatabase.planningBox: 'planning',
@@ -139,7 +166,10 @@ class HiveSyncEngine {
     LocalDatabase.catechesiBox: 'catechesi',
     LocalDatabase.meetingCatechesiBox: 'meeting_catechesi',
     LocalDatabase.studentDailyNotesBox: 'student_daily_notes',
+<<<<<<< HEAD
     LocalDatabase.trustedDevicesBox: 'trusted_devices',
+=======
+>>>>>>> feature/comunicazioni
   };
 
   static const _lastSyncKey = 'p2p_last_sync_timestamp';
@@ -162,6 +192,10 @@ class HiveSyncEngine {
     final normalized = Map<String, dynamic>.from(data);
     normalized.remove('updatedAt');
     normalized.remove('createdAt');
+<<<<<<< HEAD
+=======
+    normalized.remove('nameLocked');
+>>>>>>> feature/comunicazioni
     final json = jsonEncode(normalized);
     return sha256.convert(utf8.encode(json)).toString().substring(0, 12);
   }
@@ -169,7 +203,11 @@ class HiveSyncEngine {
   List<SyncIndexEntry> buildLocalIndex() {
     final index = <SyncIndexEntry>[];
 
+<<<<<<< HEAD
     for (final entry in _syncableBoxes.entries) {
+=======
+    for (final entry in syncableBoxes.entries) {
+>>>>>>> feature/comunicazioni
       final boxName = entry.key;
       try {
         final box = Hive.box<Map>(boxName);
@@ -182,12 +220,20 @@ class HiveSyncEngine {
               DateTime.tryParse(data['updatedAt']?.toString() ?? '')
                       ?.toUtc() ??
                   DateTime.fromMillisecondsSinceEpoch(0).toUtc();
+<<<<<<< HEAD
+=======
+          final isDeleted = data['isDeleted'] == true;
+>>>>>>> feature/comunicazioni
           final checksum = _computeRecordChecksum(data);
           index.add(SyncIndexEntry(
             id: id,
             boxName: boxName,
             updatedAt: updatedAt,
             checksum: checksum,
+<<<<<<< HEAD
+=======
+            isDeleted: isDeleted,
+>>>>>>> feature/comunicazioni
           ));
         }
       } catch (_) {}
@@ -199,7 +245,11 @@ class HiveSyncEngine {
   List<SyncRecord> extractModifiedRecords(DateTime since) {
     final records = <SyncRecord>[];
 
+<<<<<<< HEAD
     for (final entry in _syncableBoxes.entries) {
+=======
+    for (final entry in syncableBoxes.entries) {
+>>>>>>> feature/comunicazioni
       final boxName = entry.key;
       try {
         final box = Hive.box<Map>(boxName);
@@ -236,9 +286,21 @@ class HiveSyncEngine {
       try {
         final box = Hive.box<Map>(remote.boxName);
         final localRaw = box.get(remote.id);
+<<<<<<< HEAD
         if (localRaw == null) {
           needed.add(
               '${remote.boxName}:${remote.id}');
+=======
+        final localIsDeleted = localRaw != null
+            ? (LocalDatabase.toStringDynamicMap(localRaw)['isDeleted'] == true)
+            : false;
+
+        if (localRaw == null) {
+          if (!remote.isDeleted) {
+            needed.add(
+                '${remote.boxName}:${remote.id}');
+          }
+>>>>>>> feature/comunicazioni
           continue;
         }
         final localData = LocalDatabase.toStringDynamicMap(localRaw);
@@ -247,6 +309,15 @@ class HiveSyncEngine {
                     ?.toUtc() ??
                 DateTime.fromMillisecondsSinceEpoch(0).toUtc();
 
+<<<<<<< HEAD
+=======
+        if (remote.isDeleted && !localIsDeleted) {
+          needed.add(
+              '${remote.boxName}:${remote.id}');
+          continue;
+        }
+
+>>>>>>> feature/comunicazioni
         if (remote.updatedAt.isAfter(localUpdatedAt)) {
           needed.add(
               '${remote.boxName}:${remote.id}');
@@ -291,22 +362,116 @@ class HiveSyncEngine {
     return records;
   }
 
+<<<<<<< HEAD
+=======
+  /// Salva un conflitto di sync nel box dedicato.
+  Future<void> _saveConflict({
+    required String boxName,
+    required String recordId,
+    required Map<String, dynamic> localData,
+    required Map<String, dynamic> remoteData,
+    required List<String> conflictingFields,
+  }) async {
+    try {
+      final box = Hive.box<Map>(LocalDatabase.syncConflictsBox);
+      final conflictKey = '${boxName}:$recordId';
+      await box.put(conflictKey, {
+        'boxName': boxName,
+        'recordId': recordId,
+        'localData': localData,
+        'remoteData': remoteData,
+        'conflictingFields': conflictingFields,
+        'detectedAt': DateTime.now().toUtc().toIso8601String(),
+        'resolved': false,
+      });
+    } catch (_) {}
+  }
+
+  /// Esegue un merge field-by-field tra dati locali e remoti.
+  /// Restituisce la mappa mergiata e l'elenco dei campi in conflitto.
+  Map<String, dynamic> _mergeFields({
+    required Map<String, dynamic> localData,
+    required Map<String, dynamic> remoteData,
+    required DateTime localUpdatedAt,
+    required DateTime remoteUpdatedAt,
+  }) {
+    final merged = Map<String, dynamic>.from(localData);
+    final conflictFields = <String>[];
+
+    for (final entry in remoteData.entries) {
+      final field = entry.key;
+      final remoteValue = entry.value;
+
+      // Campi tecnici da non considerare nei conflitti
+      if (field == 'updatedAt' || field == 'createdAt' || field == 'lastModifiedBy') continue;
+
+      if (!merged.containsKey(field)) {
+        // Solo remoto ha questo campo: lo prendiamo
+        merged[field] = remoteValue;
+      } else if (merged[field] != remoteValue) {
+        // Stesso campo, valori diversi: potenziale conflitto
+
+        // Se la differenza è solo nel timestamp dell'intero record,
+        // diamo priorità al record più recente per i campi divergenti
+        if (remoteUpdatedAt.isAfter(localUpdatedAt) &&
+            localUpdatedAt.difference(remoteUpdatedAt).inSeconds.abs() > 5) {
+          merged[field] = remoteValue;
+        } else if (localUpdatedAt.isAfter(remoteUpdatedAt) &&
+            localUpdatedAt.difference(remoteUpdatedAt).inSeconds.abs() > 5) {
+          // Keep local value (already in merged)
+        } else {
+          // Timestamp ravvicinati o uguali: conflitto reale
+          merged[field] = remoteValue;
+          conflictFields.add(field);
+        }
+      }
+      // Se sono uguali, non fare nulla
+    }
+
+    if (conflictFields.isNotEmpty) {
+      merged['_conflicts'] = conflictFields;
+    }
+
+    return merged;
+  }
+
+>>>>>>> feature/comunicazioni
   Future<SyncResult> applyRemoteRecords(
     List<SyncRecord> records,
   ) async {
     var appliedCount = 0;
     var conflictsResolved = 0;
+<<<<<<< HEAD
 
     for (final remote in records) {
       if (!_syncableBoxes.containsKey(remote.boxName)) continue;
+=======
+    final newConflicts = <String, List<String>>{};
+
+    for (final remote in records) {
+      if (!syncableBoxes.containsKey(remote.boxName)) continue;
+>>>>>>> feature/comunicazioni
 
       try {
         final box = Hive.box<Map>(remote.boxName);
         final localRaw = box.get(remote.id);
+<<<<<<< HEAD
 
         if (localRaw == null) {
           if (!remote.isDeleted) {
             await box.put(remote.id, remote.data);
+=======
+        final isClassBox = remote.boxName == 'classes';
+
+        if (localRaw == null) {
+          if (!remote.isDeleted) {
+            final data = Map<String, dynamic>.from(remote.data);
+            data.remove('_conflicts');
+            if (isClassBox && data['nameLocked'] != true) {
+              data['nameLocked'] = true;
+            }
+            await box.put(remote.id, data);
+>>>>>>> feature/comunicazioni
             appliedCount++;
           }
           continue;
@@ -317,6 +482,7 @@ class HiveSyncEngine {
             DateTime.tryParse(localData['updatedAt']?.toString() ?? '')
                     ?.toUtc() ??
                 DateTime.fromMillisecondsSinceEpoch(0).toUtc();
+<<<<<<< HEAD
 
         if (remote.updatedAt.isAfter(localUpdatedAt)) {
           if (remote.isDeleted) {
@@ -344,6 +510,64 @@ class HiveSyncEngine {
             conflictsResolved++;
           }
         }
+=======
+        final localIsDeleted = localData['isDeleted'] == true;
+
+        if (remote.isDeleted && !localIsDeleted) {
+          final merged = Map<String, dynamic>.from(localData);
+          merged['isDeleted'] = true;
+          merged['updatedAt'] = remote.updatedAt.toIso8601String();
+          await box.put(remote.id, merged);
+          appliedCount++;
+          continue;
+        }
+
+        if (localIsDeleted && !remote.isDeleted) {
+          final data = Map<String, dynamic>.from(remote.data);
+          data.remove('_conflicts');
+          if (isClassBox && data['nameLocked'] != true) {
+            data['nameLocked'] = true;
+          }
+          await box.put(remote.id, data);
+          appliedCount++;
+          continue;
+        }
+
+        final merged = _mergeFields(
+          localData: localData,
+          remoteData: remote.data,
+          localUpdatedAt: localUpdatedAt,
+          remoteUpdatedAt: remote.updatedAt,
+        );
+
+        final conflictFields =
+            (merged['_conflicts'] as List<String>?) ?? [];
+        merged.remove('_conflicts');
+
+        if (isClassBox) {
+          merged['nameLocked'] = (localData['nameLocked'] ?? true) ||
+              (remote.data['nameLocked'] == true);
+        }
+
+        final now = DateTime.now().toUtc();
+        merged['updatedAt'] = now.toIso8601String();
+        await box.put(remote.id, merged);
+
+        if (conflictFields.isNotEmpty) {
+          final conflictKey = '${remote.boxName}:${remote.id}';
+          newConflicts[conflictKey] = conflictFields;
+          await _saveConflict(
+            boxName: remote.boxName,
+            recordId: remote.id,
+            localData: localData,
+            remoteData: remote.data,
+            conflictingFields: conflictFields,
+          );
+        }
+
+        appliedCount++;
+        conflictsResolved += conflictFields.isEmpty ? 1 : 0;
+>>>>>>> feature/comunicazioni
       } catch (_) {}
     }
 
@@ -428,6 +652,10 @@ class HiveSyncEngine {
       utf8.encode(plainText),
       secretKey: sessionKey,
       nonce: nonce,
+<<<<<<< HEAD
+=======
+      aad: _syncAad,
+>>>>>>> feature/comunicazioni
     );
 
     final payload = P2PEncryptedPayload(
@@ -454,6 +682,10 @@ class HiveSyncEngine {
     final plainBytes = await AesGcm.with256bits().decrypt(
       secretBox,
       secretKey: sessionKey,
+<<<<<<< HEAD
+=======
+      aad: _syncAad,
+>>>>>>> feature/comunicazioni
     );
 
     return utf8.decode(plainBytes);
@@ -544,6 +776,7 @@ class HiveSyncEngine {
       final remote = remoteIndexMap[key];
       
       if (remote == null) {
+<<<<<<< HEAD
         // Remote doesn't have this record at all
         needed.add(key);
       } else if (local.updatedAt.isAfter(remote.updatedAt)) {
@@ -551,6 +784,18 @@ class HiveSyncEngine {
         needed.add(key);
       } else if (local.updatedAt == remote.updatedAt && local.checksum != remote.checksum) {
         // Same timestamp but different content
+=======
+        if (!local.isDeleted) {
+          needed.add(key);
+        }
+      } else if (remote.isDeleted && !local.isDeleted) {
+        needed.add(key);
+      } else if (local.updatedAt.isAfter(remote.updatedAt)) {
+        if (!local.isDeleted) {
+          needed.add(key);
+        }
+      } else if (local.updatedAt == remote.updatedAt && local.checksum != remote.checksum) {
+>>>>>>> feature/comunicazioni
         needed.add(key);
       }
     }

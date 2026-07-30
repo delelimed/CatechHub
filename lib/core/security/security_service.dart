@@ -104,7 +104,7 @@ class SecurityService {
   /// Deve essere chiamata **DOPO** `WidgetsFlutterBinding.ensureInitialized()`
   /// e **PRIMA** di `runApp()`.
   ///
-  /// Legge la configurazione da `.env` (caricato via `flutter_dotenv`):
+  /// Legge la configurazione da `--dart-define` tramite `EnvConfig`:
   /// - `FREERASP_PACKAGE_NAME` (es. `com.delelimed.catechhub`)
   /// - `FREERASP_RELEASE_HASH` (SHA-256 del certificato in Base64)
   ///
@@ -121,23 +121,22 @@ class SecurityService {
 
     debugPrint('[SecurityService] Inizializzazione freeRASP...');
 
-    // ─── Lettura configurazione da .env (caricato via flutter_dotenv) ───
-    await EnvConfig.load();
+    // ─── Lettura configurazione da --dart-define tramite EnvConfig ───
     final String packageName = EnvConfig.freeraspPackageName;
     final String releaseHash = EnvConfig.freeraspReleaseHash;
 
-    // In Release, le variabili DEVONO essere presenti nel file .env
+    // In Release, le variabili DEVONO essere definite (via --dart-define-from-file)
     if (!kDebugMode) {
       if (packageName.isEmpty) {
         throw StateError(
-          '[SecurityService] FREERASP_PACKAGE_NAME non definito nel file .env. '
-          'In build Release, deve essere presente nel file .env incluso negli asset.',
+          '[SecurityService] FREERASP_PACKAGE_NAME non definito. '
+          'Usa --dart-define-from-file=.env in build Release.',
         );
       }
       if (releaseHash.isEmpty) {
         throw StateError(
-          '[SecurityService] FREERASP_RELEASE_HASH non definito nel file .env. '
-          'In build Release, deve essere presente nel file .env '
+          '[SecurityService] FREERASP_RELEASE_HASH non definito. '
+          'Usa --dart-define-from-file=.env in build Release '
           '(SHA-256 del certificato di firma in Base64)',
         );
       }

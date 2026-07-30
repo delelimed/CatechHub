@@ -542,11 +542,7 @@ class _MetricPanel extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
     final labelColor = isDark ? Colors.grey.shade400 : Colors.black54;
 
-<<<<<<< HEAD
-    return _Panel(
-=======
     final panel = _Panel(
->>>>>>> feature/comunicazioni
       child: Row(
         children: [
           Container(
@@ -790,42 +786,6 @@ class _QuickActionsGrid extends StatelessWidget {
       ),
     ];
 
-<<<<<<< HEAD
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: constraints.maxWidth < 420 ? 220 : 260,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            mainAxisExtent: 68,
-          ),
-          itemCount: actions.length,
-          itemBuilder: (context, index) {
-            final item = actions[index];
-            return InkWell(
-              onTap: () => context.push(item.path),
-              borderRadius: BorderRadius.circular(16),
-              child: _Panel(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Icon(item.icon, color: iconColor),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        item.title,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: textColor,
-                        ),
-                      ),
-                    ),
-                  ],
-=======
     return Column(
       children: [
         Row(
@@ -869,7 +829,6 @@ class _QuickActionsGrid extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                     color: textColor,
                   ),
->>>>>>> feature/comunicazioni
                 ),
               ),
             ),

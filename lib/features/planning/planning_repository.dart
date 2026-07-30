@@ -131,8 +131,6 @@ class PlanningRepository {
 
     // Rimuovi la notifica programmata
     await MeetingNotificationService.removeMeeting(id);
-<<<<<<< HEAD
-=======
   }
 
   /// Cerca il codice univoco di 40 cifre della classe a partire dal [classId].
@@ -141,7 +139,6 @@ class PlanningRepository {
     if (classData == null) return '';
     final map = LocalDatabase.toStringDynamicMap(classData);
     return map['uniqueCode'] as String? ?? '';
->>>>>>> feature/comunicazioni
   }
 
   /// Restituisce il messaggio di errore localizzato per conflitto di data,

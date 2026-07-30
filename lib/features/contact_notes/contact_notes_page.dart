@@ -108,20 +108,6 @@ class ContactNotesPage extends ConsumerWidget {
               final lastNote =
                   latestNotes.isNotEmpty ? latestNotes.first : null;
 
-<<<<<<< HEAD
-                return _StudentContactTile(
-                  student: student,
-                  lastNote: lastNote,
-                  isDark: isDark,
-                  colorScheme: colorScheme,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => StudentContactNotesPage(
-                          student: student,
-                        ),
-=======
               return _StudentContactTile(
                 student: student,
                 lastNote: lastNote,
@@ -133,7 +119,6 @@ class ContactNotesPage extends ConsumerWidget {
                     MaterialPageRoute(
                       builder: (_) => StudentContactNotesPage(
                         student: student,
->>>>>>> feature/comunicazioni
                       ),
                     ),
                   );
@@ -187,59 +172,6 @@ class _StudentContactTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-<<<<<<< HEAD
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: isDark ? colorScheme.primaryContainer.withValues(alpha: 0.3) : const Color(0xFF174A7E).withValues(alpha: 0.1),
-                child: Text(
-                  student.surname.isNotEmpty
-                      ? student.surname[0].toUpperCase()
-                      : '?',
-                  style: TextStyle(
-                    color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${student.surname} ${student.name}',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? colorScheme.onSurface : const Color(0xFF1A1A1A),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    if (lastNote != null)
-                      Text(
-                        '${DateFormat('dd/MM/yy').format(lastNote.dateTime)} — ${lastNote.notes.length > 40 ? '${lastNote.notes.substring(0, 40)}...' : lastNote.notes}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      )
-                    else
-                      Text(
-                        'Nessun contatto registrato',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right, color: isDark ? Colors.grey.shade600 : Colors.grey.shade400),
-=======
               Row(
                 children: [
                   CircleAvatar(
@@ -304,7 +236,6 @@ class _StudentContactTile extends StatelessWidget {
                     compact: true,
                   ),
                 ),
->>>>>>> feature/comunicazioni
             ],
           ),
         ),

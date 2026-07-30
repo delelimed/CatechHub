@@ -215,68 +215,6 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
                   );
                 }
 
-<<<<<<< HEAD
-                  return Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: s.hasTwoConsecutiveAbsences
-                          ? (isDark ? Colors.red.shade900.withValues(alpha: 0.2) : Colors.red.shade50)
-                          : (isDark ? colorScheme.surfaceContainer : Colors.white),
-                      borderRadius: BorderRadius.circular(20),
-                      border: s.hasTwoConsecutiveAbsences
-                          ? Border.all(color: isDark ? Colors.red.shade700.withValues(alpha: 0.4) : Colors.red.shade200, width: 1)
-                          : null,
-                      boxShadow: [
-                        BoxShadow(
-                          color: isDark
-                              ? Colors.black.withValues(alpha: 0.3)
-                              : Colors.black.withValues(alpha: 0.04),
-                          blurRadius: 12,
-                          offset: const Offset(0, 6),
-                        )
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: s.hasTwoConsecutiveAbsences
-                              ? (isDark ? Colors.red.shade800.withValues(alpha: 0.3) : Colors.red.shade100)
-                              : (isDark ? colorScheme.primaryContainer.withValues(alpha: 0.3) : Colors.blue.shade50),
-                          child: Icon(
-                            Icons.person,
-                            color: s.hasTwoConsecutiveAbsences
-                                ? (isDark ? Colors.red.shade300 : Colors.red.shade900)
-                                : (isDark ? colorScheme.primary : const Color(0xFF174A7E)),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${s.name} ${s.surname}',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: s.hasTwoConsecutiveAbsences
-                                      ? (isDark ? Colors.red.shade300 : Colors.red.shade900)
-                                      : (isDark ? colorScheme.onSurface : Colors.black87),
-                                ),
-                              ),
-                              if (s.hasTwoConsecutiveAbsences)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2),
-                                  child: Text(
-                                    '2+ assenze consecutive!',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: isDark ? Colors.red.shade400 : Colors.red.shade700,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-=======
                 return studentsWithHistoryAsync.when(
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
@@ -343,7 +281,6 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
                                 blurRadius: 12,
                                 offset: const Offset(0, 6),
                               ),
->>>>>>> feature/comunicazioni
                             ],
                           ),
                           child: Row(

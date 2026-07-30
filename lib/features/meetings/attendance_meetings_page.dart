@@ -180,63 +180,6 @@ class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisSize: MainAxisSize.min,
                               children: [
-<<<<<<< HEAD
-                                Container(
-                                  width: 56,
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        DateFormat('dd').format(m.date),
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 17,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      Text(
-                                        DateFormat('MMM', 'it_IT')
-                                            .format(m.date)
-                                            .toUpperCase(),
-                                        style: const TextStyle(
-                                          color: Colors.white70,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 10,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        m.title,
-                                        style: theme.textTheme.titleMedium?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                          color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-                                        ),
-                                      ),
-                                      if (exists) ...[
-                                        const SizedBox(height: 8),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 10,
-                                            vertical: 4,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.green.withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(
-                                              color: Colors.green.withValues(alpha: 0.4),
-=======
                                 Row(
                                   children: [
                                     Container(
@@ -255,7 +198,6 @@ class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage>
                                               color: Colors.white,
                                               fontSize: 17,
                                               fontWeight: FontWeight.bold,
->>>>>>> feature/comunicazioni
                                             ),
                                           ),
                                           Text(
@@ -326,15 +268,6 @@ class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage>
                                       compact: true,
                                     ),
                                   ),
-<<<<<<< HEAD
-                                ),
-                                Icon(
-                                  Icons.arrow_forward_ios_rounded,
-                                  size: 16,
-                                  color: isDark ? Colors.grey.shade500 : Colors.grey,
-                                ),
-=======
->>>>>>> feature/comunicazioni
                               ],
                             ),
                           ),

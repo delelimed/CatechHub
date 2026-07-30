@@ -32,11 +32,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
 
   String? _errorMessage;
 
-<<<<<<< HEAD
-  static const _totalPages = 8;
-=======
   static const _totalPages = 9;
->>>>>>> feature/comunicazioni
 
   @override
   void dispose() {

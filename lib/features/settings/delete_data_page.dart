@@ -86,10 +86,7 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final colorScheme = theme.colorScheme;
-<<<<<<< HEAD
-=======
     final className = _currentClassName ?? 'Classe corrente';
->>>>>>> feature/comunicazioni
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -280,11 +277,8 @@ class _DeleteDataPageState extends ConsumerState<DeleteDataPage> {
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-<<<<<<< HEAD
-=======
     final className = _currentClassName ?? 'Classe corrente';
 
->>>>>>> feature/comunicazioni
     return AppScaffold(
       title: 'Cancella dati',
       child: _isDeleting || _isResetting

@@ -8,6 +8,11 @@ on:
   push:
     branches:
       - feature/**
+      
+  # Fa partire l'azione ad ogni Pull Request verso il ramo develop
+  #pull_request:
+  #  branches:
+  #    - develop
 
 jobs:
   build:

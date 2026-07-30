@@ -184,13 +184,10 @@ class _GroupHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
-<<<<<<< HEAD
-=======
     final hasKnownCreator = schoolClass.creatorCatechistId.isNotEmpty || schoolClass.creatorId.isNotEmpty || schoolClass.creatorName.isNotEmpty;
     final canEdit = schoolClass.isCreator(AuthService.localUserId, getCurrentCatechistName(),
             catechistId: AuthService.getCatechistId()) &&
         (!hasKnownCreator || schoolClass.creatorCatechistId.isNotEmpty || !schoolClass.nameLocked);
->>>>>>> feature/comunicazioni
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -249,15 +246,11 @@ class _GroupHeader extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-<<<<<<< HEAD
-                  'Tap per modificare il nome',
-=======
                   !canEdit
                       ? 'Solo il creatore può modificare'
                       : (schoolClass.nameLocked
                           ? 'Nome sincronizzato — non modificabile'
                           : 'Tap per modificare il nome'),
->>>>>>> feature/comunicazioni
                   style: TextStyle(
                     fontSize: 12,
                     color: isDark ? Colors.grey.shade400 : Colors.grey,
@@ -268,13 +261,9 @@ class _GroupHeader extends ConsumerWidget {
           ),
           IconButton(
             icon: Icon(Icons.edit, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
-<<<<<<< HEAD
-            onPressed: () => _showEditNameDialog(context, ref),
-=======
             onPressed: canEdit
                 ? () => _showEditNameDialog(context, ref)
                 : null,
->>>>>>> feature/comunicazioni
           ),
         ],
       ),

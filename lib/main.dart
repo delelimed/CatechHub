@@ -26,7 +26,6 @@ import 'core/security/security_service.dart';
 import 'core/services/update_service.dart';
 import 'core/services/meeting_notification_service.dart';
 import 'core/storage/local_database.dart';
-import 'core/storage/migration_manager.dart';
 import 'core/config/env_config.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -341,8 +340,73 @@ Future<void> main() async {
       // (LocalDatabase.init potrebbe essere chiamato anche da altri punti).
       LocalDatabase.markHiveInitialized();
 
+      // ═══════════════════════════════════════════════════════════════════════
+      // FASE 2.5 - INIZIALIZZAZIONE SECURITY MANAGER (HARDWARE-BACKED OR BLOCK)
+      //
+      // Verifica che il dispositivo supporti protezione hardware (TEE/StrongBox)
+      // e inizializza la Master Key AES-256 per la cifratura dei Box Hive.
+      //
+      // REQUISITO FONDAMENTALE: HARDWARE-ONLY, NO FALLBACK SOFTWARE.
+      // Se il dispositivo non ha TEE/StrongBox/Keymaster hardware-backed:
+      //   - SecurityManager.initialize() solleva HardwareSecurityException
+      //   - L'eccezione viene intercettata qui sotto
+      //   - Viene mostrata SecurityBlockScreen ("Dispositivo non conforme...")
+      //   - L'app NON prosegue l'avvio
+      //
+      // SOLO se l'inizializzazione ha successo:
+      //   - Viene generata/ripristinata la Master Key AES-256
+      //   - Viene creato HiveAesCipher per proteggere tutti i Box
+      //   - Il cipher viene passato a LocalDatabase.init()
+      // ═══════════════════════════════════════════════════════════════════════
+      late final HiveAesCipher hiveCipher;
       try {
-        await LocalDatabase.init();
+        await SecurityManager.instance.initialize();
+        hiveCipher = SecurityManager.instance.hiveCipher;
+        debugPrint('[MAIN] SecurityManager inizializzato: hardware-backed OK');
+      } on HardwareSecurityException catch (e) {
+        // ─────────────────────────────────────────────────────────────────────
+        // BLOCCO SICUREZZA: DISPOSITIVO NON CONFORME
+        //
+        // Se HardwareSecurityException viene sollevata, significa che:
+        // - Manca TEE/StrongBox/Keymaster hardware-backed
+        // - O FlutterSecureStorage non può usare Android Keystore
+        // - O la Master Key non può essere generata/letta
+        //
+        // REQUISITO: NESSUN FALLBACK SOFTWARE. L'app DEVE bloccarsi.
+        // ─────────────────────────────────────────────────────────────────────
+        debugPrint('[MAIN] BLOCCO SICUREZZA HARDWARE: $e');
+        runApp(MaterialApp(
+          debugShowCheckedModeBanner: false,
+          home: SecurityBlockScreen(
+            message: 'Impossibile avviare l\'applicazione.\n\n'
+                '${e.userMessage}\n\n'
+                'Dopo aver configurato un metodo di sblocco, riavvia l\'app.',
+          ),
+        ));
+        return;
+      } catch (e) {
+        // Qualsiasi altro errore imprevisto durante l'inizializzazione sicurezza
+        debugPrint('[MAIN] Errore imprevisto inizializzazione sicurezza: $e');
+        runApp(_FatalErrorApp(
+          message: 'Errore di inizializzazione sicurezza imprevisto.\n'
+              'Dettaglio: $e\n\n'
+              'Contattare l\'amministratore o reinstallare l\'app.',
+        ));
+        return;
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // FASE 3 - DATABASE LOCALE HIVE (apertura Box con corruption recovery)
+      //
+      // LocalDatabase.init() apre ogni Box in un try-catch atomico
+      // INDIVIDUALE usando il cipher hardware-backed da SecurityManager.
+      //
+      // Se un Box è corrotto, viene eliminato da disco con
+      // Hive.deleteBoxFromDisk() e ricreato vuoto SENZA coinvolgere gli
+      // altri Box.
+      // ═══════════════════════════════════════════════════════════════════════
+      try {
+        await LocalDatabase.init(cipher: hiveCipher);
       } catch (e) {
         // ─────────────────────────────────────────────────────────────────────
         // ERRORE FATALE: NESSUN RECOVERY POSSIBILE.

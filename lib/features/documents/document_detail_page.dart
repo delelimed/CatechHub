@@ -340,10 +340,6 @@ class DocumentDetailPage extends ConsumerWidget {
                                 ),
                               ],
                             ),
-<<<<<<< HEAD
-                          )
-                        else ...[
-=======
                           ),
                           if (deliveryData?['lastModifiedBy'] != null)
                             Padding(
@@ -364,7 +360,6 @@ class DocumentDetailPage extends ConsumerWidget {
                               ),
                             ),
                         ] else ...[
->>>>>>> feature/comunicazioni
                           Divider(height: 20, thickness: 0.5, color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : null),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,

@@ -1160,86 +1160,14 @@ class _AbsencesCard extends ConsumerWidget {
               'Errore nel caricamento assenze: $e',
               style: TextStyle(color: isDark ? Colors.red.shade200 : Colors.red.shade700),
             ),
-<<<<<<< HEAD
-            data: (absences) {
-              if (absences.isEmpty) {
-                return Text(
-                  'Nessuna assenza registrata',
-                  style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
-                );
-              }
-=======
             data: (data) {
               final absences = data['absences'] as List<Map<String, dynamic>>;
               final lastPresenceDate = data['lastPresenceDate'] as String?;
               final consecutiveAbsences = data['consecutiveAbsences'] as int;
->>>>>>> feature/comunicazioni
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-<<<<<<< HEAD
-                  Text(
-                    'Tocca per vedere lo storico completo',
-                    style: TextStyle(
-                      color: isDark ? Colors.red.shade300 : Colors.red.shade400,
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ...absences.take(3).map((absence) {
-                    final date = absence['date'] as DateTime;
-                    final title = absence['meetingTitle'] as String;
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.red.withValues(alpha: 0.15) : Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: isDark ? Colors.red.withValues(alpha: 0.3) : Colors.red.shade200, width: 1),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.calendar_today, size: 14, color: isDark ? Colors.red.shade200 : Colors.red.shade700),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  DateFormat('dd/MM/yyyy').format(date),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark ? Colors.red.shade200 : Colors.red.shade900,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                Text(
-                                  title,
-                                  style: TextStyle(fontSize: 12, color: isDark ? colorScheme.onSurface : null),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                  if (absences.length > 3)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        '+ ${absences.length - 3} altre assenze',
-                        style: TextStyle(
-                          color: isDark ? Colors.red.shade300 : Colors.red.shade600,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-=======
                   Row(
                     children: [
                       _StatBadge(
@@ -1275,7 +1203,6 @@ class _AbsencesCard extends ConsumerWidget {
                         color: isDark ? Colors.red.shade300 : Colors.red.shade400,
                         fontSize: 12,
                         fontStyle: FontStyle.italic,
->>>>>>> feature/comunicazioni
                       ),
                     ),
                     const SizedBox(height: 8),

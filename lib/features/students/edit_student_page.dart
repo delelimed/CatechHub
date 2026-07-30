@@ -305,10 +305,6 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
               parentType: AttachmentParentType.student,
             ),
 
-<<<<<<< HEAD
-            const SizedBox(height: 30),
-
-=======
             const SizedBox(height: 16),
 
             LastModifiedInfo(
@@ -319,7 +315,6 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
 
             const SizedBox(height: 30),
 
->>>>>>> feature/comunicazioni
             /// =========================
             /// SAVE
             /// =========================
@@ -544,17 +539,6 @@ class _ParentCard extends StatelessWidget {
               Expanded(
                 child: _Field(phone, 'Telefono', enabled: editMode, keyboardType: TextInputType.phone, isDark: isDark, colorScheme: colorScheme),
               ),
-<<<<<<< HEAD
-              const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.call, color: Colors.green),
-                onPressed: () => onCall(phone.text),
-              ),
-              IconButton(
-                icon: const Icon(Icons.chat, color: Colors.green),
-                onPressed: () => onWhatsapp(phone.text),
-              ),
-=======
               if (phone.text.isNotEmpty) ...[
                 const SizedBox(width: 8),
                 IconButton(
@@ -566,7 +550,6 @@ class _ParentCard extends StatelessWidget {
                   onPressed: () => onWhatsapp(phone.text),
                 ),
               ],
->>>>>>> feature/comunicazioni
             ],
           ),
         ],
@@ -690,17 +673,6 @@ class _PhoneRow extends StatelessWidget {
             colorScheme: colorScheme,
           ),
         ),
-<<<<<<< HEAD
-        const SizedBox(width: 8),
-        IconButton(
-          icon: const Icon(Icons.call, color: Colors.green),
-          onPressed: () => onCall(controller.text),
-        ),
-        IconButton(
-          icon: const Icon(Icons.chat, color: Colors.green),
-          onPressed: () => onWhatsapp(controller.text),
-        ),
-=======
         if (controller.text.isNotEmpty) ...[
           const SizedBox(width: 8),
           IconButton(
@@ -712,7 +684,6 @@ class _PhoneRow extends StatelessWidget {
             onPressed: () => onWhatsapp(controller.text),
           ),
         ],
->>>>>>> feature/comunicazioni
       ],
     );
   }

@@ -24,82 +24,6 @@ import '../../core/security/privacy_settings.dart';
 import '../../core/services/meeting_notification_service.dart';
 import '../../shared/widgets/app_scaffold.dart';
 
-void _showDeleteDataDialog(BuildContext context, WidgetRef ref) {
-  showDialog(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      title: const Text(
-        'Cancella dati salvati',
-        style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-      ),
-      content: const Text(
-        'Questa azione eliminerà TUTTI i dati locali (studenti, classi, presenze, documenti, note, programmazione). '
-        'L\'operazione NON può essere annullata. Sei sicuro di voler procedere?',
-        style: TextStyle(fontSize: 14, height: 1.4),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Annulla'),
-        ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          onPressed: () async {
-            Navigator.of(ctx).pop();
-            // Show confirmation dialog
-            final confirmed = await showDialog<bool>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                title: const Text(
-                  'Conferma cancellazione',
-                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-                ),
-                content: const Text(
-                  'ATTENZIONE: Tutti i dati saranno persi definitivamente. '
-                  'Non è possibile ripristinarli senza un backup.',
-                  style: TextStyle(fontSize: 14, height: 1.4),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(ctx).pop(false),
-                    child: const Text('Annulla'),
-                  ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () => Navigator.of(ctx).pop(true),
-                    child: const Text('Elimina tutto'),
-                  ),
-                ],
-              ),
-            );
-            if (confirmed == true && context.mounted) {
-              // Here you would implement the actual data deletion
-              // For now show a message
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Funzione di cancellazione completa in fase di implementazione'),
-                  backgroundColor: Colors.orange,
-                ),
-              );
-            }
-          },
-          child: const Text('Conferma'),
-        ),
-      ],
-    ),
-  );
-}
-
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
@@ -322,17 +246,10 @@ class SettingsPage extends ConsumerWidget {
               _SettingsItem(
                 icon: Icons.delete_forever_rounded,
                 title: 'Cancella dati salvati',
-<<<<<<< HEAD
-                subtitle: 'Elimina anagrafica, presenze, giornate o allegati',
-                color: Colors.red,
-                isDestructive: true,
-                onTap: () => _showDeleteDataDialog(context, ref),
-=======
                 subtitle: 'Elimina selettivamente anagrafiche, presenze, documenti, calendario, catechesi o allegati',
                 color: Colors.red,
                 isDestructive: true,
                 onTap: () => context.push('/delete-data'),
->>>>>>> feature/comunicazioni
               ),
 
               const SizedBox(height: 12),

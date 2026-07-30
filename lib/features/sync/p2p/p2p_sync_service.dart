@@ -551,7 +551,7 @@ class P2PSyncService {
       final identity = await _security.getLocalIdentity();
       addLog('DEBUG', 'Avvio advertising come ${identity.deviceId}');
       await _nearby.startAdvertising(
-        '$_syncPrefix${identity.deviceId}',
+        identity.deviceId,
         Strategy.P2P_CLUSTER,
         onConnectionInitiated: _onConnectionInitiated,
         onConnectionResult: _onConnectionResult,
@@ -586,35 +586,38 @@ class P2PSyncService {
           _updateNearbyCount();
 
           Future(() async {
-            if (_connectedEndpoints.contains(endpointId)) {
-              addLog('DEBUG', '  già connesso a $endpointId');
-              return;
-            }
-            if (_endpointConnIdMap.containsValue(deviceId)) {
-              addLog('DEBUG', '  già connesso a $deviceId');
-              return;
-            }
-
-            final assoc = await _security.getAssociation(deviceId);
-            if (assoc != null && assoc.isValid) {
-              if (!_sessionSyncAllowed && _needsSessionPermission(assoc)) {
-                _updateState(_state.copyWith(
-                  awaitingSessionPermission: true,
-                  pendingSessionDeviceName: assoc.deviceName,
-                ));
+            try {
+              if (_connectedEndpoints.contains(endpointId)) {
+                addLog('DEBUG', '  già connesso a $endpointId');
                 return;
               }
-              addLog('DEBUG', '  associazione valida, richiedo connessione a $deviceId');
-              final localIdentity = await _security.getLocalIdentity();
-              await _nearby.requestConnection(
-                '$_syncPrefix${localIdentity.deviceId}',
-                endpointId,
-                onConnectionInitiated: _onConnectionInitiated,
-                onConnectionResult: _onConnectionResult,
-                onDisconnected: _onDisconnected,
-              );
-            } else {
-              addLog('DEBUG', '  nessuna associazione valida per $deviceId');
+              if (_endpointConnIdMap.containsValue(deviceId)) {
+                addLog('DEBUG', '  già connesso a $deviceId');
+                return;
+              }
+
+              final assoc = await _security.getAssociation(deviceId);
+              if (assoc != null && assoc.isValid) {
+                if (!_sessionSyncAllowed && _needsSessionPermission(assoc)) {
+                  _updateState(_state.copyWith(
+                    awaitingSessionPermission: true,
+                    pendingSessionDeviceName: assoc.deviceName,
+                  ));
+                }
+                addLog('DEBUG', '  associazione valida, richiedo connessione a $deviceId');
+                final localIdentity = await _security.getLocalIdentity();
+                await _nearby.requestConnection(
+                  localIdentity.deviceId,
+                  endpointId,
+                  onConnectionInitiated: _onConnectionInitiated,
+                  onConnectionResult: _onConnectionResult,
+                  onDisconnected: _onDisconnected,
+                );
+              } else {
+                addLog('DEBUG', '  nessuna associazione valida per $deviceId');
+              }
+            } catch (e) {
+              addLog('ERROR', 'Errore durante connessione a $deviceId: $e');
             }
           });
         },
@@ -678,11 +681,10 @@ class P2PSyncService {
             awaitingSessionPermission: true,
             pendingSessionDeviceName: assoc.deviceName,
           ));
-          continue;
         }
         final localIdentity = await _security.getLocalIdentity();
         await _nearby.requestConnection(
-          '$_syncPrefix${localIdentity.deviceId}',
+          localIdentity.deviceId,
           endpointId,
           onConnectionInitiated: _onConnectionInitiated,
           onConnectionResult: _onConnectionResult,
@@ -822,8 +824,7 @@ class P2PSyncService {
 
     try {
       final identity = await _security.getLocalIdentity();
-      final displayName =
-          '$_syncPrefix${identity.deviceId}';
+      final displayName = identity.deviceId;
 
       await _nearby.startAdvertising(
         displayName,
@@ -898,7 +899,7 @@ Future<void> startPairingAdvertiseOnly() async {
 
      try {
        final identity = await _security.getLocalIdentity();
-       final displayName = '$_syncPrefix${identity.deviceId}';
+       final displayName = identity.deviceId;
 
        await _nearby.startAdvertising(
          displayName,
@@ -984,7 +985,7 @@ Future<void> startPairingAdvertiseOnly() async {
           addLog('INFO', 'Trovato dispositivo target $name, richiedo connessione');
           _security.getLocalIdentity().then((identity) {
             _nearby.requestConnection(
-              '$_syncPrefix${identity.deviceId}',
+              identity.deviceId,
               endpointId,
               onConnectionInitiated: _onConnectionInitiated,
               onConnectionResult: _onConnectionResult,
@@ -1078,7 +1079,7 @@ Future<void> stopPairingMode() async {
 
     _security.getLocalIdentity().then((identity) {
       _nearby.requestConnection(
-        '$_syncPrefix${identity.deviceId}',
+        identity.deviceId,
         endpointId,
         onConnectionInitiated: _onConnectionInitiated,
         onConnectionResult: _onConnectionResult,
@@ -1205,7 +1206,12 @@ void _onConnectionResult(String endpointId, Status status) {
   String? _extractDeviceId(String endpointName) {
     try {
       if (endpointName.startsWith(_syncPrefix)) {
-        return endpointName.substring(3);
+        // Handle old buggy format: CH_CH_xxx (double prefix) → strip first CH_
+        if (endpointName.length > 3 && endpointName.startsWith(_syncPrefix, 3)) {
+          return endpointName.substring(3);
+        }
+        // Handle correct format: CH_xxx (deviceId itself)
+        return endpointName;
       }
     } catch (_) {}
     return null;
@@ -1844,7 +1850,7 @@ void _onConnectionResult(String endpointId, Status status) {
   }
 
   Future<void> _saveAssociationIfNeeded(P2PIdentity remoteIdentity,
-      {P2PSyncRole? remoteRole}) async {
+      {P2PSyncRole? remoteRole, String? catechistId}) async {
     try {
       final existing = await _security.getAssociation(remoteIdentity.deviceId);
       if (existing != null) {
@@ -1886,6 +1892,7 @@ void _onConnectionResult(String endpointId, Status status) {
         sharedSecretBase64: sharedSecret,
         localRole: _state.role.name,
         remoteRole: remoteRole?.name,
+        catechistId: catechistId,
       );
 
       addLog('INFO', 'Associazione salvata per ${remoteIdentity.deviceName}');
@@ -2694,6 +2701,7 @@ void _onConnectionResult(String endpointId, Status status) {
             sharedSecretBase64: pending.sharedSecretBase64,
             localRole: _state.role.name,
             remoteRole: _pendingHandshakeRemoteRole?.name,
+            catechistId: _pendingHandshakeRemoteCatechistId,
           );
           addLog('INFO', 'Associazione salvata in Hive su conferma remota per ${pending.deviceName}');
         }
@@ -2703,7 +2711,8 @@ void _onConnectionResult(String endpointId, Status status) {
         final remoteIdentity = _pendingHandshakeIdentity;
         if (remoteIdentity != null) {
           await _saveAssociationIfNeeded(remoteIdentity,
-              remoteRole: _pendingHandshakeRemoteRole);
+              remoteRole: _pendingHandshakeRemoteRole,
+              catechistId: _pendingHandshakeRemoteCatechistId);
         }
       }
 
@@ -2811,11 +2820,13 @@ void _onConnectionResult(String endpointId, Status status) {
           sharedSecretBase64: pending.sharedSecretBase64,
           localRole: _state.role.name,
           remoteRole: _pendingHandshakeRemoteRole?.name,
+          catechistId: _pendingHandshakeRemoteCatechistId,
         );
         addLog('INFO', 'Associazione salvata in Hive dopo verifica per ${pending.deviceName}');
       } else {
         await _saveAssociationIfNeeded(remoteIdentity,
-            remoteRole: _pendingHandshakeRemoteRole);
+            remoteRole: _pendingHandshakeRemoteRole,
+            catechistId: _pendingHandshakeRemoteCatechistId);
       }
     }
 
@@ -3052,11 +3063,12 @@ void _onConnectionResult(String endpointId, Status status) {
       if (!_continuousModeActive) {
         _startContinuousMode();
       }
-      for (int i = 0; i < 20; i++) {
+      for (int i = 0; i < 60; i++) {
         await Future.delayed(const Duration(milliseconds: 500));
         if (_connectedEndpoints.isNotEmpty) break;
       }
     }
+
     final endpoints = _connectedEndpoints.toList();
     if (endpoints.isNotEmpty) {
       final endpointId = endpoints.first;
@@ -3071,7 +3083,7 @@ void _onConnectionResult(String endpointId, Status status) {
         addLog('INFO',
             'Connessione presente ma handshake/auth non completato, '
             'attendere...');
-        for (int i = 0; i < 20; i++) {
+        for (int i = 0; i < 60; i++) {
           await Future.delayed(const Duration(milliseconds: 500));
           if (_state.status == P2PSyncStatus.sessionEstablished &&
               _state.authenticatedByRemote) {

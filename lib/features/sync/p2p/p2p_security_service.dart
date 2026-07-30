@@ -617,6 +617,7 @@ class P2PSecurityService {
     required String sharedSecretBase64,
     String? localRole,
     String? remoteRole,
+    String? catechistId,
   }) async {
     final deviceKeyPair = await _generateDeviceKeyPair();
     final devicePubKey = await deviceKeyPair.extractPublicKey();
@@ -632,6 +633,7 @@ class P2PSecurityService {
       devicePublicKeyBase64: base64Encode(devicePubKey.bytes),
       localRole: localRole,
       remoteRole: remoteRole,
+      catechistId: catechistId,
     );
     await saveAssociation(association);
     return deviceKeyPair;

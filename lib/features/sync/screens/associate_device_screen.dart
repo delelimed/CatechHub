@@ -496,12 +496,14 @@ _pairingDialogShown = false;
   Future<void> _confirmPairingCodeAndSync() async {
     final service = ref.read(nearbySyncServiceProvider);
 
-    if (_pairingCode != null &&
-        service.currentState.status == P2PSyncStatus.pairingVerification) {
-      _isConfirmingPairing = true;
-      await service.confirmPairingCode();
-      _isConfirmingPairing = false;
+    if (service.currentState.status != P2PSyncStatus.pairingVerification) {
+      addLog('WARN', 'confirmPairingCodeAndSync chiamato fuori da pairingVerification');
+      return;
     }
+
+    _isConfirmingPairing = true;
+    await service.confirmPairingCode();
+    _isConfirmingPairing = false;
 
     setState(() {
       _currentStep = _AssociationStep.onboardingSync;

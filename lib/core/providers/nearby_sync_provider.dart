@@ -168,7 +168,9 @@ class _NearbySyncLifecycleManagerState
     switch (state) {
       case AppLifecycleState.resumed:
         _expirationWarningShown = false;
-        daemonController.setAppForeground(true);
+        daemonController.init().then((_) {
+          daemonController.setAppForeground(true);
+        });
         break;
       case AppLifecycleState.paused:
       case AppLifecycleState.detached:

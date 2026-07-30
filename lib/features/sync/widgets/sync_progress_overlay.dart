@@ -270,10 +270,13 @@ class _SyncProgressContentState extends ConsumerState<_SyncProgressContent> {
     if (state.status == P2PSyncStatus.completed ||
         state.status == P2PSyncStatus.idle) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
+        if (!mounted) return;
+        try {
           Navigator.of(context).pop();
-          widget.onDismiss();
+        } catch (_) {
+          // Route già rimossa
         }
+        widget.onDismiss();
       });
       return const SizedBox.shrink();
     }

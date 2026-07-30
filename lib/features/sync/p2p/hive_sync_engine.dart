@@ -264,6 +264,8 @@ class HiveSyncEngine {
                 DateTime.fromMillisecondsSinceEpoch(0).toUtc();
 
         if (remote.isDeleted && !localIsDeleted) {
+          needed.add(
+              '${remote.boxName}:${remote.id}');
           continue;
         }
 
@@ -345,6 +347,11 @@ class HiveSyncEngine {
         final localIsDeleted = localData['isDeleted'] == true;
 
         if (remote.isDeleted && !localIsDeleted) {
+          final merged = Map<String, dynamic>.from(localData);
+          merged['isDeleted'] = true;
+          merged['updatedAt'] = remote.updatedAt.toIso8601String();
+          await box.put(remote.id, merged);
+          appliedCount++;
           continue;
         }
 

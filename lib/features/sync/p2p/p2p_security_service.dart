@@ -280,7 +280,9 @@ class P2PSecurityService {
           publicKey: SimplePublicKey(pubBytes, type: KeyPairType.x25519),
           type: KeyPairType.x25519,
         );
-      } catch (_) {}
+      } catch (e) {
+        print('P2PSecurityService.getOrCreateIdentityKeyPair: stored key corrupted, regenerating: $e');
+      }
     }
     return _generateAndStoreIdentityKeyPair();
   }
@@ -313,7 +315,9 @@ class P2PSecurityService {
     if (stored != null && stored.isNotEmpty) {
       try {
         return P2PIdentity.fromJson(jsonDecode(stored) as Map<String, dynamic>);
-      } catch (_) {}
+      } catch (e) {
+        print('P2PSecurityService.getLocalIdentity: stored identity corrupted, regenerating: $e');
+      }
     }
     return _createAndStoreIdentity();
   }
@@ -654,7 +658,8 @@ class P2PSecurityService {
         return null;
       }
       return assoc;
-    } catch (_) {
+    } catch (e) {
+      print('P2PSecurityService.getAssociation error for $deviceId: $e');
       return null;
     }
   }

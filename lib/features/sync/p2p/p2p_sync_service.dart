@@ -308,6 +308,7 @@ class P2PSyncService {
   final Map<String, String> _nearbyEndpointToDevice = {};
   final Map<String, String> _endpointConnIdMap = {};
   final Set<String> _sessionConfirmedDevices = {};
+  final Set<String> _authRequestSent = {};
   bool _restartingEndpoints = false;
 
   bool _sessionSyncAllowed = false;
@@ -746,6 +747,10 @@ class P2PSyncService {
 
   Future<void> _onLocalDataChanged() async {
     if (_connectedEndpoints.isEmpty) return;
+    if (_state.awaitingConfirmation || !_state.authenticatedByRemote) {
+      addLog('DEBUG', 'Modifica locale ignorata: attesa autenticazione');
+      return;
+    }
     if (_isSyncing) {
       if (_lastSyncStartTime != null &&
           DateTime.now().difference(_lastSyncStartTime!).inSeconds > 60) {
@@ -1164,6 +1169,7 @@ void _onConnectionResult(String endpointId, Status status) {
     final deviceId = _endpointConnIdMap.remove(endpointId);
     _endpointSessionKeys.remove(endpointId);
     _endpointSyncPhase.remove(endpointId);
+    _authRequestSent.remove(endpointId);
     _isSyncing = false;
     if (_pendingEndpointId == endpointId) {
       _pendingEndpointId = null;
@@ -1623,7 +1629,8 @@ void _onConnectionResult(String endpointId, Status status) {
           localIdentity.deviceId.compareTo(remoteId) <= 0;
       _isInitiator = iAmInitiator;
       addLog('DEBUG', 'Sono iniziatore: $iAmInitiator');
-      if (iAmInitiator) {
+      if (iAmInitiator && !_authRequestSent.contains(endpointId)) {
+        _authRequestSent.add(endpointId);
         final authRequest = jsonEncode({
           'type': 'p2p_auth_request',
           'deviceId': localIdentity.deviceId,
@@ -1819,7 +1826,8 @@ void _onConnectionResult(String endpointId, Status status) {
           localIdentity.deviceId.compareTo(remoteId) <= 0;
       _isInitiator = iAmInitiator;
 
-      if (iAmInitiator) {
+      if (iAmInitiator && !_authRequestSent.contains(endpointId)) {
+        _authRequestSent.add(endpointId);
         final authRequest = jsonEncode({
           'type': 'p2p_auth_request',
           'deviceId': localIdentity.deviceId,
@@ -2502,6 +2510,10 @@ void _onConnectionResult(String endpointId, Status status) {
 
   Future<void> _handleSyncIndex(
       String endpointId, Map<String, dynamic> message) async {
+    if (_state.awaitingConfirmation || !_state.authenticatedByRemote) {
+      addLog('DEBUG', 'Sync index ignorato: attesa autenticazione');
+      return;
+    }
     final phase = _endpointSyncPhase[endpointId] ??= _SyncPhase2();
     if (!phase.isIdle && !phase.complete) {
       addLog('DEBUG', 'Sync index ignorato: sync già in corso per $endpointId');
@@ -2636,6 +2648,10 @@ void _onConnectionResult(String endpointId, Status status) {
       String endpointId, Map<String, dynamic> message) async {
     final phase = _endpointSyncPhase[endpointId];
     if (phase == null || phase.isIdle) {
+      if (_state.awaitingConfirmation || !_state.authenticatedByRemote) {
+        addLog('DEBUG', 'Dati incrementali ignorati: attesa autenticazione');
+        return;
+      }
       try {
         final engine = HiveSyncEngine();
         final recordsData = message['records'] as List<dynamic>? ?? [];
@@ -2704,7 +2720,7 @@ void _onConnectionResult(String endpointId, Status status) {
       String endpointId, Map<String, dynamic> message) async {
     final phase = _endpointSyncPhase[endpointId];
     if (phase == null) {
-      addLog('WARN', 'Sync ACK ignorato: nessuna sync attiva per $endpointId');
+      addLog('DEBUG', 'Sync ACK ignorato: nessuna sync attiva per $endpointId');
       return;
     }
     phase.sendDone = true;

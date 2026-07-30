@@ -30,8 +30,6 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   bool _locationRequested = false;
   bool _bluetoothRequested = false;
 
-  bool _notificationPageAutoTriggered = false;
-
   String? _errorMessage;
 
   static const _totalPages = 9;
@@ -458,13 +456,6 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   // ─── PAGE 4: NOTIFICATION PERMISSION ───────────────────────────────
 
   Widget _buildNotificationPermissionPage() {
-    if (_currentPage == 3 && !_notificationRequested && !_notificationPageAutoTriggered) {
-      _notificationPageAutoTriggered = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _requestNotificationPermission();
-      });
-    }
-
     return _buildPageContainer(
       Column(
         mainAxisAlignment: MainAxisAlignment.center,

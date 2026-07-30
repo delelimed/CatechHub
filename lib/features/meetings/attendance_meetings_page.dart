@@ -17,12 +17,32 @@ class AttendanceMeetingsPage extends ConsumerStatefulWidget {
   ConsumerState<AttendanceMeetingsPage> createState() => _AttendanceMeetingsPageState();
 }
 
+class _AttendanceInfo {
+  final bool exists;
+  final DateTime? updatedAt;
+  final String lastModifiedBy;
+
+  const _AttendanceInfo({
+    required this.exists,
+    this.updatedAt,
+    this.lastModifiedBy = '',
+  });
+}
+
 class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage> {
   bool _showPast = false;
 
-  Stream<Map<String, bool>> _getAttendanceStatus() {
+  Stream<Map<String, _AttendanceInfo>> _getAttendanceStatus() {
     return AttendanceRepository().getAttendance().map((records) {
-      return {for (final record in records) record['id'].toString(): true};
+      return {
+        for (final record in records)
+          record['id'].toString(): _AttendanceInfo(
+            exists: true,
+            updatedAt:
+                DateTime.tryParse(record['updatedAt']?.toString() ?? ''),
+            lastModifiedBy: record['lastModifiedBy']?.toString() ?? '',
+          ),
+      };
     });
   }
 
@@ -95,7 +115,7 @@ class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage>
                 );
               }
 
-              return StreamBuilder<Map<String, bool>>(
+              return StreamBuilder<Map<String, _AttendanceInfo>>(
                 stream: _getAttendanceStatus(),
                 builder: (context, attendanceSnapshot) {
                   final attendanceMap = attendanceSnapshot.data ?? {};
@@ -121,7 +141,8 @@ class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage>
                         );
                       }
                       final m = meetings[index - 1];
-                      final exists = attendanceMap[m.id] ?? false;
+                      final attInfo = attendanceMap[m.id];
+                      final exists = attInfo?.exists ?? false;
 
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 6),
@@ -238,14 +259,15 @@ class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage>
                                     ),
                                   ],
                                 ),
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: LastModifiedInfo(
-                                    updatedAt: m.updatedAt,
-                                    lastModifiedBy: m.lastModifiedBy,
-                                    compact: true,
+                                if (attInfo != null && attInfo.updatedAt != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: LastModifiedInfo(
+                                      updatedAt: attInfo.updatedAt!,
+                                      lastModifiedBy: attInfo.lastModifiedBy,
+                                      compact: true,
+                                    ),
                                   ),
-                                ),
                               ],
                             ),
                           ),

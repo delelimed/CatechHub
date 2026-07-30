@@ -311,6 +311,7 @@ class P2PSyncService {
   bool _restartingEndpoints = false;
 
   bool _sessionSyncAllowed = false;
+  bool _isInitiator = false;
 
   String? _sessionPairingNonce;
   String? _remoteSessionPairingNonce;
@@ -1107,12 +1108,7 @@ Future<void> stopPairingMode() async {
           return;
         }
         if (_needsSessionPermission(association) && !_sessionSyncAllowed) {
-          addLog('DEBUG', 'Connessione in arrivo da $deviceId, concedo permesso');
-          _sessionSyncAllowed = true;
-          _updateState(_state.copyWith(
-            awaitingSessionPermission: false,
-            pendingSessionDeviceName: null,
-          ));
+          addLog('DEBUG', 'Connessione in arrivo da $deviceId, attesa autorizzazione');
         }
         addLog('DEBUG', 'Associazione valida trovata per $deviceId, accetto connessione');
       } else {
@@ -1625,6 +1621,7 @@ void _onConnectionResult(String endpointId, Status status) {
 
       final iAmInitiator =
           localIdentity.deviceId.compareTo(remoteId) <= 0;
+      _isInitiator = iAmInitiator;
       addLog('DEBUG', 'Sono iniziatore: $iAmInitiator');
       if (iAmInitiator) {
         final authRequest = jsonEncode({
@@ -1634,8 +1631,21 @@ void _onConnectionResult(String endpointId, Status status) {
         });
         await _sendEncryptedPayload(endpointId, authRequest);
         addLog('DEBUG', 'Auth request inviata a $endpointId');
+
+        final needsUserConfirm = _state.role == P2PSyncRole.altroCatechista ||
+            remoteRole == P2PSyncRole.altroCatechista;
+        if (needsUserConfirm) {
+          addLog('INFO', 'Richiesta conferma utente per sincronizzazione (initiator)');
+          _updateState(_state.copyWith(
+            awaitingConfirmation: true,
+            pendingConfirmationDeviceName: remoteName,
+            pendingConfirmationDeviceId: remoteId,
+            status: P2PSyncStatus.sessionEstablished,
+          ));
+          _startConfirmationTimeout();
+        }
       }
-} else {
+    } else {
        addLog('DEBUG',
            'Handshake: associazione trovata, calcolo pairing code');
 
@@ -1807,6 +1817,7 @@ void _onConnectionResult(String endpointId, Status status) {
       final localIdentity = await _security.getLocalIdentity();
       final iAmInitiator =
           localIdentity.deviceId.compareTo(remoteId) <= 0;
+      _isInitiator = iAmInitiator;
 
       if (iAmInitiator) {
         final authRequest = jsonEncode({
@@ -1816,6 +1827,19 @@ void _onConnectionResult(String endpointId, Status status) {
         });
         await _sendEncryptedPayload(endpointId, authRequest);
         addLog('DEBUG', 'Auth request inviata a $endpointId');
+
+        final needsUserConfirm = _state.role == P2PSyncRole.altroCatechista ||
+            remoteRole == P2PSyncRole.altroCatechista;
+        if (needsUserConfirm) {
+          addLog('INFO', 'Richiesta conferma utente per sincronizzazione (initiator)');
+          _updateState(_state.copyWith(
+            awaitingConfirmation: true,
+            pendingConfirmationDeviceName: remoteName,
+            pendingConfirmationDeviceId: remoteId,
+            status: P2PSyncStatus.sessionEstablished,
+          ));
+          _startConfirmationTimeout();
+        }
       }
     } else {
       _remoteSessionPairingNonce =
@@ -2180,6 +2204,11 @@ void _onConnectionResult(String endpointId, Status status) {
         assoc?.remoteRole == P2PSyncRole.altroCatechista.name;
 
     if (needsUserConfirm) {
+      if (_state.authenticatedByRemote && !_state.awaitingConfirmation) {
+        addLog('INFO', 'Utente ha già confermato, avvio sync');
+        await _performBidirectionalSync(endpointId);
+        return;
+      }
       final remoteId = _endpointConnIdMap[endpointId];
       addLog('INFO', 'Richiesta conferma utente per sincronizzazione (initiator)');
       _updateState(_state.copyWith(
@@ -2951,7 +2980,7 @@ void _onConnectionResult(String endpointId, Status status) {
 
     final alreadyAuthed = _state.authenticatedByRemote;
 
-    if (endpointId != null && !alreadyAuthed) {
+    if (endpointId != null && !alreadyAuthed && !_isInitiator) {
       final ack = jsonEncode({
         'type': 'p2p_auth_response',
         'accepted': true,

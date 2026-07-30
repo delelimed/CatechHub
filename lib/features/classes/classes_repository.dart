@@ -58,7 +58,7 @@ class ClassesRepository {
     if (previous == null) return;
 
     final currentName = getCurrentCatechistName();
-    final isCreator = previous.isCreator(AuthService.localUserId, currentName);
+    final isCreator = previous.isCreator(AuthService.localUserId, currentName, catechistId: AuthService.getCatechistId());
 
     SchoolClass toSave;
     if (isCreator) {

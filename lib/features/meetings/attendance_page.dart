@@ -104,6 +104,8 @@ class AttendancePage extends ConsumerStatefulWidget {
 
 class _AttendancePageState extends ConsumerState<AttendancePage> {
   Map<String, String> presence = {};
+  DateTime? _attendanceUpdatedAt;
+  String _attendanceLastModifiedBy = '';
 
   @override
   void initState() {
@@ -113,6 +115,9 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
     );
     if (existing != null) {
       presence = Map<String, String>.from(existing['presence'] as Map? ?? {});
+      _attendanceUpdatedAt =
+          DateTime.tryParse(existing['updatedAt']?.toString() ?? '');
+      _attendanceLastModifiedBy = existing['lastModifiedBy']?.toString() ?? '';
     }
   }
 
@@ -179,12 +184,12 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (meeting is PlanningMeeting)
+          if (meeting is PlanningMeeting && _attendanceUpdatedAt != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: LastModifiedInfo(
-                updatedAt: meeting.updatedAt,
-                lastModifiedBy: meeting.lastModifiedBy,
+                updatedAt: _attendanceUpdatedAt!,
+                lastModifiedBy: _attendanceLastModifiedBy,
                 compact: true,
               ),
             ),

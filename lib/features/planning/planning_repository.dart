@@ -59,8 +59,13 @@ class PlanningRepository {
     }
 
     final id = m.id.isEmpty ? LocalDatabase.newId('meeting') : m.id;
-    final data = m.toMap();
-    data['lastModifiedBy'] = getCurrentCatechistName();
+    final catechistName = getCurrentCatechistName();
+    final now = DateTime.now();
+    final code = m.classUniqueCode.isNotEmpty ? m.classUniqueCode : _lookupClassUniqueCode(m.classId);
+    final data = m.copyWith(classUniqueCode: code).toMap();
+    data['lastModifiedBy'] = catechistName;
+    data['createdAt'] = now.toIso8601String();
+    data['updatedAt'] = now.toIso8601String();
     await _box.put(id, data);
 
     // Sincronizza con le notifiche
@@ -78,8 +83,21 @@ class PlanningRepository {
       throw Exception(_sameDayError(m.isReunion));
     }
 
-    final data = m.toMap();
+    final existingData = _box.get(id);
+    String? existingCreatedAt;
+    String? existingUniqueCode;
+    if (existingData != null) {
+      final map = LocalDatabase.toStringDynamicMap(existingData);
+      existingCreatedAt = map['createdAt']?.toString();
+      existingUniqueCode = map['classUniqueCode'] as String?;
+    }
+    final code = m.classUniqueCode.isNotEmpty
+        ? m.classUniqueCode
+        : (existingUniqueCode?.isNotEmpty == true ? existingUniqueCode! : _lookupClassUniqueCode(m.classId));
+    final data = m.copyWith(classUniqueCode: code).toMap();
     data['lastModifiedBy'] = getCurrentCatechistName();
+    data['createdAt'] = existingCreatedAt ?? data['createdAt'];
+    data['updatedAt'] = DateTime.now().toIso8601String();
     await _box.put(id, data);
 
     // Sincronizza con le notifiche
@@ -113,6 +131,17 @@ class PlanningRepository {
 
     // Rimuovi la notifica programmata
     await MeetingNotificationService.removeMeeting(id);
+<<<<<<< HEAD
+=======
+  }
+
+  /// Cerca il codice univoco di 40 cifre della classe a partire dal [classId].
+  String _lookupClassUniqueCode(String classId) {
+    final classData = LocalDatabase.classes().get(classId);
+    if (classData == null) return '';
+    final map = LocalDatabase.toStringDynamicMap(classData);
+    return map['uniqueCode'] as String? ?? '';
+>>>>>>> feature/comunicazioni
   }
 
   /// Restituisce il messaggio di errore localizzato per conflitto di data,

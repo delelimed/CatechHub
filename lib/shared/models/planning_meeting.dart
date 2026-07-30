@@ -35,6 +35,10 @@ class PlanningMeeting {
   /// FK verso SchoolClass (gruppo a cui appartiene l'incontro).
   final String classId;
 
+  /// Codice univoco di 40 cifre della classe.
+  /// Copia ridondante di SchoolClass.uniqueCode per il sync multi-classe.
+  final String classUniqueCode;
+
   /// ID del catechista che ha creato l'incontro.
   final String createdBy;
 
@@ -62,9 +66,16 @@ class PlanningMeeting {
   /// Nome del catechista che ha modificato per ultimo questo record.
   final String lastModifiedBy;
 
+  /// Timestamp di creazione (UTC, ISO 8601).
+  final DateTime createdAt;
+
+  /// Timestamp dell'ultima modifica (UTC, ISO 8601).
+  final DateTime updatedAt;
+
   PlanningMeeting({
     required this.id,
     required this.classId,
+    this.classUniqueCode = '',
     required this.createdBy,
     required this.date,
     this.time,
@@ -73,7 +84,42 @@ class PlanningMeeting {
     required this.notes,
     this.isReunion = false,
     this.lastModifiedBy = '',
-  });
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  })  : createdAt = createdAt ?? DateTime.now(),
+        updatedAt = updatedAt ?? DateTime.now();
+
+  PlanningMeeting copyWith({
+    String? id,
+    String? classId,
+    String? classUniqueCode,
+    String? createdBy,
+    DateTime? date,
+    String? time,
+    String? title,
+    String? activity,
+    String? notes,
+    bool? isReunion,
+    String? lastModifiedBy,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return PlanningMeeting(
+      id: id ?? this.id,
+      classId: classId ?? this.classId,
+      classUniqueCode: classUniqueCode ?? this.classUniqueCode,
+      createdBy: createdBy ?? this.createdBy,
+      date: date ?? this.date,
+      time: time ?? this.time,
+      title: title ?? this.title,
+      activity: activity ?? this.activity,
+      notes: notes ?? this.notes,
+      isReunion: isReunion ?? this.isReunion,
+      lastModifiedBy: lastModifiedBy ?? this.lastModifiedBy,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
 
   PlanningMeeting copyWith({
     String? id,
@@ -104,6 +150,7 @@ class PlanningMeeting {
   Map<String, dynamic> toMap() {
     return {
       'classId': classId,
+      'classUniqueCode': classUniqueCode,
       'createdBy': createdBy,
       'date': date.toIso8601String(),
       'time': time,
@@ -112,6 +159,8 @@ class PlanningMeeting {
       'notes': notes,
       'isReunion': isReunion,
       'lastModifiedBy': lastModifiedBy,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
     };
   }
 
@@ -122,6 +171,7 @@ class PlanningMeeting {
     return PlanningMeeting(
       id: id,
       classId: data['classId'] ?? '',
+      classUniqueCode: data['classUniqueCode'] ?? '',
       createdBy: data['createdBy'] ?? '',
       date: date,
       time: data['time']?.toString(),
@@ -132,6 +182,8 @@ class PlanningMeeting {
       notes: data['notes'] ?? data['publicNotes'] ?? '',
       isReunion: data['isReunion'] == true,
       lastModifiedBy: data['lastModifiedBy'] ?? '',
+      createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
+      updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
     );
   }
 }

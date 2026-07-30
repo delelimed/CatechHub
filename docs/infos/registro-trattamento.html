@@ -7,6 +7,10 @@
 <link rel="icon" href="../logo.png" type="image/png">
 <link rel="stylesheet" href="../style.css">
 <script src="../js/version.js" defer></script>
+<<<<<<< HEAD
+=======
+<script src="../js/nav.js" defer></script>
+>>>>>>> feature/comunicazioni
 </head>
 <body>
 
@@ -126,11 +130,19 @@
         </tr>
         <tr>
           <td>8</td>
+<<<<<<< HEAD
           <td><strong>Sincronizzazione P2P</strong><br>Condivisione dati tra dispositivi di catechisti autorizzati tramite Bluetooth con crittografia end-to-end.</td>
           <td>Box sincronizzabili: classi, studenti, presenze, documenti, delivery, allegati, note contatto, pianificazione</td>
           <td>Minori, genitori (dati condivisi tra catechisti autorizzati)</td>
           <td>N/A (dati sincronizzati, non conservati centralmente)</td>
           <td>ECDH P-256 + HKDF + AES-256-GCM per pacchetto, trusted devices list, 30s timeout</td>
+=======
+          <td><strong>Sincronizzazione P2P</strong><br>Condivisione dati tra dispositivi di catechisti autorizzati tramite Bluetooth/WiFi Direct (Google Nearby Connections) con crittografia end-to-end.</td>
+          <td>Box sincronizzabili: classi, studenti, presenze, documenti, delivery, allegati, note contatto, pianificazione</td>
+          <td>Minori, genitori (dati condivisi tra catechisti autorizzati)</td>
+          <td>N/A (dati sincronizzati, non conservati centralmente)</td>
+          <td>X25519 ECDH + HKDF + AES-256-GCM per sessione, chiavi per dispositivo, pairing code SHA-256 a 6 cifre anti-MitM, key pinning sulle riconnessioni, forward secrecy (ECDHE), trusted devices list, timeout sessione 30min</td>
+>>>>>>> feature/comunicazioni
           <td>Consenso interessati + autorizzazione parrocchia (Art. 6.1.a + 6.1.e)</td>
         </tr>
       </tbody>
@@ -154,7 +166,11 @@
       <thead><tr><th>Categoria</th><th>Misure implementate</th></tr></thead>
       <tbody>
         <tr><td>Controllo accessi</td><td>Biometria / PIN, sessione in RAM, timeout 120s background</td></tr>
+<<<<<<< HEAD
         <tr><td>Crittografia</td><td>AES-256-GCM, PBKDF2 (210k), ECDH P-256, HKDF-SHA256</td></tr>
+=======
+        <tr><td>Crittografia</td><td>AES-256-GCM, PBKDF2 (210k), X25519 ECDH, HKDF-SHA256, pairing code anti-MitM</td></tr>
+>>>>>>> feature/comunicazioni
         <tr><td>Integrità</td><td>Tag GCM 128bit, checksum SHA-256 su backup, message ID SHA-256</td></tr>
         <tr><td>Disponibilità</td><td>Auto-recovery corruzione Hive (2 livelli), retry apertura box</td></tr>
         <tr><td>Riservatezza</td><td>FLAG_SECURE, AndroidKeyStore, freeRASP anti-tamper</td></tr>
@@ -168,6 +184,15 @@
       <strong>Nota:</strong> Il presente registro è uno strumento messo a disposizione dalla documentazione di CatechHub. Spetta al titolare del trattamento (catechista / parrocchia) verificare la completezza e aggiornare il registro in base alle proprie specifiche attività di trattamento.
     </div>
 
+<<<<<<< HEAD
+=======
+    <div style="text-align:center;margin-top:2rem;">
+      <a href="../index.html" class="card" style="display:inline-block;text-decoration:none;color:inherit;padding:0.75rem 1.5rem;">
+        &#8592; Torna alla Home
+      </a>
+    </div>
+
+>>>>>>> feature/comunicazioni
   </div>
 </section>
 
@@ -193,5 +218,9 @@
   </div>
 </footer>
 
+<<<<<<< HEAD
 <script src="../js/nav.js"></script></body>
+=======
+</body>
+>>>>>>> feature/comunicazioni
 </html>

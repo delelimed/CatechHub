@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../../shared/utils/auth_utils.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/models/student_model.dart';
@@ -22,7 +23,7 @@ import '../students/students_repository.dart';
 import '../students/students_add_page.dart' hide classesRepoProvider;
 import '../students/edit_student_page.dart' hide classesRepoProvider;
 import 'classes_provider.dart';
-//import 'classes_repository.dart';
+import 'catechist_management_page.dart';
 
 class GroupManagementPage extends ConsumerWidget {
   const GroupManagementPage({super.key});
@@ -88,6 +89,8 @@ class GroupManagementPage extends ConsumerWidget {
                   ref.refresh(classesStreamProvider);
                 },
               ),
+              const SizedBox(height: 20),
+              _CatechistButton(myClass: myClass),
               const SizedBox(height: 20),
               _StudentsList(
                 classId: myClass.id,
@@ -181,6 +184,13 @@ class _GroupHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
+<<<<<<< HEAD
+=======
+    final hasKnownCreator = schoolClass.creatorCatechistId.isNotEmpty || schoolClass.creatorId.isNotEmpty || schoolClass.creatorName.isNotEmpty;
+    final canEdit = schoolClass.isCreator(AuthService.localUserId, getCurrentCatechistName(),
+            catechistId: AuthService.getCatechistId()) &&
+        (!hasKnownCreator || schoolClass.creatorCatechistId.isNotEmpty || !schoolClass.nameLocked);
+>>>>>>> feature/comunicazioni
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -239,7 +249,15 @@ class _GroupHeader extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
+<<<<<<< HEAD
                   'Tap per modificare il nome',
+=======
+                  !canEdit
+                      ? 'Solo il creatore può modificare'
+                      : (schoolClass.nameLocked
+                          ? 'Nome sincronizzato — non modificabile'
+                          : 'Tap per modificare il nome'),
+>>>>>>> feature/comunicazioni
                   style: TextStyle(
                     fontSize: 12,
                     color: isDark ? Colors.grey.shade400 : Colors.grey,
@@ -250,9 +268,126 @@ class _GroupHeader extends ConsumerWidget {
           ),
           IconButton(
             icon: Icon(Icons.edit, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+<<<<<<< HEAD
             onPressed: () => _showEditNameDialog(context, ref),
+=======
+            onPressed: canEdit
+                ? () => _showEditNameDialog(context, ref)
+                : null,
+>>>>>>> feature/comunicazioni
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// =========================
+/// CATECHIST BUTTON
+/// =========================
+class _CatechistButton extends ConsumerWidget {
+  final SchoolClass myClass;
+
+  const _CatechistButton({required this.myClass});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+    final canManage = myClass.isCreator(AuthService.localUserId, getCurrentCatechistName(),
+        catechistId: AuthService.getCatechistId());
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(22),
+      onTap: canManage
+          ? () {
+              try {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ManageCatechistsPage(schoolClass: myClass),
+                  ),
+                ).then((_) => ref.refresh(classesStreamProvider));
+              } catch (_) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Errore durante la navigazione')),
+                );
+              }
+            }
+          : null,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isDark
+                ? [
+                    colorScheme.surfaceContainer,
+                    colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                  ]
+                : [
+                    Colors.white,
+                    Colors.green.shade50.withValues(alpha: 0.35),
+                  ],
+          ),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.green.shade200,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.3)
+                  : Colors.black.withValues(alpha: 0.04),
+              blurRadius: 14,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: Colors.green,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(Icons.person, color: Colors.white),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Gestisci Catechisti',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    !canManage
+                        ? 'Solo il creatore può gestire i catechisti'
+                        : (myClass.nameLocked
+                            ? '${myClass.catechistIds.length} catechist${myClass.catechistIds.length == 1 ? 'a' : 'i'} — sola lettura'
+                            : '${myClass.catechistIds.length} catechist${myClass.catechistIds.length == 1 ? 'a' : 'i'}'),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+            ),
+          ],
+        ),
       ),
     );
   }

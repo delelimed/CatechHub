@@ -17,6 +17,7 @@ import '../meetings/attendance_repository.dart';
 import '../planning/planning_provider.dart';
 import '../students/students_repository.dart';
 
+
 /// Pagina principale della dashboard di CateREG.
 ///
 /// Mostra una panoramica completa delle attività del catechista:
@@ -234,6 +235,14 @@ class DashboardPage extends ConsumerWidget {
                             highAbsences: highAbsences,
                             compact: !isWide,
                             absenceThreshold: privacySettings.absenceThreshold,
+                            currentClassId: currentClass.id,
+                            currentClassName: currentClass.name,
+                            onPresenceTap: () {
+                              context.push('/statistics', extra: {
+                                'className': currentClass.name,
+                                'classId': currentClass.id,
+                              });
+                            },
                           ),
                           const SizedBox(height: 24),
                           _SectionTitle('Documenti in attesa'),
@@ -464,12 +473,18 @@ class _OverviewCard extends StatelessWidget {
   final List<_HighAbsenceStudent> highAbsences;
   final bool compact;
   final int absenceThreshold;
+  final String? currentClassId;
+  final String? currentClassName;
+  final VoidCallback? onPresenceTap;
 
   const _OverviewCard({
     required this.presenceRate,
     required this.highAbsences,
     required this.compact,
     required this.absenceThreshold,
+    this.currentClassId,
+    this.currentClassName,
+    this.onPresenceTap,
   });
 
   @override
@@ -479,6 +494,7 @@ class _OverviewCard extends StatelessWidget {
       label: 'Presenze medie',
       value: '${presenceRate.toStringAsFixed(0)}%',
       color: Colors.green,
+      onTap: onPresenceTap,
     );
 
     final absencesPanel = _HighAbsencePanel(
@@ -510,12 +526,14 @@ class _MetricPanel extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
+  final VoidCallback? onTap;
 
   const _MetricPanel({
     required this.icon,
     required this.label,
     required this.value,
     required this.color,
+    this.onTap,
   });
 
   @override
@@ -524,7 +542,11 @@ class _MetricPanel extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
     final labelColor = isDark ? Colors.grey.shade400 : Colors.black54;
 
+<<<<<<< HEAD
     return _Panel(
+=======
+    final panel = _Panel(
+>>>>>>> feature/comunicazioni
       child: Row(
         children: [
           Container(
@@ -553,9 +575,20 @@ class _MetricPanel extends StatelessWidget {
               ],
             ),
           ),
+          if (onTap != null)
+            Icon(Icons.chevron_right_rounded, color: color.withValues(alpha: 0.5)),
         ],
       ),
     );
+
+    if (onTap != null) {
+      return GestureDetector(
+        onTap: onTap,
+        child: panel,
+      );
+    }
+
+    return panel;
   }
 }
 
@@ -757,6 +790,7 @@ class _QuickActionsGrid extends StatelessWidget {
       ),
     ];
 
+<<<<<<< HEAD
     return LayoutBuilder(
       builder: (context, constraints) {
         return GridView.builder(
@@ -791,12 +825,57 @@ class _QuickActionsGrid extends StatelessWidget {
                       ),
                     ),
                   ],
+=======
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(child: _buildAction(context, actions[0], iconColor, textColor)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildAction(context, actions[1], iconColor, textColor)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _buildAction(context, actions[2], iconColor, textColor)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildAction(context, actions[3], iconColor, textColor)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAction(BuildContext context, _ActionItem item, Color iconColor, Color textColor) {
+    return InkWell(
+      onTap: () => context.push(item.path),
+      borderRadius: BorderRadius.circular(16),
+      child: _Panel(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(item.icon, color: iconColor),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  item.title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
+>>>>>>> feature/comunicazioni
                 ),
               ),
-            );
-          },
-        );
-      },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

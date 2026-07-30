@@ -3,10 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/auth/auth_provider.dart';
+import '../core/auth/auth_service.dart';
 import '../features/auth/login_page.dart';
 import '../features/classes/my_group_page.dart';
 import '../features/classes/group_management_page.dart';
+import '../features/classes/view_groups_page.dart';
 import '../features/dashboard/dashboard_page.dart';
+import '../features/dashboard/statistics_page.dart';
 import '../features/students/students_page.dart';
 import '../shared/models/student_model.dart';
 import '../features/students/student_detail_page.dart';
@@ -17,6 +20,7 @@ import '../features/planning/planning_page.dart';
 import '../features/documents/documents_page.dart';
 import '../features/settings/settings_page.dart';
 import '../features/contact_notes/contact_notes_page.dart';
+import '../features/contact_notes/avvisi_page.dart' show AvvisiPage;
 
 import '../features/settings/licenses_page.dart';
 import '../features/settings/changelog_page.dart';
@@ -25,9 +29,11 @@ import '../features/settings/commit_detail_page.dart';
 import '../features/settings/release_detail_page.dart';
 import '../features/settings/privacy.dart';
 import '../features/onboarding/presentation/screens/onboarding_page.dart';
+import '../features/onboarding/presentation/screens/onboarding_sync_page.dart';
 import '../core/storage/local_database.dart';
 import '../features/settings/backup_page.dart';
 import '../features/settings/delete_data_page.dart';
+import '../features/settings/pdf_report_page.dart';
 import '../features/documents/document_detail_page.dart';
 import '../features/students/allergies_page.dart';
 import '../features/students/autonomous_exits_page.dart';
@@ -36,7 +42,10 @@ import '../features/update/update_page.dart';
 import '../features/data_share/data_share_selection_page.dart';
 import '../features/data_share/data_share_send_page.dart';
 import '../features/data_share/data_share_receive_page.dart';
-import '../screens/settings_association_screen.dart';
+import '../features/sync/screens/settings_association_screen.dart';
+import '../features/sync/screens/associate_device_screen.dart';
+import '../features/sync/screens/sync_log_page.dart';
+import '../features/sync/screens/conflict_resolution_page.dart';
 import '../features/catechesi/catechesi_page.dart';
 import '../features/catechesi/catechesi_edit_page.dart';
 import '../features/catechesi/catechesi_detail_page.dart';
@@ -241,13 +250,44 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       final authState = ref.read(authStateProvider);
       final isLoginPath = location == '/login';
+      final isOnboardingSyncPath = location == '/onboarding-sync';
 
       return authState.when(
         loading: () => null,
         error: (_, __) => isLoginPath ? null : '/login',
         data: (user) {
           if (user == null && !isLoginPath) return '/login';
-          if (user != null && isLoginPath) return '/';
+          if (user != null) {
+            // Se l'utente ha scelto "unisciti" durante l'onboarding e
+            // non ha ancora classi, reindirizza all'associazione P2P.
+            // Questo controllo vale per OGNI navigazione, non solo /login,
+            // per impedire di lasciare l'onboarding senza essere in una classe.
+            if (!isOnboardingSyncPath) {
+              try {
+                final setupMode =
+                    LocalDatabase.auth().get('setup_mode', defaultValue: 'create');
+                if (setupMode == 'join') {
+                  final classesBox = LocalDatabase.classes();
+                  const localId = AuthService.localUserId;
+                  bool userInClass = false;
+                  for (final key in classesBox.keys) {
+                    final data = LocalDatabase.toStringDynamicMap(classesBox.get(key));
+                    final ids = (data['catechistIds'] as List? ?? [])
+                        .map((e) => e.toString())
+                        .toList();
+                    if (ids.contains(localId)) {
+                      userInClass = true;
+                      break;
+                    }
+                  }
+                  if (!userInClass) {
+                    return '/onboarding-sync';
+                  }
+                }
+              } catch (_) {}
+            }
+            if (isLoginPath) return '/';
+          }
           return null;
         },
       );
@@ -278,6 +318,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/onboarding',
         builder: (context, state) => const OnboardingPage(),
+      ),
+
+      // ═══════════════════════════════════════════════════════════════════
+      // ONBOARDING SYNC - Sincronizzazione Bluetooth post-registrazione
+      // ═══════════════════════════════════════════════════════════════════
+      GoRoute(
+        path: '/onboarding-sync',
+        builder: (context, state) => const OnboardingSyncPage(),
       ),
 
       // ═══════════════════════════════════════════════════════════════════
@@ -439,6 +487,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       /// Pagina di backup e ripristino dati: esporta/importa backup cifrati.
       GoRoute(path: '/backup', builder: (context, state) => const BackupPage()),
 
+      /// Pagina di esportazione report PDF (in sviluppo).
+      GoRoute(
+        path: '/pdf-report',
+        builder: (context, state) => const PdfReportPage(),
+      ),
+
       // ═══════════════════════════════════════════════════════════════════
       // CONTACT NOTES - Note di contatto genitori
       // ═══════════════════════════════════════════════════════════════════
@@ -448,6 +502,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/contact-notes',
         builder: (context, state) => const ContactNotesPage(),
+      ),
+
+      /// Gestione avvisi e messaggi standard per genitori.
+      GoRoute(
+        path: '/avvisi',
+        builder: (context, state) => const AvvisiPage(),
       ),
 
       // ═══════════════════════════════════════════════════════════════════
@@ -466,6 +526,31 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/group-management',
         builder: (context, state) => const GroupManagementPage(),
+      ),
+
+      /// Visualizzazione di tutti i gruppi a cui appartiene il catechista.
+      GoRoute(
+        path: '/view-groups',
+        builder: (context, state) => const ViewGroupsPage(),
+      ),
+
+      // ═══════════════════════════════════════════════════════════════════
+      // STATISTICS - Statistiche del gruppo
+      // ═══════════════════════════════════════════════════════════════════
+
+      /// Pagina delle statistiche di presenza del gruppo.
+      /// I dati (className, classId) vengono passati tramite state.extra.
+      GoRoute(
+        path: '/statistics',
+        builder: (context, state) {
+          final extra = state.extra is Map<String, dynamic>
+              ? state.extra as Map<String, dynamic>
+              : <String, dynamic>{};
+          return StatisticsPage(
+            className: extra['className'] as String? ?? '',
+            classId: extra['classId'] as String? ?? '',
+          );
+        },
       ),
 
       // ═══════════════════════════════════════════════════════════════════
@@ -534,11 +619,28 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // ASSOCIATION - Associazione dispositivi (QR + Nearby Connections)
       // ═══════════════════════════════════════════════════════════════════
 
-      /// Schermata di associazione dispositivi tramite QR Code e
-      /// sincronizzazione tramite Google Nearby Connections.
+      /// Schermata di sincronizzazione dispositivi associati.
       GoRoute(
         path: '/settings/association',
         builder: (context, state) => const SettingsAssociationScreen(),
+      ),
+
+      /// Procedura guidata per associare un nuovo dispositivo.
+      GoRoute(
+        path: '/settings/associate-device',
+        builder: (context, state) => const AssociateDeviceScreen(),
+      ),
+
+      /// Log di sincronizzazione Nearby.
+      GoRoute(
+        path: '/settings/sync-log',
+        builder: (context, state) => const SyncLogPage(),
+      ),
+
+      /// Risoluzione conflitti di sincronizzazione.
+      GoRoute(
+        path: '/settings/sync-conflicts',
+        builder: (context, state) => const ConflictResolutionPage(),
       ),
 
       // ═══════════════════════════════════════════════════════════════════

@@ -1,8 +1,22 @@
+<<<<<<< HEAD
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../features/sync/p2p/p2p_sync_service.dart';
+=======
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../features/sync/widgets/sync_progress_overlay.dart';
+
+import '../../features/sync/p2p/p2p_sync_service.dart';
+import '../services/bluetooth_permission_service.dart';
+>>>>>>> feature/comunicazioni
 
 final nearbySyncServiceProvider = Provider<P2PSyncService>((ref) {
   return P2PSyncService();
@@ -13,6 +27,7 @@ final nearbySyncStateProvider = StreamProvider<P2PSyncState>((ref) {
   return service.onStateChanged;
 });
 
+<<<<<<< HEAD
 class NearbySyncDaemonController extends StateNotifier<bool> {
   final P2PSyncService _service;
   bool _isAppInForeground = false;
@@ -28,6 +43,56 @@ class NearbySyncDaemonController extends StateNotifier<bool> {
     } else {
       _service.stopBackgroundSync();
       state = false;
+=======
+final syncLogsProvider = StreamProvider<List<SyncLogEntry>>((ref) async* {
+  final service = ref.watch(nearbySyncServiceProvider);
+  yield service.syncLogs;
+  await for (final _ in service.onLogChanged) {
+    yield service.syncLogs;
+  }
+});
+
+class NearbySyncDaemonController extends StateNotifier<bool> {
+  final P2PSyncService _service;
+  bool _isAppInForeground = false;
+  bool _initialized = false;
+  static const _prefsKey = 'sync_permanently_enabled';
+
+  NearbySyncDaemonController(this._service) : super(false);
+
+  Future<void> init() async {
+    if (_initialized) return;
+    _initialized = true;
+    final prefs = await SharedPreferences.getInstance();
+    final enabled = prefs.getBool(_prefsKey) ?? false;
+    if (enabled) {
+      state = true;
+    }
+  }
+
+  void setAppForeground(bool isForeground) {
+    if (_isAppInForeground == isForeground) return;
+    _isAppInForeground = isForeground;
+    if (isForeground && state) {
+      _service.startBackgroundSync();
+    } else if (!isForeground) {
+      _service.stopBackgroundSync();
+    }
+  }
+
+  Future<void> setSyncEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefsKey, enabled);
+    state = enabled;
+    if (enabled) {
+      final permResult =
+          await BluetoothPermissionService.checkAndRequestPermissions();
+      if (permResult.allGranted) {
+        _service.startBackgroundSync();
+      }
+    } else {
+      _service.stopBackgroundSync();
+>>>>>>> feature/comunicazioni
     }
   }
 
@@ -64,6 +129,11 @@ class _NearbySyncLifecycleManagerState
     extends ConsumerState<NearbySyncLifecycleManager>
     with WidgetsBindingObserver {
   bool _daemonStarted = false;
+<<<<<<< HEAD
+=======
+  bool _expirationWarningShown = false;
+  StreamSubscription<P2PSyncState>? _stateSub;
+>>>>>>> feature/comunicazioni
 
   @override
   void initState() {
@@ -73,23 +143,79 @@ class _NearbySyncLifecycleManagerState
       if (!_daemonStarted) {
         _daemonStarted = true;
         final daemonController = ref.read(nearbySyncDaemonProvider.notifier);
+<<<<<<< HEAD
         daemonController.setAppForeground(true);
       }
     });
+=======
+        daemonController.init().then((_) {
+          daemonController.setAppForeground(true);
+        });
+      }
+    });
+    final service = ref.read(nearbySyncServiceProvider);
+    _stateSub = service.onStateChanged.listen(_onSyncStateChanged);
+>>>>>>> feature/comunicazioni
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+<<<<<<< HEAD
     super.dispose();
   }
 
+=======
+    _stateSub?.cancel();
+    super.dispose();
+  }
+
+  void _onSyncStateChanged(P2PSyncState state) {
+    if (!mounted) return;
+
+    if (state.expirationWarning != null && !_expirationWarningShown) {
+      _expirationWarningShown = true;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange[700]),
+              const SizedBox(width: 8),
+              const Text('Connessione in scadenza'),
+            ],
+          ),
+          content: Text(
+            '${state.expirationWarning}.\n\n'
+            'Le connessioni hanno validità 30 giorni. '
+            'Per continuare a sincronizzare, associa nuovamente '
+            'i dispositivi prima della scadenza.',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Ho capito'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+>>>>>>> feature/comunicazioni
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final daemonController = ref.read(nearbySyncDaemonProvider.notifier);
     switch (state) {
       case AppLifecycleState.resumed:
+<<<<<<< HEAD
         daemonController.setAppForeground(true);
+=======
+        _expirationWarningShown = false;
+        daemonController.init().then((_) {
+          daemonController.setAppForeground(true);
+        });
+>>>>>>> feature/comunicazioni
         break;
       case AppLifecycleState.paused:
       case AppLifecycleState.detached:
@@ -102,5 +228,11 @@ class _NearbySyncLifecycleManagerState
   }
 
   @override
+<<<<<<< HEAD
   Widget build(BuildContext context) => widget.child;
+=======
+  Widget build(BuildContext context) => SyncProgressOverlay(
+        child: widget.child,
+      );
+>>>>>>> feature/comunicazioni
 }

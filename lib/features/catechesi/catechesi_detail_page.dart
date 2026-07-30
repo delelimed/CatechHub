@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:intl/intl.dart';
-
 import '../../shared/models/attachment_parent_type.dart';
 import '../attachments/widgets/attachments_section.dart';
 import '../../shared/models/catechesi_model.dart';
+import '../../shared/widgets/last_modified_info.dart';
 import 'catechesi_repository.dart';
 
 class CatechesiDetailPage extends ConsumerStatefulWidget {
@@ -98,6 +97,7 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
       description: _descriptionController.text.trim(),
       createdAt: _catechesi.createdAt,
       updatedAt: now,
+      lastModifiedBy: _catechesi.lastModifiedBy,
     );
 
     try {
@@ -150,7 +150,10 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
   }
 
   Widget _buildReadOnlyView() {
+<<<<<<< HEAD
     final formatter = DateFormat('dd MMMM yyyy', 'it_IT');
+=======
+>>>>>>> feature/comunicazioni
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -168,6 +171,7 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
               color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
             ),
           ),
+<<<<<<< HEAD
           const SizedBox(height: 6),
           Row(
             children: [
@@ -178,6 +182,13 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
                 style: TextStyle(fontSize: 13, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
               ),
             ],
+=======
+          const SizedBox(height: 8),
+          LastModifiedInfo(
+            createdAt: _catechesi.createdAt,
+            updatedAt: _catechesi.updatedAt,
+            lastModifiedBy: _catechesi.lastModifiedBy,
+>>>>>>> feature/comunicazioni
           ),
           const SizedBox(height: 24),
           if (_catechesi.description.trim().isNotEmpty) ...[

@@ -87,7 +87,7 @@
     <h2>6. Condivisione dei dati</h2>
     <p><strong>CatechHub non condivide automaticamente alcun dato con terze parti.</strong> Le uniche modalità di trasferimento dei dati sono:</p>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
-      <li><strong>Sincronizzazione Bluetooth P2P</strong>: avviata volontariamente dall'utente, solo con dispositivi di altri catechisti di fiducia. I dati sono cifrati end-to-end.</li>
+      <li><strong>Sincronizzazione P2P Bluetooth/WiFi Direct</strong>: avviata volontariamente dall'utente, solo con dispositivi di altri catechisti di fiducia. I dati sono cifrati end-to-end con X25519 ECDH + HKDF + AES-256-GCM, con verifica pairing code a 6 cifre e key pinning.</li>
       <li><strong>Condivisione QR</strong>: esportazione volontaria di moduli selezionati, protetta da PIN.</li>
       <li><strong>Backup manuale</strong>: l'utente può creare un file .catechhub e trasferirlo come preferisce.</li>
     </ul>
@@ -96,11 +96,13 @@
     <p>CatechHub implementa le seguenti misure di sicurezza:</p>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
       <li>Crittografia AES-256-GCM di tutti i dati a riposo</li>
+      <li>Chiave master custodita in AndroidKeyStore con protezione hardware (TEE/StrongBox) — verifica obbligatoria all'avvio, nessun fallback software</li>
       <li>Autenticazione biometrica per l'accesso all'app</li>
       <li>Blocco screenshot e screen recording</li>
       <li>freeRASP per rilevamento root, emulatori e tampering</li>
       <li>Blocco automatico sessione dopo 120 secondi in background</li>
       <li>Backup protetti da password con derivazione PBKDF2 (210.000 iterazioni)</li>
+      <li>Sincronizzazione P2P con crittografia end-to-end X25519 ECDH + HKDF + AES-256-GCM, pairing code a 6 cifre anti-MitM, key pinning per dispositivo</li>
     </ul>
 
     <h2>8. Diritti dell'interessato (GDPR)</h2>
@@ -144,7 +146,7 @@
       </small><br>
       <a href="privacy.html">Privacy</a> &middot;
       <a href="terms.html">Termini</a> &middot;
-      <a href="gdpr/index.html">GDPR</a> &middot;
+      <a href="infos/index.html">GDPR</a> &middot;
       <a href="developer.html">Sviluppatore</a> &middot;
       <a href="https://github.com/delelimed/CatechHub" class="release-url">GitHub</a><br>
       <small>MIT License &copy; 2026 CatechHub</small>

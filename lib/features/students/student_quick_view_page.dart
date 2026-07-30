@@ -8,6 +8,7 @@ import '../../shared/models/contact_note_model.dart';
 import '../../shared/models/planning_meeting.dart';
 import '../../shared/models/student_daily_note_model.dart';
 import '../../shared/models/student_model.dart';
+import '../../shared/widgets/last_modified_info.dart';
 import '../attachments/widgets/attachments_section.dart';
 import '../contact_notes/contact_notes_repository.dart';
 import '../contact_notes/student_contact_notes_page.dart';
@@ -25,7 +26,7 @@ final _studentDailyNotesStreamProvider = StreamProvider.autoDispose
 });
 
 final _studentAbsencesProvider = StreamProvider.autoDispose
-    .family<List<Map<String, dynamic>>, String>((ref, studentId) {
+    .family<Map<String, dynamic>, String>((ref, studentId) {
   final attendanceRepo = AttendanceRepository();
   final planningRepo = PlanningRepository();
 
@@ -34,10 +35,23 @@ final _studentAbsencesProvider = StreamProvider.autoDispose
     final meetingMap = {for (var m in meetings) m.id: m};
 
     final absences = <Map<String, dynamic>>[];
+    String? lastPresenceDate;
+    int consecutiveAbsences = 0;
 
-    for (final record in attendanceRecords) {
+    final sortedRecords = attendanceRecords.toList()
+      ..sort((a, b) {
+        final aDate = DateTime.tryParse(a['date']?.toString() ?? '') ?? DateTime.now();
+        final bDate = DateTime.tryParse(b['date']?.toString() ?? '') ?? DateTime.now();
+        return bDate.compareTo(aDate);
+      });
+
+    bool countingConsecutive = true;
+
+    for (final record in sortedRecords) {
       final presenceMap = Map<String, dynamic>.from(record['presence'] as Map? ?? {});
       final studentStatus = presenceMap[studentId]?.toString();
+
+      if (studentStatus == null) continue;
 
       if (studentStatus == 'Assente') {
         final meeting = meetingMap[record['id']];
@@ -49,11 +63,30 @@ final _studentAbsencesProvider = StreamProvider.autoDispose
           'meetingActivity': meeting?.activity ?? '',
           'isReunion': meeting?.isReunion ?? false,
         });
+
+        if (countingConsecutive) {
+          consecutiveAbsences++;
+        }
+      } else if (studentStatus == 'Giustificato') {
+        if (countingConsecutive) {
+          consecutiveAbsences++;
+        }
+      } else if (studentStatus == 'Presente') {
+        if (lastPresenceDate == null) {
+          final date = DateTime.tryParse(record['date']?.toString() ?? '');
+          if (date != null) {
+            lastPresenceDate = DateFormat('dd/MM/yyyy').format(date);
+          }
+        }
+        countingConsecutive = false;
       }
     }
 
-    absences.sort((a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
-    return absences;
+    return {
+      'absences': absences,
+      'lastPresenceDate': lastPresenceDate,
+      'consecutiveAbsences': consecutiveAbsences,
+    };
   });
 });
 
@@ -268,8 +301,7 @@ class _HeaderCard extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
+                      Text(
                   DateFormat('dd/MM/yyyy').format(student.birthDate),
                   style: TextStyle(
                     color: isDark
@@ -277,6 +309,12 @@ class _HeaderCard extends StatelessWidget {
                         : Colors.white70,
                     fontSize: 14,
                   ),
+                ),
+                LastModifiedInfo(
+                  createdAt: student.createdAt,
+                  updatedAt: student.updatedAt,
+                  lastModifiedBy: student.lastModifiedBy,
+                  compact: true,
                 ),
               ],
             ),
@@ -1103,18 +1141,18 @@ class _AbsencesCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final absencesAsync = ref.watch(_studentAbsencesProvider(studentId));
+    final dataAsync = ref.watch(_studentAbsencesProvider(studentId));
 
     return InkWell(
       onTap: () => _showFullHistory(context, ref, studentId),
       borderRadius: BorderRadius.circular(16),
       child: _InfoCard(
-        title: 'Assenze',
+        title: 'assenze'.toUpperCase(),
         icon: Icons.event_busy_rounded,
         color: Colors.red,
         trailing: Icon(Icons.chevron_right, color: isDark ? Colors.grey.shade500 : Colors.grey.shade400, size: 20),
         children: [
-          absencesAsync.when(
+          dataAsync.when(
             loading: () => const Center(
               child: CircularProgressIndicator(),
             ),
@@ -1122,6 +1160,7 @@ class _AbsencesCard extends ConsumerWidget {
               'Errore nel caricamento assenze: $e',
               style: TextStyle(color: isDark ? Colors.red.shade200 : Colors.red.shade700),
             ),
+<<<<<<< HEAD
             data: (absences) {
               if (absences.isEmpty) {
                 return Text(
@@ -1129,10 +1168,17 @@ class _AbsencesCard extends ConsumerWidget {
                   style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
                 );
               }
+=======
+            data: (data) {
+              final absences = data['absences'] as List<Map<String, dynamic>>;
+              final lastPresenceDate = data['lastPresenceDate'] as String?;
+              final consecutiveAbsences = data['consecutiveAbsences'] as int;
+>>>>>>> feature/comunicazioni
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+<<<<<<< HEAD
                   Text(
                     'Tocca per vedere lo storico completo',
                     style: TextStyle(
@@ -1193,8 +1239,100 @@ class _AbsencesCard extends ConsumerWidget {
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
+=======
+                  Row(
+                    children: [
+                      _StatBadge(
+                        icon: Icons.check_circle_outline,
+                        label: 'Ultima presenza',
+                        value: lastPresenceDate ?? 'Mai',
+                        valueColor: lastPresenceDate != null ? Colors.green : Colors.grey,
+                        isDark: isDark,
+                      ),
+                      const SizedBox(width: 12),
+                      _StatBadge(
+                        icon: Icons.warning_amber_rounded,
+                        label: 'Assenze consecutive',
+                        value: '$consecutiveAbsences',
+                        valueColor: consecutiveAbsences >= 2 ? Colors.red : (consecutiveAbsences > 0 ? Colors.orange : Colors.green),
+                        isDark: isDark,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (absences.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Nessuna assenza registrata',
+                        style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, fontSize: 13),
+                      ),
+                    )
+                  else ...[
+                    Text(
+                      'Tocca per vedere lo storico completo',
+                      style: TextStyle(
+                        color: isDark ? Colors.red.shade300 : Colors.red.shade400,
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+>>>>>>> feature/comunicazioni
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    ...absences.take(3).map((absence) {
+                      final date = absence['date'] as DateTime;
+                      final title = absence['meetingTitle'] as String;
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.red.withValues(alpha: 0.15) : Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: isDark ? Colors.red.withValues(alpha: 0.3) : Colors.red.shade200, width: 1),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.calendar_today, size: 14, color: isDark ? Colors.red.shade200 : Colors.red.shade700),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    DateFormat('dd/MM/yyyy').format(date),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: isDark ? Colors.red.shade200 : Colors.red.shade900,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  Text(
+                                    title,
+                                    style: TextStyle(fontSize: 12, color: isDark ? colorScheme.onSurface : null),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    if (absences.length > 3)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          '+ ${absences.length - 3} altre assenze',
+                          style: TextStyle(
+                            color: isDark ? Colors.red.shade300 : Colors.red.shade600,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
                 ],
               );
             },
@@ -1452,6 +1590,61 @@ class _InfoRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _StatBadge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color valueColor;
+  final bool isDark;
+
+  const _StatBadge({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.valueColor,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: valueColor.withValues(alpha: isDark ? 0.12 : 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: valueColor.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: valueColor),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                  ),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: valueColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

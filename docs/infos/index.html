@@ -57,7 +57,11 @@
         <tr>
           <td>Art. 6</td>
           <td>Lawfulness of processing</td>
+<<<<<<< HEAD
           <td>Base giuridica: consenso dell'interessato (Art. 6.1.a) e compito di interesse pubblico (Art. 6.1.e) — l'attività educativa catechistica. L'app non impone alcun trattamento senza base giuridica.</td>
+=======
+          <td>Base giuridica: consenso dell'interessato (Art. 6.1.a) e compito di interesse pubblico (Art. 6.1.e) — l'attività educativa catechistica. L'app non impone alcun trattamento senza base giuridica. La sincronizzazione P2P tra dispositivi "Altro Catechista" richiede il consenso esplicito di entrambi gli utenti (doppio consenso) prima del trasferimento dati.</td>
+>>>>>>> feature/comunicazioni
         </tr>
         <tr>
           <td>Art. 9</td>
@@ -92,7 +96,11 @@
         <tr>
           <td>Art. 32</td>
           <td>Security of processing</td>
+<<<<<<< HEAD
           <td>AES-256-GCM a riposo, PBKDF2 per backup, ECDH + HKDF per sync, E2EE Bluetooth, AndroidKeyStore, sessione in RAM, timeout 120s, freeRASP anti-tamper.</td>
+=======
+          <td>AES-256-GCM a riposo con chiave in AndroidKeyStore (TEE/StrongBox), verifica hardware obbligatoria all'avvio, PBKDF2 210k iterazioni per backup, X25519 ECDH + HKDF + AES-256-GCM per sync P2P, pairing code a 6 cifre anti-MitM, key pinning per dispositivo, doppio consenso esplicito tra catechisti, sessione in RAM, timeout 120s, freeRASP anti-tamper.</td>
+>>>>>>> feature/comunicazioni
         </tr>
         <tr>
           <td>Art. 35</td>
@@ -109,7 +117,11 @@
       <tbody>
         <tr><td>Furto dispositivo</td><td>Bassa</td><td>Alto</td><td>Crittografia AES-256-GCM, chiave in AndroidKeyStore, auth biometrica</td></tr>
         <tr><td>Accesso non autorizzato</td><td>Media</td><td>Alto</td><td>Autenticazione obbligatoria, timeout sessione 120s</td></tr>
+<<<<<<< HEAD
         <tr><td>Intercettazione sync</td><td>Bassa</td><td>Medio</td><td>E2EE con ECDH + HKDF + AES-256-GCM per pacchetto</td></tr>
+=======
+        <tr><td>Intercettazione sync</td><td>Bassa</td><td>Medio</td><td>E2EE con X25519 ECDH + HKDF + AES-256-GCM, pairing code anti-MitM, forward secrecy, key pinning</td></tr>
+>>>>>>> feature/comunicazioni
         <tr><td>Perdita dati</td><td>Media</td><td>Alto</td><td>Backup crittografato, export selettivo, merge import</td></tr>
         <tr><td>Malware/root</td><td>Bassa</td><td>Alto</td><td>freeRASP rilevamento root, hooking, emulatori</td></tr>
         <tr><td>Errore umano</td><td>Alta</td><td>Medio</td><td>Conferma eliminazione, cronologia modifiche, recovery corruzione Hive</td></tr>
@@ -117,6 +129,22 @@
       </tbody>
     </table>
 
+<<<<<<< HEAD
+=======
+    <h2>Tracciabilit&agrave; delle modifiche (Art. 5 GDPR)</h2>
+
+    <p>CatechHub implementa un sistema completo di tracciabilit&agrave; delle modifiche per garantire la conformit&agrave; ai principi di minimizzazione (Art. 5.1.c) e responsabilizzazione (Art. 5.2):</p>
+
+    <ul>
+      <li><strong>Campi di audit:</strong> Ogni record nell'app (studenti, programmazione, catechesi, note di contatto, ecc.) traccia automaticamente <code>createdAt</code>, <code>updatedAt</code> e <code>lastModifiedBy</code>.</li>
+      <li><strong>Visualizzazione:</strong> Questi campi sono visualizzati in tutte le schermate di dettaglio, consentendo all'utente di conoscere sempre chi ha creato o modificato un dato e quando.</li>
+      <li><strong>Presenze:</strong> Per le presenze, viene mostrata la data cumulativa dell'ultima modifica per giornata, non per singolo studente, bilanciando trasparenza e minimizzazione.</li>
+      <li><strong>Sync P2P &mdash; doppio consenso:</strong> Quando entrambi i dispositivi sono configurati come "Altro Catechista", entrambi gli utenti devono autorizzare esplicitamente la sincronizzazione, fornendo un consenso reciproco prima del trasferimento dei dati.</li>
+    </ul>
+
+    <p>Questa tracciabilit&agrave; fornisce una pista di audit chiara per il titolare del trattamento, in linea con il principio di responsabilizzazione (accountability) sancito dall'Art. 5.2 GDPR.</p>
+
+>>>>>>> feature/comunicazioni
     <h2>Disclaimer dello sviluppatore</h2>
     <div class="alert alert-warning" style="display:block;">
       <p style="margin-bottom:0.25rem;"><strong>Lo sviluppatore di CatechHub non &egrave; il titolare del trattamento.</strong> Il titolare del trattamento &egrave; il catechista o la parrocchia che utilizza l'app. Lo sviluppatore fornisce uno strumento, non un servizio di trattamento dati. Ogni parrocchia deve condurre la propria DPIA e garantire la conformit&agrave; GDPR delle proprie attivit&agrave;.</p>
@@ -143,6 +171,15 @@
       </a>
     </div>
 
+<<<<<<< HEAD
+=======
+    <div style="text-align:center;margin-top:2rem;">
+      <a href="../index.html" class="card" style="display:inline-block;text-decoration:none;color:inherit;padding:0.75rem 1.5rem;">
+        &#8592; Torna alla Home
+      </a>
+    </div>
+
+>>>>>>> feature/comunicazioni
   </div>
 </section>
 

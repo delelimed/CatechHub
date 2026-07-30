@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../shared/models/attachment_parent_type.dart';
 import '../../shared/models/student_model.dart';
+import '../../shared/widgets/last_modified_info.dart';
 import '../attachments/widgets/attachments_section.dart';
 import '../classes/classes_repository.dart';
 import 'students_repository.dart';
@@ -304,8 +305,21 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
               parentType: AttachmentParentType.student,
             ),
 
+<<<<<<< HEAD
             const SizedBox(height: 30),
 
+=======
+            const SizedBox(height: 16),
+
+            LastModifiedInfo(
+              createdAt: widget.student.createdAt,
+              updatedAt: widget.student.updatedAt,
+              lastModifiedBy: widget.student.lastModifiedBy,
+            ),
+
+            const SizedBox(height: 30),
+
+>>>>>>> feature/comunicazioni
             /// =========================
             /// SAVE
             /// =========================
@@ -530,6 +544,7 @@ class _ParentCard extends StatelessWidget {
               Expanded(
                 child: _Field(phone, 'Telefono', enabled: editMode, keyboardType: TextInputType.phone, isDark: isDark, colorScheme: colorScheme),
               ),
+<<<<<<< HEAD
               const SizedBox(width: 8),
               IconButton(
                 icon: const Icon(Icons.call, color: Colors.green),
@@ -539,6 +554,19 @@ class _ParentCard extends StatelessWidget {
                 icon: const Icon(Icons.chat, color: Colors.green),
                 onPressed: () => onWhatsapp(phone.text),
               ),
+=======
+              if (phone.text.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.call, color: Colors.green),
+                  onPressed: () => onCall(phone.text),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chat, color: Colors.green),
+                  onPressed: () => onWhatsapp(phone.text),
+                ),
+              ],
+>>>>>>> feature/comunicazioni
             ],
           ),
         ],
@@ -662,6 +690,7 @@ class _PhoneRow extends StatelessWidget {
             colorScheme: colorScheme,
           ),
         ),
+<<<<<<< HEAD
         const SizedBox(width: 8),
         IconButton(
           icon: const Icon(Icons.call, color: Colors.green),
@@ -671,6 +700,19 @@ class _PhoneRow extends StatelessWidget {
           icon: const Icon(Icons.chat, color: Colors.green),
           onPressed: () => onWhatsapp(controller.text),
         ),
+=======
+        if (controller.text.isNotEmpty) ...[
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.call, color: Colors.green),
+            onPressed: () => onCall(controller.text),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chat, color: Colors.green),
+            onPressed: () => onWhatsapp(controller.text),
+          ),
+        ],
+>>>>>>> feature/comunicazioni
       ],
     );
   }

@@ -1,18 +1,29 @@
 name: Flutter Android Signed Build
 
 on:
-  # Permette di far partire l'azione manualmente a comando dalla scheda "Actions" di GitHub
+  # Permette di far partire l'azione manualmente dalla scheda "Actions" di GitHub
   workflow_dispatch:
 
+<<<<<<< HEAD
   # Fa partire l'azione automaticamente ad ogni push sul ramo develop
   #push:
    # branches:
     #  - develop
+=======
+  # Fa partire l'azione automaticamente ad ogni push sui rami feature
+  push:
+    branches:
+      - feature/**
+>>>>>>> feature/comunicazioni
       
   # Fa partire l'azione ad ogni Pull Request verso il ramo develop
   #pull_request:
   #  branches:
+<<<<<<< HEAD
    #   - develop
+=======
+  #    - develop
+>>>>>>> feature/comunicazioni
 
 jobs:
   build:
@@ -64,16 +75,29 @@ jobs:
           SIGNING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: flutter build apk --release --dart-define-from-file=.env --target-platform=android-arm64 --obfuscate --split-debug-info=./debug_info
 
-      # 9. Salva l'APK firmato finale negli Artifacts di GitHub scaricabili
+      # 9. Salva l'APK firmato finale negli Artifacts di GitHub scaricabili (Sempre attivo)
       - name: Upload Signed APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: release-signed-apk
           path: build/app/outputs/flutter-apk/app-release.apk
 
-      # 10. Salva anche i file di debug generati dall'offuscamento
+      # 10. Salva anche i file di debug generati dall'offuscamento (Sempre attivo)
       - name: Upload Debug Info (Obfuscation Symbols)
         uses: actions/upload-artifact@v4
         with:
           name: CatechHub-Debug-Info
           path: ./debug_info
+
+      # 11. Crea una bozza (Draft) di Release solo se eseguito manualmente su 'main'
+      - name: Create GitHub Draft Release
+        id: create_release
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          tag_name: v1.0.0-${{ github.run_number }}
+          name: Release v1.0.0-${{ github.run_number }} (Draft)
+          files: build/app/outputs/flutter-apk/app-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

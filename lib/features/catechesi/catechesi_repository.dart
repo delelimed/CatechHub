@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/attachment_parent_type.dart';
 import '../../shared/models/catechesi_model.dart';
+import '../../shared/utils/auth_utils.dart';
 import '../attachments/attachments_repository.dart';
 
 /// Provider Riverpod che espone un'istanza singleton di [CatechesiRepository].
@@ -46,13 +47,30 @@ class CatechesiRepository {
   /// [LocalDatabase.newId].
   Future<void> addCatechesi(Catechesi c) async {
     final id = c.id.isEmpty ? LocalDatabase.newId('catechesi') : c.id;
-    await _box.put(id, c.toMap());
+    final catechistName = getCurrentCatechistName();
+    final now = DateTime.now();
+    final data = c.toMap();
+    data['lastModifiedBy'] = catechistName;
+    data['createdAt'] = now.toIso8601String();
+    data['updatedAt'] = now.toIso8601String();
+    await _box.put(id, data);
   }
 
   /// Aggiorna una scheda catechesi esistente, sovrascrivendo il record
   /// corrispondente all'ID specificato nel box Hive.
   Future<void> updateCatechesi(String id, Catechesi c) async {
-    await _box.put(id, c.toMap());
+    final existingData = _box.get(id);
+    String? existingCreatedAt;
+    if (existingData != null) {
+      final map = LocalDatabase.toStringDynamicMap(existingData);
+      existingCreatedAt = map['createdAt']?.toString();
+    }
+    final catechistName = getCurrentCatechistName();
+    final data = c.toMap();
+    data['lastModifiedBy'] = catechistName;
+    data['createdAt'] = existingCreatedAt ?? data['createdAt'];
+    data['updatedAt'] = DateTime.now().toIso8601String();
+    await _box.put(id, data);
   }
 
   /// Elimina una scheda catechesi e tutti gli allegati a essa associati

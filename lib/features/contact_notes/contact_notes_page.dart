@@ -2,18 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import 'package:go_router/go_router.dart';
+
 import '../../shared/models/student_model.dart';
 import '../../shared/widgets/app_scaffold.dart';
+import '../../shared/widgets/last_modified_info.dart';
 import '../students/students_repository.dart';
 import 'contact_notes_repository.dart';
 import 'student_contact_notes_page.dart';
 
-/// Pagina principale "Registro di Contatto" di CateREG.
-///
-/// Mostra l'elenco completo di tutti i ragazzi (ordinati per cognome) con
-/// un'anteprima dell'ultima nota di contatto registrata per ciascuno.
-/// Da ogni tile è possibile navigare alla pagina dei dettagli contatto
-/// del singolo studente ([StudentContactNotesPage]).
 class ContactNotesPage extends ConsumerWidget {
   const ContactNotesPage({super.key});
 
@@ -28,8 +25,63 @@ class ContactNotesPage extends ConsumerWidget {
 
     return AppScaffold(
       title: 'Registro di Contatto',
-      child: students.isEmpty
-          ? Center(
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          InkWell(
+            onTap: () => context.push('/avvisi'),
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.green.shade600,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.green.withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.send_rounded, color: Colors.white, size: 28),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Condividi avviso',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Invia messaggi a genitori e ragazzi',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.white.withValues(alpha: 0.85),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: Colors.white.withValues(alpha: 0.7),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          if (students.isEmpty)
+            Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(
@@ -49,16 +101,14 @@ class ContactNotesPage extends ConsumerWidget {
                 ),
               ),
             )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: students.length,
-              itemBuilder: (context, index) {
-                final student = students[index];
-                final latestNotes =
-                    contactNotesRepo.getNotesForStudentSync(student.id);
-                final lastNote =
-                    latestNotes.isNotEmpty ? latestNotes.first : null;
+          else
+            ...students.map((student) {
+              final latestNotes =
+                  contactNotesRepo.getNotesForStudentSync(student.id);
+              final lastNote =
+                  latestNotes.isNotEmpty ? latestNotes.first : null;
 
+<<<<<<< HEAD
                 return _StudentContactTile(
                   student: student,
                   lastNote: lastNote,
@@ -71,21 +121,31 @@ class ContactNotesPage extends ConsumerWidget {
                         builder: (_) => StudentContactNotesPage(
                           student: student,
                         ),
+=======
+              return _StudentContactTile(
+                student: student,
+                lastNote: lastNote,
+                isDark: isDark,
+                colorScheme: colorScheme,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => StudentContactNotesPage(
+                        student: student,
+>>>>>>> feature/comunicazioni
                       ),
-                    );
-                  },
-                );
-              },
-            ),
+                    ),
+                  );
+                },
+              );
+            }),
+        ],
+      ),
     );
   }
 }
 
-/// Tile per singolo studente nella lista principale.
-///
-/// Mostra iniziale del cognome, nome completo e anteprima dell'ultimo
-/// contatto (data + testo troncato a 40 caratteri). Se non ci sono
-/// contatti, mostra un messaggio "Nessun contatto registrato".
 class _StudentContactTile extends StatelessWidget {
   final Student student;
   final dynamic lastNote;
@@ -123,8 +183,11 @@ class _StudentContactTile extends StatelessWidget {
               ),
             ],
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
+<<<<<<< HEAD
               CircleAvatar(
                 radius: 22,
                 backgroundColor: isDark ? colorScheme.primaryContainer.withValues(alpha: 0.3) : const Color(0xFF174A7E).withValues(alpha: 0.1),
@@ -176,6 +239,72 @@ class _StudentContactTile extends StatelessWidget {
                 ),
               ),
               Icon(Icons.chevron_right, color: isDark ? Colors.grey.shade600 : Colors.grey.shade400),
+=======
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: isDark ? colorScheme.primaryContainer.withValues(alpha: 0.3) : const Color(0xFF174A7E).withValues(alpha: 0.1),
+                    child: Text(
+                      student.surname.isNotEmpty
+                          ? student.surname[0].toUpperCase()
+                          : '?',
+                      style: TextStyle(
+                        color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${student.surname} ${student.name}',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? colorScheme.onSurface : const Color(0xFF1A1A1A),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        if (lastNote != null)
+                          Text(
+                            '${DateFormat('dd/MM/yy').format(lastNote.dateTime)} — ${lastNote.notes.length > 40 ? '${lastNote.notes.substring(0, 40)}...' : lastNote.notes}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          )
+                        else
+                          Text(
+                            'Nessun contatto registrato',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, color: isDark ? Colors.grey.shade600 : Colors.grey.shade400),
+                ],
+              ),
+              if (lastNote != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: LastModifiedInfo(
+                    updatedAt: lastNote.updatedAt,
+                    lastModifiedBy: lastNote.lastModifiedBy,
+                    compact: true,
+                  ),
+                ),
+>>>>>>> feature/comunicazioni
             ],
           ),
         ),

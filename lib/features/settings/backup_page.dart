@@ -460,6 +460,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                     'presenze, programmazione, catechesi, documenti e allegati (foto e PDF).\n\n'
                     'Il file è protetto da un PIN che crei al momento dell\'esportazione '
                     'e che dovrai reinserire per importarlo su un altro dispositivo.\n\n'
+                    'L\'importazione inserisce i dati nella classe attualmente aperta '
+                    'sul dispositivo ricevente.\n\n'
                     'L\'accesso alle operazioni di backup richiede l\'autenticazione '
                     'con impronta, volto o PIN del tuo dispositivo.',
                     style: TextStyle(fontSize: 13, color: Colors.blue.shade900),

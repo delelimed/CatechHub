@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sync P2P Bluetooth — CatechHub</title>
-<meta name="description" content="Sincronizza i tuoi dati con altri catechisti via Bluetooth, senza internet, in modo sicuro e automatico.">
+<title>Sync P2P Bluetooth/WiFi — CatechHub</title>
+<meta name="description" content="Sincronizza i tuoi dati con altri catechisti via Bluetooth o WiFi Direct, senza internet, in modo sicuro e automatico.">
 <link rel="icon" href="../logo.png" type="image/png">
 <link rel="stylesheet" href="../style.css">
 <script src="../js/version.js" defer></script>
@@ -25,8 +25,8 @@
 
 <section class="page-header">
   <div class="container">
-    <h1>Sync P2P Bluetooth</h1>
-    <p>Sincronizza i dati tra catechisti senza bisogno di internet, server o cloud: solo Bluetooth e crittografia</p>
+    <h1>Sync P2P Bluetooth / WiFi Direct</h1>
+    <p>Sincronizza i dati tra catechisti senza bisogno di internet, server o cloud: solo Bluetooth o WiFi Direct con crittografia end-to-end</p>
   </div>
 </section>
 
@@ -53,6 +53,27 @@
     <h3>3. Conflitti? Nessun problema</h3>
     <p>Se lo stesso ragazzo è stato modificato da entrambi i catechisti, CatechHub tiene automaticamente la versione più recente. Non si perdono mai dati: vince l'ultima modifica.</p>
 
+    <h2>Ruoli di sincronizzazione</h2>
+    <p>Quando aggiungi un dispositivo fidato, puoi scegliere come registrarlo:</p>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li><strong>Mio Dispositivo:</strong> la sincronizzazione è automatica. Ideale per i tuoi dispositivi personali (tablet, secondo telefono). Non è richiesta alcuna conferma.</li>
+      <li><strong>Altro Catechista:</strong> richiede la tua autorizzazione esplicita prima di ogni sincronizzazione. Perfetto per sincronizzarsi con altri catechisti.</li>
+    </ul>
+
+    <h3>Doppio consenso</h3>
+    <p>Quando due dispositivi sono entrambi registrati come <strong>Altro Catechista</strong>, la sincronizzazione richiede il consenso esplicito di entrambi. Un dialogo appare su entrambi i dispositivi con il riepilogo dei dati da sincronizzare e un pulsante <strong>"Procedi"</strong>. La sincronizzazione parte solo dopo che entrambi gli utenti hanno premuto <strong>"Procedi"</strong>.</p>
+
+    <div class="alert alert-info">
+      Il doppio consenso garantisce che nessun dato venga trasferito senza la piena consapevolezza di entrambi i catechisti.
+    </div>
+
+    <h2>Tracciabilità delle modifiche</h2>
+    <p>Ogni record in CatechHub ora mostra chi lo ha modificato e quando. Questa tracciabilità completa permette di sapere sempre chi ha apportato l'ultima modifica a un ragazzo, una presenza o un incontro, garantendo piena trasparenza tra i catechisti.</p>
+
+    <div class="alert alert-info">
+      La tracciabilità è particolarmente utile in team numerosi, dove più catechisti collaborano sugli stessi dati.
+    </div>
+
     <h2>Cosa si sincronizza</h2>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
       <li>Anagrafica ragazzi</li>
@@ -74,7 +95,10 @@
 
     <h2>Sicurezza</h2>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
-      <li><strong>Crittografia end-to-end:</strong> i dati sono cifrati prima di essere trasmessi via Bluetooth</li>
+      <li><strong>Crittografia end-to-end:</strong> X25519 ECDH + HKDF + AES-256-GCM — i dati sono cifrati prima di essere trasmessi</li>
+      <li><strong>Pairing code anti-MitM:</strong> durante l'associazione, un codice a 6 cifre derivato dalla chiave condivisa permette di verificare che non ci siano intercettatori</li>
+      <li><strong>Key pinning:</strong> alla riconnessione, la chiave pubblica del dispositivo remoto viene verificata contro l'associazione salvata</li>
+      <li><strong>Forward secrecy:</strong> ogni sessione usa chiavi effimere — anche se una chiave viene compromessa, le sessioni passate restano sicure</li>
       <li><strong>Associazione tramite QR:</strong> solo i dispositivi che hanno scambiato il QR possono sincronizzarsi</li>
       <li><strong>Niente internet:</strong> i dati non passano mai da server esterni</li>
       <li><strong>Controllo totale:</strong> puoi decidere con chi e quando sincronizzarti</li>

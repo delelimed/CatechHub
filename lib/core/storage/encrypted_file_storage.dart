@@ -66,6 +66,24 @@ class EncryptedFileStorage {
     await file.writeAsBytes(encrypted, flush: true);
   }
 
+  /// Legge i bytes cifrati grezzi del vault (senza decifrarli).
+  /// Usato per trasferire allegati durante la sincronizzazione P2P.
+  static Future<Uint8List> readRawEncrypted(String storageId) async {
+    final file = await _fileFor(storageId);
+    if (!await file.exists()) {
+      throw Exception('File allegato non trovato');
+    }
+    return await file.readAsBytes();
+  }
+
+  /// Scrive bytes già cifrati direttamente nel vault.
+  /// Usato per ricevere allegati durante la sincronizzazione P2P.
+  static Future<void> writeRawEncrypted(
+      String storageId, Uint8List encryptedBytes) async {
+    final file = await _fileFor(storageId);
+    await file.writeAsBytes(encryptedBytes, flush: true);
+  }
+
   /// Legge e decifra un file vault.
   /// [storageId] deve corrispondere a un file .vault esistente.
   /// Lancia Exception se il file non esiste (dati orfani: può succedere se

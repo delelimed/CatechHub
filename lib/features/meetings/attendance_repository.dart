@@ -45,12 +45,32 @@ class AttendanceRepository {
     required Map<String, String> presence,
   }) async {
     final catechistName = getCurrentCatechistName();
+    final now = DateTime.now();
+    final existing = _box.get(meetingId);
+    String? existingCreatedAt;
+    String? existingUniqueCode;
+    if (existing != null) {
+      final map = LocalDatabase.toStringDynamicMap(existing);
+      existingCreatedAt = map['createdAt']?.toString();
+      existingUniqueCode = map['classUniqueCode'] as String?;
+    }
+    final classUniqueCode = existingUniqueCode ?? _lookupClassUniqueCode(classId);
     await _box.put(meetingId, {
       'meetingId': meetingId,
       'date': date.toIso8601String(),
       'classId': classId,
+      'classUniqueCode': classUniqueCode,
       'presence': presence,
       'lastModifiedBy': catechistName,
+      'createdAt': existingCreatedAt ?? now.toIso8601String(),
+      'updatedAt': now.toIso8601String(),
     });
+  }
+
+  String? _lookupClassUniqueCode(String classId) {
+    final classData = LocalDatabase.classes().get(classId);
+    if (classData == null) return null;
+    final map = LocalDatabase.toStringDynamicMap(classData);
+    return map['uniqueCode'] as String?;
   }
 }

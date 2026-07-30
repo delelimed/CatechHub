@@ -31,6 +31,9 @@ class StudentDailyNote {
   /// FK verso PlanningMeeting (incontro in cui è stata scritta).
   final String meetingId;
 
+  /// Codice univoco di 40 cifre della classe.
+  final String? classUniqueCode;
+
   /// Testo della nota (es. "Ha partecipato attivamente al gioco").
   final String text;
 
@@ -47,6 +50,7 @@ class StudentDailyNote {
     required this.id,
     required this.studentId,
     required this.meetingId,
+    this.classUniqueCode,
     required this.text,
     required this.createdAt,
     required this.updatedAt,
@@ -58,6 +62,7 @@ class StudentDailyNote {
       id: id,
       studentId: data['studentId'] ?? '',
       meetingId: data['meetingId'] ?? '',
+      classUniqueCode: data['classUniqueCode'],
       text: data['text'] ?? '',
       createdAt: DateTime.tryParse(data['createdAt'] ?? '') ?? DateTime.now(),
       updatedAt: DateTime.tryParse(data['updatedAt'] ?? '') ?? DateTime.now(),
@@ -69,6 +74,7 @@ class StudentDailyNote {
     return {
       'studentId': studentId,
       'meetingId': meetingId,
+      'classUniqueCode': classUniqueCode,
       'text': text,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
@@ -80,6 +86,7 @@ class StudentDailyNote {
     String? id,
     String? studentId,
     String? meetingId,
+    String? classUniqueCode,
     String? text,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -89,6 +96,7 @@ class StudentDailyNote {
       id: id ?? this.id,
       studentId: studentId ?? this.studentId,
       meetingId: meetingId ?? this.meetingId,
+      classUniqueCode: classUniqueCode ?? this.classUniqueCode,
       text: text ?? this.text,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

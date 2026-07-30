@@ -41,6 +41,11 @@ class Student {
   /// FK verso SchoolClass (null se non ancora assegnato a un gruppo).
   final String? classId;
 
+  /// Codice univoco di 40 cifre della classe di appartenenza.
+  /// Copia ridondante di SchoolClass.uniqueCode per identificare la classe
+  /// anche in assenza di relazione diretta (utile per sync multi-classe).
+  final String? classUniqueCode;
+
   /// Data di nascita (formato ISO 8601).
   final DateTime birthDate;
 
@@ -71,6 +76,12 @@ class Student {
   /// Nome del catechista che ha modificato per ultimo questo record.
   final String lastModifiedBy;
 
+  /// Timestamp di creazione (UTC, ISO 8601).
+  final DateTime createdAt;
+
+  /// Timestamp dell'ultima modifica (UTC, ISO 8601).
+  final DateTime updatedAt;
+
   Student({
     required this.id,
     required this.name,
@@ -84,11 +95,15 @@ class Student {
     required this.fatherPhone,
     required this.studentPhone,
     this.classId,
+    this.classUniqueCode,
     this.allergies,
     this.autonomousExits,
     this.notes,
     this.lastModifiedBy = '',
-  });
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  })  : createdAt = createdAt ?? DateTime.now(),
+        updatedAt = updatedAt ?? DateTime.now();
 
   /// Deserializza da Map (proveniente da Hive o da sync CRDT).
   /// I campi mancanti defaultano a stringa vuota o DateTime.now().
@@ -100,6 +115,7 @@ class Student {
       birthDate: DateTime.tryParse(data['birthDate']?.toString() ?? '') ??
           DateTime.now(),
       classId: data['classId'],
+      classUniqueCode: data['classUniqueCode'],
       motherName: data['motherName'] ?? '',
       motherSurname: data['motherSurname'] ?? '',
       fatherName: data['fatherName'] ?? '',
@@ -111,6 +127,8 @@ class Student {
       autonomousExits: data['autonomousExits'],
       notes: data['notes'],
       lastModifiedBy: data['lastModifiedBy'] ?? '',
+      createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
+      updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
     );
   }
 
@@ -136,6 +154,7 @@ class Student {
     String? name,
     String? surname,
     String? classId,
+    String? classUniqueCode,
     DateTime? birthDate,
     String? motherName,
     String? motherSurname,
@@ -148,6 +167,8 @@ class Student {
     String? autonomousExits,
     String? notes,
     String? lastModifiedBy,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return Student(
       id: id ?? this.id,
@@ -155,6 +176,7 @@ class Student {
       surname: surname ?? this.surname,
       birthDate: birthDate ?? this.birthDate,
       classId: classId ?? this.classId,
+      classUniqueCode: classUniqueCode ?? this.classUniqueCode,
       motherName: motherName ?? this.motherName,
       motherSurname: motherSurname ?? this.motherSurname,
       fatherName: fatherName ?? this.fatherName,
@@ -166,6 +188,8 @@ class Student {
       autonomousExits: autonomousExits ?? this.autonomousExits,
       notes: notes ?? this.notes,
       lastModifiedBy: lastModifiedBy ?? this.lastModifiedBy,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -177,6 +201,7 @@ class Student {
       'surname': surname,
       'birthDate': birthDate.toIso8601String(),
       'classId': classId,
+      'classUniqueCode': classUniqueCode,
       'motherName': motherName,
       'motherSurname': motherSurname,
       'fatherName': fatherName,
@@ -188,6 +213,8 @@ class Student {
       'autonomousExits': autonomousExits,
       'notes': notes,
       'lastModifiedBy': lastModifiedBy,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
     };
   }
 }

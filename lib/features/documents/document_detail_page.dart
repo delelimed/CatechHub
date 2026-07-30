@@ -27,7 +27,7 @@ class DocumentDetailPage extends ConsumerWidget {
       'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'
     ];
 
-    return '${date.day} ${mesi[date.month - 1]}';
+    return '${date.day} ${mesi[date.month - 1]} ${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 
   Future<int> _setDeliveredForToday() async {
@@ -151,7 +151,7 @@ class DocumentDetailPage extends ConsumerWidget {
             (s) => deliveries[s.id]?['exoneratedAt'] != null,
           ).length;
 
-          return ListView.builder(
+              return ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: students.length + 1,
             itemBuilder: (context, index) {
@@ -316,7 +316,7 @@ class DocumentDetailPage extends ConsumerWidget {
                             ),
                           ],
                         ),
-                        if (isExonerated)
+                        if (isExonerated) ...[
                           Container(
                             width: double.infinity,
                             margin: const EdgeInsets.only(top: 12),
@@ -340,8 +340,31 @@ class DocumentDetailPage extends ConsumerWidget {
                                 ),
                               ],
                             ),
+<<<<<<< HEAD
                           )
                         else ...[
+=======
+                          ),
+                          if (deliveryData?['lastModifiedBy'] != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.person_rounded, size: 12, color: isDark ? Colors.grey.shade500 : Colors.grey.shade400),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'da ${deliveryData!['lastModifiedBy']}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ] else ...[
+>>>>>>> feature/comunicazioni
                           Divider(height: 20, thickness: 0.5, color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : null),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,
@@ -410,6 +433,24 @@ class DocumentDetailPage extends ConsumerWidget {
                               ),
                             ],
                           ),
+                          if (deliveryData?['lastModifiedBy'] != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Icon(Icons.person_rounded, size: 12, color: isDark ? Colors.grey.shade500 : Colors.grey.shade400),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'da ${deliveryData!['lastModifiedBy']}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                         ],
                       ],
                     ),

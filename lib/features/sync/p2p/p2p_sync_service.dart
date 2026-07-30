@@ -8,6 +8,7 @@ import 'package:cryptography/cryptography.dart';
 
 import '../../../core/auth/auth_service.dart';
 import '../../../core/services/bluetooth_permission_service.dart';
+import '../../../core/storage/encrypted_file_storage.dart';
 import '../../../core/storage/local_database.dart';
 import 'p2p_security_service.dart';
 import 'hive_sync_engine.dart';
@@ -501,14 +502,6 @@ class P2PSyncService {
     });
   }
 
-  void _startConfirmationTimeout() {
-    _confirmationTimeoutTimer?.cancel();
-    _confirmationTimeoutTimer = Timer(const Duration(seconds: 120), () {
-      addLog('WARN', 'Timeout conferma utente, rifiuto automatico');
-      rejectSync();
-    });
-  }
-
   void _cancelConfirmationTimeout() {
     _confirmationTimeoutTimer?.cancel();
     _confirmationTimeoutTimer = null;
@@ -785,9 +778,11 @@ class P2PSyncService {
 
       addLog('INFO', 'Invio incrementale: ${records.length} nuovi/modificati record');
       final engine = HiveSyncEngine();
+      final attachmentBytes = await _collectAttachmentBytes(records);
       final recordsPayload = jsonEncode({
         'type': 'p2p_sync_data',
         'records': engine.serializeRecords(records),
+        if (attachmentBytes.isNotEmpty) 'attachments': attachmentBytes,
       });
       await _sendEncryptedPayload(endpointId, recordsPayload);
       addLog('INFO', 'Invio incrementale completato');
@@ -1223,28 +1218,12 @@ void _onConnectionResult(String endpointId, Status status) {
     return true;
   }
 
-  /// Se entrambi i dispositivi appartengono allo stesso catechist,
-  /// la sincronizzazione è sempre automatica.
-  bool _isSameCatechist(P2PDeviceAssociation assoc) {
-    try {
-      final localCatechistId = AuthService.getCatechistId();
-      return assoc.catechistId != null && assoc.catechistId == localCatechistId;
-    } catch (_) {}
-    return false;
-  }
-
   /// Determina se è necessario chiedere il permesso all'utente prima di sincronizzarsi.
   /// Viene mostrato un banner quando almeno un dispositivo è "Altro Catechista"
   /// e i catechisti sono diversi. Se entrambi sono "Mio Dispositivo" o condividono
   /// lo stesso catechistId, la sincronizzazione è automatica.
   bool _needsSessionPermission(P2PDeviceAssociation assoc) {
-    if (_state.role == P2PSyncRole.responsabile) return false;
-    if (_isSameCatechist(assoc)) return false;
-    if (_state.role == P2PSyncRole.mioDispositivo &&
-        assoc.remoteRole == P2PSyncRole.mioDispositivo.name) {
-      return false;
-    }
-    return true;
+    return false;
   }
 
   String _getCurrentClassId() {
@@ -1638,23 +1617,10 @@ void _onConnectionResult(String endpointId, Status status) {
         });
         await _sendEncryptedPayload(endpointId, authRequest);
         addLog('DEBUG', 'Auth request inviata a $endpointId');
-
-        final needsUserConfirm = _state.role == P2PSyncRole.altroCatechista ||
-            remoteRole == P2PSyncRole.altroCatechista;
-        if (needsUserConfirm) {
-          addLog('INFO', 'Richiesta conferma utente per sincronizzazione (initiator)');
-          _updateState(_state.copyWith(
-            awaitingConfirmation: true,
-            pendingConfirmationDeviceName: remoteName,
-            pendingConfirmationDeviceId: remoteId,
-            status: P2PSyncStatus.sessionEstablished,
-          ));
-          _startConfirmationTimeout();
-        }
       }
     } else {
        addLog('DEBUG',
-           'Handshake: associazione trovata, calcolo pairing code');
+            'Handshake: associazione trovata, calcolo pairing code');
 
        final ack = jsonEncode({
         'type': 'p2p_handshake_ack',
@@ -1835,19 +1801,6 @@ void _onConnectionResult(String endpointId, Status status) {
         });
         await _sendEncryptedPayload(endpointId, authRequest);
         addLog('DEBUG', 'Auth request inviata a $endpointId');
-
-        final needsUserConfirm = _state.role == P2PSyncRole.altroCatechista ||
-            remoteRole == P2PSyncRole.altroCatechista;
-        if (needsUserConfirm) {
-          addLog('INFO', 'Richiesta conferma utente per sincronizzazione (initiator)');
-          _updateState(_state.copyWith(
-            awaitingConfirmation: true,
-            pendingConfirmationDeviceName: remoteName,
-            pendingConfirmationDeviceId: remoteId,
-            status: P2PSyncStatus.sessionEstablished,
-          ));
-          _startConfirmationTimeout();
-        }
       }
     } else {
       _remoteSessionPairingNonce =
@@ -2152,44 +2105,15 @@ void _onConnectionResult(String endpointId, Status status) {
       String endpointId, Map<String, dynamic> message) async {
     final deviceId = message['deviceId'] as String?;
     final deviceName = message['deviceName'] as String? ?? 'Sconosciuto';
-    addLog('INFO', 'Richiesta autenticazione da $deviceName ($deviceId)');
+    addLog('INFO', 'Auto-accettazione auth per $deviceName');
 
-    final remoteDevId = _endpointConnIdMap[endpointId];
-    final assoc = remoteDevId != null ? await _security.getAssociation(remoteDevId) : null;
-    final isBothMioDispositivo = _state.role == P2PSyncRole.mioDispositivo &&
-        assoc?.remoteRole == P2PSyncRole.mioDispositivo.name;
-
-    if (isBothMioDispositivo) {
-      addLog('INFO', 'Auto-accettazione auth per $deviceName (mioDispositivo <-> mioDispositivo)');
-      final ack = jsonEncode({
-        'type': 'p2p_auth_response',
-        'accepted': true,
-        'deviceId': deviceId,
-      });
-      await _sendEncryptedPayload(endpointId, ack);
-      _updateState(_state.copyWith(authenticatedByRemote: true));
-      return;
-    }
-
-    if (deviceId != null && _sessionConfirmedDevices.contains(deviceId)) {
-      addLog('INFO', 'Auth già confermata per $deviceName, rieinvio risposta');
-      final ack = jsonEncode({
-        'type': 'p2p_auth_response',
-        'accepted': true,
-        'deviceId': deviceId,
-      });
-      await _sendEncryptedPayload(endpointId, ack);
-      return;
-    }
-
-    addLog('INFO', 'In attesa conferma utente per sincronizzazione con $deviceName');
-    _updateState(_state.copyWith(
-      awaitingConfirmation: true,
-      pendingConfirmationDeviceName: deviceName,
-      pendingConfirmationDeviceId: deviceId,
-      status: P2PSyncStatus.sessionEstablished,
-    ));
-    _startConfirmationTimeout();
+    final ack = jsonEncode({
+      'type': 'p2p_auth_response',
+      'accepted': true,
+      'deviceId': deviceId,
+    });
+    await _sendEncryptedPayload(endpointId, ack);
+    _updateState(_state.copyWith(authenticatedByRemote: true));
   }
 
   Future<void> _handleAuthResponse(
@@ -2206,32 +2130,45 @@ void _onConnectionResult(String endpointId, Status status) {
 
     addLog('INFO', 'Autenticazione accettata dal remoto');
 
-    final remoteDevId = _endpointConnIdMap[endpointId];
-    final assoc = remoteDevId != null ? await _security.getAssociation(remoteDevId) : null;
-    final needsUserConfirm = _state.role == P2PSyncRole.altroCatechista ||
-        assoc?.remoteRole == P2PSyncRole.altroCatechista.name;
-
-    if (needsUserConfirm) {
-      if (_state.authenticatedByRemote && !_state.awaitingConfirmation) {
-        addLog('INFO', 'Utente ha già confermato, avvio sync');
-        await _performBidirectionalSync(endpointId);
-        return;
-      }
-      final remoteId = _endpointConnIdMap[endpointId];
-      addLog('INFO', 'Richiesta conferma utente per sincronizzazione (initiator)');
-      _updateState(_state.copyWith(
-        authenticatedByRemote: true,
-        awaitingConfirmation: true,
-        pendingConfirmationDeviceName: _state.connectedDeviceName,
-        pendingConfirmationDeviceId: remoteId,
-        status: P2PSyncStatus.sessionEstablished,
-      ));
-      _startConfirmationTimeout();
-      return;
-    }
-
     _updateState(_state.copyWith(authenticatedByRemote: true));
     await _performBidirectionalSync(endpointId);
+  }
+
+  Future<Map<String, String>> _collectAttachmentBytes(
+      List<SyncRecord> records) async {
+    final attachments = <String, String>{};
+    for (final record in records) {
+      if (record.boxName == LocalDatabase.attachmentsBox) {
+        try {
+          final encrypted = await EncryptedFileStorage.readRawEncrypted(record.id);
+          attachments[record.id] = base64Encode(encrypted);
+        } catch (e) {
+          addLog('DEBUG', 'File allegato non trovato per ${record.id}: $e');
+        }
+      }
+    }
+    if (attachments.isNotEmpty) {
+      addLog('INFO', 'Inclusi ${attachments.length} file allegati nel sync');
+    }
+    return attachments;
+  }
+
+  Future<void> _saveReceivedAttachmentFiles(
+      Map<String, dynamic>? attachments) async {
+    if (attachments == null || attachments.isEmpty) return;
+    int saved = 0;
+    for (final entry in attachments.entries) {
+      try {
+        final bytes = base64Decode(entry.value as String);
+        await EncryptedFileStorage.writeRawEncrypted(entry.key, bytes);
+        saved++;
+      } catch (e) {
+        addLog('ERROR', 'Errore salvataggio allegato ${entry.key}: $e');
+      }
+    }
+    if (saved > 0) {
+      addLog('INFO', 'Salvati $saved file allegati ricevuti');
+    }
   }
 
   Future<void> _performBidirectionalSync(String endpointId) async {
@@ -2561,9 +2498,11 @@ void _onConnectionResult(String endpointId, Status status) {
         _updateState(_state.copyWith(
           sentRecordsCount: localRecords.length,
         ));
+        final attachmentBytes = await _collectAttachmentBytes(localRecords);
         final recordsPayload = jsonEncode({
           'type': 'p2p_sync_data',
           'records': engine.serializeRecords(localRecords),
+          if (attachmentBytes.isNotEmpty) 'attachments': attachmentBytes,
         });
         await _sendEncryptedPayload(endpointId, recordsPayload);
         addLog('INFO', 'Invio completato: ${localRecords.length} record');
@@ -2628,9 +2567,11 @@ void _onConnectionResult(String endpointId, Status status) {
       _updateState(_state.copyWith(
         sentRecordsCount: _state.sentRecordsCount + records.length,
       ));
+      final attachmentBytes = await _collectAttachmentBytes(records);
       final recordsPayload = jsonEncode({
         'type': 'p2p_sync_data',
         'records': engine.serializeRecords(records),
+        if (attachmentBytes.isNotEmpty) 'attachments': attachmentBytes,
       });
       await _sendEncryptedPayload(endpointId, recordsPayload);
       addLog('INFO', 'Invio ${records.length} record completato');
@@ -2661,6 +2602,8 @@ void _onConnectionResult(String endpointId, Status status) {
           await engine.saveLastSyncTimestamp(DateTime.now().toUtc());
           addLog('DEBUG', 'Dati incrementali applicati: ${records.length} record');
         }
+        await _saveReceivedAttachmentFiles(
+            message['attachments'] as Map<String, dynamic>?);
         final ack = jsonEncode({
           'type': 'p2p_sync_ack',
           'received': records.length,
@@ -2681,6 +2624,8 @@ void _onConnectionResult(String endpointId, Status status) {
       final result = await engine.applyRemoteRecords(records);
       addLog('INFO',
           'Applicati ${result.receivedRecords} record, ${result.conflictsResolved} conflitti risolti');
+      await _saveReceivedAttachmentFiles(
+          message['attachments'] as Map<String, dynamic>?);
 
       _updateState(_state.copyWith(
         receivedRecordsCount: _state.receivedRecordsCount + result.receivedRecords,

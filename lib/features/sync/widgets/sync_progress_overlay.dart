@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hive/hive.dart';
 import '../../../core/providers/nearby_sync_provider.dart';
+import '../../../core/storage/local_database.dart';
 import '../p2p/p2p_sync_service.dart';
 
 class SyncProgressOverlay extends ConsumerStatefulWidget {
@@ -51,6 +53,32 @@ class _SyncProgressOverlayState extends ConsumerState<SyncProgressOverlay> {
       _showingSheet = true;
       _showProgressSheet(state);
     }
+    if (state.status == P2PSyncStatus.completed && !_showingConfirmation) {
+      _checkConflicts();
+    }
+    if (state.status == P2PSyncStatus.syncing) {
+      _conflictsChecked = false;
+    }
+  }
+
+  bool _conflictsChecked = false;
+
+  void _checkConflicts() {
+    if (_conflictsChecked) return;
+    _conflictsChecked = true;
+    try {
+      final box = LocalDatabase.syncConflicts();
+      final unresolved = box.values.where((v) {
+        final data = Map<String, dynamic>.from(v);
+        return data['resolved'] != true;
+      }).length;
+      if (unresolved > 0) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _showConflictNotification(unresolved);
+        });
+      }
+    } catch (_) {}
   }
 
   String _getCurrentClassName() {
@@ -217,6 +245,34 @@ class _SyncProgressOverlayState extends ConsumerState<SyncProgressOverlay> {
         );
       },
     ).then((_) => _showingSessionPermission = false);
+  }
+
+  void _showConflictNotification(int count) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: Icon(Icons.warning_amber, size: 48, color: Colors.orange[700]),
+        title: const Text('Conflitti di sincronizzazione'),
+        content: Text(
+          '$count campo${count == 1 ? ' è' : ' sono'} in conflitto.\n\n'
+          'Scegli per ogni campo se mantenere la versione locale o '
+          'quella ricevuta dall\'altro dispositivo.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Più tardi'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              context.push('/settings/sync-conflicts');
+            },
+            child: const Text('Risolvi ora'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showProgressSheet(P2PSyncState state) {

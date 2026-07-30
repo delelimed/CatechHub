@@ -313,11 +313,83 @@ class HiveSyncEngine {
     return records;
   }
 
+  /// Salva un conflitto di sync nel box dedicato.
+  Future<void> _saveConflict({
+    required String boxName,
+    required String recordId,
+    required Map<String, dynamic> localData,
+    required Map<String, dynamic> remoteData,
+    required List<String> conflictingFields,
+  }) async {
+    try {
+      final box = Hive.box<Map>(LocalDatabase.syncConflictsBox);
+      final conflictKey = '${boxName}:$recordId';
+      await box.put(conflictKey, {
+        'boxName': boxName,
+        'recordId': recordId,
+        'localData': localData,
+        'remoteData': remoteData,
+        'conflictingFields': conflictingFields,
+        'detectedAt': DateTime.now().toUtc().toIso8601String(),
+        'resolved': false,
+      });
+    } catch (_) {}
+  }
+
+  /// Esegue un merge field-by-field tra dati locali e remoti.
+  /// Restituisce la mappa mergiata e l'elenco dei campi in conflitto.
+  Map<String, dynamic> _mergeFields({
+    required Map<String, dynamic> localData,
+    required Map<String, dynamic> remoteData,
+    required DateTime localUpdatedAt,
+    required DateTime remoteUpdatedAt,
+  }) {
+    final merged = Map<String, dynamic>.from(localData);
+    final conflictFields = <String>[];
+
+    for (final entry in remoteData.entries) {
+      final field = entry.key;
+      final remoteValue = entry.value;
+
+      // Campi tecnici da non considerare nei conflitti
+      if (field == 'updatedAt' || field == 'createdAt' || field == 'lastModifiedBy') continue;
+
+      if (!merged.containsKey(field)) {
+        // Solo remoto ha questo campo: lo prendiamo
+        merged[field] = remoteValue;
+      } else if (merged[field] != remoteValue) {
+        // Stesso campo, valori diversi: potenziale conflitto
+
+        // Se la differenza è solo nel timestamp dell'intero record,
+        // diamo priorità al record più recente per i campi divergenti
+        if (remoteUpdatedAt.isAfter(localUpdatedAt) &&
+            localUpdatedAt.difference(remoteUpdatedAt).inSeconds.abs() > 5) {
+          merged[field] = remoteValue;
+        } else if (localUpdatedAt.isAfter(remoteUpdatedAt) &&
+            localUpdatedAt.difference(remoteUpdatedAt).inSeconds.abs() > 5) {
+          // Keep local value (already in merged)
+        } else {
+          // Timestamp ravvicinati o uguali: conflitto reale
+          merged[field] = remoteValue;
+          conflictFields.add(field);
+        }
+      }
+      // Se sono uguali, non fare nulla
+    }
+
+    if (conflictFields.isNotEmpty) {
+      merged['_conflicts'] = conflictFields;
+    }
+
+    return merged;
+  }
+
   Future<SyncResult> applyRemoteRecords(
     List<SyncRecord> records,
   ) async {
     var appliedCount = 0;
     var conflictsResolved = 0;
+    final newConflicts = <String, List<String>>{};
 
     for (final remote in records) {
       if (!syncableBoxes.containsKey(remote.boxName)) continue;
@@ -330,6 +402,7 @@ class HiveSyncEngine {
         if (localRaw == null) {
           if (!remote.isDeleted) {
             final data = Map<String, dynamic>.from(remote.data);
+            data.remove('_conflicts');
             if (isClassBox && data['nameLocked'] != true) {
               data['nameLocked'] = true;
             }
@@ -355,41 +428,51 @@ class HiveSyncEngine {
           continue;
         }
 
-          if (remote.updatedAt.isAfter(localUpdatedAt)) {
-            if (remote.isDeleted) {
-              final merged = Map<String, dynamic>.from(localData);
-              merged['isDeleted'] = true;
-              merged['updatedAt'] = remote.updatedAt.toIso8601String();
-              await box.put(remote.id, merged);
-            } else {
-              final data = Map<String, dynamic>.from(remote.data);
-              if (isClassBox) {
-                data['nameLocked'] = data['nameLocked'] == true ||
-                    (localData['nameLocked'] ?? true);
-              }
-              await box.put(remote.id, data);
-            }
-            appliedCount++;
-          } else if (remote.updatedAt == localUpdatedAt) {
-            final merged = Map<String, dynamic>.from(localData);
-            bool changed = false;
-            remote.data.forEach((k, v) {
-              if (!merged.containsKey(k) || merged[k] != v) {
-                merged[k] = v;
-                changed = true;
-              }
-            });
-            if (isClassBox) {
-              merged['nameLocked'] = (localData['nameLocked'] ?? true) ||
-                  remote.data['nameLocked'] == true;
-            }
-            if (changed) {
-              merged['updatedAt'] = DateTime.now().toUtc().toIso8601String();
-              await box.put(remote.id, merged);
-              appliedCount++;
-              conflictsResolved++;
-            }
+        if (localIsDeleted && !remote.isDeleted) {
+          final data = Map<String, dynamic>.from(remote.data);
+          data.remove('_conflicts');
+          if (isClassBox && data['nameLocked'] != true) {
+            data['nameLocked'] = true;
           }
+          await box.put(remote.id, data);
+          appliedCount++;
+          continue;
+        }
+
+        final merged = _mergeFields(
+          localData: localData,
+          remoteData: remote.data,
+          localUpdatedAt: localUpdatedAt,
+          remoteUpdatedAt: remote.updatedAt,
+        );
+
+        final conflictFields =
+            (merged['_conflicts'] as List<String>?) ?? [];
+        merged.remove('_conflicts');
+
+        if (isClassBox) {
+          merged['nameLocked'] = (localData['nameLocked'] ?? true) ||
+              (remote.data['nameLocked'] == true);
+        }
+
+        final now = DateTime.now().toUtc();
+        merged['updatedAt'] = now.toIso8601String();
+        await box.put(remote.id, merged);
+
+        if (conflictFields.isNotEmpty) {
+          final conflictKey = '${remote.boxName}:${remote.id}';
+          newConflicts[conflictKey] = conflictFields;
+          await _saveConflict(
+            boxName: remote.boxName,
+            recordId: remote.id,
+            localData: localData,
+            remoteData: remote.data,
+            conflictingFields: conflictFields,
+          );
+        }
+
+        appliedCount++;
+        conflictsResolved += conflictFields.isEmpty ? 1 : 0;
       } catch (_) {}
     }
 

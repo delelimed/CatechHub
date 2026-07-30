@@ -45,6 +45,7 @@ import '../features/data_share/data_share_receive_page.dart';
 import '../features/sync/screens/settings_association_screen.dart';
 import '../features/sync/screens/associate_device_screen.dart';
 import '../features/sync/screens/sync_log_page.dart';
+import '../features/sync/screens/conflict_resolution_page.dart';
 import '../features/catechesi/catechesi_page.dart';
 import '../features/catechesi/catechesi_edit_page.dart';
 import '../features/catechesi/catechesi_detail_page.dart';
@@ -634,6 +635,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings/sync-log',
         builder: (context, state) => const SyncLogPage(),
+      ),
+
+      /// Risoluzione conflitti di sincronizzazione.
+      GoRoute(
+        path: '/settings/sync-conflicts',
+        builder: (context, state) => const ConflictResolutionPage(),
       ),
 
       // ═══════════════════════════════════════════════════════════════════

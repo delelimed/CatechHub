@@ -70,6 +70,7 @@ class LocalDatabase {
   static const trustedDevicesBox = 'trusted_devices_box';
   static const meetingNotificationsBox = 'meeting_notifications_box';
   static const avvisiBox = 'avvisi_box';
+  static const syncConflictsBox = 'sync_conflicts_box';
 
   static late final HiveAesCipher _cipher;
   static bool _initialized = false;
@@ -167,6 +168,7 @@ class LocalDatabase {
       _BoxDefinition(name: trustedDevicesBox, isMap: true, isCritical: false),
       _BoxDefinition(name: meetingNotificationsBox, isMap: true, isCritical: false),
       _BoxDefinition(name: avvisiBox, isMap: true, isCritical: false),
+      _BoxDefinition(name: syncConflictsBox, isMap: true, isCritical: false),
     ];
 
     for (final definition in boxDefinitions) {
@@ -294,6 +296,7 @@ class LocalDatabase {
   static Box<Map> trustedDevices() => Hive.box<Map>(trustedDevicesBox);
   static Box<Map> meetingNotifications() => Hive.box<Map>(meetingNotificationsBox);
   static Box<Map> avvisi() => Hive.box<Map>(avvisiBox);
+  static Box<Map> syncConflicts() => Hive.box<Map>(syncConflictsBox);
 
   // ─────────────────────────────────────────────────────────────────────────
   // UTILITÀ DI CIFRATURA BYTES

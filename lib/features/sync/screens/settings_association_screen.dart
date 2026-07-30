@@ -234,8 +234,7 @@ class _SettingsAssociationScreenState
                 const SizedBox(height: 4),
                 Text(
                   'La sincronizzazione Bluetooth è ancora in fase di sviluppo. '
-                  'Per scambiare dati in modo affidabile, utilizza la scansione QR '
-                  'o esporta un file di backup dalle impostazioni.',
+                  'Potrebbero verificarsi occasionali problemi, che vi chiedo di segnalare mediante le funzioni apposite. Grazie! ',
                   style: TextStyle(fontSize: 13, color: Colors.amber[900]),
                 ),
               ],

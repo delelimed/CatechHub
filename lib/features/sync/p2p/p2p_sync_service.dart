@@ -966,7 +966,7 @@ Future<void> startPairingAdvertiseOnly() async {
       isSessionEncrypted: false,
     ));
 
-    final fullTargetName = '$_syncPrefix$targetEndpoint';
+    final fullTargetName = targetEndpoint.startsWith(_syncPrefix) ? targetEndpoint : '$_syncPrefix$targetEndpoint';
 
     try {
       await _nearby.startDiscovery(

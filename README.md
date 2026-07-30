@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD033 -->
 # CatechHub
 
 ![CatechHub](assets/images/logo_BG.png)

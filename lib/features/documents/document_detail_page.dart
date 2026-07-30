@@ -189,22 +189,6 @@ class DocumentDetailPage extends ConsumerWidget {
                           ],
                         ),
                       ],
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Icon(Icons.update_rounded, size: 14, color: isDark ? Colors.grey.shade500 : Colors.grey.shade400),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            '${_formatTimestamp(document['updatedAt'])}${document['lastModifiedBy'] != null ? ' da ${document['lastModifiedBy']}' : ''}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
                     ],
                   );
                 }
@@ -332,7 +316,7 @@ class DocumentDetailPage extends ConsumerWidget {
                             ),
                           ],
                         ),
-                        if (isExonerated)
+                        if (isExonerated) ...[
                           Container(
                             width: double.infinity,
                             margin: const EdgeInsets.only(top: 12),
@@ -356,8 +340,26 @@ class DocumentDetailPage extends ConsumerWidget {
                                 ),
                               ],
                             ),
-                          )
-                        else ...[
+                          ),
+                          if (deliveryData?['lastModifiedBy'] != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.person_rounded, size: 12, color: isDark ? Colors.grey.shade500 : Colors.grey.shade400),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'da ${deliveryData!['lastModifiedBy']}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ] else ...[
                           Divider(height: 20, thickness: 0.5, color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : null),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,
@@ -426,6 +428,24 @@ class DocumentDetailPage extends ConsumerWidget {
                               ),
                             ],
                           ),
+                          if (deliveryData?['lastModifiedBy'] != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Icon(Icons.person_rounded, size: 12, color: isDark ? Colors.grey.shade500 : Colors.grey.shade400),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'da ${deliveryData!['lastModifiedBy']}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                         ],
                       ],
                     ),

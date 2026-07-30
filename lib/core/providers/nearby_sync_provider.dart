@@ -104,7 +104,6 @@ class _NearbySyncLifecycleManagerState
     with WidgetsBindingObserver {
   bool _daemonStarted = false;
   bool _expirationWarningShown = false;
-  bool _sessionPermissionDialogShown = false;
   StreamSubscription<P2PSyncState>? _stateSub;
 
   @override
@@ -133,49 +132,6 @@ class _NearbySyncLifecycleManagerState
 
   void _onSyncStateChanged(P2PSyncState state) {
     if (!mounted) return;
-
-    if (state.awaitingSessionPermission && !_sessionPermissionDialogShown &&
-        state.pendingSessionDeviceName != null) {
-      _sessionPermissionDialogShown = true;
-      final deviceName = state.pendingSessionDeviceName!;
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.shield_outlined, color: Colors.orange[700]),
-              const SizedBox(width: 8),
-              const Text('Permesso di sincronizzazione'),
-            ],
-          ),
-          content: Text(
-            'Il dispositivo "$deviceName" richiede l\'autorizzazione '
-            'per sincronizzare i dati.\n\n'
-            'Concedere l\'accesso per la sincronizzazione?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                _sessionPermissionDialogShown = false;
-                ref.read(nearbySyncServiceProvider).denySessionPermission();
-              },
-              child: const Text('Nega',
-                  style: TextStyle(color: Colors.red)),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                _sessionPermissionDialogShown = false;
-                ref.read(nearbySyncServiceProvider).grantSessionPermission();
-              },
-              child: const Text('Concedi'),
-            ),
-          ],
-        ),
-      );
-    }
 
     if (state.expirationWarning != null && !_expirationWarningShown) {
       _expirationWarningShown = true;

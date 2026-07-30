@@ -462,7 +462,8 @@ class P2PSyncService {
       if (assoc != null && assoc.isValid) {
         final isLocalAltro = _state.role == P2PSyncRole.altroCatechista;
         final isRemoteAltro = assoc.remoteRole == P2PSyncRole.altroCatechista.name;
-        if (isLocalAltro && isRemoteAltro) {
+        final isSameCatechist = _isSameDeviceForAltroCatechista(assoc);
+        if (isLocalAltro && isRemoteAltro && !isSameCatechist) {
           _updateState(_state.copyWith(
             awaitingSessionPermission: true,
             pendingSessionDeviceName: assoc.deviceName,
@@ -492,6 +493,20 @@ class P2PSyncService {
       isBackgroundSyncActive: false,
     ));
     _stopContinuousMode();
+  }
+
+  /// Se entrambi i dispositivi appartengono allo stesso altroCatechista,
+  /// la sincronizzazione è automatica (nessuna richiesta di permesso).
+  bool _isSameDeviceForAltroCatechista(P2PDeviceAssociation assoc) {
+    if (_state.role != P2PSyncRole.altroCatechista) return false;
+    if (assoc.remoteRole != P2PSyncRole.altroCatechista.name) return false;
+    try {
+      final localCatechistId = AuthService.getCatechistId();
+      if (assoc.catechistId != null && assoc.catechistId == localCatechistId) {
+        return true;
+      }
+    } catch (_) {}
+    return false;
   }
 
   void _startPeriodicSync() {
@@ -588,8 +603,8 @@ class P2PSyncService {
             if (assoc != null && assoc.isValid) {
               final isLocalAltro = _state.role == P2PSyncRole.altroCatechista;
               final isRemoteAltro = assoc.remoteRole == P2PSyncRole.altroCatechista.name;
-              if (!_sessionSyncAllowed && isLocalAltro && isRemoteAltro) {
-                addLog('DEBUG', '  permesso sessione non concesso per $deviceId');
+              final isSameCatechist = _isSameDeviceForAltroCatechista(assoc);
+              if (!_sessionSyncAllowed && isLocalAltro && isRemoteAltro && !isSameCatechist) {
                 _updateState(_state.copyWith(
                   awaitingSessionPermission: true,
                   pendingSessionDeviceName: assoc.deviceName,
@@ -663,7 +678,8 @@ class P2PSyncService {
       if (assoc != null && assoc.isValid) {
         final isLocalAltro = _state.role == P2PSyncRole.altroCatechista;
         final isRemoteAltro = assoc.remoteRole == P2PSyncRole.altroCatechista.name;
-        if (!_sessionSyncAllowed && isLocalAltro && isRemoteAltro) {
+        final isSameCatechist = _isSameDeviceForAltroCatechista(assoc);
+        if (!_sessionSyncAllowed && isLocalAltro && isRemoteAltro && !isSameCatechist) {
           _updateState(_state.copyWith(
             awaitingSessionPermission: true,
             pendingSessionDeviceName: assoc.deviceName,
@@ -1086,10 +1102,15 @@ Future<void> stopPairingMode() async {
         }
         if (_state.role == P2PSyncRole.altroCatechista &&
             association.remoteRole == P2PSyncRole.altroCatechista.name &&
-            !_sessionSyncAllowed) {
-          addLog('WARN', 'Rifiuto connessione: permesso sessione non ancora concesso per $deviceId');
-          await _nearby.rejectConnection(endpointId);
-          return;
+            !_isSameDeviceForAltroCatechista(association)) {
+          if (!_sessionSyncAllowed) {
+            addLog('DEBUG', 'Connessione in arrivo da $deviceId, concedo permesso');
+            _sessionSyncAllowed = true;
+            _updateState(_state.copyWith(
+              awaitingSessionPermission: false,
+              pendingSessionDeviceName: null,
+            ));
+          }
         }
         addLog('DEBUG', 'Associazione valida trovata per $deviceId, accetto connessione');
       } else {

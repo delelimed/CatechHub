@@ -168,103 +168,6 @@ class DataShareSelectionPage extends ConsumerWidget {
           ),
           content: SizedBox(
             width: double.maxFinite,
-<<<<<<< HEAD
-            child: _isPreparing
-                ? Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CircularProgressIndicator(color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
-                        const SizedBox(height: 16),
-                        Text('Preparazione dati in corso...', style: TextStyle(color: isDark ? colorScheme.onSurface : null)),
-                      ],
-                    ),
-                  )
-                : SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _ModuleCheckbox(
-                          label: 'Anagrafica ragazzi',
-                          subtitle: 'Nomi, cognomi, contatti genitori',
-                          icon: Icons.people_rounded,
-                          value: includeAnagrafica,
-                          isDark: isDark,
-                          colorScheme: colorScheme,
-                          onChanged: (v) => setDialogState(
-                            () => includeAnagrafica = v,
-                          ),
-                        ),
-                        _ModuleCheckbox(
-                          label: 'Presenze',
-                          subtitle: 'Registro presenze e assenze',
-                          icon: Icons.fact_check_rounded,
-                          value: includeAgenda,
-                          isDark: isDark,
-                          colorScheme: colorScheme,
-                          onChanged: (v) => setDialogState(
-                            () => includeAgenda = v,
-                          ),
-                        ),
-                        _ModuleCheckbox(
-                          label: 'Programmazione',
-                          subtitle: 'Giornate e incontri programmati',
-                          icon: Icons.calendar_month_rounded,
-                          value: includeProgrammazione,
-                          isDark: isDark,
-                          colorScheme: colorScheme,
-                          onChanged: (v) => setDialogState(
-                            () => includeProgrammazione = v,
-                          ),
-                        ),
-                        _ModuleCheckbox(
-                          label: 'Documenti',
-                          subtitle: 'Certificati, autorizzazioni, consegne',
-                          icon: Icons.description_rounded,
-                          value: includeDocumenti,
-                          isDark: isDark,
-                          colorScheme: colorScheme,
-                          onChanged: (v) => setDialogState(
-                            () => includeDocumenti = v,
-                          ),
-                        ),
-                        _ModuleCheckbox(
-                          label: 'Note di contatto',
-                          subtitle: 'Comunicazioni con le famiglie',
-                          icon: Icons.contact_mail_rounded,
-                          value: includeContactNotes,
-                          isDark: isDark,
-                          colorScheme: colorScheme,
-                          onChanged: (v) => setDialogState(
-                            () => includeContactNotes = v,
-                          ),
-                        ),
-                        _ModuleCheckbox(
-                          label: 'Catechesi',
-                          subtitle: 'Argomenti e contenuti delle catechesi',
-                          icon: Icons.menu_book_rounded,
-                          value: includeCatechesi,
-                          isDark: isDark,
-                          colorScheme: colorScheme,
-                          onChanged: (v) => setDialogState(
-                            () => includeCatechesi = v,
-                          ),
-                        ),
-                        _ModuleCheckbox(
-                          label: 'Annotazioni giornaliere',
-                          subtitle: 'Note e osservazioni sui ragazzi',
-                          icon: Icons.note_alt_rounded,
-                          value: includeAnnotazioni,
-                          isDark: isDark,
-                          colorScheme: colorScheme,
-                          onChanged: (v) => setDialogState(
-                            () => includeAnnotazioni = v,
-                          ),
-                        ),
-                      ],
-                    ),
-=======
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -277,7 +180,6 @@ class DataShareSelectionPage extends ConsumerWidget {
                     isDark: isDark,
                     colorScheme: colorScheme,
                     onChanged: (v) => setDialogState(() => includeAnagrafica = v),
->>>>>>> feature/comunicazioni
                   ),
                   _ModuleCheckbox(
                     label: 'Presenze',
@@ -337,35 +239,6 @@ class DataShareSelectionPage extends ConsumerWidget {
               ),
             ),
           ),
-<<<<<<< HEAD
-          actions: _isPreparing
-              ? []
-              : [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: Text('Annulla', style: TextStyle(color: isDark ? colorScheme.primary : null)),
-                  ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-                      foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: () async {
-                      setDialogState(() => _isPreparing = true);
-                      try {
-                        final allData = await DataExportService.exportSelectiveData(
-                          includeAnagrafica: includeAnagrafica,
-                          includeAgenda: includeAgenda,
-                          includeProgrammazione: includeProgrammazione,
-                          includeDocumenti: includeDocumenti,
-                          includeContactNotes: includeContactNotes,
-                          includeCatechesi: includeCatechesi,
-                          includeAnnotazioni: includeAnnotazioni,
-                        );
-=======
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
@@ -389,7 +262,6 @@ class DataShareSelectionPage extends ConsumerWidget {
                         includeCatechesi: includeCatechesi,
                         includeAnnotazioni: includeAnnotazioni,
                       );
->>>>>>> feature/comunicazioni
 
                       ref.read(dataShareOptionsProvider.notifier).state =
                           options;

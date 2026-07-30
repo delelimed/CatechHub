@@ -252,17 +252,6 @@ final HKDF_INFO = 'CatechHub_SessionKey_v2';
 
     <h2 id="security">5. Security architecture</h2>
 
-<<<<<<< HEAD
-    <h3>5.1 Hardware-backed Master Key (AndroidKeyStore)</h3>
-    <p>A partire dalla versione 2.0, CatechHub richiede <strong>esclusivamente</strong> protezione hardware per la chiave master di cifratura Hive. Il modulo <code>SecurityManager</code>:</p>
-    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
-      <li>Verifica la presenza di TEE (Trusted Execution Environment) o StrongBox all'avvio tramite <code>local_auth</code> e <code>FlutterSecureStorage</code></li>
-      <li>Genera la chiave master AES-256 tramite <code>Hive.generateSecureKey()</code> e la custodisce in AndroidKeyStore con <code>encryptedSharedPreferences=true</code></li>
-      <li>Se TEE/StrongBox non è disponibile, solleva <code>HardwareSecurityException</code> e blocca l'avvio con <code>SecurityBlockScreen</code></li>
-      <li><strong>Nessun fallback software</strong>: la chiave master non viene mai memorizzata in memoria volatile o storage non protetto</li>
-    </ul>
-    <p>Configurazione Android (<code>flutter_secure_storage</code>): <code>encryptedSharedPreferences: true</code> forza l'uso di <code>KeyGenParameterSpec</code> con <code>setIsStrongBoxBacked(true)</code> su API 28+.</p>
-=======
     <h3>5.1 Hardware-backed Master Key (AndroidKeyStore) — SecurityManager</h3>
     <p>A partire dalla versione 2.0, CatechHub richiede <strong>esclusivamente</strong> protezione hardware per la chiave master di cifratura Hive. Il modulo <code>SecurityManager</code> (singleton in <code>lib/core/security/security_manager.dart</code>):</p>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
@@ -273,7 +262,6 @@ final HKDF_INFO = 'CatechHub_SessionKey_v2';
       <li>Flusso di inizializzazione: (1) verifica biometrica (local_auth) → proxy TEE, (2) test FlutterSecureStorage → verifica Keystore, (3) generazione/lettura Master Key, (4) creazione HiveAesCipher, (5) marcatura hardware come verificato</li>
     </ul>
     <p>Configurazione Android (<code>flutter_secure_storage</code>): <code>encryptedSharedPreferences: true</code> forza l'uso di <code>KeyGenParameterSpec</code> con <code>setIsStrongBoxBacked(true)</code> su API 28+. StrongBox richiede hardware dedicato (Pixel 3+, Samsung S20+), TEE è presente su quasi tutti i dispositivi Android 10+ certificati.</p>
->>>>>>> feature/comunicazioni
 
     <h3>5.2 freeRASP</h3>
     <p>Libreria di runtime application self-protection (RASP) che rileva 8 categorie di minacce:</p>
@@ -319,11 +307,7 @@ if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
   ┌─────────────────────────────────────────────────────────────────┐
   │  Layer 8: freeRASP (root, emulator, hooking, app integrity)    │
   ├─────────────────────────────────────────────────────────────────┤
-<<<<<<< HEAD
-  │  Layer 7: E2EE Sync (ECDH P-256 + HKDF + AES-256-GCM)         │
-=======
   │  Layer 7: E2EE Sync (X25519 ECDH + HKDF + AES-256-GCM)        │
->>>>>>> feature/comunicazioni
   ├─────────────────────────────────────────────────────────────────┤
   │  Layer 6: Biometric Auth + Session in RAM (120s timeout)       │
   ├─────────────────────────────────────────────────────────────────┤

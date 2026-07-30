@@ -274,31 +274,7 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
 
   // ─── FASE 1: MOSTRA INDICE ────────────────────────────────────────────
 
-<<<<<<< HEAD
-  const _ScanningCard({
-    required this.isScanning,
-    required this.receivedCount,
-    required this.totalChunks,
-    required this.missingChunkIndices,
-    required this.onQRCodeDetected,
-    required this.errorMessage,
-    required this.onToggleScanning,
-  });
-
-  @override
-  State<_ScanningCard> createState() => _ScanningCardState();
-}
-
-class _ScanningCardState extends State<_ScanningCard> {
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-
-=======
   Widget _buildIndexPhase() {
->>>>>>> feature/comunicazioni
     return Column(
       children: [
         Container(
@@ -426,11 +402,7 @@ class _ScanningCardState extends State<_ScanningCard> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-<<<<<<< HEAD
-              color: widget.isScanning
-=======
               color: _isScanning
->>>>>>> feature/comunicazioni
                   ? (isDark ? colorScheme.primary : const Color(0xFF174A7E))
                   : (isDark ? Colors.grey.shade600 : Colors.grey.shade400),
               width: 2,
@@ -442,25 +414,6 @@ class _ScanningCardState extends State<_ScanningCard> {
                 ? MobileScanner(onDetect: _onQRCodeDetected)
                 : Container(
                     color: isDark ? colorScheme.surfaceContainer : Colors.grey.shade200,
-<<<<<<< HEAD
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.qr_code_scanner_rounded,
-                            size: 64,
-                            color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Scansione in pausa',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                            ),
-                          ),
-=======
                     child: const Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -468,7 +421,6 @@ class _ScanningCardState extends State<_ScanningCard> {
                           Icon(Icons.qr_code_scanner_rounded, size: 64, color: Colors.grey),
                           SizedBox(height: 16),
                           Text('Scansione in pausa', style: TextStyle(fontSize: 16, color: Colors.grey)),
->>>>>>> feature/comunicazioni
                         ],
                       ),
                     ),
@@ -477,18 +429,10 @@ class _ScanningCardState extends State<_ScanningCard> {
         ),
         const SizedBox(height: 16),
         _ProgressInfo(
-<<<<<<< HEAD
-          receivedCount: widget.receivedCount,
-          totalChunks: widget.totalChunks,
-          missingChunkIndices: widget.missingChunkIndices,
-          isDark: isDark,
-          colorScheme: colorScheme,
-=======
           receivedCount: _receivedChunks.length,
           totalChunks: _totalChunks,
           missingChunkIndices: _getMissingChunkIndices(),
           label: 'Chunk dati ricevuti',
->>>>>>> feature/comunicazioni
         ),
         if (_errorMessage != null) _ErrorMessage(message: _errorMessage!),
         const SizedBox(height: 16),
@@ -516,10 +460,6 @@ class _ScanningCardState extends State<_ScanningCard> {
           ],
         ),
         const SizedBox(height: 16),
-<<<<<<< HEAD
-
-        _InstructionsCard(isDark: isDark, colorScheme: colorScheme),
-=======
         TextButton.icon(
           onPressed: () {
             _indexTimer?.cancel();
@@ -529,7 +469,6 @@ class _ScanningCardState extends State<_ScanningCard> {
           icon: const Icon(Icons.cancel_rounded),
           label: const Text('Annulla'),
         ),
->>>>>>> feature/comunicazioni
       ],
     );
   }
@@ -539,15 +478,6 @@ class _ScanningCardState extends State<_ScanningCard> {
   Widget _buildPinPhase() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-<<<<<<< HEAD
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-
-=======
->>>>>>> feature/comunicazioni
     return Column(
       children: [
         Container(
@@ -559,26 +489,8 @@ class _ScanningCardState extends State<_ScanningCard> {
           ),
           child: const Column(
             children: [
-<<<<<<< HEAD
-              const Icon(
-                Icons.check_circle_rounded,
-                color: Colors.green,
-                size: 48,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Tutti i chunk ricevuti!',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-                ),
-              ),
-              const SizedBox(height: 8),
-=======
               Icon(Icons.check_circle_rounded, color: Colors.green, size: 48),
               SizedBox(height: 16),
->>>>>>> feature/comunicazioni
               Text(
                 'Tutti i chunk ricevuti!',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
@@ -587,11 +499,7 @@ class _ScanningCardState extends State<_ScanningCard> {
               Text(
                 'Inserisci il PIN di 8 cifre fornito dal mittente',
                 textAlign: TextAlign.center,
-<<<<<<< HEAD
-                style: TextStyle(fontSize: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade700),
-=======
                 style: TextStyle(fontSize: 14, color: Colors.grey),
->>>>>>> feature/comunicazioni
               ),
             ],
           ),
@@ -618,8 +526,8 @@ class _ScanningCardState extends State<_ScanningCard> {
           icon: const Icon(Icons.verified_rounded),
           label: const Text('Verifica e Importa'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-            foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
+            backgroundColor: const Color(0xFF174A7E),
+            foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
             minimumSize: const Size(double.infinity, 56),
           ),
@@ -641,50 +549,29 @@ class _ScanningCardState extends State<_ScanningCard> {
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-<<<<<<< HEAD
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-
-=======
->>>>>>> feature/comunicazioni
     return Container(
       padding: const EdgeInsets.all(32),
       child: Column(
         children: [
           CircularProgressIndicator(color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
           const SizedBox(height: 24),
-          Text(
+          const Text(
             'Importazione in corso...',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? colorScheme.onSurface : null),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           if (_phaseMessage != null) ...[
             const SizedBox(height: 12),
             Text(
               _phaseMessage!,
               textAlign: TextAlign.center,
-<<<<<<< HEAD
-              style: TextStyle(
-                fontSize: 14,
-                color: isDark ? colorScheme.primary : const Color(0xFF174A7E).withValues(alpha: 0.8),
-                fontWeight: FontWeight.w500,
-              ),
-=======
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF174A7E)),
->>>>>>> feature/comunicazioni
             ),
           ],
           const SizedBox(height: 8),
           const Text(
             'I dati vengono salvati. Non chiudere l\'app.',
             textAlign: TextAlign.center,
-<<<<<<< HEAD
-            style: TextStyle(fontSize: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
-=======
             style: TextStyle(fontSize: 14, color: Colors.grey),
->>>>>>> feature/comunicazioni
           ),
         ],
       ),
@@ -748,23 +635,13 @@ class _ProgressInfo extends StatelessWidget {
   final int receivedCount;
   final int totalChunks;
   final List<int> missingChunkIndices;
-<<<<<<< HEAD
-  final bool isDark;
-  final ColorScheme colorScheme;
-=======
   final String label;
->>>>>>> feature/comunicazioni
 
   const _ProgressInfo({
     required this.receivedCount,
     required this.totalChunks,
     required this.missingChunkIndices,
-<<<<<<< HEAD
-    required this.isDark,
-    required this.colorScheme,
-=======
     required this.label,
->>>>>>> feature/comunicazioni
   });
 
   @override
@@ -868,15 +745,8 @@ class _ErrorMessage extends StatelessWidget {
 }
 
 class _InstructionsCard extends StatelessWidget {
-<<<<<<< HEAD
-  final bool isDark;
-  final ColorScheme colorScheme;
-
-  const _InstructionsCard({required this.isDark, required this.colorScheme});
-=======
   final List<String> steps;
   const _InstructionsCard({required this.steps});
->>>>>>> feature/comunicazioni
 
   @override
   Widget build(BuildContext context) {
@@ -898,95 +768,6 @@ class _InstructionsCard extends StatelessWidget {
             children: [
               Icon(Icons.info_rounded, color: isDark ? colorScheme.primary : Colors.blue.shade700),
               const SizedBox(width: 8),
-<<<<<<< HEAD
-              Text(
-                'Istruzioni',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? colorScheme.primary : Colors.blue.shade700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _InstructionStep(
-            number: 1,
-            text: 'Inquadra i QR code mostrati dal dispositivo mittente',
-            isDark: isDark,
-            colorScheme: colorScheme,
-          ),
-          _InstructionStep(
-            number: 2,
-            text:
-                'I QR code vengono mostrati ciclicamente, puoi riprovare se ne perdi uno',
-            isDark: isDark,
-            colorScheme: colorScheme,
-          ),
-          _InstructionStep(
-            number: 3,
-            text:
-                'Quando tutti i chunk sono ricevuti, inserisci il PIN fornito',
-            isDark: isDark,
-            colorScheme: colorScheme,
-          ),
-          _InstructionStep(
-            number: 4,
-            text: 'I dati verranno importati sostituendo quelli esistenti',
-            isDark: isDark,
-            colorScheme: colorScheme,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InstructionStep extends StatelessWidget {
-  final int number;
-  final String text;
-  final bool isDark;
-  final ColorScheme colorScheme;
-
-  const _InstructionStep({
-    required this.number,
-    required this.text,
-    required this.isDark,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              color: isDark ? colorScheme.primary : Colors.blue.shade700,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: Text(
-                '$number',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(fontSize: 13, color: isDark ? colorScheme.onSurface : null),
-            ),
-          ),
-=======
               Text('Istruzioni',
                   style: TextStyle(
                       fontWeight: FontWeight.bold,
@@ -1017,7 +798,6 @@ class _InstructionStep extends StatelessWidget {
                 ],
               ),
             ),
->>>>>>> feature/comunicazioni
         ],
       ),
     );

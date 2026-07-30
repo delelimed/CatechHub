@@ -121,32 +121,6 @@ class PlanningMeeting {
     );
   }
 
-  PlanningMeeting copyWith({
-    String? id,
-    String? classId,
-    String? createdBy,
-    DateTime? date,
-    String? time,
-    String? title,
-    String? activity,
-    String? notes,
-    bool? isReunion,
-    String? lastModifiedBy,
-  }) {
-    return PlanningMeeting(
-      id: id ?? this.id,
-      classId: classId ?? this.classId,
-      createdBy: createdBy ?? this.createdBy,
-      date: date ?? this.date,
-      time: time ?? this.time,
-      title: title ?? this.title,
-      activity: activity ?? this.activity,
-      notes: notes ?? this.notes,
-      isReunion: isReunion ?? this.isReunion,
-      lastModifiedBy: lastModifiedBy ?? this.lastModifiedBy,
-    );
-  }
-
   Map<String, dynamic> toMap() {
     return {
       'classId': classId,

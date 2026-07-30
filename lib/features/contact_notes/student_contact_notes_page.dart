@@ -299,8 +299,6 @@ class _ContactNoteCard extends StatelessWidget {
             child: Text(
               note.notes,
               style: TextStyle(fontSize: 14, height: 1.4, color: isDark ? colorScheme.onSurface : null),
-<<<<<<< HEAD
-=======
             ),
           ),
           Padding(
@@ -309,7 +307,6 @@ class _ContactNoteCard extends StatelessWidget {
               updatedAt: note.updatedAt,
               lastModifiedBy: note.lastModifiedBy,
               compact: true,
->>>>>>> feature/comunicazioni
             ),
           ),
         ],

@@ -4,26 +4,15 @@ on:
   # Permette di far partire l'azione manualmente dalla scheda "Actions" di GitHub
   workflow_dispatch:
 
-<<<<<<< HEAD
-  # Fa partire l'azione automaticamente ad ogni push sul ramo develop
-  #push:
-   # branches:
-    #  - develop
-=======
   # Fa partire l'azione automaticamente ad ogni push sui rami feature
   push:
     branches:
       - feature/**
->>>>>>> feature/comunicazioni
       
   # Fa partire l'azione ad ogni Pull Request verso il ramo develop
   #pull_request:
   #  branches:
-<<<<<<< HEAD
-   #   - develop
-=======
   #    - develop
->>>>>>> feature/comunicazioni
 
 jobs:
   build:

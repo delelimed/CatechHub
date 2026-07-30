@@ -307,24 +307,11 @@ class _CatechesiCard extends StatelessWidget {
                     .toList(),
               ),
             ],
-<<<<<<< HEAD
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(Icons.update_rounded, size: 14, color: isDark ? Colors.grey.shade500 : Colors.grey.shade500),
-                const SizedBox(width: 4),
-                Text(
-                  'Modificata ${formatter.format(catechesi.updatedAt)}',
-                  style: TextStyle(fontSize: 12, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
-                ),
-              ],
-=======
             const SizedBox(height: 8),
             LastModifiedInfo(
               updatedAt: catechesi.updatedAt,
               lastModifiedBy: catechesi.lastModifiedBy,
               compact: true,
->>>>>>> feature/comunicazioni
             ),
           ],
         ),

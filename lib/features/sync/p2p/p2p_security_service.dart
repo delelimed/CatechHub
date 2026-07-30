@@ -2,61 +2,33 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
-<<<<<<< HEAD
-import 'package:cryptography/cryptography.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-=======
 import 'package:crypto/crypto.dart' show sha256;
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive/hive.dart';
 
 import '../../../core/storage/local_database.dart';
->>>>>>> feature/comunicazioni
 
 class P2PIdentity {
   final String deviceId;
   final String deviceName;
-<<<<<<< HEAD
-  final String publicKeyBase64;
-  final String fingerprint;
-=======
   final String username;
   final String publicKeyBase64;
   final String fingerprint;
   final String connectionEndpoint;
->>>>>>> feature/comunicazioni
 
   const P2PIdentity({
     required this.deviceId,
     required this.deviceName,
-<<<<<<< HEAD
-    required this.publicKeyBase64,
-    required this.fingerprint,
-=======
     required this.username,
     required this.publicKeyBase64,
     required this.fingerprint,
     required this.connectionEndpoint,
->>>>>>> feature/comunicazioni
   });
 
   Map<String, dynamic> toJson() => {
         'deviceId': deviceId,
         'deviceName': deviceName,
-<<<<<<< HEAD
-        'publicKey': publicKeyBase64,
-        'fingerprint': fingerprint,
-        'v': 2,
-      };
-
-  factory P2PIdentity.fromJson(Map<String, dynamic> json) => P2PIdentity(
-        deviceId: json['deviceId'] as String,
-        deviceName: json['deviceName'] as String? ?? '',
-        publicKeyBase64: json['publicKey'] as String,
-        fingerprint: json['fingerprint'] as String,
-      );
-=======
         'username': username,
         'publicKey': publicKeyBase64,
         'fingerprint': fingerprint,
@@ -90,7 +62,6 @@ class P2PIdentity {
       connectionEndpoint: endpoint,
     );
   }
->>>>>>> feature/comunicazioni
 
   String encode() => base64Encode(utf8.encode(jsonEncode(toJson())));
 
@@ -132,15 +103,12 @@ class P2PDeviceAssociation {
   final String fingerprint;
   final String sharedSecretBase64;
   final DateTime associatedAt;
-<<<<<<< HEAD
-=======
   final String devicePrivateKeyBase64;
   final String devicePublicKeyBase64;
   final String? localRole;
   final String? remoteRole;
   final String? catechistId;
   final DateTime? lastSyncAt;
->>>>>>> feature/comunicazioni
 
   const P2PDeviceAssociation({
     required this.deviceId,
@@ -149,15 +117,12 @@ class P2PDeviceAssociation {
     required this.fingerprint,
     required this.sharedSecretBase64,
     required this.associatedAt,
-<<<<<<< HEAD
-=======
     required this.devicePrivateKeyBase64,
     required this.devicePublicKeyBase64,
     this.localRole,
     this.remoteRole,
     this.catechistId,
     this.lastSyncAt,
->>>>>>> feature/comunicazioni
   });
 
   bool get isValid => DateTime.now().difference(associatedAt).inDays < 30;
@@ -168,8 +133,6 @@ class P2PDeviceAssociation {
     return remaining > 0 ? remaining : 0;
   }
 
-<<<<<<< HEAD
-=======
   P2PDeviceAssociation copyWith({DateTime? lastSyncAt, String? catechistId}) {
     return P2PDeviceAssociation(
       deviceId: deviceId,
@@ -187,7 +150,6 @@ class P2PDeviceAssociation {
     );
   }
 
->>>>>>> feature/comunicazioni
   Map<String, dynamic> toJson() => {
         'deviceId': deviceId,
         'deviceName': deviceName,
@@ -195,15 +157,12 @@ class P2PDeviceAssociation {
         'fingerprint': fingerprint,
         'sharedSecret': sharedSecretBase64,
         'associatedAt': associatedAt.toUtc().toIso8601String(),
-<<<<<<< HEAD
-=======
         'privKey': devicePrivateKeyBase64,
         'pubKey': devicePublicKeyBase64,
         if (localRole != null) 'localRole': localRole,
         if (remoteRole != null) 'remoteRole': remoteRole,
         if (catechistId != null) 'catechistId': catechistId,
         if (lastSyncAt != null) 'lastSyncAt': lastSyncAt!.toUtc().toIso8601String(),
->>>>>>> feature/comunicazioni
       };
 
   factory P2PDeviceAssociation.fromJson(Map<String, dynamic> json) =>
@@ -214,9 +173,6 @@ class P2PDeviceAssociation {
         fingerprint: json['fingerprint'] as String? ?? '',
         sharedSecretBase64: json['sharedSecret'] as String,
         associatedAt: DateTime.parse(json['associatedAt'] as String).toLocal(),
-<<<<<<< HEAD
-      );
-=======
         devicePrivateKeyBase64: json['privKey'] as String? ?? '',
         devicePublicKeyBase64: json['pubKey'] as String? ?? '',
         localRole: json['localRole'] as String?,
@@ -244,7 +200,6 @@ class P2PDeviceAssociation {
       return null;
     }
   }
->>>>>>> feature/comunicazioni
 }
 
 class P2PEncryptedPayload {
@@ -291,13 +246,10 @@ String _bytesToHex(List<int> bytes) {
   return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 }
 
-<<<<<<< HEAD
-=======
 final _p2pAad = Uint8List.fromList(
   utf8.encode('CatechHub_Context_P2P_v1'),
 );
 
->>>>>>> feature/comunicazioni
 class P2PSecurityService {
   static const _storagePrefix = 'p2p_assoc_';
   static const _localKeyPairName = 'p2p_local_keypair';
@@ -316,11 +268,7 @@ class P2PSecurityService {
     );
   }
 
-<<<<<<< HEAD
-  Future<SimpleKeyPair> getOrCreateKeyPair() async {
-=======
   Future<SimpleKeyPair> getOrCreateIdentityKeyPair() async {
->>>>>>> feature/comunicazioni
     final stored = await _secureStorage.read(key: _localKeyPairName);
     if (stored != null && stored.isNotEmpty) {
       try {
@@ -332,14 +280,6 @@ class P2PSecurityService {
           publicKey: SimplePublicKey(pubBytes, type: KeyPairType.x25519),
           type: KeyPairType.x25519,
         );
-<<<<<<< HEAD
-      } catch (_) {}
-    }
-    return _generateAndStoreKeyPair();
-  }
-
-  Future<SimpleKeyPair> _generateAndStoreKeyPair() async {
-=======
       } catch (e) {
         print('P2PSecurityService.getOrCreateIdentityKeyPair: stored key corrupted, regenerating: $e');
       }
@@ -348,7 +288,6 @@ class P2PSecurityService {
   }
 
   Future<SimpleKeyPair> _generateAndStoreIdentityKeyPair() async {
->>>>>>> feature/comunicazioni
     final keyPair = await _x25519.newKeyPair();
     final publicKey = await keyPair.extractPublicKey();
     final privateKeyData = await keyPair.extractPrivateKeyBytes();
@@ -360,8 +299,6 @@ class P2PSecurityService {
     return keyPair;
   }
 
-<<<<<<< HEAD
-=======
   Future<SimpleKeyPairData> _generateDeviceKeyPair() async {
     final keyPair = await _x25519.newKeyPair();
     final publicKey = await keyPair.extractPublicKey();
@@ -373,61 +310,40 @@ class P2PSecurityService {
     );
   }
 
->>>>>>> feature/comunicazioni
   Future<P2PIdentity> getLocalIdentity() async {
     final stored = await _secureStorage.read(key: _localIdentityKey);
     if (stored != null && stored.isNotEmpty) {
       try {
         return P2PIdentity.fromJson(jsonDecode(stored) as Map<String, dynamic>);
-<<<<<<< HEAD
-      } catch (_) {}
-=======
       } catch (e) {
         print('P2PSecurityService.getLocalIdentity: stored identity corrupted, regenerating: $e');
       }
->>>>>>> feature/comunicazioni
     }
     return _createAndStoreIdentity();
   }
 
   Future<P2PIdentity> _createAndStoreIdentity() async {
-<<<<<<< HEAD
-    final keyPair = await getOrCreateKeyPair();
-=======
     final keyPair = await getOrCreateIdentityKeyPair();
->>>>>>> feature/comunicazioni
     final publicKey = await keyPair.extractPublicKey();
     final deviceId =
         'CH_${DateTime.now().microsecondsSinceEpoch}_${_randomHex(6)}';
     final deviceName = await _getDeviceDisplayName();
-<<<<<<< HEAD
-=======
     final username = await _getUsername();
->>>>>>> feature/comunicazioni
     final fingerprint = await _computeFingerprint(publicKey);
 
     final identity = P2PIdentity(
       deviceId: deviceId,
       deviceName: deviceName,
-<<<<<<< HEAD
-      publicKeyBase64: base64Encode(publicKey.bytes),
-      fingerprint: fingerprint,
-=======
       username: username,
       publicKeyBase64: base64Encode(publicKey.bytes),
       fingerprint: fingerprint,
       connectionEndpoint: deviceId,
->>>>>>> feature/comunicazioni
     );
     await _secureStorage.write(
         key: _localIdentityKey, value: jsonEncode(identity.toJson()));
     return identity;
   }
 
-<<<<<<< HEAD
-  Future<String> _getDeviceDisplayName() async {
-    try {
-=======
   Future<String> _getUsername() async {
     try {
       final authBox = Hive.box('registroBox');
@@ -456,7 +372,6 @@ class P2PSecurityService {
       }
     } catch (_) {}
     try {
->>>>>>> feature/comunicazioni
       const prefs = FlutterSecureStorage();
       final name = await prefs.read(key: 'device_display_name');
       if (name != null && name.trim().isNotEmpty) {
@@ -471,10 +386,6 @@ class P2PSecurityService {
     return List.generate(length, (_) => random.nextInt(16).toRadixString(16)).join();
   }
 
-<<<<<<< HEAD
-  Future<String> getPublicKeyBase64() async {
-    final keyPair = await getOrCreateKeyPair();
-=======
   Future<void> refreshIdentityName() async {
     try {
       final identity = await getLocalIdentity();
@@ -512,7 +423,6 @@ class P2PSecurityService {
 
   Future<String> getPublicKeyBase64() async {
     final keyPair = await getOrCreateIdentityKeyPair();
->>>>>>> feature/comunicazioni
     final publicKey = await keyPair.extractPublicKey();
     return base64Encode(publicKey.bytes);
   }
@@ -522,23 +432,10 @@ class P2PSecurityService {
     return identity.fingerprint;
   }
 
-<<<<<<< HEAD
-  Future<String> generateQrPayload() async {
-    final identity = await getLocalIdentity();
-    return identity.encode();
-  }
-
-=======
->>>>>>> feature/comunicazioni
   static P2PIdentity? parseQrPayload(String raw) {
     return P2PIdentity.decode(raw);
   }
 
-<<<<<<< HEAD
-  Future<String> computeStaticSharedSecret(String remotePublicKeyBase64) async {
-    final remoteKeyBytes = base64Decode(remotePublicKeyBase64);
-    final keyPair = await getOrCreateKeyPair();
-=======
   Future<String> computeStaticSharedSecret(String remotePublicKeyBase64, {String? forDeviceId}) async {
     Uint8List remoteKeyBytes;
     try {
@@ -549,7 +446,6 @@ class P2PSecurityService {
     final keyPair = forDeviceId != null
         ? await _getOrCreateAssociationKeyPair(forDeviceId)
         : await getOrCreateIdentityKeyPair();
->>>>>>> feature/comunicazioni
 
     final sharedSecret = await _x25519.sharedSecretKey(
       keyPair: keyPair,
@@ -560,8 +456,6 @@ class P2PSecurityService {
     return base64Encode(secretBytes);
   }
 
-<<<<<<< HEAD
-=======
   Future<SimpleKeyPairData> _getOrCreateAssociationKeyPair(String deviceId) async {
     final existing = await getAssociation(deviceId);
     if (existing != null && existing.devicePrivateKeyBase64.isNotEmpty) {
@@ -571,32 +465,11 @@ class P2PSecurityService {
     return _generateDeviceKeyPair();
   }
 
->>>>>>> feature/comunicazioni
   Future<P2PSession> createEphemeralSession({
     required String remoteDeviceId,
     required String remoteDeviceName,
     required String remotePublicKeyBase64,
     bool isInitiator = false,
-<<<<<<< HEAD
-  }) async {
-    final ephemeralKeyPair = await X25519().newKeyPair();
-    final remoteKeyBytes = base64Decode(remotePublicKeyBase64);
-    final myKeyPair = await getOrCreateKeyPair();
-
-    final staticShared = await _x25519.sharedSecretKey(
-      keyPair: myKeyPair,
-      remotePublicKey: SimplePublicKey(remoteKeyBytes, type: KeyPairType.x25519),
-    );
-    final staticBytes = await staticShared.extractBytes();
-
-    final ecdhe = await _x25519.sharedSecretKey(
-      keyPair: ephemeralKeyPair,
-      remotePublicKey: SimplePublicKey(remoteKeyBytes, type: KeyPairType.x25519),
-    );
-    final ecdheBytes = await ecdhe.extractBytes();
-
-    final handshakeNonce = secureRandom(32);
-=======
     String? sessionNonce,
   }) async {
     Uint8List remoteKeyBytes;
@@ -624,25 +497,12 @@ class P2PSecurityService {
       final hkdfInput = sha256.convert(sharedBytes).bytes;
       handshakeNonce = Uint8List.fromList(hkdfInput.sublist(0, 32));
     }
->>>>>>> feature/comunicazioni
 
     final hkdf = Hkdf(
       hmac: Hmac(_sha256Algo),
       outputLength: 32,
     );
 
-<<<<<<< HEAD
-    final info = utf8.encode(
-        'CatechHub_P2P_Session_v2:$remoteDeviceId:${isInitiator ? 'init' : 'resp'}');
-
-    final inputKeyMaterial = Uint8List(staticBytes.length + ecdheBytes.length + handshakeNonce.length);
-    inputKeyMaterial.setAll(0, staticBytes);
-    inputKeyMaterial.setAll(staticBytes.length, ecdheBytes);
-    inputKeyMaterial.setAll(staticBytes.length + ecdheBytes.length, handshakeNonce);
-
-    final sessionKeyData = await hkdf.deriveKey(
-      secretKey: SecretKey(inputKeyMaterial),
-=======
     final localIdentity = await getLocalIdentity();
     final ids = [localIdentity.deviceId, remoteDeviceId]..sort();
     final info = utf8.encode(
@@ -650,7 +510,6 @@ class P2PSecurityService {
 
     final sessionKeyData = await hkdf.deriveKey(
       secretKey: SecretKey(Uint8List.fromList(sharedBytes)),
->>>>>>> feature/comunicazioni
       nonce: handshakeNonce,
       info: info,
     );
@@ -674,10 +533,7 @@ class P2PSecurityService {
       utf8.encode(plainText),
       secretKey: sessionKey,
       nonce: nonce,
-<<<<<<< HEAD
-=======
       aad: _p2pAad,
->>>>>>> feature/comunicazioni
     );
 
     return P2PEncryptedPayload(
@@ -701,10 +557,7 @@ class P2PSecurityService {
     final plainBytes = await AesGcm.with256bits().decrypt(
       secretBox,
       secretKey: sessionKey,
-<<<<<<< HEAD
-=======
       aad: _p2pAad,
->>>>>>> feature/comunicazioni
     );
 
     return utf8.decode(plainBytes);
@@ -722,10 +575,7 @@ class P2PSecurityService {
       utf8.encode(plainText),
       secretKey: secretKey,
       nonce: nonce,
-<<<<<<< HEAD
-=======
       aad: _p2pAad,
->>>>>>> feature/comunicazioni
     );
 
     final payload = P2PEncryptedPayload(
@@ -753,32 +603,12 @@ class P2PSecurityService {
     final plainBytes = await AesGcm.with256bits().decrypt(
       secretBox,
       secretKey: secretKey,
-<<<<<<< HEAD
-=======
       aad: _p2pAad,
->>>>>>> feature/comunicazioni
     );
 
     return utf8.decode(plainBytes);
   }
 
-<<<<<<< HEAD
-  Future<void> saveAssociation(P2PDeviceAssociation association) async {
-    final key = '$_storagePrefix${association.deviceId}';
-    await _secureStorage.write(
-      key: key,
-      value: jsonEncode(association.toJson()),
-    );
-  }
-
-  Future<P2PDeviceAssociation?> getAssociation(String deviceId) async {
-    final key = '$_storagePrefix$deviceId';
-    final raw = await _secureStorage.read(key: key);
-    if (raw == null) return null;
-    try {
-      final assoc =
-          P2PDeviceAssociation.fromJson(jsonDecode(raw) as Map<String, dynamic>);
-=======
   Future<SimpleKeyPairData> registerAndSaveAssociation({
     required String deviceId,
     required String deviceName,
@@ -825,34 +655,18 @@ class P2PSecurityService {
       }
       final assoc =
           P2PDeviceAssociation.fromJson(Map<String, dynamic>.from(raw));
->>>>>>> feature/comunicazioni
       if (!assoc.isValid) {
         await removeAssociation(deviceId);
         return null;
       }
       return assoc;
-<<<<<<< HEAD
-    } catch (_) {
-=======
     } catch (e) {
       print('P2PSecurityService.getAssociation error for $deviceId: $e');
->>>>>>> feature/comunicazioni
       return null;
     }
   }
 
   Future<List<P2PDeviceAssociation>> getAllAssociations() async {
-<<<<<<< HEAD
-    final allKeys = await _secureStorage.readAll();
-    final associations = <P2PDeviceAssociation>[];
-    final expiredKeys = <String>[];
-
-    for (final entry in allKeys.entries) {
-      if (!entry.key.startsWith(_storagePrefix)) continue;
-      try {
-        final assoc = P2PDeviceAssociation.fromJson(
-          jsonDecode(entry.value) as Map<String, dynamic>,
-=======
     final associations = <P2PDeviceAssociation>[];
     final expiredIds = <String>[];
 
@@ -864,22 +678,10 @@ class P2PSecurityService {
         if (raw == null) continue;
         final assoc = P2PDeviceAssociation.fromJson(
           Map<String, dynamic>.from(raw),
->>>>>>> feature/comunicazioni
         );
         if (assoc.isValid) {
           associations.add(assoc);
         } else {
-<<<<<<< HEAD
-          expiredKeys.add(entry.key);
-        }
-      } catch (_) {
-        expiredKeys.add(entry.key);
-      }
-    }
-
-    for (final key in expiredKeys) {
-      await _secureStorage.delete(key: key);
-=======
           expiredIds.add(key.toString());
         }
       } catch (_) {
@@ -889,7 +691,6 @@ class P2PSecurityService {
 
     for (final id in expiredIds) {
       await _assocBox.delete(id);
->>>>>>> feature/comunicazioni
     }
 
     associations.sort((a, b) => b.associatedAt.compareTo(a.associatedAt));
@@ -897,18 +698,12 @@ class P2PSecurityService {
   }
 
   Future<void> removeAssociation(String deviceId) async {
-<<<<<<< HEAD
-=======
     await _assocBox.delete(deviceId);
->>>>>>> feature/comunicazioni
     await _secureStorage.delete(key: '$_storagePrefix$deviceId');
   }
 
   Future<void> removeAllAssociations() async {
-<<<<<<< HEAD
-=======
     await _assocBox.clear();
->>>>>>> feature/comunicazioni
     final allKeys = await _secureStorage.readAll();
     for (final key in allKeys.keys) {
       if (key.startsWith(_storagePrefix)) {
@@ -917,8 +712,6 @@ class P2PSecurityService {
     }
   }
 
-<<<<<<< HEAD
-=======
   /// Resetta TUTTI i dati di sicurezza P2P: associazioni, identità locale,
   /// chiavi crittografiche e sessioni. Usato per il reset totale dell'app.
   Future<void> resetAllSecurityData() async {
@@ -967,7 +760,6 @@ class P2PSecurityService {
     }
   }
 
->>>>>>> feature/comunicazioni
   Future<bool> hasValidAssociation() async {
     final associations = await getAllAssociations();
     return associations.isNotEmpty;
@@ -977,8 +769,6 @@ class P2PSecurityService {
     final assoc = await getAssociation(deviceId);
     return assoc?.sharedSecretBase64;
   }
-<<<<<<< HEAD
-=======
 
   Future<String?> getDevicePrivateKey(String deviceId) async {
     final assoc = await getAssociation(deviceId);
@@ -1012,7 +802,6 @@ class P2PSecurityService {
   ) {
     return assoc.publicKeyBase64 == receivedPublicKeyBase64;
   }
->>>>>>> feature/comunicazioni
 }
 
 Future<String> _computeFingerprint(SimplePublicKey publicKey) async {

@@ -150,10 +150,6 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
   }
 
   Widget _buildReadOnlyView() {
-<<<<<<< HEAD
-    final formatter = DateFormat('dd MMMM yyyy', 'it_IT');
-=======
->>>>>>> feature/comunicazioni
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -171,24 +167,11 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
               color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
             ),
           ),
-<<<<<<< HEAD
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Icon(Icons.update_rounded, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
-              const SizedBox(width: 4),
-              Text(
-                'Modificata ${formatter.format(_catechesi.updatedAt)}',
-                style: TextStyle(fontSize: 13, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
-              ),
-            ],
-=======
           const SizedBox(height: 8),
           LastModifiedInfo(
             createdAt: _catechesi.createdAt,
             updatedAt: _catechesi.updatedAt,
             lastModifiedBy: _catechesi.lastModifiedBy,
->>>>>>> feature/comunicazioni
           ),
           const SizedBox(height: 24),
           if (_catechesi.description.trim().isNotEmpty) ...[

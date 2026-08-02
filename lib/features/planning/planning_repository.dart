@@ -50,6 +50,22 @@ class PlanningRepository {
     );
   }
 
+  /// Stream dei meeting filtrati per classe.
+  Stream<List<PlanningMeeting>> getPlanningByClass(String classId) {
+    return LocalDatabase.watchList(
+      _box,
+      (id, data) => PlanningMeeting.fromMap(id, data),
+    ).map((meetings) => meetings.where((m) => m.classId == classId).toList());
+  }
+
+  /// Lista sincrona dei meeting filtrati per classe.
+  List<PlanningMeeting> getPlanningByClassSync(String classId) {
+    return LocalDatabase.values(
+      _box,
+      (id, data) => PlanningMeeting.fromMap(id, data),
+    ).where((m) => m.classId == classId).toList();
+  }
+
   /// Aggiunge un nuovo meeting dopo aver verificato che non esista già
   /// un altro evento della stessa tipologia (giornata/riunione) per la
   /// stessa classe nella stessa data.

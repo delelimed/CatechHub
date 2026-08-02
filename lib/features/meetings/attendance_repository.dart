@@ -32,6 +32,22 @@ class AttendanceRepository {
     );
   }
 
+  /// Stream delle presenze filtrate per classe.
+  Stream<List<Map<String, dynamic>>> getAttendanceByClass(String classId) {
+    return LocalDatabase.watchList(
+      _box,
+      (id, data) => {'id': id, ...data},
+    ).map((records) => records.where((r) => r['classId'] == classId).toList());
+  }
+
+  /// Lista sincrona delle presenze filtrate per classe.
+  List<Map<String, dynamic>> getAttendanceByClassSync(String classId) {
+    return LocalDatabase.values(
+      _box,
+      (id, data) => {'id': id, ...data},
+    ).where((r) => r['classId'] == classId).toList();
+  }
+
   Map<String, dynamic>? getAttendanceForMeeting(String meetingId) {
     final data = _box.get(meetingId);
     if (data == null) return null;

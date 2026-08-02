@@ -8,6 +8,8 @@ import '../features/auth/login_page.dart';
 import '../features/classes/my_group_page.dart';
 import '../features/classes/group_management_page.dart';
 import '../features/classes/view_groups_page.dart';
+import '../features/classes/class_selection_page.dart';
+import '../features/classes/class_switcher_page.dart';
 import '../features/dashboard/dashboard_page.dart';
 import '../features/dashboard/statistics_page.dart';
 import '../features/students/students_page.dart';
@@ -212,7 +214,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // L'onboarding spiega il funzionamento dell'app e richiede i
       // permessi uno per uno (notifiche, fotocamera, Bluetooth).
       // ─────────────────────────────────────────────────────────────────────
-      if (location != '/onboarding') {
+      if (location != '/onboarding' && location != '/class-selection') {
         try {
           final onboardingDone =
               LocalDatabase.auth().get(
@@ -246,7 +248,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // NOTA: state.matchedLocation restituisce solo il path senza query
       // parameters, garantendo che il confronto sia preciso.
       // ─────────────────────────────────────────────────────────────────────
-      if (location == '/onboarding') return null;
+      if (location == '/onboarding' || location == '/class-selection') return null;
 
       final authState = ref.read(authStateProvider);
       final isLoginPath = location == '/login';
@@ -286,7 +288,52 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 }
               } catch (_) {}
             }
-            if (isLoginPath) return '/';
+            if (isLoginPath) {
+              // Dopo il login, se l'utente ha classi ma nessuna selezionata,
+              // reindirizza alla selezione classe
+              try {
+                final currentClassId = LocalDatabase.auth().get('current_class_id');
+                final classesBox = LocalDatabase.classes();
+                const localId = AuthService.localUserId;
+                bool hasClasses = false;
+                for (final key in classesBox.keys) {
+                  final data = LocalDatabase.toStringDynamicMap(classesBox.get(key));
+                  final ids = (data['catechistIds'] as List? ?? [])
+                      .map((e) => e.toString())
+                      .toList();
+                  if (ids.contains(localId)) {
+                    hasClasses = true;
+                    break;
+                  }
+                }
+                if (hasClasses && (currentClassId == null || (currentClassId as String).isEmpty)) {
+                  return '/class-selection';
+                }
+              } catch (_) {}
+              return '/';
+            }
+            // Se l'utente è autenticato ma non ha una classe selezionata e non è su class-selection
+            if (location != '/class-selection' && location != '/onboarding-sync') {
+              try {
+                final currentClassId = LocalDatabase.auth().get('current_class_id');
+                final classesBox = LocalDatabase.classes();
+                const localId = AuthService.localUserId;
+                bool hasClasses = false;
+                for (final key in classesBox.keys) {
+                  final data = LocalDatabase.toStringDynamicMap(classesBox.get(key));
+                  final ids = (data['catechistIds'] as List? ?? [])
+                      .map((e) => e.toString())
+                      .toList();
+                  if (ids.contains(localId)) {
+                    hasClasses = true;
+                    break;
+                  }
+                }
+                if (hasClasses && (currentClassId == null || (currentClassId as String).isEmpty)) {
+                  return '/class-selection';
+                }
+              } catch (_) {}
+            }
           }
           return null;
         },
@@ -329,6 +376,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
 
       // ═══════════════════════════════════════════════════════════════════
+      // CLASS SELECTION - Selezione classe post-login
+      // ══════════════════════════════════════════════════════════════════
+      GoRoute(
+        path: '/class-selection',
+        builder: (context, state) => const ClassSelectionPage(),
+      ),
+
+      // ══════════════════════════════════════════════════════════════════
       // AUTH - Schermata di sblocco (PIN/biometrico)
       // ═══════════════════════════════════════════════════════════════════
       GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
@@ -623,6 +678,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings/association',
         builder: (context, state) => const SettingsAssociationScreen(),
+      ),
+
+      /// Schermata per cambiare classe
+      GoRoute(
+        path: '/settings/class-switcher',
+        builder: (context, state) => const ClassSwitcherPage(),
       ),
 
       /// Procedura guidata per associare un nuovo dispositivo.

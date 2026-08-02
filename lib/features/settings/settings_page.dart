@@ -19,6 +19,7 @@ import 'package:wiredash/wiredash.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/auth/auth_provider.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../../core/providers/theme_provider.dart';
 import '../../core/security/privacy_settings.dart';
 import '../../core/services/meeting_notification_service.dart';
@@ -219,6 +220,16 @@ class SettingsPage extends ConsumerWidget {
                 subtitle: 'Vedi tutti i gruppi di cui fai parte',
                 color: const Color(0xFF174A7E),
                 onTap: () => context.push('/view-groups'),
+              ),
+
+              const SizedBox(height: 12),
+
+              _SettingsItem(
+                icon: Icons.swap_horiz_rounded,
+                title: 'Cambia classe',
+                subtitle: 'Seleziona una classe diversa',
+                color: Colors.purple,
+                onTap: () => context.push('/settings/class-switcher'),
               ),
 
               const SizedBox(height: 12),

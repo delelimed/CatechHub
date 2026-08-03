@@ -76,6 +76,8 @@ class ClassesPage extends ConsumerWidget {
                       onDelete: () async {
                         try {
                           await ref.read(classesRepoProvider).deleteClass(c.id);
+                          // Se si eliminava la classe aperta, pulisce la selezione
+                          await clearCurrentClassIfDeleted(ref, c.id);
                         } catch (e) {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(

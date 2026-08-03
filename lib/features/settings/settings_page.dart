@@ -224,26 +224,6 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: 12),
 
               _SettingsItem(
-                icon: Icons.swap_horiz_rounded,
-                title: 'Cambia classe',
-                subtitle: 'Seleziona una classe diversa',
-                color: Colors.purple,
-                onTap: () => context.push('/settings/class-switcher'),
-              ),
-
-              const SizedBox(height: 12),
-
-              _SettingsItem(
-                icon: Icons.copy_all_rounded,
-                title: 'Copia da altra classe',
-                subtitle: 'Copia contenuti senza associazioni ai ragazzi',
-                color: Colors.teal,
-                onTap: () => context.push('/settings/class-copy'),
-              ),
-
-              const SizedBox(height: 12),
-
-              _SettingsItem(
                 icon: Icons.groups_rounded,
                 title: 'Gestione Gruppo',
                 subtitle: 'Gestisci il gruppo e i ragazzi',

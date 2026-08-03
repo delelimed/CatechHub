@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_service.dart';
 import '../../core/providers/current_class_provider.dart';
@@ -43,7 +44,7 @@ class ViewGroupsPage extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  _buildCreateButton(context, isDark, colorScheme),
+                  _buildCreateButton(context, ref, isDark, colorScheme),
                 ],
               ),
             );
@@ -57,9 +58,15 @@ class ViewGroupsPage extends ConsumerWidget {
               ...myClasses.map((c) => _GroupCard(
                 schoolClass: c,
                 isActive: c.id == activeGroupId,
+                onTap: () async {
+                  await ref.read(currentClassProvider.notifier).setClass(c.id);
+                  if (context.mounted) context.push('/settings/class-switcher');
+                },
                 onDelete: () async {
                   try {
                     await ref.read(classesRepoProvider).deleteClass(c.id);
+                    // Se si eliminava la classe aperta, pulisce la selezione
+                    await clearCurrentClassIfDeleted(ref, c.id);
                   } catch (e) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -73,7 +80,25 @@ class ViewGroupsPage extends ConsumerWidget {
                 },
               )),
               const SizedBox(height: 24),
-              _buildCreateButton(context, isDark, colorScheme),
+              _buildCreateButton(context, ref, isDark, colorScheme),
+              const SizedBox(height: 12),
+              _ActionCard(
+                icon: Icons.swap_horiz_rounded,
+                title: 'Cambia classe',
+                subtitle: 'Seleziona una classe diversa',
+                color: Colors.purple,
+                isDark: isDark,
+                onTap: () => context.push('/settings/class-switcher'),
+              ),
+              const SizedBox(height: 12),
+              _ActionCard(
+                icon: Icons.copy_all_rounded,
+                title: 'Copia da altra classe',
+                subtitle: 'Copia contenuti senza associazioni ai ragazzi',
+                color: Colors.teal,
+                isDark: isDark,
+                onTap: () => context.push('/settings/class-copy'),
+              ),
               const SizedBox(height: 32),
             ],
           );
@@ -82,10 +107,10 @@ class ViewGroupsPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildCreateButton(BuildContext context, bool isDark, ColorScheme colorScheme) {
+  Widget _buildCreateButton(BuildContext context, WidgetRef ref, bool isDark, ColorScheme colorScheme) {
     return Center(
       child: ElevatedButton.icon(
-        onPressed: () => _showComingSoonDialog(context, isDark, colorScheme),
+        onPressed: () => _showCreateClassDialog(context, ref, isDark, colorScheme),
         icon: const Icon(Icons.add),
         label: const Text('Crea nuovo gruppo'),
         style: ElevatedButton.styleFrom(
@@ -100,52 +125,163 @@ class ViewGroupsPage extends ConsumerWidget {
     );
   }
 
-  void _showComingSoonDialog(BuildContext context, bool isDark, ColorScheme colorScheme) {
+  void _showCreateClassDialog(BuildContext context, WidgetRef ref, bool isDark, ColorScheme colorScheme) {
+    final controller = TextEditingController();
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: isDark ? colorScheme.surface : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.construction_rounded, size: 56, color: Colors.orange.shade400),
-            const SizedBox(height: 20),
-            Text(
-              'Prossimamente in CatechHub 2.0',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Il supporto multi-classe sarà disponibile\n'
-              'a partire dall\'anno catechistico 2027/2028.\n\n'
-              'Questa funzionalità ti permetterà di gestire\n'
-              'più gruppi contemporaneamente.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
-                height: 1.5,
-              ),
-            ),
-          ],
+        title: const Text(
+          'Nuovo gruppo',
+          style: TextStyle(color: Color(0xFF174A7E), fontWeight: FontWeight.bold),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Nome del gruppo',
+            hintText: 'Es. Prima elementare',
+            border: OutlineInputBorder(),
+          ),
         ),
         actions: [
-          ElevatedButton(
+          TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Annulla'),
+          ),
+          ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
               foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            child: const Text('Ho capito'),
+            onPressed: () async {
+              final name = controller.text.trim();
+              if (name.isEmpty) return;
+              Navigator.of(ctx).pop();
+              try {
+                await ref.read(classesRepoProvider).addClass(
+                  SchoolClass(
+                    id: '',
+                    name: name,
+                    studentIds: [],
+                    catechistIds: [AuthService.localUserId],
+                  ),
+                );
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Errore durante la creazione: $e'),
+                      backgroundColor: Colors.red.shade700,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Crea'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ActionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _ActionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final cardColor = isDark ? colorScheme.surfaceContainer : Colors.white;
+    final iconBgColor = color.withValues(alpha: isDark ? 0.2 : 0.10);
+    final titleColor = isDark ? colorScheme.onSurface : const Color(0xFF1A1A1A);
+    final subtitleColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+    final borderColor = isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.transparent;
+    final shadowColor = isDark
+        ? Colors.black.withValues(alpha: 0.4)
+        : Colors.black.withValues(alpha: 0.04);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(22),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: borderColor),
+          boxShadow: [
+            BoxShadow(
+              color: shadowColor,
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: iconBgColor,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: color),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: titleColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: subtitleColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -155,8 +291,9 @@ class _GroupCard extends StatelessWidget {
   final SchoolClass schoolClass;
   final bool isActive;
   final VoidCallback? onDelete;
+  final VoidCallback? onTap;
 
-  const _GroupCard({required this.schoolClass, this.isActive = false, this.onDelete});
+  const _GroupCard({required this.schoolClass, this.isActive = false, this.onDelete, this.onTap});
 
   void _showDeleteConfirmation(BuildContext context) {
     showDialog(
@@ -201,9 +338,12 @@ class _GroupCard extends StatelessWidget {
         : Colors.black.withValues(alpha: 0.04);
     final borderColor = isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.blue.shade100;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+    return InkWell(
+      borderRadius: BorderRadius.circular(22),
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(22),
@@ -288,6 +428,7 @@ class _GroupCard extends StatelessWidget {
               ],
             ),
         ],
+      ),
       ),
     );
   }

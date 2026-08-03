@@ -260,6 +260,11 @@ class AuthService {
       final fullName = '${firstName.trim()} ${lastName.trim()}';
       await _box.put('local_user_name', fullName);
 
+      // La fase di onboarding dedicata alla gestione multiclasse è pendente:
+      // il router reindirizzerà il catechista alla schermata "/onboarding-classes"
+      // finché non verrà completata (flag impostato a true dalla schermata).
+      await _box.put('onboarding_classes_completed', false);
+
       if (createClass) {
         await _box.put('group_name', groupName!.trim());
 
@@ -280,6 +285,12 @@ class AuthService {
           catechistDeviceCounts: {getCatechistId(): 1},
         );
         await classBox.put(classId, newClass.toMap());
+        // Forza la scrittura su disco: la classe deve sopravvivere anche a un
+        // kill del processo immediatamente dopo la creazione.
+        await classBox.flush();
+        // La classe creata durante l'onboarding è subito quella corrente,
+        // così al riavvio il router trova una selezione valida e persistente.
+        await _box.put('current_class_id', classId);
       } else {
         await _box.put('group_name', fullName);
       }

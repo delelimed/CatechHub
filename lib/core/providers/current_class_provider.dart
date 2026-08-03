@@ -52,6 +52,17 @@ final currentClassProvider = NotifierProvider<CurrentClassNotifier, String?>(
   CurrentClassNotifier.new,
 );
 
+/// Se la classe appena eliminata era quella attualmente aperta, deseleziona la
+/// classe corrente (pulisce anche `current_class_id` nel box auth).
+///
+/// Da chiamare DOPO aver eliminato la classe, così modifica/cancellazione
+/// restano sempre coerenti con la classe effettivamente aperta.
+Future<void> clearCurrentClassIfDeleted(WidgetRef ref, String deletedClassId) async {
+  if (ref.read(currentClassProvider) == deletedClassId) {
+    await ref.read(currentClassProvider.notifier).clear();
+  }
+}
+
 /// Provider che restituisce la SchoolClass corrente completa (non solo l'ID).
 final currentClassDetailsProvider = Provider<SchoolClass?>((ref) {
   final classId = ref.watch(currentClassProvider);

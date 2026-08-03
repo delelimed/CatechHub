@@ -910,11 +910,11 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
-              icon: const Icon(Icons.home_rounded),
-              label: const Text('Vai alla home',
+              icon: const Icon(Icons.groups_rounded),
+              label: const Text('Gestisci le tue classi',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               onPressed: () {
-                context.go('/');
+                context.go('/onboarding-classes');
               },
             ),
           ),

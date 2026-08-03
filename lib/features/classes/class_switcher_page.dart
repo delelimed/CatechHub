@@ -2,18 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/auth/auth_service.dart';
 import '../../core/providers/current_class_provider.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/widgets/app_scaffold.dart';
-import 'class_selection_page.dart';
 
 class ClassSwitcherPage extends ConsumerWidget {
   const ClassSwitcherPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final myClassesAsync = ref.watch(myClassesProvider);
+    final myClasses = ref.watch(myClassesProvider);
     final currentClassId = ref.watch(currentClassProvider);
     final currentClassNotifier = ref.read(currentClassProvider.notifier);
     final theme = Theme.of(context);
@@ -22,10 +20,8 @@ class ClassSwitcherPage extends ConsumerWidget {
 
     return AppScaffold(
       title: 'Cambia classe',
-      child: myClassesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Errore: $e')),
-        data: (myClasses) {
+      child: Builder(
+        builder: (context) {
           if (myClasses.isEmpty) {
             return _EmptyState(
               isDark: isDark,
@@ -34,11 +30,15 @@ class ClassSwitcherPage extends ConsumerWidget {
             );
           }
 
+          final currentName = myClasses
+              .firstWhere((c) => c.id == currentClassId, orElse: () => SchoolClass(id: '', name: '', studentIds: [], catechistIds: []))
+              .name;
+
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
               Text(
-                'Classe attuale: ${myClasses.firstWhere((c) => c.id == currentClassId, orElse: () => SchoolClass(id: '', name: '', studentIds: [], catechistIds: [])).name.isNotEmpty ? myClasses.firstWhere((c) => c.id == currentClassId, orElse: () => SchoolClass(id: '', name: '', studentIds: [], catechistIds: [])).name : 'Nessuna'}',
+                'Classe attuale: ${currentName.isNotEmpty ? currentName : 'Nessuna'}',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,

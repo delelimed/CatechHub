@@ -10,12 +10,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/auth/auth_service.dart';
-import '../../shared/models/class_model.dart';
 import '../../shared/models/planning_meeting.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/widgets/last_modified_info.dart';
-import '../classes/classes_provider.dart';
 import '../students/students_provider.dart';
 import 'attendance_repository.dart';
 
@@ -34,11 +31,11 @@ class _Student {
 }
 
 final _studentsWithHistoryProvider = StreamProvider.autoDispose
-    .family<List<_Student>, String>((ref, currentMeetingId) {
+    .family<List<_Student>, ({String currentMeetingId, String classId})>((ref, args) {
       final studentsRepo = ref.watch(studentsRepoProvider);
       final attendanceRepo = AttendanceRepository();
 
-      return studentsRepo.getAllStudents().map((students) {
+      return studentsRepo.getStudentsByClass(args.classId).map((students) {
         final attendance = attendanceRepo.getAttendanceSync()
           ..sort((a, b) {
             final aDate =
@@ -52,7 +49,7 @@ final _studentsWithHistoryProvider = StreamProvider.autoDispose
 
         final studentHistory = <String, List<String>>{};
         for (final record in attendance.where(
-          (a) => a['id'] != currentMeetingId,
+          (a) => a['id'] != args.currentMeetingId,
         )) {
           final presenceMap = Map<String, dynamic>.from(
             record['presence'] as Map? ?? {},
@@ -166,11 +163,14 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
       );
     }
 
-    final classesAsync = ref.watch(classesStreamProvider);
+    final meetingClassId =
+        meeting is PlanningMeeting ? meeting.classId : '';
     final studentsWithHistoryAsync = ref.watch(
-      _studentsWithHistoryProvider(widget.meeting?.id ?? ''),
+      _studentsWithHistoryProvider((
+        currentMeetingId: widget.meeting?.id ?? '',
+        classId: meetingClassId,
+      )),
     );
-    const uid = AuthService.localUserId;
 
     return AppScaffold(
       title: 'Appello presenze',
@@ -194,53 +194,17 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
               ),
             ),
           Expanded(
-            child: classesAsync.when(
+            child: studentsWithHistoryAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) =>
-                  Center(child: Text('Errore nel caricamento classi: $e')),
-              data: (classes) {
-                final myClass = classes.firstWhere(
-                  (c) => c.catechistIds.contains(uid),
-                  orElse: () => SchoolClass(
-                    id: '',
-                    name: '',
-                    studentIds: [],
-                    catechistIds: [],
-                  ),
-                );
-
-                if (myClass.id.isEmpty) {
+              error: (e, _) => Center(
+                child: Text('Errore nel caricamento studenti: $e'),
+              ),
+              data: (students) {
+                if (students.isEmpty) {
                   return const Center(
-                    child: Text('Nessun gruppo assegnato per questo profilo'),
+                    child: Text('Nessun ragazzo presente nel tuo gruppo'),
                   );
                 }
-
-                return studentsWithHistoryAsync.when(
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(
-                    child: Text('Errore nel caricamento studenti: $e'),
-                  ),
-                  data: (allStudents) {
-                    final students =
-                        allStudents
-                            .where((s) => myClass.studentIds.contains(s.id))
-                            .toList()
-                          ..sort((a, b) {
-                            final bySurname = a.surname.toLowerCase().compareTo(
-                              b.surname.toLowerCase(),
-                            );
-                            if (bySurname != 0) return bySurname;
-                            return a.name.toLowerCase().compareTo(
-                              b.name.toLowerCase(),
-                            );
-                          });
-
-                    if (students.isEmpty) {
-                      return const Center(
-                        child: Text('Nessun ragazzo presente nel tuo gruppo'),
-                      );
-                    }
 
                     return ListView.separated(
                       padding: const EdgeInsets.only(bottom: 100),
@@ -370,9 +334,7 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
                       },
                     );
                   },
-                );
-              },
-            ),
+                ),
           ),
         ],
       ),

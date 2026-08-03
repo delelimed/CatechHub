@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../../shared/utils/auth_utils.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/models/class_model.dart';
@@ -30,79 +31,62 @@ class GroupManagementPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final classesAsync = ref.watch(classesStreamProvider);
+    final currentClass = ref.watch(currentClassDetailsProvider);
     final studentsRepo = ref.watch(Provider((r) => StudentsRepository()));
-    const uid = AuthService.localUserId;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-    return classesAsync.when(
-      loading: () => const AppScaffold(
+    if (currentClass == null || currentClass.id.isEmpty) {
+      return const AppScaffold(
         title: 'Gestione Gruppo',
-        child: Center(child: CircularProgressIndicator()),
-      ),
-      error: (e, _) => AppScaffold(
-        title: 'Gestione Gruppo',
-        child: Center(child: Text('Errore: $e')),
-      ),
-      data: (classes) {
-        final myClass = classes.firstWhere(
-          (c) => c.catechistIds.contains(uid),
-          orElse: () =>
-              SchoolClass(id: '', name: '', studentIds: [], catechistIds: []),
-        );
+        child: Center(child: Text('Nessun gruppo assegnato')),
+      );
+    }
 
-        if (myClass.id.isEmpty) {
-          return const AppScaffold(
-            title: 'Gestione Gruppo',
-            child: Center(child: Text('Nessun gruppo assegnato')),
-          );
-        }
+    final myClass = currentClass;
 
-        return AppScaffold(
-          title: 'Gestione Gruppo',
-          floatingActionButton: FloatingActionButton.extended(
-            backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-            foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
-            icon: const Icon(Icons.add),
-            label: const Text('Nuovo ragazzo'),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const AddStudentPage(),
-                ),
-              ).then((_) {
-                // ignore: unused_result
-                ref.refresh(classesStreamProvider);
-              });
+    return AppScaffold(
+      title: 'Gestione Gruppo',
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+        foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
+        icon: const Icon(Icons.add),
+        label: const Text('Nuovo ragazzo'),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const AddStudentPage(),
+            ),
+          ).then((_) {
+            // ignore: unused_result
+            ref.refresh(classesStreamProvider);
+          });
+        },
+      ),
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _GroupHeader(
+            schoolClass: myClass,
+            onNameChanged: () {
+              // ignore: unused_result
+              ref.refresh(classesStreamProvider);
             },
           ),
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _GroupHeader(
-                schoolClass: myClass,
-                onNameChanged: () {
-                  // ignore: unused_result
-                  ref.refresh(classesStreamProvider);
-                },
-              ),
-              const SizedBox(height: 20),
-              _CatechistButton(myClass: myClass),
-              const SizedBox(height: 20),
-              _StudentsList(
-                classId: myClass.id,
-                studentIds: myClass.studentIds,
-                studentsRepo: studentsRepo,
-                isDark: isDark,
-                colorScheme: colorScheme,
-              ),
-            ],
+          const SizedBox(height: 20),
+          _CatechistButton(myClass: myClass),
+          const SizedBox(height: 20),
+          _StudentsList(
+            classId: myClass.id,
+            studentIds: myClass.studentIds,
+            studentsRepo: studentsRepo,
+            isDark: isDark,
+            colorScheme: colorScheme,
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }

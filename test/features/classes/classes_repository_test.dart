@@ -14,6 +14,7 @@ void main() {
     setUp(() async {
       tempDir = Directory.systemTemp.createTempSync('hive_test_');
       Hive.init(tempDir.path);
+      await Hive.openBox(LocalDatabase.authBox);
     });
 
     tearDown(() async {

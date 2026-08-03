@@ -3,13 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../../core/providers/class_scoped_providers.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/attachment_parent_type.dart';
 import '../../shared/models/planning_meeting.dart';
 import '../attachments/widgets/attachments_section.dart';
 import '../catechesi/catechesi_repository.dart';
 import '../../shared/models/catechesi_model.dart';
-import '../classes/classes_provider.dart';
 import 'planning_provider.dart';
 import '../../shared/widgets/last_modified_info.dart';
 
@@ -104,7 +105,7 @@ class _PlanningEditPageState extends ConsumerState<PlanningEditPage> {
   @override
   Widget build(BuildContext context) {
     final repo = ref.read(planningRepoProvider);
-    final classesAsync = ref.watch(classesStreamProvider);
+    final currentClass = ref.watch(currentClassProvider);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -132,21 +133,17 @@ class _PlanningEditPageState extends ConsumerState<PlanningEditPage> {
             ),
         ],
       ),
-      body: classesAsync.when(
-        data: (classes) {
-          final myClass = classes.where(
-            (c) => c.catechistIds.contains(AuthService.localUserId),
-          );
-
-          if (myClass.isEmpty) {
-            return const Center(
+      body: currentClass == null || currentClass.isEmpty
+          ? const Center(
               child: Text('Non sei assegnato a nessuna classe'),
-            );
-          }
+            )
+          : Builder(
+              builder: (context) {
+                final classId = currentClass;
+                final classUniqueCode =
+                    ref.watch(currentClassUniqueCodeProvider);
 
-          final classId = myClass.first.id;
-
-          return SingleChildScrollView(
+                return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Column(
               children: [
@@ -309,6 +306,7 @@ class _PlanningEditPageState extends ConsumerState<PlanningEditPage> {
                       setState(() => associatedCatechesiIds = ids);
                     },
                     readOnly: _readOnly,
+                    classUniqueCode: classUniqueCode,
                   ),
                 ],
                 const SizedBox(height: 24),
@@ -388,10 +386,8 @@ class _PlanningEditPageState extends ConsumerState<PlanningEditPage> {
               ],
             ),
           );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Errore: $e')),
-      ),
+              },
+            ),
     );
   }
 
@@ -677,10 +673,12 @@ class _CatechesiAssociationSection extends StatefulWidget {
   final List<String> associatedIds;
   final ValueChanged<List<String>> onChanged;
   final bool readOnly;
+  final String classUniqueCode;
 
   const _CatechesiAssociationSection({
     required this.associatedIds,
     required this.onChanged,
+    required this.classUniqueCode,
     this.readOnly = false,
   });
 
@@ -691,8 +689,9 @@ class _CatechesiAssociationSection extends StatefulWidget {
 class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSection> {
   late List<String> _selectedIds;
 
-  /// Recupera tutte le catechesi disponibili dal repository.
-  List<Catechesi> _allCatechesi() => CatechesiRepository().getCatechesiSync();
+  /// Recupera le catechesi della classe corrente dal repository.
+  List<Catechesi> _allCatechesi() =>
+      CatechesiRepository().getCatechesiByClassSync(widget.classUniqueCode);
 
   @override
   void initState() {
@@ -842,7 +841,7 @@ class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSecti
     final isDark = theme.brightness == Brightness.dark;
 
     final repo = CatechesiRepository();
-    final all = repo.getCatechesiSync();
+    final all = repo.getCatechesiByClassSync(widget.classUniqueCode);
     final candidates = all.where((c) => !_selectedIds.contains(c.id)).toList();
 
     await showModalBottomSheet<List<String>>(

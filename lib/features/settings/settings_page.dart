@@ -19,7 +19,6 @@ import 'package:wiredash/wiredash.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/auth/auth_provider.dart';
-import '../../core/providers/current_class_provider.dart';
 import '../../core/providers/theme_provider.dart';
 import '../../core/security/privacy_settings.dart';
 import '../../core/services/meeting_notification_service.dart';
@@ -230,6 +229,16 @@ class SettingsPage extends ConsumerWidget {
                 subtitle: 'Seleziona una classe diversa',
                 color: Colors.purple,
                 onTap: () => context.push('/settings/class-switcher'),
+              ),
+
+              const SizedBox(height: 12),
+
+              _SettingsItem(
+                icon: Icons.copy_all_rounded,
+                title: 'Copia da altra classe',
+                subtitle: 'Copia contenuti senza associazioni ai ragazzi',
+                color: Colors.teal,
+                onTap: () => context.push('/settings/class-copy'),
               ),
 
               const SizedBox(height: 12),

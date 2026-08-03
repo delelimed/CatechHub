@@ -229,16 +229,24 @@ class DataExportService {
 
   static Future<void> _importAnagrafica(Map<String, dynamic> data) async {
     await _mergeBoxRecords(LocalDatabase.students(), data['students'] as List<dynamic>?);
-    // Sostituisci completamente le classi (non merge) per evitare duplicati/vecchi dati
+    // Aggiorna (merge/aggiornamento) le sole classi presenti nel payload,
+    // preservando le altre classi (multiclasse): non si usa un clear globale,
+    // altrimenti una condivisione per-classe cancellerebbe le classi non toccate.
     final classesBox = LocalDatabase.classes();
-    await classesBox.clear();
     final incomingClasses = data['classes'] as List<dynamic>?;
     if (incomingClasses != null) {
       for (final item in incomingClasses) {
-        final record = Map<String, dynamic>.from(item as Map);
+        var record = Map<String, dynamic>.from(item as Map);
         final rawId = record.remove('id') as String?;
         final id = (rawId != null && rawId.isNotEmpty) ? rawId : LocalDatabase.newId('class');
-        // Assicura che il catechista locale sia nella classe importata
+        // Per una classe esistente aggiorna solo i campi ricevuti (merge),
+        // così i dati locali non presenti nel payload non vanno persi.
+        final existing = LocalDatabase.toStringDynamicMap(classesBox.get(id));
+        if (existing.isNotEmpty) {
+          final merged = _mergeMaps(existing, record);
+          record = merged;
+        }
+        // Assicura che il catechista locale sia nella classe import import
         final catechistIds = List<String>.from(record['catechistIds'] as List? ?? []);
         if (!catechistIds.contains(AuthService.localUserId)) {
           catechistIds.add(AuthService.localUserId);

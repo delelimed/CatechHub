@@ -10,6 +10,7 @@ import '../features/classes/group_management_page.dart';
 import '../features/classes/view_groups_page.dart';
 import '../features/classes/class_selection_page.dart';
 import '../features/classes/class_switcher_page.dart';
+import '../features/classes/class_copy_page.dart';
 import '../features/dashboard/dashboard_page.dart';
 import '../features/dashboard/statistics_page.dart';
 import '../features/students/students_page.dart';
@@ -684,6 +685,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings/class-switcher',
         builder: (context, state) => const ClassSwitcherPage(),
+      ),
+
+      /// Schermata per copiare contenuti da un'altra classe
+      GoRoute(
+        path: '/settings/class-copy',
+        builder: (context, state) => const ClassCopyPage(),
       ),
 
       /// Procedura guidata per associare un nuovo dispositivo.

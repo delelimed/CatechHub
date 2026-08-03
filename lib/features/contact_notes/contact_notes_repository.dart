@@ -7,6 +7,9 @@ import '../../shared/utils/auth_utils.dart';
 /// Provider Riverpod singleton del repository delle note di contatto.
 final contactNotesRepoProvider = Provider((ref) => ContactNotesRepository());
 
+/// Provider Riverpod singleton (alias) del repository delle note di contatto.
+final contactNotesRepositoryProvider = contactNotesRepoProvider;
+
 /// Repository CRUD per le [ContactNote] persistenti su Hive.
 ///
 /// In CateREG ogni nota di contatto è legata a uno studente tramite
@@ -37,6 +40,39 @@ class ContactNotesRepository {
         .where((n) => n.studentId == studentId)
         .toList()
       ..sort((a, b) => b.dateTime.compareTo(a.dateTime));
+  }
+
+  /// Stream in tempo reale delle note di contatto appartenenti alla classe
+  /// identificata dal [classUniqueCode], dalla più recente alla più vecchia.
+  Stream<List<Map<String, dynamic>>> getNotesByClass(String classUniqueCode) {
+    return LocalDatabase.watchList(
+      _box,
+      (id, data) => {'id': id, ...data},
+    ).map((notes) => notes
+        .where((n) => n['classUniqueCode'] == classUniqueCode)
+        .toList()
+      ..sort((a, b) {
+        final aDate = DateTime.tryParse(a['dateTime']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final bDate = DateTime.tryParse(b['dateTime']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        return bDate.compareTo(aDate);
+      }));
+  }
+
+  /// Lettura sincrona delle note di contatto di una classe.
+  List<Map<String, dynamic>> getNotesByClassSync(String classUniqueCode) {
+    return LocalDatabase.values(
+      _box,
+      (id, data) => {'id': id, ...data},
+    ).where((n) => n['classUniqueCode'] == classUniqueCode).toList()
+      ..sort((a, b) {
+        final aDate = DateTime.tryParse(a['dateTime']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final bDate = DateTime.tryParse(b['dateTime']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        return bDate.compareTo(aDate);
+      });
   }
 
   /// Aggiunge una nuova [ContactNote] al database Hive.

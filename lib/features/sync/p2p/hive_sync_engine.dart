@@ -130,6 +130,78 @@ class SyncResult {
   }
 }
 
+/// Scope per-classe per la sincronizzazione.
+///
+/// Quando impostato, solo i record appartenenti alla classe indicata vengono
+/// sincronizzati. Se `null`, vengono sincronizzate tutte le classi
+/// (modalità "Mio Dispositivo").
+class SyncClassScope {
+  final String classId;
+  final String classUniqueCode;
+
+  const SyncClassScope({
+    required this.classId,
+    required this.classUniqueCode,
+  });
+
+  bool get isAll => false;
+}
+
+/// Determina se un record (per box/id/dati) appartiene allo scope classe.
+/// Se [scope] è `null` restituisce sempre `true` (sincronizza tutte le classi).
+bool _recordMatchesScope({
+  required String boxName,
+  required String id,
+  required Map<String, dynamic> data,
+  SyncClassScope? scope,
+}) {
+  if (scope == null) return true;
+
+  // Il record della classe stessa: match per id o uniqueCode.
+  if (boxName == LocalDatabase.classesBox) {
+    return id == scope.classId ||
+        data['uniqueCode']?.toString() == scope.classUniqueCode;
+  }
+
+  // Record con classId esplicito (students, planning, attendance).
+  final classId = data['classId']?.toString();
+  if (classId != null && classId.isNotEmpty) {
+    return classId == scope.classId;
+  }
+
+  // Record con classUniqueCode (documents, catechesi, contact_notes,
+  // student_daily_notes, avvisi, attachments).
+  final classCode = data['classUniqueCode']?.toString();
+  if (classCode != null && classCode.isNotEmpty) {
+    return classCode == scope.classUniqueCode;
+  }
+
+  // Box associativi senza campo classe diretto: risolviamo tramite il padre.
+  if (boxName == LocalDatabase.documentDeliveriesBox) {
+    try {
+      final docRaw = Hive.box<Map>(LocalDatabase.documentsBox).get(id);
+      if (docRaw != null) {
+        final doc = LocalDatabase.toStringDynamicMap(docRaw);
+        return doc['classUniqueCode']?.toString() == scope.classUniqueCode;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  if (boxName == LocalDatabase.meetingCatechesiBox) {
+    try {
+      final meetingRaw = Hive.box<Map>(LocalDatabase.planningBox).get(id);
+      if (meetingRaw != null) {
+        final meeting = LocalDatabase.toStringDynamicMap(meetingRaw);
+        return meeting['classId']?.toString() == scope.classId;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  return false;
+}
+
 class HiveSyncEngine {
   static final HiveSyncEngine _instance = HiveSyncEngine._();
   factory HiveSyncEngine() => _instance;
@@ -174,7 +246,7 @@ class HiveSyncEngine {
     return sha256.convert(utf8.encode(json)).toString().substring(0, 12);
   }
 
-  List<SyncIndexEntry> buildLocalIndex() {
+  List<SyncIndexEntry> buildLocalIndex([SyncClassScope? scope]) {
     final index = <SyncIndexEntry>[];
 
     for (final entry in syncableBoxes.entries) {
@@ -186,6 +258,14 @@ class HiveSyncEngine {
           final raw = box.get(key);
           if (raw == null) continue;
           final data = LocalDatabase.toStringDynamicMap(raw);
+          if (!_recordMatchesScope(
+            boxName: boxName,
+            id: id,
+            data: data,
+            scope: scope,
+          )) {
+            continue;
+          }
           final updatedAt =
               DateTime.tryParse(data['updatedAt']?.toString() ?? '')
                       ?.toUtc() ??
@@ -206,7 +286,8 @@ class HiveSyncEngine {
     return index;
   }
 
-  List<SyncRecord> extractModifiedRecords(DateTime since) {
+  List<SyncRecord> extractModifiedRecords(DateTime since,
+      [SyncClassScope? scope]) {
     final records = <SyncRecord>[];
 
     for (final entry in syncableBoxes.entries) {
@@ -218,6 +299,14 @@ class HiveSyncEngine {
           final raw = box.get(key);
           if (raw == null) continue;
           final data = LocalDatabase.toStringDynamicMap(raw);
+          if (!_recordMatchesScope(
+            boxName: boxName,
+            id: id,
+            data: data,
+            scope: scope,
+          )) {
+            continue;
+          }
           final updatedAt =
               DateTime.tryParse(data['updatedAt']?.toString() ?? '')
                       ?.toUtc() ??
@@ -288,7 +377,8 @@ class HiveSyncEngine {
     return needed;
   }
 
-  List<SyncRecord> fetchRecords(List<String> recordKeys) {
+  List<SyncRecord> fetchRecords(List<String> recordKeys,
+      [SyncClassScope? scope]) {
     final records = <SyncRecord>[];
 
     for (final key in recordKeys) {
@@ -302,6 +392,14 @@ class HiveSyncEngine {
         final raw = box.get(recordId);
         if (raw == null) continue;
         final data = LocalDatabase.toStringDynamicMap(raw);
+        if (!_recordMatchesScope(
+          boxName: boxName,
+          id: recordId,
+          data: data,
+          scope: scope,
+        )) {
+          continue;
+        }
         records.add(SyncRecord.fromHiveEntry(
           id: recordId,
           boxName: boxName,
@@ -385,8 +483,9 @@ class HiveSyncEngine {
   }
 
   Future<SyncResult> applyRemoteRecords(
-    List<SyncRecord> records,
-  ) async {
+    List<SyncRecord> records, {
+    SyncClassScope? scope,
+  }) async {
     var appliedCount = 0;
     var conflictsResolved = 0;
     final newConflicts = <String, List<String>>{};
@@ -398,6 +497,15 @@ class HiveSyncEngine {
         final box = Hive.box<Map>(remote.boxName);
         final localRaw = box.get(remote.id);
         final isClassBox = remote.boxName == 'classes';
+
+        if (!_recordMatchesScope(
+          boxName: remote.boxName,
+          id: remote.id,
+          data: remote.data,
+          scope: scope,
+        )) {
+          continue;
+        }
 
         if (localRaw == null) {
           if (!remote.isDeleted) {
@@ -502,6 +610,7 @@ class HiveSyncEngine {
     required List<SyncIndexEntry> remoteIndex,
     required Future<List<SyncRecord>> Function(List<String> neededKeys)
         fetchRemoteRecords,
+    SyncClassScope? scope,
   }) async {
     try {
       final neededFromRemote = computeNeededRecords(remoteIndex);
@@ -511,13 +620,16 @@ class HiveSyncEngine {
 
       final neededFromLocal = computeNeededRecords(localIndex);
       if (neededFromLocal.isNotEmpty) {
-        final localRecords = fetchRecords(neededFromLocal);
+        final localRecords = fetchRecords(neededFromLocal, scope);
         sentCount = localRecords.length;
       }
 
       if (neededFromRemote.isNotEmpty) {
         final remoteRecords = await fetchRemoteRecords(neededFromRemote);
-        final result = await applyRemoteRecords(remoteRecords);
+        final result = await applyRemoteRecords(
+          remoteRecords,
+          scope: scope,
+        );
         receivedCount = result.receivedRecords;
       }
 
@@ -538,9 +650,10 @@ class HiveSyncEngine {
 
   Future<void> exportToJson({
     required String Function(Map<String, dynamic>) encryptRecord,
+    SyncClassScope? scope,
   }) async {
     final records = extractModifiedRecords(
-        DateTime.fromMillisecondsSinceEpoch(0));
+        DateTime.fromMillisecondsSinceEpoch(0), scope);
 
     for (final record in records) {
       encryptRecord(record.data);
@@ -606,10 +719,11 @@ class HiveSyncEngine {
     required Future<void> Function(List<SyncIndexEntry> index) sendLocalIndex,
     required Future<void> Function(List<SyncRecord> records) sendLocalRecords,
     void Function(int sent, int received, int total)? onProgress,
+    SyncClassScope? scope,
   }) async {
     try {
       // Step 1: Build local index
-      final localIndex = buildLocalIndex();
+      final localIndex = buildLocalIndex(scope);
       
       // Step 2: Send local index to remote
       await sendLocalIndex(localIndex);
@@ -626,7 +740,7 @@ class HiveSyncEngine {
       // Step 6: Send our records that remote needs
       var sentCount = 0;
       if (neededFromLocal.isNotEmpty) {
-        final localRecords = fetchRecords(neededFromLocal);
+        final localRecords = fetchRecords(neededFromLocal, scope);
         await sendLocalRecords(localRecords);
         sentCount = localRecords.length;
       }
@@ -639,7 +753,10 @@ class HiveSyncEngine {
         final remoteRecords = await fetchRemoteRecords(neededFromRemote);
         
         // Apply with conflict resolution
-        final result = await applyRemoteRecords(remoteRecords);
+        final result = await applyRemoteRecords(
+          remoteRecords,
+          scope: scope,
+        );
         receivedCount = result.receivedRecords;
         conflictsResolved = result.conflictsResolved;
       }

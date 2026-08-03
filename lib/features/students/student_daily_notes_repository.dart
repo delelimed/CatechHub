@@ -7,6 +7,9 @@ import '../../shared/utils/auth_utils.dart';
 final studentDailyNotesRepoProvider =
     Provider((ref) => StudentDailyNotesRepository());
 
+/// Provider Riverpod singleton (alias) del repository delle note giornaliere.
+final studentDailyNotesRepositoryProvider = studentDailyNotesRepoProvider;
+
 /// Repository per le annotazioni giornaliere per studente, archiviate
 /// nel Box `studentDailyNotes` di Hive.
 /// Modello: [StudentDailyNote]. Espone stream in tempo reale
@@ -34,6 +37,39 @@ class StudentDailyNotesRepository {
         .where((n) => n.studentId == studentId)
         .toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+
+  /// Stream in tempo reale delle note giornaliere della classe identificata
+  /// dal [classUniqueCode], dalla più recente alla più vecchia.
+  Stream<List<Map<String, dynamic>>> getNotesByClass(String classUniqueCode) {
+    return LocalDatabase.watchList(
+      _box,
+      (id, data) => {'id': id, ...data},
+    ).map((notes) => notes
+        .where((n) => n['classUniqueCode'] == classUniqueCode)
+        .toList()
+      ..sort((a, b) {
+        final aDate = DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final bDate = DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        return bDate.compareTo(aDate);
+      }));
+  }
+
+  /// Lettura sincrona delle note giornaliere di una classe.
+  List<Map<String, dynamic>> getNotesByClassSync(String classUniqueCode) {
+    return LocalDatabase.values(
+      _box,
+      (id, data) => {'id': id, ...data},
+    ).where((n) => n['classUniqueCode'] == classUniqueCode).toList()
+      ..sort((a, b) {
+        final aDate = DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final bDate = DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        return bDate.compareTo(aDate);
+      });
   }
 
   Future<void> addNote(StudentDailyNote note) async {

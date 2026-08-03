@@ -16,6 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../../shared/utils/auth_utils.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/models/class_model.dart';
@@ -31,12 +32,7 @@ class ClassesPage extends ConsumerWidget {
 
     return classesAsync.when(
       data: (classes) {
-        final activeClassId = classes.isNotEmpty
-            ? classes.firstWhere(
-                (c) => c.catechistIds.contains(AuthService.localUserId),
-                orElse: () => classes.first,
-              ).id
-            : null;
+        final activeClassId = ref.watch(currentClassProvider) ?? '';
 
         return AppScaffold(
           title: 'Gruppi',

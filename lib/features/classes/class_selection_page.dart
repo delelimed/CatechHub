@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/auth/auth_service.dart';
 import '../../core/providers/current_class_provider.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/widgets/app_scaffold.dart';
@@ -12,7 +11,7 @@ class ClassSelectionPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final myClassesAsync = ref.watch(myClassesProvider);
+    final myClasses = ref.watch(myClassesProvider);
     final currentClassNotifier = ref.read(currentClassProvider.notifier);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -20,11 +19,8 @@ class ClassSelectionPage extends ConsumerWidget {
 
     return AppScaffold(
       title: 'Scegli una classe',
-      automaticallyImplyLeading: false,
-      child: myClassesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Errore: $e')),
-        data: (myClasses) {
+      child: Builder(
+        builder: (context) {
           if (myClasses.isEmpty) {
             return _EmptyState(
               isDark: isDark,

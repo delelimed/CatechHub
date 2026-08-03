@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import 'classes_provider.dart';
@@ -48,7 +49,7 @@ class ViewGroupsPage extends ConsumerWidget {
             );
           }
 
-          final activeGroupId = myClasses.isNotEmpty ? myClasses.first.id : '';
+          final activeGroupId = ref.watch(currentClassProvider) ?? '';
 
           return ListView(
             padding: const EdgeInsets.all(16),

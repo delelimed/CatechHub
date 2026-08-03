@@ -18,12 +18,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/auth/auth_service.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/models/student_model.dart';
 
-import '../classes/classes_provider.dart';
 import '../meetings/attendance_repository.dart';
 import '../students/students_provider.dart';
 import 'attendance_print_page.dart';
@@ -121,8 +120,7 @@ class MyGroupPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final classesAsync = ref.watch(classesStreamProvider);
-    const uid = AuthService.localUserId;
+    final currentClass = ref.watch(currentClassDetailsProvider);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -131,30 +129,26 @@ class MyGroupPage extends ConsumerWidget {
 
     return AppScaffold(
       title: 'Il mio gruppo',
-      child: classesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Errore: $e')),
-        data: (classes) {
-          final myClass = classes.firstWhere(
-            (c) => c.catechistIds.contains(uid),
-            orElse: () =>
-                SchoolClass(id: '', name: '', studentIds: [], catechistIds: []),
-          );
+      child: currentClass == null
+          ? const Center(child: Text('Nessun gruppo assegnato'))
+          : Builder(
+              builder: (context) {
+                final myClass = currentClass;
 
-          if (myClass.id.isEmpty) {
-            return const Center(child: Text('Nessun gruppo assegnato'));
-          }
+                if (myClass.id.isEmpty) {
+                  return const Center(child: Text('Nessun gruppo assegnato'));
+                }
 
-          final studentsStatsAsync = ref.watch(
-            _groupStudentsStatsProvider(myClass.studentIds),
-          );
+                final studentsStatsAsync = ref.watch(
+                  _groupStudentsStatsProvider(myClass.studentIds),
+                );
 
-          return studentsStatsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) =>
-                Center(child: Text('Errore nel caricamento dati: $e')),
-            data: (studentsWithStats) {
-              return Column(
+                return studentsStatsAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, _) =>
+                      Center(child: Text('Errore nel caricamento dati: $e')),
+                  data: (studentsWithStats) {
+                    return Column(
                 children: [
                   const SizedBox(height: 12),
 
@@ -211,8 +205,8 @@ Padding(
               );
             },
           );
-        },
-      ),
+              },
+            ),
     );
   }
 }

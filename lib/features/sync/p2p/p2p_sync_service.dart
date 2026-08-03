@@ -758,7 +758,8 @@ class P2PSyncService {
 
     final engine = HiveSyncEngine();
     final lastSync = await engine.getLastSyncTimestamp();
-    final modified = engine.extractModifiedRecords(lastSync);
+    final scope = _currentSyncScope();
+    final modified = engine.extractModifiedRecords(lastSync, scope);
     if (modified.isEmpty) {
       addLog('DEBUG', 'Modifica locale rilevata ma nessun nuovo record');
       return;
@@ -1256,6 +1257,39 @@ void _onConnectionResult(String endpointId, Status status) {
       return ids;
     } catch (_) {}
     return {};
+  }
+
+  /// Restituisce lo scope di sincronizzazione in base al ruolo corrente.
+  ///
+  /// - `mioDispositivo`: `null` → sincronizza TUTTE le classi.
+  /// - `altroCatechista`: scope limitato alla classe corrente (selezionata).
+  /// - `responsabile`: tutte le classi.
+  SyncClassScope? _currentSyncScope() {
+    if (_state.role == P2PSyncRole.altroCatechista) {
+      try {
+        final auth = LocalDatabase.auth();
+        final classId = auth.get('current_class_id') as String?;
+        if (classId == null || classId.isEmpty) {
+          addLog('WARN', 'Ruolo altroCatechista ma nessuna classe corrente: sync tutte le classi');
+          return null;
+        }
+        final classData = LocalDatabase.classes().get(classId);
+        final data = LocalDatabase.toStringDynamicMap(classData);
+        final uniqueCode = data['uniqueCode']?.toString() ?? '';
+        if (uniqueCode.isEmpty) {
+          addLog('WARN', 'Classe corrente senza uniqueCode: sync tutte le classi');
+          return null;
+        }
+        return SyncClassScope(
+          classId: classId,
+          classUniqueCode: uniqueCode,
+        );
+      } catch (e) {
+        addLog('WARN', 'Errore calcolo scope classe corrente: $e');
+        return null;
+      }
+    }
+    return null;
   }
 
   Future<void> _sendHandshakePayload(String endpointId) async {
@@ -2196,7 +2230,8 @@ void _onConnectionResult(String endpointId, Status status) {
 
       final engine = HiveSyncEngine();
       final lastSync = await engine.getLastSyncTimestamp();
-      final localIndex = engine.buildLocalIndex();
+      final scope = _currentSyncScope();
+      final localIndex = engine.buildLocalIndex(scope);
       addLog('DEBUG',
           'Indice locale costruito: ${localIndex.length} record, lastSync: $lastSync');
 
@@ -2460,7 +2495,8 @@ void _onConnectionResult(String endpointId, Status status) {
     try {
       phase.indexSent = true;
       final engine = HiveSyncEngine();
-      final localIndex = engine.buildLocalIndex();
+      final scope = _currentSyncScope();
+      final localIndex = engine.buildLocalIndex(scope);
 
       final remoteIndexData = message['index'] as List<dynamic>? ?? [];
       final remoteIndex = remoteIndexData
@@ -2493,7 +2529,7 @@ void _onConnectionResult(String endpointId, Status status) {
       }
 
       if (neededFromLocal.isNotEmpty) {
-        final localRecords = engine.fetchRecords(neededFromLocal);
+        final localRecords = engine.fetchRecords(neededFromLocal, scope);
         addLog('INFO', 'Invio ${localRecords.length} record al remoto');
         _updateState(_state.copyWith(
           sentRecordsCount: localRecords.length,
@@ -2550,6 +2586,7 @@ void _onConnectionResult(String endpointId, Status status) {
     final phase = _endpointSyncPhase[endpointId] ??= _SyncPhase2();
     try {
       final engine = HiveSyncEngine();
+      final scope = _currentSyncScope();
       final keys = (message['keys'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
@@ -2562,7 +2599,7 @@ void _onConnectionResult(String endpointId, Status status) {
         return;
       }
 
-      final records = engine.fetchRecords(keys);
+      final records = engine.fetchRecords(keys, scope);
       addLog('INFO', 'Invio ${records.length} record richiesti');
       _updateState(_state.copyWith(
         sentRecordsCount: _state.sentRecordsCount + records.length,
@@ -2595,10 +2632,11 @@ void _onConnectionResult(String endpointId, Status status) {
       }
       try {
         final engine = HiveSyncEngine();
+        final scope = _currentSyncScope();
         final recordsData = message['records'] as List<dynamic>? ?? [];
         final records = engine.deserializeRecords(recordsData);
         if (records.isNotEmpty) {
-          await engine.applyRemoteRecords(records);
+          await engine.applyRemoteRecords(records, scope: scope);
           await engine.saveLastSyncTimestamp(DateTime.now().toUtc());
           addLog('DEBUG', 'Dati incrementali applicati: ${records.length} record');
         }
@@ -2616,12 +2654,13 @@ void _onConnectionResult(String endpointId, Status status) {
     }
     try {
       final engine = HiveSyncEngine();
+      final scope = _currentSyncScope();
       final recordsData = message['records'] as List<dynamic>? ?? [];
       final records = engine.deserializeRecords(recordsData);
       addLog('DEBUG',
           'Dati sync ricevuti: ${records.length} record da applicare');
 
-      final result = await engine.applyRemoteRecords(records);
+      final result = await engine.applyRemoteRecords(records, scope: scope);
       addLog('INFO',
           'Applicati ${result.receivedRecords} record, ${result.conflictsResolved} conflitti risolti');
       await _saveReceivedAttachmentFiles(

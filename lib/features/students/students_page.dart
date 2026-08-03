@@ -7,9 +7,10 @@ import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/widgets/last_modified_info.dart';
 import '../../shared/models/student_model.dart';
 import '../documents/documents_provider.dart';
-import 'student_quick_view_page.dart';
-import 'students_add_page.dart';
-import 'edit_student_page.dart';
+import 'student_quick_view_page.dart' hide studentsRepoProvider;
+import 'students_add_page.dart' hide studentsRepoProvider;
+import 'edit_student_page.dart' hide studentsRepoProvider;
+import 'students_provider.dart';
 
 /// Schermata principale dell'area ragazzi: elenco completo degli studenti
 /// con cards nominative, indicatori visivi di documenti mancanti (arancione)

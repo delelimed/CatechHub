@@ -1,18 +1,25 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../features/classes/classes_provider.dart';
 import '../../shared/models/class_model.dart';
+import '../auth/auth_service.dart';
 import '../storage/local_database.dart';
 
-/// Provider per gestire la classe attualmente selezionata dall'utente.
+/// Notifier per gestire la classe attualmente selezionata dall'utente.
 ///
 /// Questa classe è il punto centrale per lo scope per-classe di tutti i dati
 /// dell'app: studenti, incontri, documenti, presenze, catechesi, ecc.
 /// Quando l'utente cambia classe, tutti i provider che dipendono da questo
 /// si aggiornano automaticamente.
-class CurrentClassNotifier extends StateNotifier<String?> {
-  CurrentClassNotifier() : super(null);
+class CurrentClassNotifier extends Notifier<String?> {
+  @override
+  String? build() {
+    final box = LocalDatabase.auth();
+    final saved = box.get('current_class_id') as String?;
+    return (saved != null && saved.isNotEmpty) ? saved : null;
+  }
 
-  /// Imposta la classe corrente e la salva in SharedPreferences per persistenza.
+  /// Imposta la classe corrente e la salva in Hive per persistenza.
   Future<void> setClass(String? classId) async {
     if (classId == state) return;
     state = classId;
@@ -24,11 +31,11 @@ class CurrentClassNotifier extends StateNotifier<String?> {
     }
   }
 
-  /// Carica la classe salvata all'avvio dell'app.
+  /// Carica la classe salvata all'avvio dell'app (già gestita in [build]).
   Future<void> loadSavedClass() async {
     final box = LocalDatabase.auth();
     final saved = box.get('current_class_id') as String?;
-    if (saved != null && saved.isNotEmpty) {
+    if (saved != null && saved.isNotEmpty && saved != state) {
       state = saved;
     }
   }
@@ -41,12 +48,12 @@ class CurrentClassNotifier extends StateNotifier<String?> {
   }
 }
 
-final currentClassProvider = StateNotifierProvider<CurrentClassNotifier, String?>((ref) {
-  return CurrentClassNotifier();
-});
+final currentClassProvider = NotifierProvider<CurrentClassNotifier, String?>(
+  CurrentClassNotifier.new,
+);
 
 /// Provider che restituisce la SchoolClass corrente completa (non solo l'ID).
-final currentClassDetailsProvider = Provider.autoDispose<SchoolClass?>((ref) {
+final currentClassDetailsProvider = Provider<SchoolClass?>((ref) {
   final classId = ref.watch(currentClassProvider);
   if (classId == null) return null;
   final classesAsync = ref.watch(classesStreamProvider);
@@ -61,7 +68,7 @@ final currentClassDetailsProvider = Provider.autoDispose<SchoolClass?>((ref) {
 });
 
 /// Provider che restituisce l'elenco delle classi a cui appartiene l'utente corrente.
-final myClassesProvider = Provider.autoDispose<List<SchoolClass>>((ref) {
+final myClassesProvider = Provider<List<SchoolClass>>((ref) {
   const uid = AuthService.localUserId;
   final classesAsync = ref.watch(classesStreamProvider);
   return classesAsync.when(

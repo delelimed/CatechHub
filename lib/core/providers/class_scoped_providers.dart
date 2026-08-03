@@ -1,17 +1,19 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/current_class_provider.dart';
-import '../../core/storage/local_database.dart';
 import '../../features/catechesi/catechesi_repository.dart';
-import '../../features/classes/classes_repository.dart';
 import '../../features/classes/classes_provider.dart';
+import '../../features/contact_notes/avvisi_repository.dart';
 import '../../features/contact_notes/contact_notes_repository.dart';
 import '../../features/documents/documents_repository.dart';
 import '../../features/meetings/attendance_repository.dart';
-import '../../features/meetings/planning_repository.dart';
+import '../../features/planning/planning_repository.dart';
 import '../../features/students/student_daily_notes_repository.dart';
-import '../../features/students/students_repository.dart';
+import '../../features/students/students_provider.dart';
+import '../../shared/models/catechesi_model.dart';
+import '../../shared/models/avviso_template_model.dart';
 import '../../shared/models/class_model.dart';
+import '../../shared/models/planning_meeting.dart';
 import '../../shared/models/student_model.dart';
 
 /// ═══════════════════════════════════════════════════════════════════════════════
@@ -25,6 +27,13 @@ import '../../shared/models/student_model.dart';
 /// Provider che restituisce l'ID della classe corrente (stringa vuota se nessuna).
 final currentClassIdProvider = Provider<String>((ref) {
   return ref.watch(currentClassProvider) ?? '';
+});
+
+/// Provider che restituisce il codice univoco della classe corrente
+/// (stringa vuota se nessuna classe selezionata).
+final currentClassUniqueCodeProvider = Provider<String>((ref) {
+  final details = ref.watch(currentClassDetailsProvider);
+  return details?.uniqueCode ?? '';
 });
 
 /// Stream degli studenti della classe corrente.
@@ -77,66 +86,82 @@ final currentClassAttendanceSyncProvider = Provider<List<Map<String, dynamic>>>(
 
 /// Stream dei documenti della classe corrente.
 final currentClassDocumentsProvider = StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
-  final classId = ref.watch(currentClassIdProvider);
-  if (classId.isEmpty) return const Stream.empty();
+  final classCode = ref.watch(currentClassUniqueCodeProvider);
+  if (classCode.isEmpty) return const Stream.empty();
   final repo = ref.read(documentsRepositoryProvider);
-  return repo.getDocumentsByClass(classId);
+  return repo.getDocumentsByClass(classCode);
 });
 
 /// Lista sincrona dei documenti della classe corrente.
 final currentClassDocumentsSyncProvider = Provider<List<Map<String, dynamic>>>((ref) {
-  final classId = ref.watch(currentClassIdProvider);
-  if (classId.isEmpty) return [];
+  final classCode = ref.watch(currentClassUniqueCodeProvider);
+  if (classCode.isEmpty) return [];
   final repo = ref.read(documentsRepositoryProvider);
-  return repo.getDocumentsByClassSync(classId);
+  return repo.getDocumentsByClassSync(classCode);
 });
 
 /// Stream delle note di contatto della classe corrente.
 final currentClassContactNotesProvider = StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
-  final classId = ref.watch(currentClassIdProvider);
-  if (classId.isEmpty) return const Stream.empty();
+  final classCode = ref.watch(currentClassUniqueCodeProvider);
+  if (classCode.isEmpty) return const Stream.empty();
   final repo = ref.read(contactNotesRepositoryProvider);
-  return repo.getNotesByClass(classId);
+  return repo.getNotesByClass(classCode);
 });
 
 /// Lista sincrona delle note di contatto della classe corrente.
 final currentClassContactNotesSyncProvider = Provider<List<Map<String, dynamic>>>((ref) {
-  final classId = ref.watch(currentClassIdProvider);
-  if (classId.isEmpty) return [];
+  final classCode = ref.watch(currentClassUniqueCodeProvider);
+  if (classCode.isEmpty) return [];
   final repo = ref.read(contactNotesRepositoryProvider);
-  return repo.getNotesByClassSync(classId);
+  return repo.getNotesByClassSync(classCode);
 });
 
 /// Stream delle catechesi della classe corrente.
 final currentClassCatechesiProvider = StreamProvider.autoDispose<List<Catechesi>>((ref) {
-  final classId = ref.watch(currentClassIdProvider);
-  if (classId.isEmpty) return const Stream.empty();
+  final classCode = ref.watch(currentClassUniqueCodeProvider);
+  if (classCode.isEmpty) return const Stream.empty();
   final repo = ref.read(catechesiRepositoryProvider);
-  return repo.getCatechesiByClass(classId);
+  return repo.getCatechesiByClass(classCode);
 });
 
 /// Lista sincrona delle catechesi della classe corrente.
 final currentClassCatechesiSyncProvider = Provider<List<Catechesi>>((ref) {
-  final classId = ref.watch(currentClassIdProvider);
-  if (classId.isEmpty) return [];
+  final classCode = ref.watch(currentClassUniqueCodeProvider);
+  if (classCode.isEmpty) return [];
   final repo = ref.read(catechesiRepositoryProvider);
-  return repo.getCatechesiByClassSync(classId);
+  return repo.getCatechesiByClassSync(classCode);
 });
 
 /// Stream delle note giornaliere degli studenti della classe corrente.
 final currentClassDailyNotesProvider = StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
-  final classId = ref.watch(currentClassIdProvider);
-  if (classId.isEmpty) return const Stream.empty();
+  final classCode = ref.watch(currentClassUniqueCodeProvider);
+  if (classCode.isEmpty) return const Stream.empty();
   final repo = ref.read(studentDailyNotesRepositoryProvider);
-  return repo.getNotesByClass(classId);
+  return repo.getNotesByClass(classCode);
 });
 
 /// Lista sincrona delle note giornaliere della classe corrente.
 final currentClassDailyNotesSyncProvider = Provider<List<Map<String, dynamic>>>((ref) {
-  final classId = ref.watch(currentClassIdProvider);
-  if (classId.isEmpty) return [];
+  final classCode = ref.watch(currentClassUniqueCodeProvider);
+  if (classCode.isEmpty) return [];
   final repo = ref.read(studentDailyNotesRepositoryProvider);
-  return repo.getNotesByClassSync(classId);
+  return repo.getNotesByClassSync(classCode);
+});
+
+/// Stream degli avvisi della classe corrente.
+final currentClassAvvisiProvider = StreamProvider.autoDispose<List<AvvisoTemplate>>((ref) {
+  final classCode = ref.watch(currentClassUniqueCodeProvider);
+  if (classCode.isEmpty) return const Stream.empty();
+  final repo = ref.read(avvisiRepoProvider);
+  return repo.watchByClass(classCode);
+});
+
+/// Lista sincrona degli avvisi della classe corrente.
+final currentClassAvvisiSyncProvider = Provider<List<AvvisoTemplate>>((ref) {
+  final classCode = ref.watch(currentClassUniqueCodeProvider);
+  if (classCode.isEmpty) return [];
+  final repo = ref.read(avvisiRepoProvider);
+  return repo.getByClassSync(classCode);
 });
 
 /// Stream delle classi dell'utente corrente (già esiste come myClassesProvider).

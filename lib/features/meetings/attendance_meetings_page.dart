@@ -3,11 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/auth/auth_service.dart';
+import '../../core/providers/class_scoped_providers.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/widgets/last_modified_info.dart';
-import '../classes/classes_provider.dart';
-import '../planning/planning_provider.dart';
 import 'attendance_repository.dart';
 
 class AttendanceMeetingsPage extends ConsumerStatefulWidget {
@@ -51,74 +50,59 @@ class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final classesAsync = ref.watch(classesStreamProvider);
-    final planningRepo = ref.watch(planningRepoProvider);
+    final currentClassId = ref.watch(currentClassProvider);
+    final planningAsync = ref.watch(currentClassPlanningProvider);
 
     return AppScaffold(
       title: 'Seleziona incontro',
-      child: classesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _EmptyState(
-          icon: Icons.gpp_bad_rounded,
-          title: 'Errore',
-          subtitle: e.toString(),
-        ),
-        data: (classes) {
-          final myClass = classes.where(
-            (c) => c.catechistIds.contains(AuthService.localUserId),
-          );
-
-          if (myClass.isEmpty) {
-            return const _EmptyState(
+      child: currentClassId == null
+          ? const _EmptyState(
               icon: Icons.error_outline_rounded,
               title: 'Attenzione',
-              subtitle: 'Non sei associato a nessuna classe come catechista',
-            );
-          }
+              subtitle: 'Nessuna classe selezionata',
+            )
+          : planningAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => _EmptyState(
+                icon: Icons.gpp_bad_rounded,
+                title: 'Errore',
+                subtitle: e.toString(),
+              ),
+              data: (allMeetings) {
+                final now = DateTime.now();
+                final today = DateTime(now.year, now.month, now.day);
 
-          final classId = myClass.first.id;
+                var meetings = allMeetings
+                    .where((m) => !m.isReunion)
+                    .toList();
 
-          return StreamBuilder(
-            stream: planningRepo.getMeetings(),
-            builder: (context, meetingsSnapshot) {
-              if (!meetingsSnapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
+                if (_showPast) {
+                  meetings = meetings.where((m) => m.date.isBefore(today)).toList();
+                  meetings.sort((a, b) => b.date.compareTo(a.date));
+                } else {
+                  meetings = meetings.where((m) => !m.date.isBefore(today)).toList();
+                  meetings.sort((a, b) => a.date.compareTo(b.date));
+                }
 
-              final now = DateTime.now();
-              final today = DateTime(now.year, now.month, now.day);
-
-              var meetings = meetingsSnapshot.data!
-                  .where((m) => m.classId == classId && !m.isReunion)
-                  .toList();
-
-              if (_showPast) {
-                meetings = meetings.where((m) => m.date.isBefore(today)).toList();
-                meetings.sort((a, b) => b.date.compareTo(a.date));
-              } else {
-                meetings = meetings.where((m) => !m.date.isBefore(today)).toList();
-                meetings.sort((a, b) => a.date.compareTo(b.date));
-              }
-
-              if (meetings.isEmpty) {
-                return Column(
-                  children: [
-                    _buildToggleBar(),
-                    const Expanded(
-                      child: _EmptyState(
-                        icon: Icons.event_note_rounded,
-                        title: 'Nessun incontro',
-                        subtitle: 'Non ci sono incontri programmati per la tua classe.',
+                if (meetings.isEmpty) {
+                  return Column(
+                    children: [
+                      _buildToggleBar(),
+                      const Expanded(
+                        child: _EmptyState(
+                          icon: Icons.event_note_rounded,
+                          title: 'Nessun incontro',
+                          subtitle: 'Non ci sono incontri programmati per la tua classe.',
+                        ),
                       ),
-                    ),
-                  ],
-                );
-              }
+                    ],
+                  );
+                }
 
-              return StreamBuilder<Map<String, _AttendanceInfo>>(
-                stream: _getAttendanceStatus(),
-                builder: (context, attendanceSnapshot) {
-                  final attendanceMap = attendanceSnapshot.data ?? {};
+                return StreamBuilder<Map<String, _AttendanceInfo>>(
+                  stream: _getAttendanceStatus(),
+                  builder: (context, attendanceSnapshot) {
+                    final attendanceMap = attendanceSnapshot.data ?? {};
 
                   return ListView.builder(
                     padding: const EdgeInsets.only(
@@ -278,9 +262,7 @@ class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage>
                 },
               );
             },
-          );
-        },
-      ),
+          ),
     );
   }
 

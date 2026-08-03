@@ -301,6 +301,20 @@ class P2PSyncService {
   P2PSyncRole? _pendingHandshakeRemoteRole;
   String? _pendingHandshakeRemoteCatechistId;
 
+  /// Classe scelta dall'utente durante l'associazione quando il ruolo è
+  /// "Altro Catechista". Solo questa classe viene condivisa con il remoto.
+  /// Viene azzerata al termine della modalità associazione.
+  String? _associationSharedClassId;
+
+  /// Mappa endpoint → catechistId del dispositivo remoto, raccolto dall'handshake.
+  /// Permette di distinguere un altro dispositivo dello STESSO catechista
+  /// (stesso catechistId → sincronizza tutte le classi) da un catechista
+  /// diverso (catechistId diverso → solo la classe condivisa).
+  final Map<String, String> _endpointRemoteCatechistId = {};
+
+  /// Mappa endpoint → classe condivisa con un catechista diverso.
+  final Map<String, String> _endpointSharedClassId = {};
+
   final Map<String, SecretKeyData> _endpointSessionKeys = {};
 
   bool _continuousModeActive = false;
@@ -758,18 +772,19 @@ class P2PSyncService {
 
     final engine = HiveSyncEngine();
     final lastSync = await engine.getLastSyncTimestamp();
-    final scope = _currentSyncScope();
-    final modified = engine.extractModifiedRecords(lastSync, scope);
-    if (modified.isEmpty) {
-      addLog('DEBUG', 'Modifica locale rilevata ma nessun nuovo record');
-      return;
-    }
-    addLog('INFO', 'Modifiche locali rilevate: ${modified.length} record da sincronizzare');
 
+    var sentAny = false;
     for (final endpointId in _connectedEndpoints.toList()) {
+      final scope = _currentSyncScope(endpointId);
+      final modified = engine.extractModifiedRecords(lastSync, scope);
+      if (modified.isEmpty) continue;
+      addLog('INFO', 'Modifiche locali rilevate: ${modified.length} record da sincronizzare');
       await _pushIncrementalSync(endpointId, modified);
+      sentAny = true;
     }
-    await engine.saveLastSyncTimestamp(DateTime.now().toUtc());
+    if (sentAny) {
+      await engine.saveLastSyncTimestamp(DateTime.now().toUtc());
+    }
   }
 
   Future<void> _pushIncrementalSync(
@@ -794,6 +809,17 @@ class P2PSyncService {
 
   Future<void> setRole(P2PSyncRole role) async {
     _updateState(_state.copyWith(role: role));
+  }
+
+  /// Imposta la classe scelta dall'utente per l'associazione corrente.
+  /// Quando il ruolo è "Altro Catechista", solo questa classe viene
+  /// sincronizzata con il dispositivo remoto.
+  Future<void> setAssociationSharedClass(String? classId) async {
+    _associationSharedClassId = (classId != null && classId.isNotEmpty)
+        ? classId
+        : null;
+    addLog('INFO',
+        'Classe condivisa associazione: ${_associationSharedClassId ?? 'tutte le classi'}');
   }
 
   Future<void> startPairingMode() async {
@@ -1047,6 +1073,9 @@ Future<void> stopPairingMode() async {
       _isSyncing = false;
       _sessionPairingNonce = null;
       _remoteSessionPairingNonce = null;
+      _associationSharedClassId = null;
+      _endpointRemoteCatechistId.clear();
+      _endpointSharedClassId.clear();
 
       _updateState(_state.copyWith(
         isPairingMode: false,
@@ -1166,6 +1195,8 @@ void _onConnectionResult(String endpointId, Status status) {
     _endpointSessionKeys.remove(endpointId);
     _endpointSyncPhase.remove(endpointId);
     _authRequestSent.remove(endpointId);
+    _endpointRemoteCatechistId.remove(endpointId);
+    _endpointSharedClassId.remove(endpointId);
     _isSyncing = false;
     if (_pendingEndpointId == endpointId) {
       _pendingEndpointId = null;
@@ -1196,6 +1227,8 @@ void _onConnectionResult(String endpointId, Status status) {
     _endpointConnIdMap.remove(endpointId);
     _endpointSessionKeys.remove(endpointId);
     _endpointSyncPhase.remove(endpointId);
+    _endpointRemoteCatechistId.remove(endpointId);
+    _endpointSharedClassId.remove(endpointId);
     if (_pendingEndpointId == endpointId) {
       _pendingEndpointId = null;
     }
@@ -1259,37 +1292,78 @@ void _onConnectionResult(String endpointId, Status status) {
     return {};
   }
 
-  /// Restituisce lo scope di sincronizzazione in base al ruolo corrente.
+  /// Classe da annunciare nell'handshake: se durante l'associazione è stata
+  /// scelta una classe condivisa (ruolo "Altro Catechista"), annuncia quella;
+  /// altrimenti la classe corrente.
+  String _handshakeClassId() {
+    if (_associationSharedClassId != null && _associationSharedClassId!.isNotEmpty) {
+      return _associationSharedClassId!;
+    }
+    return _getCurrentClassId();
+  }
+
+  /// Determina la classe condivisa con l'endpoint [endpointId].
   ///
-  /// - `mioDispositivo`: `null` → sincronizza TUTTE le classi.
-  /// - `altroCatechista`: scope limitato alla classe corrente (selezionata).
-  /// - `responsabile`: tutte le classi.
-  SyncClassScope? _currentSyncScope() {
-    if (_state.role == P2PSyncRole.altroCatechista) {
-      try {
-        final auth = LocalDatabase.auth();
-        final classId = auth.get('current_class_id') as String?;
-        if (classId == null || classId.isEmpty) {
-          addLog('WARN', 'Ruolo altroCatechista ma nessuna classe corrente: sync tutte le classi');
-          return null;
-        }
-        final classData = LocalDatabase.classes().get(classId);
-        final data = LocalDatabase.toStringDynamicMap(classData);
-        final uniqueCode = data['uniqueCode']?.toString() ?? '';
-        if (uniqueCode.isEmpty) {
-          addLog('WARN', 'Classe corrente senza uniqueCode: sync tutte le classi');
-          return null;
-        }
-        return SyncClassScope(
-          classId: classId,
-          classUniqueCode: uniqueCode,
-        );
-      } catch (e) {
-        addLog('WARN', 'Errore calcolo scope classe corrente: $e');
-        return null;
-      }
+  /// Priorità:
+  /// 1. La classe scelta esplicitamente durante l'associazione
+  ///    (`_associationSharedClassId`).
+  /// 2. La classe corrente del remoto (dall'handshake) se è tra le nostre.
+  String? _resolveSharedClassForEndpoint(String endpointId, String? remoteClassId) {
+    if (_associationSharedClassId != null && _associationSharedClassId!.isNotEmpty) {
+      return _associationSharedClassId;
+    }
+    final localClassIds = _getCurrentClassIds();
+    if (remoteClassId != null &&
+        remoteClassId.isNotEmpty &&
+        localClassIds.contains(remoteClassId)) {
+      return remoteClassId;
     }
     return null;
+  }
+
+  /// Restituisce lo scope di sincronizzazione per un endpoint specifico.
+  ///
+  /// La distinzione si basa sul `catechistId` (identità stabile della persona,
+  /// NON sul nome, che è liberamente modificabile):
+  /// - stesso `catechistId` del remoto → stessa persona su un suo altro
+  ///   dispositivo → sincronizza TUTTE le classi;
+  /// - `catechistId` diverso → altro catechista → SOLO la classe condivisa
+  ///   (scelta durante l'associazione).
+  SyncClassScope? _currentSyncScope([String? endpointId]) {
+    final localCatechistId = AuthService.getCatechistId();
+
+    String? remoteCatechistId;
+    String? sharedClassId;
+    if (endpointId != null) {
+      remoteCatechistId = _endpointRemoteCatechistId[endpointId];
+      sharedClassId = _endpointSharedClassId[endpointId];
+    }
+
+    // Stesso catechista (su un suo altro dispositivo): tutte le classi.
+    if (remoteCatechistId != null && remoteCatechistId == localCatechistId) {
+      addLog('DEBUG',
+          'Sync scope: stesso catechista ($remoteCatechistId), tutte le classi');
+      return null;
+    }
+
+    // Altro catechista: solo la classe condivisa.
+    final classId = sharedClassId;
+    if (classId == null || classId.isEmpty) {
+      addLog('WARN',
+          'Ruolo altroCatechista ma nessuna classe condivisa per $endpointId: sync tutte le classi');
+      return null;
+    }
+    final classData = LocalDatabase.classes().get(classId);
+    final data = LocalDatabase.toStringDynamicMap(classData);
+    final uniqueCode = data['uniqueCode']?.toString() ?? '';
+    if (uniqueCode.isEmpty) {
+      addLog('WARN', 'Classe condivisa senza uniqueCode: sync tutte le classi');
+      return null;
+    }
+    return SyncClassScope(
+      classId: classId,
+      classUniqueCode: uniqueCode,
+    );
   }
 
   Future<void> _sendHandshakePayload(String endpointId) async {
@@ -1306,7 +1380,7 @@ void _onConnectionResult(String endpointId, Status status) {
             DateTime.now().millisecondsSinceEpoch ~/ 1000,
         'role': _state.role.name,
         'sessionNonce': _sessionPairingNonce,
-        'classId': _getCurrentClassId(),
+        'classId': _handshakeClassId(),
         'catechistId': AuthService.getCatechistId(),
       });
       addLog('DEBUG', 'Invio handshake a $endpointId (nonce: ${_sessionPairingNonce?.substring(0, 8)}...)');
@@ -1520,6 +1594,15 @@ void _onConnectionResult(String endpointId, Status status) {
       _endpointConnIdMap[endpointId] = remoteId;
       _connectedEndpoints.add(endpointId);
 
+      if (remoteCatechistId != null && remoteCatechistId.isNotEmpty) {
+        _endpointRemoteCatechistId[endpointId] = remoteCatechistId;
+      }
+      final sharedClass =
+          _resolveSharedClassForEndpoint(endpointId, message['classId'] as String?);
+      if (sharedClass != null) {
+        _endpointSharedClassId[endpointId] = sharedClass;
+      }
+
       _pendingHandshakeData[endpointId] = _PendingHandshakeData(
         endpointId: endpointId,
         remoteId: remoteId,
@@ -1582,22 +1665,19 @@ void _onConnectionResult(String endpointId, Status status) {
     addLog('DEBUG',
         'Ruoli compatibili: ${_state.role.name} <-> ${remoteRole.name}');
 
-    final remoteClassId = message['classId'] as String? ?? '';
-    final localClassIds = _getCurrentClassIds();
-    if (remoteClassId.isNotEmpty && localClassIds.isNotEmpty && !localClassIds.contains(remoteClassId)) {
-      addLog('ERROR',
-          'Classi diverse: locale=$localClassIds remoto=$remoteClassId con $remoteName');
-      try {
-        await _nearby.disconnectFromEndpoint(endpointId);
-      } catch (_) {}
-      _connectedEndpoints.remove(endpointId);
-      _pendingEndpointId = null;
-      _updateState(_state.copyWith(
-        status: P2PSyncStatus.error,
-        errorMessage: 'Classi diverse: impossibile sincronizzare con $remoteName. '
-            'La sincronizzazione Bluetooth è consentita solo tra dispositivi della stessa classe.',
-      ));
-      return;
+    // Registra identità e classe condivisa: lo scope di sincronizzazione
+    // viene deciso confrontando il catechistId (stesso catechista → tutte
+    // le classi; diverso → solo la classe condivisa). Non blocchiamo più
+    // qui per classe corrente diversa: la distinzione per classe è demandata
+    // allo scope, che filtra i record per il solo catechista condiviso.
+    final remoteCatechistId = message['catechistId'] as String?;
+    if (remoteCatechistId != null && remoteCatechistId.isNotEmpty) {
+      _endpointRemoteCatechistId[endpointId] = remoteCatechistId;
+    }
+    final sharedClass =
+        _resolveSharedClassForEndpoint(endpointId, message['classId'] as String?);
+    if (sharedClass != null) {
+      _endpointSharedClassId[endpointId] = sharedClass;
     }
 
     final timestamp = message['timestamp'] as int? ?? 0;
@@ -1626,7 +1706,7 @@ void _onConnectionResult(String endpointId, Status status) {
         'senderName': localIdentity.deviceName,
         'role': _state.role.name,
         'sessionNonce': _sessionPairingNonce ?? '',
-        'classId': _getCurrentClassId(),
+        'classId': _handshakeClassId(),
         'catechistId': AuthService.getCatechistId(),
       });
       await _sendEncryptedPayload(endpointId, ack);
@@ -1662,7 +1742,7 @@ void _onConnectionResult(String endpointId, Status status) {
         'senderName': localIdentity.deviceName,
         'role': _state.role.name,
         'sessionNonce': _sessionPairingNonce ?? '',
-        'classId': _getCurrentClassId(),
+        'classId': _handshakeClassId(),
         'catechistId': AuthService.getCatechistId(),
       });
       await _sendPayload(endpointId, ack);
@@ -1739,6 +1819,16 @@ void _onConnectionResult(String endpointId, Status status) {
       _endpointConnIdMap[endpointId] = remoteId;
       _connectedEndpoints.add(endpointId);
 
+      final ackRemoteCatechistId = message['catechistId'] as String?;
+      if (ackRemoteCatechistId != null && ackRemoteCatechistId.isNotEmpty) {
+        _endpointRemoteCatechistId[endpointId] = ackRemoteCatechistId;
+      }
+      final ackSharedClass =
+          _resolveSharedClassForEndpoint(endpointId, message['classId'] as String?);
+      if (ackSharedClass != null) {
+        _endpointSharedClassId[endpointId] = ackSharedClass;
+      }
+
       _pendingHandshakeData[endpointId] ??= _PendingHandshakeData(
         endpointId: endpointId,
         remoteId: remoteId,
@@ -1794,21 +1884,18 @@ void _onConnectionResult(String endpointId, Status status) {
     }
 
     final remoteClassId = message['classId'] as String? ?? '';
-    final localClassIds = _getCurrentClassIds();
-    if (remoteClassId.isNotEmpty && localClassIds.isNotEmpty && !localClassIds.contains(remoteClassId)) {
-      addLog('ERROR',
-          'Classi diverse: locale=$localClassIds remoto=$remoteClassId con $remoteName');
-      try {
-        await _nearby.disconnectFromEndpoint(endpointId);
-      } catch (_) {}
-      _connectedEndpoints.remove(endpointId);
-      _pendingEndpointId = null;
-      _updateState(_state.copyWith(
-        status: P2PSyncStatus.error,
-        errorMessage: 'Classi diverse: impossibile sincronizzare con $remoteName. '
-            'La sincronizzazione Bluetooth è consentita solo tra dispositivi della stessa classe.',
-      ));
-      return;
+    addLog('DEBUG',
+        'Handshake ACK: remoto=$remoteName, classId=$remoteClassId, '
+        'catechistId=${message['catechistId']}');
+
+    final ackRemoteCatechistId = message['catechistId'] as String?;
+    if (ackRemoteCatechistId != null && ackRemoteCatechistId.isNotEmpty) {
+      _endpointRemoteCatechistId[endpointId] = ackRemoteCatechistId;
+    }
+    final ackSharedClass =
+        _resolveSharedClassForEndpoint(endpointId, remoteClassId);
+    if (ackSharedClass != null) {
+      _endpointSharedClassId[endpointId] = ackSharedClass;
     }
 
     _endpointConnIdMap[endpointId] = remoteId;
@@ -2230,7 +2317,7 @@ void _onConnectionResult(String endpointId, Status status) {
 
       final engine = HiveSyncEngine();
       final lastSync = await engine.getLastSyncTimestamp();
-      final scope = _currentSyncScope();
+      final scope = _currentSyncScope(endpointId);
       final localIndex = engine.buildLocalIndex(scope);
       addLog('DEBUG',
           'Indice locale costruito: ${localIndex.length} record, lastSync: $lastSync');
@@ -2309,12 +2396,25 @@ void _onConnectionResult(String endpointId, Status status) {
       final remoteCatechistId = _pendingHandshakeRemoteCatechistId;
       final remoteRole = _pendingHandshakeRemoteRole;
 
+      // Per un ALTRO catechista condividiamo SOLO la classe scelta durante
+      // l'associazione (se presente). Per un dispositivo della stessa persona
+      // ("Mio Dispositivo") tutte le classi.
+      final sharedClassId = _associationSharedClassId;
+
       for (final key in box.keys) {
         final data = LocalDatabase.toStringDynamicMap(box.get(key));
         final ids = (data['catechistIds'] as List? ?? [])
             .map((e) => e.toString())
             .toList();
         if (!ids.contains(localId)) continue;
+
+        // Catechista diverso: salta le classi non condivise.
+        if (remoteRole == P2PSyncRole.altroCatechista &&
+            sharedClassId != null &&
+            sharedClassId.isNotEmpty &&
+            key.toString() != sharedClassId) {
+          continue;
+        }
 
         Map<String, int> counts = {};
         if (data['catechistDeviceCounts'] is Map) {
@@ -2339,7 +2439,7 @@ void _onConnectionResult(String endpointId, Status status) {
           }
           final current = counts[remoteCatechistId] ?? 0;
           counts[remoteCatechistId] = current + 1;
-          addLog('INFO', 'Aggiunto catechista $remoteCatechistId');
+          addLog('INFO', 'Aggiunto catechista $remoteCatechistId alla classe ${data['name']}');
 
           if ((data['creatorCatechistId'] as String? ?? '').isEmpty) {
             data['creatorCatechistId'] = localCatechistId;
@@ -2495,7 +2595,7 @@ void _onConnectionResult(String endpointId, Status status) {
     try {
       phase.indexSent = true;
       final engine = HiveSyncEngine();
-      final scope = _currentSyncScope();
+      final scope = _currentSyncScope(endpointId);
       final localIndex = engine.buildLocalIndex(scope);
 
       final remoteIndexData = message['index'] as List<dynamic>? ?? [];
@@ -2586,7 +2686,7 @@ void _onConnectionResult(String endpointId, Status status) {
     final phase = _endpointSyncPhase[endpointId] ??= _SyncPhase2();
     try {
       final engine = HiveSyncEngine();
-      final scope = _currentSyncScope();
+      final scope = _currentSyncScope(endpointId);
       final keys = (message['keys'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
@@ -2632,7 +2732,7 @@ void _onConnectionResult(String endpointId, Status status) {
       }
       try {
         final engine = HiveSyncEngine();
-        final scope = _currentSyncScope();
+        final scope = _currentSyncScope(endpointId);
         final recordsData = message['records'] as List<dynamic>? ?? [];
         final records = engine.deserializeRecords(recordsData);
         if (records.isNotEmpty) {
@@ -2654,7 +2754,7 @@ void _onConnectionResult(String endpointId, Status status) {
     }
     try {
       final engine = HiveSyncEngine();
-      final scope = _currentSyncScope();
+      final scope = _currentSyncScope(endpointId);
       final recordsData = message['records'] as List<dynamic>? ?? [];
       final records = engine.deserializeRecords(recordsData);
       addLog('DEBUG',

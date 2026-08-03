@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/auth/auth_service.dart';
 import '../../core/providers/current_class_provider.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/widgets/app_scaffold.dart';
@@ -24,6 +25,83 @@ class _ClassCopyPageState extends ConsumerState<ClassCopyPage> {
   bool _includeAvvisi = true;
   bool _includeCalendar = true;
   bool _isCopying = false;
+
+  Future<void> _confirmAndCopy({
+    required SchoolClass source,
+    required SchoolClass target,
+  }) async {
+    final anySelected =
+        _includeDocuments || _includeCatechesi || _includeAvvisi || _includeCalendar;
+    if (!anySelected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Seleziona almeno un tipo di contenuto da copiare.'),
+        ),
+      );
+      return;
+    }
+
+    final modules = <String>[
+      if (_includeDocuments) 'Documenti',
+      if (_includeCatechesi) 'Catechesi',
+      if (_includeAvvisi) 'Messaggi programmati',
+      if (_includeCalendar) 'Calendario',
+    ];
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Conferma copia'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Vuoi copiare i contenuti da "${source.name}" a "${target.name}"?',
+              style: const TextStyle(fontSize: 14, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Verranno copiati:\n• ${modules.join('\n• ')}',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.4,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Annulla'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Copia'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final ok = await AuthService().authenticate(
+      localizedReason: 'Autenticati per copiare i contenuti da "${source.name}"',
+    );
+    if (!ok) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Copia annullata: autenticazione non riuscita.'),
+          ),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+
+    await _performCopy(source: source, target: target);
+  }
 
   Future<void> _performCopy({
     required SchoolClass source,
@@ -147,7 +225,7 @@ class _ClassCopyPageState extends ConsumerState<ClassCopyPage> {
               _SourceSelector(
                 sourceClasses: sourceClasses,
                 isCopying: _isCopying,
-                onCopy: (source) => _performCopy(
+                onCopy: (source) => _confirmAndCopy(
                   source: source,
                   target: currentClass!,
                 ),

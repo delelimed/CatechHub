@@ -312,13 +312,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               } catch (_) {}
             }
             if (isLoginPath) {
-              // Dopo il login, se l'utente ha classi ma nessuna selezionata,
-              // reindirizza alla selezione classe.
+              // Dopo il login si chiede SEMPRE quale classe aprire, anche se
+              // una classe è già salvata come corrente: la selezione viene
+              // proposta a ogni avvio dell'app (richiesta esplicita).
+              // La pagina /class-selection gestisce anche il caso in cui
+              // l'utente non faccia parte di alcun gruppo (empty state con
+              // "Crea nuovo gruppo").
               try {
-                final userClassIds = _userClassIds();
-                final hasClasses = userClassIds.isNotEmpty;
-                final currentClassId = _validatedCurrentClassId();
-
                 // Fase di onboarding multiclasse: finché non viene completata
                 // dal catechista, il router lo mantiene sulla schermata dedicata
                 // alla gestione delle classi (funziona anche senza classi).
@@ -331,11 +331,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 if (!classesStepDone) {
                   return '/onboarding-classes';
                 }
-                if (hasClasses && (currentClassId == null || currentClassId.isEmpty)) {
-                  return '/class-selection';
-                }
+                return '/class-selection';
               } catch (_) {}
-              return '/';
+              return '/class-selection';
             }
             // Se l'utente è autenticato ma non ha una classe selezionata e non è su class-selection
             if (location != '/class-selection' &&

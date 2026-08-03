@@ -26,7 +26,7 @@ class ClassSwitcherPage extends ConsumerWidget {
             return _EmptyState(
               isDark: isDark,
               colorScheme: colorScheme,
-              onCreateClass: () => context.push('/group-management'),
+              onOpenGroups: () => context.push('/view-groups'),
             );
           }
 
@@ -61,12 +61,6 @@ class ClassSwitcherPage extends ConsumerWidget {
                   }
                 },
               )),
-              const SizedBox(height: 24),
-              _CreateClassButton(
-                isDark: isDark,
-                colorScheme: colorScheme,
-                onTap: () => context.push('/group-management'),
-              ),
               const SizedBox(height: 32),
             ],
           );
@@ -201,12 +195,12 @@ class _ClassCard extends StatelessWidget {
 class _EmptyState extends StatelessWidget {
   final bool isDark;
   final ColorScheme colorScheme;
-  final VoidCallback onCreateClass;
+  final VoidCallback onOpenGroups;
 
   const _EmptyState({
     required this.isDark,
     required this.colorScheme,
-    required this.onCreateClass,
+    required this.onOpenGroups,
   });
 
   @override
@@ -224,14 +218,25 @@ class _EmptyState extends StatelessWidget {
               color: Colors.grey.shade600,
             ),
           ),
+          const SizedBox(height: 8),
+          Text(
+            'Puoi creare un nuovo gruppo dalla sezione "I miei gruppi".',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade500,
+            ),
+          ),
           const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: onCreateClass,
-            icon: const Icon(Icons.add),
-            label: const Text('Crea nuovo gruppo'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-              foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
+          OutlinedButton.icon(
+            onPressed: onOpenGroups,
+            icon: const Icon(Icons.groups_rounded),
+            label: const Text('Vai a "I miei gruppi"'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+              side: BorderSide(
+                color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+              ),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -239,39 +244,6 @@ class _EmptyState extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _CreateClassButton extends StatelessWidget {
-  final bool isDark;
-  final ColorScheme colorScheme;
-  final VoidCallback onTap;
-
-  const _CreateClassButton({
-    required this.isDark,
-    required this.colorScheme,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: OutlinedButton.icon(
-        onPressed: onTap,
-        icon: const Icon(Icons.add),
-        label: const Text('Crea nuovo gruppo'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-          side: BorderSide(
-            color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
       ),
     );
   }

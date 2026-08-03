@@ -7,6 +7,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../core/auth/auth_service.dart';
+import '../../../core/providers/current_class_provider.dart';
 import '../../../core/providers/nearby_sync_provider.dart';
 import '../../../core/storage/local_database.dart';
 import '../p2p/p2p_sync_service.dart';
@@ -83,6 +84,10 @@ class _AssociateDeviceScreenState
   P2PSyncRole _selectedRole = P2PSyncRole.mioDispositivo;
   bool _isOnboarding = false;
 
+  /// Classe scelta quando il ruolo è "Altro Catechista": solo questa classe
+  /// viene condivisa/sincronizzata con il dispositivo remoto.
+  String? _selectedSharedClassId;
+
   String? _qrData;
   String? _errorMessage;
   String? _successMessage;
@@ -141,6 +146,26 @@ class _AssociateDeviceScreenState
       _errorMessage = null;
     });
     ref.read(nearbySyncServiceProvider).setRole(role);
+
+    if (role == P2PSyncRole.altroCatechista) {
+      final current = ref.read(currentClassProvider);
+      final classes = ref.read(myClassesProvider);
+      final valid =
+          current != null && current.isNotEmpty && classes.any((c) => c.id == current);
+      final initial = valid ? current : (classes.isNotEmpty ? classes.first.id : null);
+      setState(() => _selectedSharedClassId = initial);
+      ref
+          .read(nearbySyncServiceProvider)
+          .setAssociationSharedClass(initial);
+    } else {
+      setState(() => _selectedSharedClassId = null);
+      ref.read(nearbySyncServiceProvider).setAssociationSharedClass(null);
+    }
+  }
+
+  void _setSharedClass(String? classId) {
+    setState(() => _selectedSharedClassId = classId);
+    ref.read(nearbySyncServiceProvider).setAssociationSharedClass(classId);
   }
 
   void _chooseShowQrFirst() {
@@ -187,6 +212,7 @@ class _AssociateDeviceScreenState
     _pairingTimeoutTimer?.cancel();
     _p2pStateSub?.cancel();
     _stopP2pPairing();
+    ref.read(nearbySyncServiceProvider).setAssociationSharedClass(null);
     setState(() {
       _currentStep = _AssociationStep.roleChoice;
       _errorMessage = null;
@@ -196,7 +222,7 @@ class _AssociateDeviceScreenState
       _pairingComplete = false;
       _pairingCode = null;
       _awaitingVerification = false;
-_pairingDialogShown = false;
+      _pairingDialogShown = false;
       _isConfirmingPairing = false;
     });
   }
@@ -557,7 +583,7 @@ _pairingDialogShown = false;
         if (state.status == P2PSyncStatus.completed) break;
       }
 
-      _ensureLocalCatechistInClass();
+      _ensureLocalCatechistInClass(sharedClassId: _selectedSharedClassId);
 
       addLog('INFO', 'Onboarding sync completato');
     } catch (e) {
@@ -567,16 +593,22 @@ _pairingDialogShown = false;
 
   Future<void> _registerCatechistInClass() async {
     addLog('INFO', 'Registro nuovo catechista nella classe');
-    _ensureLocalCatechistInClass();
+    _ensureLocalCatechistInClass(sharedClassId: _selectedSharedClassId);
   }
 
-  void _ensureLocalCatechistInClass() {
+  /// Aggiunge il dispositivo remoto (e il catechista locale) alle classi.
+  /// Se [sharedClassId] è valorizzato (associazione di un ALTRO catechista),
+  /// tocca solo quella classe; altrimenti tutte le classi locali.
+  void _ensureLocalCatechistInClass({String? sharedClassId}) {
     try {
       final box = LocalDatabase.classes();
       const localId = AuthService.localUserId;
       if (_remoteIdentity != null) {
         final remoteDeviceId = _remoteIdentity!.deviceId;
         for (final key in box.keys) {
+          if (sharedClassId != null && key.toString() != sharedClassId) {
+            continue;
+          }
           final data = LocalDatabase.toStringDynamicMap(box.get(key));
           final ids = (data['catechistIds'] as List? ?? [])
               .map((e) => e.toString())
@@ -591,6 +623,9 @@ _pairingDialogShown = false;
         }
       }
       for (final key in box.keys) {
+        if (sharedClassId != null && key.toString() != sharedClassId) {
+          continue;
+        }
         final data = LocalDatabase.toStringDynamicMap(box.get(key));
         final ids = (data['catechistIds'] as List? ?? [])
             .map((e) => e.toString())
@@ -815,6 +850,8 @@ _pairingDialogShown = false;
                 ],
               ),
             ),
+            if (_selectedRole == P2PSyncRole.altroCatechista)
+              _buildSharedClassSelector(theme, colorScheme),
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
@@ -853,6 +890,84 @@ _pairingDialogShown = false;
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Selettore della classe da condividere con l'altro catechista.
+  /// Solo la classe scelta verrà sincronizzata con il dispositivo remoto.
+  Widget _buildSharedClassSelector(
+      ThemeData theme, ColorScheme colorScheme) {
+    final myClasses = ref.watch(myClassesProvider);
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: colorScheme.primary.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.filter_alt_rounded,
+                  size: 18, color: colorScheme.primary),
+              const SizedBox(width: 6),
+              Text(
+                'Classe da sincronizzare',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Con questo dispositivo condividerai SOLO la classe selezionata.',
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.3,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (myClasses.isEmpty)
+            Text(
+              'Non fai parte di nessun gruppo.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade500,
+              ),
+            )
+          else
+            RadioGroup<String>(
+              groupValue: _selectedSharedClassId,
+              onChanged: (v) {
+                if (v != null) _setSharedClass(v);
+              },
+              child: Column(
+                children: myClasses.map((c) => RadioListTile<String>(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                      title: Text(
+                        c.name,
+                        style: const TextStyle(fontSize: 14),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      value: c.id,
+                    )).toList(),
+              ),
+            ),
+        ],
       ),
     );
   }

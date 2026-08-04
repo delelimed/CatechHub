@@ -26,6 +26,7 @@ import '../../shared/models/student_model.dart';
 import '../meetings/attendance_repository.dart';
 import '../students/students_provider.dart';
 import 'attendance_print_page.dart';
+import 'quick_count_page.dart';
 import '../students/student_quick_view_page.dart' hide studentsRepoProvider;
 
 /// Modello di supporto locale che unisce lo studente alle sue statistiche e assenze consecutive
@@ -44,7 +45,8 @@ class _StudentWithStats {
 }
 
 final _groupStudentsStatsProvider = StreamProvider.autoDispose
-    .family<List<_StudentWithStats>, List<String>>((ref, studentIds) {
+    .family<List<_StudentWithStats>, ({List<String> studentIds, String classId})>(
+        (ref, args) {
       final studentsRepo = ref.read(studentsRepoProvider);
       final attendanceRepo = AttendanceRepository();
 
@@ -52,6 +54,7 @@ final _groupStudentsStatsProvider = StreamProvider.autoDispose
 
       return studentsStream.asyncMap((allStudents) async {
         final attendance = attendanceRepo.getAttendanceSync()
+          ..removeWhere((r) => r['classId']?.toString() != args.classId)
           ..sort((a, b) {
             final aDate =
                 DateTime.tryParse(a['date']?.toString() ?? '') ??
@@ -62,7 +65,7 @@ final _groupStudentsStatsProvider = StreamProvider.autoDispose
             return bDate.compareTo(aDate);
           });
 
-        final studentIdsSet = studentIds.toSet();
+        final studentIdsSet = args.studentIds.toSet();
         final classStudents = allStudents
             .where((s) => studentIdsSet.contains(s.id))
             .toList();
@@ -140,7 +143,10 @@ class MyGroupPage extends ConsumerWidget {
                 }
 
                 final studentsStatsAsync = ref.watch(
-                  _groupStudentsStatsProvider(myClass.studentIds),
+                  _groupStudentsStatsProvider((
+                    studentIds: myClass.studentIds,
+                    classId: myClass.id,
+                  )),
                 );
 
                 return studentsStatsAsync.when(
@@ -266,6 +272,28 @@ class _MobileActions extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _ActionButton(
+                icon: Icons.fact_check_rounded,
+                label: 'Conteggio rapido',
+                compact: true,
+                isDark: isDark,
+                colorScheme: colorScheme,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const QuickCountPage(),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -315,6 +343,23 @@ class _DesktopActions extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (_) => AttendancePrintPage(schoolClass: schoolClass),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _ActionButton(
+            icon: Icons.fact_check_rounded,
+            label: 'Conteggio rapido',
+            isDark: isDark,
+            colorScheme: colorScheme,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const QuickCountPage(),
                 ),
               );
             },

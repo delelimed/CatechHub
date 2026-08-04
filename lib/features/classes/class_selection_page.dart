@@ -22,11 +22,7 @@ class ClassSelectionPage extends ConsumerWidget {
       child: Builder(
         builder: (context) {
           if (myClasses.isEmpty) {
-            return _EmptyState(
-              isDark: isDark,
-              colorScheme: colorScheme,
-              onCreateClass: () => context.push('/group-management'),
-            );
+            return const _EmptyState();
           }
 
           return ListView(
@@ -50,11 +46,14 @@ class ClassSelectionPage extends ConsumerWidget {
                   if (context.mounted) context.go('/');
                 },
               )),
-              const SizedBox(height: 24),
-              _CreateClassButton(
-                isDark: isDark,
-                colorScheme: colorScheme,
-                onTap: () => context.push('/group-management'),
+              const SizedBox(height: 16),
+              Text(
+                'Per creare un nuovo gruppo vai su "I miei gruppi" dalle impostazioni.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
+                ),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
             ],
@@ -168,78 +167,36 @@ class _ClassCard extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  final bool isDark;
-  final ColorScheme colorScheme;
-  final VoidCallback onCreateClass;
-
-  const _EmptyState({
-    required this.isDark,
-    required this.colorScheme,
-    required this.onCreateClass,
-  });
+  const _EmptyState();
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.groups_outlined, size: 70, color: Colors.grey.shade400),
-          const SizedBox(height: 16),
-          Text(
-            'Non fai parte di nessun gruppo',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade600,
-            ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: onCreateClass,
-            icon: const Icon(Icons.add),
-            label: const Text('Crea nuovo gruppo'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-              foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.groups_outlined, size: 70, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text(
+              'Non fai parte di nessun gruppo',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey.shade600,
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CreateClassButton extends StatelessWidget {
-  final bool isDark;
-  final ColorScheme colorScheme;
-  final VoidCallback onTap;
-
-  const _CreateClassButton({
-    required this.isDark,
-    required this.colorScheme,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: OutlinedButton.icon(
-        onPressed: onTap,
-        icon: const Icon(Icons.add),
-        label: const Text('Crea nuovo gruppo'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-          side: BorderSide(
-            color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+            const SizedBox(height: 8),
+            Text(
+              'Per creare o unirti a un gruppo, apri le impostazioni e vai su "I miei gruppi".',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -262,6 +262,16 @@ class SettingsPage extends ConsumerWidget {
                 onTap: () => _showNotificationSettingsDialog(context, ref),
               ),
 
+              const SizedBox(height: 12),
+
+              _SettingsItem(
+                icon: Icons.picture_as_pdf_rounded,
+                title: 'Esporta report PDF',
+                subtitle: 'Genera un report completo del gruppo in formato PDF',
+                color: const Color(0xFF174A7E),
+                onTap: () => context.push('/pdf-report'),
+              ),
+
               const SizedBox(height: 24),
 
               /// =========================

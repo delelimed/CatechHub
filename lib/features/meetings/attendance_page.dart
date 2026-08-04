@@ -49,7 +49,9 @@ final _studentsWithHistoryProvider = StreamProvider.autoDispose
 
         final studentHistory = <String, List<String>>{};
         for (final record in attendance.where(
-          (a) => a['id'] != args.currentMeetingId,
+          (a) =>
+              a['id'] != args.currentMeetingId &&
+              a['classId']?.toString() == args.classId,
         )) {
           final presenceMap = Map<String, dynamic>.from(
             record['presence'] as Map? ?? {},

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/auth/auth_service.dart';
 import '../../core/providers/current_class_provider.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/widgets/app_scaffold.dart';
+import 'classes_provider.dart';
 
 class ClassSwitcherPage extends ConsumerWidget {
   const ClassSwitcherPage({super.key});
@@ -26,6 +28,7 @@ class ClassSwitcherPage extends ConsumerWidget {
             return _EmptyState(
               isDark: isDark,
               colorScheme: colorScheme,
+              onCreateClass: () => _showCreateClassDialog(context, ref, isDark, colorScheme),
               onOpenGroups: () => context.push('/view-groups'),
             );
           }
@@ -61,10 +64,82 @@ class ClassSwitcherPage extends ConsumerWidget {
                   }
                 },
               )),
+              const SizedBox(height: 16),
+              _CreateClassButton(
+                isDark: isDark,
+                colorScheme: colorScheme,
+                onTap: () => _showCreateClassDialog(context, ref, isDark, colorScheme),
+              ),
               const SizedBox(height: 32),
             ],
           );
         },
+      ),
+    );
+  }
+
+  void _showCreateClassDialog(
+      BuildContext context, WidgetRef ref, bool isDark, ColorScheme colorScheme) {
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? colorScheme.surface : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text(
+          'Nuovo gruppo',
+          style: TextStyle(color: Color(0xFF174A7E), fontWeight: FontWeight.bold),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Nome del gruppo',
+            hintText: 'Es. Prima elementare',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Annulla'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+              foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () async {
+              final name = controller.text.trim();
+              if (name.isEmpty) return;
+              Navigator.of(ctx).pop();
+              try {
+                await ref.read(classesRepoProvider).addClass(
+                      SchoolClass(
+                        id: '',
+                        name: name,
+                        studentIds: [],
+                        catechistIds: [AuthService.localUserId],
+                      ),
+                    );
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Errore durante la creazione: $e'),
+                      backgroundColor: Colors.red.shade700,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Crea'),
+          ),
+        ],
       ),
     );
   }
@@ -195,11 +270,13 @@ class _ClassCard extends StatelessWidget {
 class _EmptyState extends StatelessWidget {
   final bool isDark;
   final ColorScheme colorScheme;
+  final VoidCallback onCreateClass;
   final VoidCallback onOpenGroups;
 
   const _EmptyState({
     required this.isDark,
     required this.colorScheme,
+    required this.onCreateClass,
     required this.onOpenGroups,
   });
 
@@ -220,7 +297,7 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Puoi creare un nuovo gruppo dalla sezione "I miei gruppi".',
+            'Puoi creare un nuovo gruppo qui sotto.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
@@ -228,6 +305,12 @@ class _EmptyState extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
+          _CreateClassButton(
+            isDark: isDark,
+            colorScheme: colorScheme,
+            onTap: onCreateClass,
+          ),
+          const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: onOpenGroups,
             icon: const Icon(Icons.groups_rounded),
@@ -244,6 +327,37 @@ class _EmptyState extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CreateClassButton extends StatelessWidget {
+  final bool isDark;
+  final ColorScheme colorScheme;
+  final VoidCallback onTap;
+
+  const _CreateClassButton({
+    required this.isDark,
+    required this.colorScheme,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ElevatedButton.icon(
+        onPressed: onTap,
+        icon: const Icon(Icons.add),
+        label: const Text('Crea nuovo gruppo'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+          foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
       ),
     );
   }

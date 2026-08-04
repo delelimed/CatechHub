@@ -9,6 +9,7 @@ import '../../shared/widgets/app_scaffold.dart';
 import '../../core/services/qr_data_service.dart';
 import '../../core/services/data_export_service.dart';
 import '../../core/providers/data_share_provider.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../classes/classes_provider.dart';
 import '../documents/documents_provider.dart';
 import '../planning/planning_provider.dart';
@@ -187,9 +188,22 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
       }
 
       setState(() => _phaseMessage = 'Importazione dati…');
-      await DataExportService.importData(receivedData, onPhase: (phase) {
-        if (mounted) setState(() => _phaseMessage = phase);
-      });
+
+      // I dati ricevuti vengono inseriti nella classe attualmente aperta.
+      final currentClass = ref.read(currentClassDetailsProvider);
+      if (currentClass != null && currentClass.id.isNotEmpty) {
+        await DataExportService.importDataIntoClass(
+          receivedData,
+          currentClass,
+          onPhase: (phase) {
+            if (mounted) setState(() => _phaseMessage = phase);
+          },
+        );
+      } else {
+        await DataExportService.importData(receivedData, onPhase: (phase) {
+          if (mounted) setState(() => _phaseMessage = phase);
+        });
+      }
 
       ref.invalidate(classesStreamProvider);
       ref.invalidate(documentsStreamProvider);

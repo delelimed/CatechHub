@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/providers/class_scoped_providers.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/attachment_parent_type.dart';
 import '../../shared/models/catechesi_model.dart';
@@ -211,10 +210,9 @@ class _CatechesiEditPageState extends ConsumerState<CatechesiEditPage> {
                   }
 
                   final now = DateTime.now();
-                  final classCode = ref.read(currentClassUniqueCodeProvider);
                   final catechesi = Catechesi(
                     id: catechesiId,
-                    classUniqueCode: widget.existing?.classUniqueCode ?? (classCode.isEmpty ? null : classCode),
+                    classUniqueCode: null,
                     title: titleController.text.trim(),
                     tags: _splitTags(tagsController.text),
                     biblicalReferences: _splitLines(biblicalController.text),

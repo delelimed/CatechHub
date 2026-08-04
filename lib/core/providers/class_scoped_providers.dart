@@ -116,20 +116,17 @@ final currentClassContactNotesSyncProvider = Provider<List<Map<String, dynamic>>
   return repo.getNotesByClassSync(classCode);
 });
 
-/// Stream delle catechesi della classe corrente.
+/// Stream delle catechesi: le catechesi non sono legate a una classe,
+/// quindi vengono mostrate in tutte le classi dell'utente.
 final currentClassCatechesiProvider = StreamProvider.autoDispose<List<Catechesi>>((ref) {
-  final classCode = ref.watch(currentClassUniqueCodeProvider);
-  if (classCode.isEmpty) return const Stream.empty();
   final repo = ref.read(catechesiRepositoryProvider);
-  return repo.getCatechesiByClass(classCode);
+  return repo.watchCatechesi();
 });
 
-/// Lista sincrona delle catechesi della classe corrente.
+/// Lista sincrona delle catechesi (non legate a una classe).
 final currentClassCatechesiSyncProvider = Provider<List<Catechesi>>((ref) {
-  final classCode = ref.watch(currentClassUniqueCodeProvider);
-  if (classCode.isEmpty) return [];
   final repo = ref.read(catechesiRepositoryProvider);
-  return repo.getCatechesiByClassSync(classCode);
+  return repo.getCatechesiSync();
 });
 
 /// Stream delle note giornaliere degli studenti della classe corrente.

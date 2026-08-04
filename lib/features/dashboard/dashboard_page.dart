@@ -204,6 +204,8 @@ class DashboardPage extends ConsumerWidget {
                         child: ListView(
                           padding: EdgeInsets.all(padding),
                           children: [
+                            _ClassBanner(currentClassName: currentClass.name),
+                            const SizedBox(height: 12),
                             _QuoteSnippet(quote: _randomQuote()),
                             const SizedBox(height: 10),
                             _SectionTitle('Il tuo prossimo impegno'),
@@ -407,6 +409,72 @@ class _NextMeetingCard extends StatelessWidget {
               ),
             ),
             const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ClassBanner extends StatelessWidget {
+  final String currentClassName;
+
+  const _ClassBanner({required this.currentClassName});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: () => context.push('/settings/class-switcher'),
+      child: _Panel(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(
+                Icons.groups_rounded,
+                color: isDark ? colorScheme.onPrimary : Colors.white,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Classe aperta',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    currentClassName,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.swap_horiz_rounded,
+              color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+            ),
           ],
         ),
       ),

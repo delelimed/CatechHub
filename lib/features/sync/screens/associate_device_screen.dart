@@ -84,9 +84,9 @@ class _AssociateDeviceScreenState
   P2PSyncRole _selectedRole = P2PSyncRole.mioDispositivo;
   bool _isOnboarding = false;
 
-  /// Classe scelta quando il ruolo è "Altro Catechista": solo questa classe
-  /// viene condivisa/sincronizzata con il dispositivo remoto.
-  String? _selectedSharedClassId;
+  /// Classi scelte quando il ruolo è "Altro Catechista": solo queste classi
+  /// vengono condivise/sincronizzate con il dispositivo remoto.
+  Set<String> _selectedSharedClassIds = {};
 
   String? _qrData;
   String? _errorMessage;
@@ -153,19 +153,23 @@ class _AssociateDeviceScreenState
       final valid =
           current != null && current.isNotEmpty && classes.any((c) => c.id == current);
       final initial = valid ? current : (classes.isNotEmpty ? classes.first.id : null);
-      setState(() => _selectedSharedClassId = initial);
+      setState(() => _selectedSharedClassIds = initial != null ? {initial} : {});
       ref
           .read(nearbySyncServiceProvider)
-          .setAssociationSharedClass(initial);
+          .setAssociationSharedClasses(_selectedSharedClassIds);
     } else {
-      setState(() => _selectedSharedClassId = null);
-      ref.read(nearbySyncServiceProvider).setAssociationSharedClass(null);
+      setState(() => _selectedSharedClassIds = {});
+      ref.read(nearbySyncServiceProvider).setAssociationSharedClasses({});
     }
   }
 
-  void _setSharedClass(String? classId) {
-    setState(() => _selectedSharedClassId = classId);
-    ref.read(nearbySyncServiceProvider).setAssociationSharedClass(classId);
+  void _toggleSharedClass(String classId) {
+    setState(() {
+      if (!_selectedSharedClassIds.remove(classId)) {
+        _selectedSharedClassIds.add(classId);
+      }
+    });
+    ref.read(nearbySyncServiceProvider).setAssociationSharedClasses(_selectedSharedClassIds);
   }
 
   void _chooseShowQrFirst() {
@@ -212,7 +216,7 @@ class _AssociateDeviceScreenState
     _pairingTimeoutTimer?.cancel();
     _p2pStateSub?.cancel();
     _stopP2pPairing();
-    ref.read(nearbySyncServiceProvider).setAssociationSharedClass(null);
+    ref.read(nearbySyncServiceProvider).setAssociationSharedClasses({});
     setState(() {
       _currentStep = _AssociationStep.roleChoice;
       _errorMessage = null;
@@ -583,7 +587,7 @@ class _AssociateDeviceScreenState
         if (state.status == P2PSyncStatus.completed) break;
       }
 
-      _ensureLocalCatechistInClass(sharedClassId: _selectedSharedClassId);
+      _ensureLocalCatechistInClass(sharedClassIds: _selectedSharedClassIds);
 
       addLog('INFO', 'Onboarding sync completato');
     } catch (e) {
@@ -593,22 +597,25 @@ class _AssociateDeviceScreenState
 
   Future<void> _registerCatechistInClass() async {
     addLog('INFO', 'Registro nuovo catechista nella classe');
-    _ensureLocalCatechistInClass(sharedClassId: _selectedSharedClassId);
+    _ensureLocalCatechistInClass(sharedClassIds: _selectedSharedClassIds);
   }
 
   /// Aggiunge il dispositivo remoto (e il catechista locale) alle classi.
-  /// Se [sharedClassId] è valorizzato (associazione di un ALTRO catechista),
-  /// tocca solo quella classe; altrimenti tutte le classi locali.
-  void _ensureLocalCatechistInClass({String? sharedClassId}) {
+  /// Se [sharedClassIds] è valorizzato (associazione di un ALTRO catechista),
+  /// tocca solo quelle classi; altrimenti tutte le classi locali.
+  void _ensureLocalCatechistInClass({Set<String>? sharedClassIds}) {
     try {
       final box = LocalDatabase.classes();
       const localId = AuthService.localUserId;
+      bool isShared(String key) =>
+          sharedClassIds == null ||
+          sharedClassIds.isEmpty ||
+          sharedClassIds.contains(key);
+
       if (_remoteIdentity != null) {
         final remoteDeviceId = _remoteIdentity!.deviceId;
         for (final key in box.keys) {
-          if (sharedClassId != null && key.toString() != sharedClassId) {
-            continue;
-          }
+          if (!isShared(key.toString())) continue;
           final data = LocalDatabase.toStringDynamicMap(box.get(key));
           final ids = (data['catechistIds'] as List? ?? [])
               .map((e) => e.toString())
@@ -623,9 +630,7 @@ class _AssociateDeviceScreenState
         }
       }
       for (final key in box.keys) {
-        if (sharedClassId != null && key.toString() != sharedClassId) {
-          continue;
-        }
+        if (!isShared(key.toString())) continue;
         final data = LocalDatabase.toStringDynamicMap(box.get(key));
         final ids = (data['catechistIds'] as List? ?? [])
             .map((e) => e.toString())
@@ -894,8 +899,8 @@ class _AssociateDeviceScreenState
     );
   }
 
-  /// Selettore della classe da condividere con l'altro catechista.
-  /// Solo la classe scelta verrà sincronizzata con il dispositivo remoto.
+  /// Selettore delle classi da condividere con l'altro catechista.
+  /// Solo le classi selezionate verranno sincronizzate con il dispositivo remoto.
   Widget _buildSharedClassSelector(
       ThemeData theme, ColorScheme colorScheme) {
     final myClasses = ref.watch(myClassesProvider);
@@ -920,7 +925,7 @@ class _AssociateDeviceScreenState
                   size: 18, color: colorScheme.primary),
               const SizedBox(width: 6),
               Text(
-                'Classe da sincronizzare',
+                'Classi da sincronizzare',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -931,7 +936,8 @@ class _AssociateDeviceScreenState
           ),
           const SizedBox(height: 4),
           Text(
-            'Con questo dispositivo condividerai SOLO la classe selezionata.',
+            'Con questo dispositivo condividerai SOLO le classi selezionate.\n'
+            'Se non selezioni nulla, verranno sincronizzate le classi in comune.',
             style: TextStyle(
               fontSize: 11,
               height: 1.3,
@@ -948,24 +954,20 @@ class _AssociateDeviceScreenState
               ),
             )
           else
-            RadioGroup<String>(
-              groupValue: _selectedSharedClassId,
-              onChanged: (v) {
-                if (v != null) _setSharedClass(v);
-              },
-              child: Column(
-                children: myClasses.map((c) => RadioListTile<String>(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      visualDensity: VisualDensity.compact,
-                      title: Text(
-                        c.name,
-                        style: const TextStyle(fontSize: 14),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      value: c.id,
-                    )).toList(),
-              ),
+            Column(
+              children: myClasses.map((c) => CheckboxListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    value: _selectedSharedClassIds.contains(c.id),
+                    onChanged: (_) => _toggleSharedClass(c.id),
+                    title: Text(
+                      c.name,
+                      style: const TextStyle(fontSize: 14),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  )).toList(),
             ),
         ],
       ),

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/providers/class_scoped_providers.dart';
-import '../../core/providers/current_class_provider.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/models/catechesi_model.dart';
 import '../../shared/widgets/last_modified_info.dart';
@@ -43,7 +42,6 @@ class _CatechesiPageState extends ConsumerState<CatechesiPage> {
 
   @override
   Widget build(BuildContext context) {
-    final currentClassId = ref.watch(currentClassProvider);
     final catechesiAsync = ref.watch(currentClassCatechesiProvider);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -51,73 +49,67 @@ class _CatechesiPageState extends ConsumerState<CatechesiPage> {
 
     return AppScaffold(
       title: 'Catechesi',
-      floatingActionButton: currentClassId == null
-          ? null
-          : FloatingActionButton.extended(
-              elevation: 4,
-              backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-              foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text(
-                'Nuova catechesi',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              onPressed: () {
-                context.push('/catechesi/edit');
-              },
-            ),
-      child: currentClassId == null
-          ? const Center(
-              child: Text('Nessuna classe selezionata'),
-            )
-          : Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: (q) => setState(() => _query = q),
-                    decoration: InputDecoration(
-                      hintText: 'Cerca per titolo o tag...',
-                      prefixIcon: const Icon(Icons.search_rounded),
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear_rounded),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() => _query = '');
-                              },
-                            )
-                          : null,
-                      filled: true,
-                      fillColor: isDark ? colorScheme.surfaceContainer : Colors.grey.shade50,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                  ),
+      floatingActionButton: FloatingActionButton.extended(
+        elevation: 4,
+        backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+        foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text(
+          'Nuova catechesi',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        onPressed: () {
+          context.push('/catechesi/edit');
+        },
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (q) => setState(() => _query = q),
+              decoration: InputDecoration(
+                hintText: 'Cerca per titolo o tag...',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear_rounded),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _query = '');
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: isDark ? colorScheme.surfaceContainer : Colors.grey.shade50,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
                 ),
-                Expanded(
-                  child: catechesiAsync.when(
-                    loading: () => const Center(child: CircularProgressIndicator()),
-                    error: (e, _) => Center(child: Text('Errore: $e')),
-                    data: (all) {
-                      final items = _query.isEmpty
-                          ? all
-                          : all.where((c) {
-                              final q = _query.toLowerCase();
-                              if (c.title.toLowerCase().contains(q)) return true;
-                              if (c.tags.any((t) => t.toLowerCase().contains(q))) return true;
-                              if (c.biblicalReferences.any((b) => b.toLowerCase().contains(q))) return true;
-                              if (c.websiteReferences.any((w) => w.toLowerCase().contains(q))) return true;
-                              return false;
-                            }).toList();
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+            ),
+          ),
+          Expanded(
+            child: catechesiAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Errore: $e')),
+              data: (all) {
+                final items = _query.isEmpty
+                    ? all
+                    : all.where((c) {
+                        final q = _query.toLowerCase();
+                        if (c.title.toLowerCase().contains(q)) return true;
+                        if (c.tags.any((t) => t.toLowerCase().contains(q))) return true;
+                        if (c.biblicalReferences.any((b) => b.toLowerCase().contains(q))) return true;
+                        if (c.websiteReferences.any((w) => w.toLowerCase().contains(q))) return true;
+                        return false;
+                      }).toList();
 
-                      items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+                items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
-                      if (items.isEmpty) {
+                if (items.isEmpty) {
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),

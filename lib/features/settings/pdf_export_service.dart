@@ -10,11 +10,13 @@
 //       1. Anagrafica           5. Statistiche        8. Catechesi
 //       2. Note di contatto     6. Documenti
 //       3. Composizione gruppo  7. Programmazione incontri
-//       4. Presenze (landscape)
+//       4. Presenze (contenuto ruotato di 90° su foglio portrait)
 //
 // Ogni sezione viene inclusa solo se selezionata dall'utente tramite
 // [PdfExportOptions].
 // ══════════════════════════════════════════════════════════════════════════════
+
+import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -140,11 +142,12 @@ class PdfExportService {
     );
 
     // ── Contenuto ───────────────────────────────────────────────────────────
-    // La sezione "Presenze" viene resa in orizzontale (landscape) per sfruttare
-    // la larghezza della pagina; tutte le altre sezioni restano in portrait.
-    final before = <pw.Widget>[];
-    final presenze = <pw.Widget>[];
-    final after = <pw.Widget>[];
+    // Il report usa sempre fogli A4 portrait (verticale). Ogni modulo
+    // (anagrafiche, presenze, statistiche, documenti, ...) inizia su una
+    // pagina nuova. La tabella delle presenze è molto larga (una colonna per
+    // incontro) e viene ruotata di 90° sul suo foglio: il registro sfrutta
+    // l'asse lungo della pagina e si legge ruotando il foglio in senso orario,
+    // senza creare pagine in landscape.
     var index = 0;
 
     void add(List<pw.Widget> target, pw.Widget widget) {
@@ -152,59 +155,13 @@ class PdfExportService {
       target.add(pw.SizedBox(height: 18));
     }
 
-    if (options.includeAnagrafica) {
-      add(before, _sectionHeader(++index, 'Anagrafica',
-          'Dati anagrafici e contatti dei ragazzi del gruppo'));
-      add(before, _anagraficaSection(students));
-    }
-
-    if (options.includeNoteContatto) {
-      add(before, _sectionHeader(++index, 'Note di contatto',
-          'Registro delle comunicazioni con i genitori'));
-      add(before, _noteContattoSection(students, contactNotes));
-    }
-
-    if (options.includeComposizione) {
-      add(before, _sectionHeader(++index, 'Composizione del gruppo',
-          'Elenco dei ragazzi iscritti'));
-      add(before, _composizioneSection(schoolClass, students));
-    }
-
-    if (options.includePresenze) {
-      add(presenze, _sectionHeader(++index, 'Presenze',
-          'Registro delle presenze per ogni incontro'));
-      add(presenze, _presenzeSection(students, attendance));
-    }
-
-    if (options.includeStatistiche) {
-      add(after, _sectionHeader(++index, 'Statistiche',
-          'Sintesi dei dati di frequenza del gruppo'));
-      add(after, _statisticheSection(students, attendance, className));
-    }
-
-    if (options.includeDocumenti) {
-      add(after, _sectionHeader(++index, 'Documenti',
-          'Certificati, autorizzazioni e consegne'));
-      add(after, _documentiSection(students, documents));
-    }
-
-    if (options.includeProgrammazione) {
-      add(after, _sectionHeader(++index, 'Programmazione degli incontri',
-          'Incontri e riunioni programmate nel corso dell\'anno'));
-      add(after, _programmazioneSection(meetings));
-    }
-
-    if (options.includeCatechesi) {
-      add(after, _sectionHeader(++index, 'Catechesi',
-          'Contenuti e schede catechetiche'));
-      add(after, _catechesiSection(catechesi));
-    }
-
-    void addFlow(PdfPageFormat format, List<pw.Widget> widgets) {
+    // Ogni modulo selezionato viene stampato in una pagina nuova (e in più
+    // pagine successive se il contenuto va a capo), con piè di pagina.
+    void addModule(List<pw.Widget> widgets) {
       if (widgets.isEmpty) return;
       pdf.addPage(
         pw.MultiPage(
-          pageFormat: format,
+          pageFormat: PdfPageFormat.a4,
           margin: pw.EdgeInsets.fromLTRB(_pageMargin, 24, _pageMargin, 36),
           footer: (ctx) => _footer(ctx, className),
           build: (ctx) => [
@@ -217,9 +174,71 @@ class PdfExportService {
       );
     }
 
-    addFlow(PdfPageFormat.a4, before);
-    addFlow(PdfPageFormat.a4.landscape, presenze);
-    addFlow(PdfPageFormat.a4, after);
+    final anagrafica = <pw.Widget>[];
+    final noteContatto = <pw.Widget>[];
+    final composizione = <pw.Widget>[];
+    final presenze = <pw.Widget>[];
+    final statistiche = <pw.Widget>[];
+    final documenti = <pw.Widget>[];
+    final programmazione = <pw.Widget>[];
+    final catechesiModule = <pw.Widget>[];
+
+    if (options.includeAnagrafica) {
+      add(anagrafica, _sectionHeader(++index, 'Anagrafica',
+          'Dati anagrafici e contatti dei ragazzi del gruppo'));
+      add(anagrafica, _anagraficaSection(students));
+    }
+
+    if (options.includeNoteContatto) {
+      add(noteContatto, _sectionHeader(++index, 'Note di contatto',
+          'Registro delle comunicazioni con i genitori'));
+      add(noteContatto, _noteContattoSection(students, contactNotes));
+    }
+
+    if (options.includeComposizione) {
+      add(composizione, _sectionHeader(++index, 'Composizione del gruppo',
+          'Elenco dei ragazzi iscritti'));
+      add(composizione, _composizioneSection(schoolClass, students));
+    }
+
+    if (options.includePresenze) {
+      add(presenze, _sectionHeader(++index, 'Presenze',
+          'Registro delle presenze per ogni incontro'));
+      add(presenze, _rotatedPresenze(_presenzeSection(students, attendance)));
+    }
+
+    if (options.includeStatistiche) {
+      add(statistiche, _sectionHeader(++index, 'Statistiche',
+          'Sintesi dei dati di frequenza del gruppo'));
+      add(statistiche, _statisticheSection(students, attendance, className));
+    }
+
+    if (options.includeDocumenti) {
+      add(documenti, _sectionHeader(++index, 'Documenti',
+          'Certificati, autorizzazioni e consegne'));
+      add(documenti, _documentiSection(students, documents));
+    }
+
+    if (options.includeProgrammazione) {
+      add(programmazione, _sectionHeader(++index, 'Programmazione degli incontri',
+          'Incontri e riunioni programmate nel corso dell\'anno'));
+      add(programmazione, _programmazioneSection(meetings));
+    }
+
+    if (options.includeCatechesi) {
+      add(catechesiModule, _sectionHeader(++index, 'Catechesi',
+          'Contenuti e schede catechetiche'));
+      add(catechesiModule, _catechesiSection(catechesi));
+    }
+
+    addModule(anagrafica);
+    addModule(noteContatto);
+    addModule(composizione);
+    addModule(presenze);
+    addModule(statistiche);
+    addModule(documenti);
+    addModule(programmazione);
+    addModule(catechesiModule);
 
     return pdf.save();
   }
@@ -865,6 +884,20 @@ class PdfExportService {
 
   // ─── Presenze ─────────────────────────────────────────────────────────────
 
+  /// Presenta la tabella presenze ruotata di 90° sul foglio A4 portrait:
+  /// il registro, molto largo (una colonna per incontro), sfrutta l'asse
+  /// lungo della pagina e si legge ruotando il foglio di 90° in senso orario.
+  static pw.Widget _rotatedPresenze(pw.Widget table) {
+    return pw.Transform.rotateBox(
+      angle: -math.pi / 2,
+      unconstrained: true,
+      child: pw.SizedBox(
+        width: 670,
+        child: table,
+      ),
+    );
+  }
+
   static pw.Widget _presenzeSection(
       List<Student> students, List<Map<String, dynamic>> attendance) {
     if (attendance.isEmpty) {
@@ -972,8 +1005,12 @@ class PdfExportService {
       });
       final total = p + a;
       if (total > 0) {
+        final meetingId = record['id']?.toString() ?? '';
+        final dateStr = record['date']?.toString() ?? '';
         perMeeting.add({
-          'title': record['date']?.toString() ?? '',
+          'id': meetingId,
+          'title': _meetingTitle(meetingId, dateStr),
+          'date': dateStr,
           'present': p,
           'absent': a,
           'total': total,
@@ -994,6 +1031,9 @@ class PdfExportService {
                 perMeeting.length)
             .round()
         : 0;
+    final totalStudents = perMeeting.isNotEmpty
+        ? perMeeting.map((m) => (m['total'] as int)).reduce((a, b) => a > b ? a : b)
+        : 0;
 
     var best = perMeeting.isEmpty ? null : perMeeting.first;
     var worst = perMeeting.isEmpty ? null : perMeeting.first;
@@ -1005,10 +1045,12 @@ class PdfExportService {
     final cards = [
       _metricCard('Presenze medie', '${presentRate.toStringAsFixed(1)}%', _green),
       _metricCard('Assenze medie', '${absentRate.toStringAsFixed(1)}%', _red),
-      _metricCard('Media presenze/incontro',
+      _metricCard('Media presenze per incontro',
           '${avgPerMeeting.toStringAsFixed(1)}%', _accent),
       _metricCard('Totale incontri', '${perMeeting.length}', _teal),
-      _metricCard('Media ragazzi/incontro', '$avgStudents', _orange),
+      _metricCard('Ragazzi nel gruppo', '$totalStudents', _orange),
+      _metricCard('Media ragazzi per incontro', '$avgStudents',
+          PdfColor.fromInt(0xFF8E44AD)),
     ];
 
     return pw.Column(
@@ -1041,7 +1083,7 @@ class PdfExportService {
                 pw.SizedBox(width: 10),
                 pw.Expanded(
                   child: pw.Text(
-                    'Migliore presenza: ${_formatShortDate(best['title'] as String)} '
+                    'Migliore presenza: ${best['title']} '
                     '(${(best['percent'] as double).toStringAsFixed(0)}%)',
                     style: pw.TextStyle(fontSize: 10, color: _textDark),
                   ),
@@ -1071,7 +1113,7 @@ class PdfExportService {
                 pw.SizedBox(width: 10),
                 pw.Expanded(
                   child: pw.Text(
-                    'Peggiore presenza: ${_formatShortDate(worst['title'] as String)} '
+                    'Peggiore presenza: ${worst['title']} '
                     '(${(worst['percent'] as double).toStringAsFixed(0)}%)',
                     style: pw.TextStyle(fontSize: 10, color: _textDark),
                   ),
@@ -1081,6 +1123,23 @@ class PdfExportService {
           ),
         ],
         pw.SizedBox(height: 14),
+        pw.Text(
+          'ANDAMENTO PRESENZE NEL TEMPO',
+          style: pw.TextStyle(fontSize: 9.5, letterSpacing: 1.1, color: _textGrey),
+        ),
+        pw.SizedBox(height: 8),
+        _trendChart(perMeeting),
+        pw.SizedBox(height: 18),
+        pw.Text(
+          'DETTAGLIO PER INCONTRO',
+          style: pw.TextStyle(fontSize: 9.5, letterSpacing: 1.1, color: _textGrey),
+        ),
+        pw.SizedBox(height: 8),
+        for (final m in perMeeting) ...[
+          _attendanceBar(m),
+          pw.SizedBox(height: 10),
+        ],
+        pw.SizedBox(height: 8),
         pw.Text(
           'DETTAGLIO PER RAGAZZO',
           style: pw.TextStyle(fontSize: 9.5, letterSpacing: 1.1, color: _textGrey),
@@ -1113,6 +1172,141 @@ class PdfExportService {
     final total = present + absent;
     if (total == 0) return '—';
     return '${(present / total * 100).toStringAsFixed(1)}%';
+  }
+
+  /// Titolo leggibile di un incontro: preferisce il titolo programmato,
+  /// altrimenti la data breve del record presenze.
+  static String _meetingTitle(String meetingId, String dateStr) {
+    if (meetingId.isEmpty) return _formatShortDate(dateStr);
+    final data =
+        LocalDatabase.toStringDynamicMap(LocalDatabase.planning().get(meetingId));
+    final title = data['title']?.toString().trim() ?? '';
+    if (title.isNotEmpty) return title;
+    return _formatShortDate(dateStr);
+  }
+
+  /// Grafico a linee dell'andamento dei presenti nel tempo.
+  static pw.Widget _trendChart(List<Map<String, dynamic>> perMeeting) {
+    if (perMeeting.length < 2) {
+      return _emptyState('Dati non sufficienti per il grafico');
+    }
+    final maxPresent =
+        perMeeting.map((m) => (m['total'] as int)).reduce((a, b) => a > b ? a : b);
+    final maxTick = maxPresent <= 0 ? 1 : maxPresent;
+    final dates = [
+      for (final m in perMeeting) _formatShortDate(m['date'] as String),
+    ];
+    final yTicks =
+        <int>{for (var i = 0; i <= 4; i++) (maxTick * i / 4).round()}.toList()
+          ..sort();
+
+    return pw.SizedBox(
+      height: 190,
+      child: pw.Chart(
+        grid: pw.CartesianGrid(
+          xAxis: pw.FixedAxis.fromStrings(
+            dates,
+            divisions: true,
+            color: _line,
+            textStyle: pw.TextStyle(fontSize: 7, color: _textGrey),
+          ),
+          yAxis: pw.FixedAxis<int>(
+            yTicks,
+            divisions: true,
+            divisionsDashed: true,
+            color: _line,
+            textStyle: pw.TextStyle(fontSize: 7, color: _textGrey),
+          ),
+        ),
+        datasets: [
+          pw.LineDataSet(
+            data: [
+              for (var i = 0; i < perMeeting.length; i++)
+                pw.PointChartValue(
+                  i.toDouble(),
+                  (perMeeting[i]['present'] as int).toDouble(),
+                ),
+            ],
+            color: _green,
+            pointSize: 2.5,
+            lineWidth: 2,
+            drawSurface: true,
+            surfaceOpacity: 0.2,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Riga di dettaglio per singolo incontro: titolo, percentuale di presenza,
+  /// barra impilata (presenti/assenti) e conteggi P/A.
+  static pw.Widget _attendanceBar(Map<String, dynamic> m) {
+    final present = m['present'] as int;
+    final absent = m['absent'] as int;
+    final total = m['total'] as int;
+    final percent = m['percent'] as double;
+    final pctPresent = total > 0 ? present / total : 0.0;
+    final pctAbsent = total > 0 ? absent / total : 0.0;
+    final percentColor =
+        percent >= 75 ? _green : (percent >= 50 ? _orange : _red);
+    final presentFlex = (pctPresent * 100).round().clamp(1, 99);
+    final absentFlex = (pctAbsent * 100).round().clamp(1, 99);
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        pw.Row(
+          children: [
+            pw.Expanded(
+              child: pw.Text(
+                m['title'] as String,
+                maxLines: 1,
+                overflow: pw.TextOverflow.clip,
+                style: pw.TextStyle(
+                  fontSize: 9,
+                  fontWeight: pw.FontWeight.bold,
+                  color: _textDark,
+                ),
+              ),
+            ),
+            pw.SizedBox(width: 8),
+            pw.Text(
+              '${percent.toStringAsFixed(0)}%',
+              style: pw.TextStyle(
+                fontSize: 9,
+                fontWeight: pw.FontWeight.bold,
+                color: percentColor,
+              ),
+            ),
+          ],
+        ),
+        pw.SizedBox(height: 4),
+        pw.ClipRRect(
+          horizontalRadius: 4,
+          verticalRadius: 4,
+          child: pw.SizedBox(
+            height: 8,
+            child: pw.Row(
+              children: [
+                pw.Expanded(
+                  flex: presentFlex,
+                  child: pw.Container(color: _green),
+                ),
+                pw.Expanded(
+                  flex: absentFlex,
+                  child: pw.Container(color: _red),
+                ),
+              ],
+            ),
+          ),
+        ),
+        pw.SizedBox(height: 2),
+        pw.Text(
+          '${present}P · ${absent}A',
+          style: pw.TextStyle(fontSize: 8, color: _textGrey),
+        ),
+      ],
+    );
   }
 
   static pw.Widget _metricCard(String label, String value, PdfColor color) {

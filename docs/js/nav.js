@@ -22,6 +22,7 @@
       <a href="#">Funzionalit\u00e0 \u25be</a>
       <ul class="dropdown-menu">
         ${li('features/students.html', 'Anagrafica ragazzi')}
+        ${li('features/gruppi.html', 'Gestione multigruppo')}
         ${li('features/attendance.html', 'Presenze e appello')}
         ${li('features/planning.html', 'Programmazione')}
         ${li('features/documents.html', 'Documenti')}

@@ -114,7 +114,7 @@ class _QuickCountPageState extends ConsumerState<QuickCountPage> {
           title: const Text('Gruppo completo'),
           content: Text(
             'Il conteggio ($detected) coincide con i presenti all\'appello '
-            'di oggi ($present). Nessun dato è stato salvato.',
+            'di oggi ($present).',
           ),
           actions: [
             TextButton(
@@ -174,6 +174,9 @@ class _QuickCountPageState extends ConsumerState<QuickCountPage> {
   /// Fase 1: selezione classi + numero rilevato.
   Widget _buildForm() {
     final myClasses = ref.watch(myClassesProvider);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -183,11 +186,14 @@ class _QuickCountPageState extends ConsumerState<QuickCountPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              Text(
                 'Verifica la completezza del gruppo rispetto all\'appello '
                 'di oggi.',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.black54),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? Colors.grey.shade400 : Colors.black54,
+                ),
               ),
               const SizedBox(height: 24),
               Text(
@@ -195,25 +201,33 @@ class _QuickCountPageState extends ConsumerState<QuickCountPage> {
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: const Color(0xFF174A7E),
+                  color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
                 ),
               ),
               const SizedBox(height: 8),
               if (myClasses.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   child: Text(
                     'Nessuna classe assegnata',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.black54),
+                    style: TextStyle(
+                      color: isDark ? Colors.grey.shade400 : Colors.black54,
+                    ),
                   ),
                 )
               else
                 Container(
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
+                    border: Border.all(
+                      color: isDark
+                          ? colorScheme.outline.withValues(alpha: 0.3)
+                          : Colors.grey.shade300,
+                    ),
                     borderRadius: BorderRadius.circular(12),
-                    color: Colors.grey.shade50,
+                    color: isDark
+                        ? colorScheme.surfaceContainer
+                        : Colors.grey.shade50,
                   ),
                   child: Column(
                     children: [
@@ -274,6 +288,9 @@ class _QuickCountPageState extends ConsumerState<QuickCountPage> {
 
   /// Fase 2: confronto con i presenti all'appello.
   Widget _buildReview(_QuickCountData data) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
     final missingCount = data.present - _seenIds.length;
     final unseen = data.presentStudents
         .where((s) => !_seenIds.contains(s.id))
@@ -292,9 +309,15 @@ class _QuickCountPageState extends ConsumerState<QuickCountPage> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
+                      color: isDark
+                          ? Colors.orange.withValues(alpha: 0.15)
+                          : Colors.orange.shade50,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.orange.shade200),
+                      border: Border.all(
+                        color: isDark
+                            ? Colors.orange.withValues(alpha: 0.4)
+                            : Colors.orange.shade200,
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -310,15 +333,18 @@ class _QuickCountPageState extends ConsumerState<QuickCountPage> {
                         Text(
                           'Persone rilevate: ${data.detected}   ·   '
                           'Presenti all\'appello: ${data.present}',
-                          style: const TextStyle(fontSize: 14),
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isDark ? Colors.grey.shade300 : Colors.black87,
+                          ),
                         ),
                         const SizedBox(height: 4),
-                        const Text(
+                        Text(
                           'Seleziona i ragazzi che hai realmente visto per '
                           'individuare i mancanti. Nessun dato viene salvato.',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.black54,
+                            color: isDark ? Colors.grey.shade400 : Colors.black54,
                           ),
                         ),
                       ],
@@ -338,9 +364,11 @@ class _QuickCountPageState extends ConsumerState<QuickCountPage> {
                   padding: const EdgeInsets.only(top: 8, bottom: 4),
                   child: Text(
                     group.key,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF174A7E),
+                      color: isDark
+                          ? colorScheme.primary
+                          : const Color(0xFF174A7E),
                     ),
                   ),
                 ),
@@ -376,18 +404,26 @@ class _QuickCountPageState extends ConsumerState<QuickCountPage> {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: isDark
+                      ? Colors.blue.withValues(alpha: 0.15)
+                      : Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blue.shade200),
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.blue.withValues(alpha: 0.4)
+                        : Colors.blue.shade200,
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Selezionati: ${_seenIds.length} / ${data.present}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF174A7E),
+                        color: isDark
+                            ? colorScheme.primary
+                            : const Color(0xFF174A7E),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -395,20 +431,28 @@ class _QuickCountPageState extends ConsumerState<QuickCountPage> {
                       Text(
                         'Non selezionati (possibili mancanti): '
                         '${unseen.map((s) => '${s.surname} ${s.name}').join(', ')}',
-                        style: const TextStyle(fontSize: 12),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? Colors.grey.shade300 : Colors.black87,
+                        ),
                       )
                     else
-                      const Text(
+                      Text(
                         'Tutti i presenti all\'appello sono stati selezionati.',
-                        style: TextStyle(fontSize: 12),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? Colors.grey.shade300 : Colors.black87,
+                        ),
                       ),
-                    if (_seenIds.length != data.detected) ...[
+                    if (_seenIds.length != data.present) ...[
                       const SizedBox(height: 6),
                       Text(
-                        _seenIds.length < data.detected
-                            ? 'Hai selezionato meno ragazzi di quelli rilevati '
-                                  '($missingCount in meno rispetto ai rilevati).'
-                            : 'Hai selezionato più ragazzi di quelli rilevati.',
+                        _seenIds.length < data.present
+                            ? 'Hai selezionato meno ragazzi dei presenti '
+                                  'all\'appello ($missingCount in meno rispetto '
+                                  'ai presenti).'
+                            : 'Hai selezionato più ragazzi dei presenti '
+                                  'all\'appello.',
                         style: const TextStyle(
                           fontSize: 12,
                           color: Colors.deepOrange,

@@ -74,6 +74,7 @@ class LocalAuthNotifier extends AsyncNotifier<Map<String, dynamic>?> {
     required String firstName,
     required String lastName,
     String? groupName,
+    String? phoneNumber,
     bool createClass = true,
   }) async {
     state = const AsyncValue.loading();
@@ -83,6 +84,7 @@ class LocalAuthNotifier extends AsyncNotifier<Map<String, dynamic>?> {
           firstName: firstName,
           lastName: lastName,
           groupName: groupName,
+          phoneNumber: phoneNumber,
           createClass: createClass,
         ),
         const Duration(seconds: 30),

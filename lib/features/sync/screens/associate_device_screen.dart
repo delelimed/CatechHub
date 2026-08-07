@@ -533,7 +533,17 @@ class _AssociateDeviceScreenState
 
     _isConfirmingPairing = true;
     await service.confirmPairingCode();
+    final awaitingChoice = service.currentState.awaitingCatechistIdChoice;
     _isConfirmingPairing = false;
+
+    // Discordanza tra due catechistId su dispositivi della stessa persona
+    // ("Mio Dispositivo"): chiedi quale identità conservare (default: la
+    // classe che invia).
+    if (awaitingChoice) {
+      addLog('INFO', 'Rilevata discordanza catechistId, richiesco scelta');
+      await _showCatechistIdChoiceDialog();
+    }
+    if (!mounted) return;
 
     setState(() {
       _currentStep = _AssociationStep.onboardingSync;
@@ -565,6 +575,91 @@ class _AssociateDeviceScreenState
     final service = ref.read(nearbySyncServiceProvider);
     await service.rejectPairingCode();
     _resetWizard();
+  }
+
+  /// Dialogo mostrato quando due dispositivi della stessa persona ("Mio
+  /// Dispositivo") hanno già classi con due catechistId diversi. L'utente
+  /// sceglie quale identità conservare (default: quella della classe che invia).
+  Future<void> _showCatechistIdChoiceDialog() async {
+    final service = ref.read(nearbySyncServiceProvider);
+    final st = service.currentState;
+    final localId = st.pendingCatechistChoiceLocalId ?? '';
+    final remoteId = st.pendingCatechistChoiceRemoteId ?? '';
+    final remoteName =
+        st.pendingCatechistChoiceRemoteName ?? 'dispositivo remoto';
+    final defaultId = st.pendingCatechistChoiceDefault ?? localId;
+
+    String chosenValue = defaultId;
+    final chosen = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Due identità rilevate'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Entrambi i dispositivi contengono classi associate a due '
+                'identità diverse. Conservando una sola identità, tutti i '
+                'dispositivi della stessa persona la condivideranno.',
+                textAlign: TextAlign.justify,
+              ),
+              const SizedBox(height: 16),
+              StatefulBuilder(
+                builder: (ctx, setState) {
+                  String selected = chosenValue;
+                  return RadioGroup<String>(
+                    groupValue: selected,
+                    onChanged: (value) {
+                      if (value != null) {
+                        chosenValue = value;
+                        setState(() => selected = value);
+                      }
+                    },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        RadioListTile<String>(
+                          value: localId,
+                          title: const Text('Questo dispositivo'),
+                          subtitle: Text('Identità: $localId',
+                              style: const TextStyle(fontSize: 11)),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        RadioListTile<String>(
+                          value: remoteId,
+                          title: Text(remoteName),
+                          subtitle: Text('Identità: $remoteId',
+                              style: const TextStyle(fontSize: 11)),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(chosenValue),
+            child: const Text('Conservare consigliata'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(chosenValue),
+            child: const Text('Conferma'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) return;
+    final resolved = chosen ?? defaultId;
+    addLog('INFO', 'Identità scelta: $resolved (default: $defaultId)');
+    await service.chooseCatechistId(resolved);
   }
 
   Future<void> _performOnboardingSync() async {

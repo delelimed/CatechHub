@@ -163,13 +163,14 @@ class PdfExportService {
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
           margin: pw.EdgeInsets.fromLTRB(_pageMargin, 24, _pageMargin, 36),
+          crossAxisAlignment: pw.CrossAxisAlignment.stretch,
           footer: (ctx) => _footer(ctx, className),
-          build: (ctx) => [
-            pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-              children: widgets,
-            ),
-          ],
+          // I singoli widget del modulo vengono emessi come figli di primo
+          // livello del foglio MultiPage: cosi l'impostazione a capo del
+          // contenuto avviene tra i widget reali (intestazione inclusa) e
+          // l'intestazione blu di sezione non resta isolata sulla pagina,
+          // separata dal contenuto che le segue.
+          build: (ctx) => widgets,
         ),
       );
     }
@@ -915,11 +916,15 @@ class PdfExportService {
     columns.add(const pw.FlexColumnWidth(0.7));
 
     final headerCells = <pw.Widget>[
-      _cell('Studente', bold: true),
+      _cell('Studente', bold: true, color: _white),
       for (final record in attendance)
-        _cell(_formatShortDate(record['date']?.toString() ?? ''), bold: true),
-      _cell('P', bold: true, color: _green),
-      _cell('A', bold: true, color: _red),
+        _cell(
+          _formatShortDate(record['date']?.toString() ?? ''),
+          bold: true,
+          color: _white,
+        ),
+      _cell('P', bold: true, color: _white),
+      _cell('A', bold: true, color: _white),
     ];
 
     final rows = <pw.TableRow>[
@@ -1131,16 +1136,6 @@ class PdfExportService {
         _trendChart(perMeeting),
         pw.SizedBox(height: 18),
         pw.Text(
-          'DETTAGLIO PER INCONTRO',
-          style: pw.TextStyle(fontSize: 9.5, letterSpacing: 1.1, color: _textGrey),
-        ),
-        pw.SizedBox(height: 8),
-        for (final m in perMeeting) ...[
-          _attendanceBar(m),
-          pw.SizedBox(height: 10),
-        ],
-        pw.SizedBox(height: 8),
-        pw.Text(
           'DETTAGLIO PER RAGAZZO',
           style: pw.TextStyle(fontSize: 9.5, letterSpacing: 1.1, color: _textGrey),
         ),
@@ -1235,77 +1230,6 @@ class PdfExportService {
           ),
         ],
       ),
-    );
-  }
-
-  /// Riga di dettaglio per singolo incontro: titolo, percentuale di presenza,
-  /// barra impilata (presenti/assenti) e conteggi P/A.
-  static pw.Widget _attendanceBar(Map<String, dynamic> m) {
-    final present = m['present'] as int;
-    final absent = m['absent'] as int;
-    final total = m['total'] as int;
-    final percent = m['percent'] as double;
-    final pctPresent = total > 0 ? present / total : 0.0;
-    final pctAbsent = total > 0 ? absent / total : 0.0;
-    final percentColor =
-        percent >= 75 ? _green : (percent >= 50 ? _orange : _red);
-    final presentFlex = (pctPresent * 100).round().clamp(1, 99);
-    final absentFlex = (pctAbsent * 100).round().clamp(1, 99);
-
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-      children: [
-        pw.Row(
-          children: [
-            pw.Expanded(
-              child: pw.Text(
-                m['title'] as String,
-                maxLines: 1,
-                overflow: pw.TextOverflow.clip,
-                style: pw.TextStyle(
-                  fontSize: 9,
-                  fontWeight: pw.FontWeight.bold,
-                  color: _textDark,
-                ),
-              ),
-            ),
-            pw.SizedBox(width: 8),
-            pw.Text(
-              '${percent.toStringAsFixed(0)}%',
-              style: pw.TextStyle(
-                fontSize: 9,
-                fontWeight: pw.FontWeight.bold,
-                color: percentColor,
-              ),
-            ),
-          ],
-        ),
-        pw.SizedBox(height: 4),
-        pw.ClipRRect(
-          horizontalRadius: 4,
-          verticalRadius: 4,
-          child: pw.SizedBox(
-            height: 8,
-            child: pw.Row(
-              children: [
-                pw.Expanded(
-                  flex: presentFlex,
-                  child: pw.Container(color: _green),
-                ),
-                pw.Expanded(
-                  flex: absentFlex,
-                  child: pw.Container(color: _red),
-                ),
-              ],
-            ),
-          ),
-        ),
-        pw.SizedBox(height: 2),
-        pw.Text(
-          '${present}P · ${absent}A',
-          style: pw.TextStyle(fontSize: 8, color: _textGrey),
-        ),
-      ],
     );
   }
 

@@ -335,6 +335,15 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
   void _onConfirmPairingCode() async {
     final service = ref.read(nearbySyncServiceProvider);
     await service.confirmPairingCode();
+
+    final state = service.currentState;
+    if (state.awaitingCatechistIdChoice) {
+      final resolved = await _showCatechistIdChoiceDialog(state);
+      if (resolved != null) {
+        await service.chooseCatechistId(resolved);
+      }
+    }
+
     addLog('INFO', 'Codice pairing confermato, attesa sincronizzazione dati');
     if (mounted) {
       setState(() {
@@ -342,6 +351,83 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
         _successMessage = 'Sincronizzazione dati classe in corso...';
       });
     }
+  }
+
+  Future<String?> _showCatechistIdChoiceDialog(P2PSyncState state) async {
+    final localId = state.pendingCatechistChoiceLocalId ?? '';
+    final remoteId = state.pendingCatechistChoiceRemoteId ?? '';
+    final remoteName =
+        state.pendingCatechistChoiceRemoteName ?? 'dispositivo remoto';
+    final defaultId = state.pendingCatechistChoiceDefault ?? localId;
+    String chosenValue = defaultId;
+
+    final chosen = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) {
+          String selected = chosenValue;
+          return AlertDialog(
+            title: const Text('Due identità rilevate'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Entrambi i dispositivi contengono classi associate a due '
+                    'identità diverse. Conservando una sola identità, tutti i '
+                    'dispositivi della stessa persona la condivideranno.',
+                    textAlign: TextAlign.justify,
+                  ),
+                  const SizedBox(height: 16),
+                  RadioGroup<String>(
+                    groupValue: selected,
+                    onChanged: (value) {
+                      if (value != null) {
+                        chosenValue = value;
+                        setState(() => selected = value);
+                      }
+                    },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        RadioListTile<String>(
+                          value: localId,
+                          title: const Text('Questo dispositivo'),
+                          subtitle: Text('Identità: $localId',
+                              style: const TextStyle(fontSize: 11)),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        RadioListTile<String>(
+                          value: remoteId,
+                          title: Text(remoteName),
+                          subtitle: Text('Identità: $remoteId',
+                              style: const TextStyle(fontSize: 11)),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(chosenValue),
+                child: const Text('Conservare consigliata'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(chosenValue),
+                child: const Text('Conferma'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    return chosen ?? defaultId;
   }
 
   void _onRejectPairingCode() {
@@ -910,11 +996,11 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
-              icon: const Icon(Icons.home_rounded),
-              label: const Text('Vai alla home',
+              icon: const Icon(Icons.groups_rounded),
+              label: const Text('Gestisci le tue classi',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               onPressed: () {
-                context.go('/');
+                context.go('/onboarding-classes');
               },
             ),
           ),

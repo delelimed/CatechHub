@@ -8,6 +8,9 @@ import '../features/auth/login_page.dart';
 import '../features/classes/my_group_page.dart';
 import '../features/classes/group_management_page.dart';
 import '../features/classes/view_groups_page.dart';
+import '../features/classes/class_selection_page.dart';
+import '../features/classes/class_switcher_page.dart';
+import '../features/classes/class_copy_page.dart';
 import '../features/dashboard/dashboard_page.dart';
 import '../features/dashboard/statistics_page.dart';
 import '../features/students/students_page.dart';
@@ -30,6 +33,7 @@ import '../features/settings/release_detail_page.dart';
 import '../features/settings/privacy.dart';
 import '../features/onboarding/presentation/screens/onboarding_page.dart';
 import '../features/onboarding/presentation/screens/onboarding_sync_page.dart';
+import '../features/onboarding/presentation/screens/onboarding_classes_page.dart';
 import '../core/storage/local_database.dart';
 import '../features/settings/backup_page.dart';
 import '../features/settings/delete_data_page.dart';
@@ -50,6 +54,34 @@ import '../features/catechesi/catechesi_page.dart';
 import '../features/catechesi/catechesi_edit_page.dart';
 import '../features/catechesi/catechesi_detail_page.dart';
 import '../shared/models/catechesi_model.dart';
+
+/// Restituisce gli ID delle classi a cui appartiene il catechista locale.
+///
+/// Centrale per il redirect: evita di duplicare la logica di lettura del box
+/// `classes` in più punti e rende coerente il trattamento di `current_class_id`
+/// (che viene considerato valido SOLO se appartiene ancora al catechista).
+List<String> _userClassIds() {
+  final classesBox = LocalDatabase.classes();
+  const localId = AuthService.localUserId;
+  final ids = <String>[];
+  for (final key in classesBox.keys) {
+    final data = LocalDatabase.toStringDynamicMap(classesBox.get(key));
+    final catechistIds = (data['catechistIds'] as List? ?? [])
+        .map((e) => e.toString())
+        .toList();
+    if (catechistIds.contains(localId)) ids.add(key.toString());
+  }
+  return ids;
+}
+
+/// Legge `current_class_id` e lo considera valido solo se non è vuoto e punta
+/// a una classe di cui l'utente fa ancora parte. Un id "stantio" (classe
+/// eliminata o a cui si è usciti) viene ignorato come nessuna selezione.
+String? _validatedCurrentClassId() {
+  final raw = LocalDatabase.auth().get('current_class_id');
+  if (raw is! String || raw.isEmpty) return null;
+  return _userClassIds().contains(raw) ? raw : null;
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // router.dart — CatechHub (configurazione navigazione)
@@ -212,7 +244,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // L'onboarding spiega il funzionamento dell'app e richiede i
       // permessi uno per uno (notifiche, fotocamera, Bluetooth).
       // ─────────────────────────────────────────────────────────────────────
-      if (location != '/onboarding') {
+      if (location != '/onboarding' &&
+          location != '/class-selection' &&
+          location != '/onboarding-classes') {
         try {
           final onboardingDone =
               LocalDatabase.auth().get(
@@ -246,7 +280,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // NOTA: state.matchedLocation restituisce solo il path senza query
       // parameters, garantendo che il confronto sia preciso.
       // ─────────────────────────────────────────────────────────────────────
-      if (location == '/onboarding') return null;
+      if (location == '/onboarding' ||
+          location == '/class-selection' ||
+          location == '/onboarding-classes') {
+        return null;
+      }
 
       final authState = ref.read(authStateProvider);
       final isLoginPath = location == '/login';
@@ -267,26 +305,63 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 final setupMode =
                     LocalDatabase.auth().get('setup_mode', defaultValue: 'create');
                 if (setupMode == 'join') {
-                  final classesBox = LocalDatabase.classes();
-                  const localId = AuthService.localUserId;
-                  bool userInClass = false;
-                  for (final key in classesBox.keys) {
-                    final data = LocalDatabase.toStringDynamicMap(classesBox.get(key));
-                    final ids = (data['catechistIds'] as List? ?? [])
-                        .map((e) => e.toString())
-                        .toList();
-                    if (ids.contains(localId)) {
-                      userInClass = true;
-                      break;
-                    }
-                  }
-                  if (!userInClass) {
+                  if (_userClassIds().isEmpty) {
                     return '/onboarding-sync';
                   }
                 }
               } catch (_) {}
             }
-            if (isLoginPath) return '/';
+            if (isLoginPath) {
+              // Dopo il login si chiede SEMPRE quale classe aprire, anche se
+              // una classe è già salvata come corrente: la selezione viene
+              // proposta a ogni avvio dell'app (richiesta esplicita).
+              // La pagina /class-selection gestisce anche il caso in cui
+              // l'utente non faccia parte di alcun gruppo (empty state con
+              // "Crea nuovo gruppo").
+              try {
+                // Fase di onboarding multiclasse: finché non viene completata
+                // dal catechista, il router lo mantiene sulla schermata dedicata
+                // alla gestione delle classi (funziona anche senza classi).
+                final classesStepDone =
+                    LocalDatabase.auth().get(
+                          'onboarding_classes_completed',
+                          defaultValue: true,
+                        )
+                        as bool;
+                if (!classesStepDone) {
+                  return '/onboarding-classes';
+                }
+                return '/class-selection';
+              } catch (_) {}
+              return '/class-selection';
+            }
+            // Se l'utente è autenticato ma non ha una classe selezionata e non è su class-selection
+            if (location != '/class-selection' &&
+                location != '/onboarding-sync' &&
+                location != '/onboarding-classes') {
+              try {
+                final userClassIds = _userClassIds();
+                final hasClasses = userClassIds.isNotEmpty;
+                final currentClassId = _validatedCurrentClassId();
+
+                // Difesa in profondità: anche fuori da /login, se la gestione
+                // classi dell'onboarding non è stata completata si torna alla
+                // schermata dedicata (a meno di essere già su una route esclusa).
+                final classesStepDone =
+                    LocalDatabase.auth().get(
+                          'onboarding_classes_completed',
+                          defaultValue: true,
+                        )
+                        as bool;
+                if (!classesStepDone) {
+                  return '/onboarding-classes';
+                }
+
+                if (hasClasses && (currentClassId == null || currentClassId.isEmpty)) {
+                  return '/class-selection';
+                }
+              } catch (_) {}
+            }
           }
           return null;
         },
@@ -329,6 +404,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
 
       // ═══════════════════════════════════════════════════════════════════
+      // ONBOARDING CLASSES - Gestione multiclasse durante l'onboarding
+      // ═══════════════════════════════════════════════════════════════════
+      GoRoute(
+        path: '/onboarding-classes',
+        builder: (context, state) => const OnboardingClassesPage(),
+      ),
+
+      // ═══════════════════════════════════════════════════════════════════
+      // CLASS SELECTION - Selezione classe post-login
+      // ══════════════════════════════════════════════════════════════════
+      GoRoute(
+        path: '/class-selection',
+        builder: (context, state) => const ClassSelectionPage(),
+      ),
+
+      // ══════════════════════════════════════════════════════════════════
       // AUTH - Schermata di sblocco (PIN/biometrico)
       // ═══════════════════════════════════════════════════════════════════
       GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
@@ -623,6 +714,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings/association',
         builder: (context, state) => const SettingsAssociationScreen(),
+      ),
+
+      /// Schermata per cambiare classe
+      GoRoute(
+        path: '/settings/class-switcher',
+        builder: (context, state) => const ClassSwitcherPage(),
+      ),
+
+      /// Schermata per copiare contenuti da un'altra classe
+      GoRoute(
+        path: '/settings/class-copy',
+        builder: (context, state) => const ClassCopyPage(),
       ),
 
       /// Procedura guidata per associare un nuovo dispositivo.

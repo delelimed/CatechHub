@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/providers/class_scoped_providers.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import 'package:go_router/go_router.dart';
 import 'documents_provider.dart';
@@ -22,7 +24,7 @@ class DocumentsPage extends ConsumerWidget {
   /// Campo Estivo", "Certificato di Battesimo", "Modulo di Iscrizione").
   /// Al salvataggio, il documento viene persistito su Hive tramite il
   /// [DocumentsRepository].
-  void _showCreateDocumentDialog(BuildContext context, WidgetRef ref) {
+  void _showCreateDocumentDialog(BuildContext context, WidgetRef ref, String classUniqueCode) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final colorScheme = theme.colorScheme;
@@ -63,7 +65,9 @@ class DocumentsPage extends ConsumerWidget {
                 // Catturiamo il Navigator prima del blocco asincrono per evitare GoRouterState Error
                 final navigator = Navigator.of(dialogContext);
 
-                await ref.read(documentsRepoProvider).addDocument(text);
+                await ref
+                    .read(documentsRepoProvider)
+                    .addDocument(text, classUniqueCode: classUniqueCode);
                 
                 navigator.pop();
               }
@@ -141,42 +145,50 @@ class DocumentsPage extends ConsumerWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final docsAsync = ref.watch(documentsStreamProvider);
-    final studentsAsync = ref.watch(myGroupStudentsProvider);
+    final currentClassId = ref.watch(currentClassProvider);
+    final classUniqueCode = ref.watch(currentClassUniqueCodeProvider);
+    final docsAsync = ref.watch(currentClassDocumentsProvider);
+    final studentsAsync = ref.watch(currentClassStudentsProvider);
 
     return AppScaffold(
       title: 'Documenti',
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-        foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        onPressed: () => _showCreateDocumentDialog(context, ref),
-        child: const Icon(Icons.add),
-      ),
-      child: docsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Errore: $e')),
-        data: (documents) {
-          if (documents.isEmpty) {
-            return const Center(
-              child: Text('Nessun documento. Premi + per aggiungerne uno.'),
-            );
-          }
+      floatingActionButton: currentClassId == null
+          ? null
+          : FloatingActionButton(
+              backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+              foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              onPressed: () => _showCreateDocumentDialog(context, ref, classUniqueCode),
+              child: const Icon(Icons.add),
+            ),
+      child: currentClassId == null
+          ? const Center(
+              child: Text('Nessuna classe selezionata'),
+            )
+          : docsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Errore: $e')),
+              data: (documents) {
+                if (documents.isEmpty) {
+                  return const Center(
+                    child: Text('Nessun documento. Premi + per aggiungerne uno.'),
+                  );
+                }
 
-          return studentsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('Errore ragazzi: $e')),
-            data: (myStudents) {
-              return ListView.builder(
-                padding: const EdgeInsets.all(12),
-                itemCount: documents.length,
-                itemBuilder: (context, index) {
-                  final theme = Theme.of(context);
-                  final isDark = theme.brightness == Brightness.dark;
-                  final colorScheme = theme.colorScheme;
-                  final doc = documents[index];
-                  final docId = doc['id'].toString();
-                  final deliveriesAsync = ref.watch(documentDeliveriesProvider(docId));
+                return studentsAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(child: Text('Errore ragazzi: $e')),
+                  data: (myStudents) {
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(12),
+                      itemCount: documents.length,
+                      itemBuilder: (context, index) {
+                        final theme = Theme.of(context);
+                        final isDark = theme.brightness == Brightness.dark;
+                        final colorScheme = theme.colorScheme;
+                        final doc = documents[index];
+                        final docId = doc['id'].toString();
+                        final deliveriesAsync = ref.watch(documentDeliveriesProvider(docId));
 
                   return deliveriesAsync.when(
                     loading: () => const SizedBox(height: 70),

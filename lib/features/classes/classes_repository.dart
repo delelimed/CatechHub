@@ -51,6 +51,9 @@ class ClassesRepository {
       createdAt: now,
       updatedAt: now,
     ).toMap());
+    // Forza la scrittura su disco: evita la perdita di una classe appena
+    // creata se il processo viene terminato dal sistema subito dopo.
+    await _box.flush();
   }
 
   Future<void> updateClass(String id, SchoolClass c) async {
@@ -76,6 +79,7 @@ class ClassesRepository {
       lastModifiedBy: catechistName,
       updatedAt: DateTime.now(),
     ).toMap());
+    await _box.flush();
 
     final removedStudentIds = previous.studentIds
         .where((studentId) => !c.studentIds.contains(studentId))
@@ -103,6 +107,7 @@ class ClassesRepository {
   Future<void> deleteClass(String id) async {
     try {
       await _box.delete(id);
+      await _box.flush();
     } catch (e) {
       debugPrint('[ClassesRepository] Errore eliminazione classe $id: $e');
     }

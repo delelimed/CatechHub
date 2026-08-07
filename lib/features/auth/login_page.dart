@@ -101,6 +101,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _groupController = TextEditingController();
 
   bool _isFirstSetup = false;
@@ -142,6 +143,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
+    _phoneController.dispose();
     _groupController.dispose();
     super.dispose();
   }
@@ -194,6 +196,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final ok = await auth.setupInitialProfile(
       firstName: firstName,
       lastName: lastName,
+      phoneNumber: _phoneController.text.trim(),
       createClass: false,
     );
 
@@ -222,6 +225,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       firstName: firstName,
       lastName: lastName,
       groupName: groupName,
+      phoneNumber: _phoneController.text.trim(),
       createClass: true,
     );
 
@@ -482,6 +486,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             _buildTextField(_firstNameController, 'Nome', Icons.person, isLandscape),
             const SizedBox(height: 12),
             _buildTextField(_lastNameController, 'Cognome', Icons.person_outline, isLandscape),
+            const SizedBox(height: 12),
+            _buildTextField(
+              _phoneController,
+              'Telefono (facoltativo)',
+              Icons.phone_outlined,
+              isLandscape,
+              TextInputType.phone,
+            ),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: _nextStep,
@@ -683,9 +695,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     String label,
     IconData icon, [
     bool isLandscape = false,
+    TextInputType? keyboardType,
   ]) {
     return TextField(
       controller: controller,
+      keyboardType: keyboardType,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: const Color(0xFF174A7E)),

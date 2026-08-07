@@ -5,8 +5,11 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer' as dev;
+import 'dart:math';
 
+import 'package:crypto/crypto.dart' show sha256;
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:local_auth_android/local_auth_android.dart';
@@ -39,24 +42,132 @@ class AuthService {
   /// Chiave Hive per il catechistId persistente.
   static const _catechistIdKey = 'catechist_id';
 
+  /// Chiave Hive per il salt crittografico usato nella derivazione dell'ID.
+  static const _catechistSaltKey = 'catechist_salt';
+
   /// Nome visualizzato di default.
   static const localUserName = 'Catechista Locale';
+
+  /// Genera un UUID v4 con un generatore crittograficamente sicuro.
+  static String _generateUuidV4() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0F) | 0x40; // version 4
+    bytes[8] = (bytes[8] & 0x3F) | 0x80; // variant 10xx
+    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+        '${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+  }
 
   /// Restituisce (e genera se necessario) un identificatore stabile per il
   /// catechista locale. Questo ID è condiviso tra tutti i dispositivi dello
   /// stesso catechista (via sync) e permette di distinguere il creatore della
   /// classe dagli altri catechisti associati.
+  ///
+  /// DERIVAZIONE (anti-enumerazione):
+  ///   L'ID non è mai derivato SOLO dal nome (sarebbe enumerabile). Combina
+  ///   l'anagrafica normalizzata (nome+cognome, senza spazi, case-insensitive)
+  ///   con un salt crittografico unico UUIDv4:
+  ///     id = "cat_" + sha256("nome_normalizzato:salt").hex[0..16]
+  ///   Il salt viene persistito accanto all'ID, quindi l'ID resta stabile per
+  ///   tutta la vita del profilo. Due persone con lo stesso nome generano ID
+  ///   diversi perché il salt è unico per dispositivo.
   static String getCatechistId() {
     final box = LocalDatabase.auth();
     final existing = box.get(_catechistIdKey) as String?;
     if (existing != null && existing.isNotEmpty) return existing;
-    final newId = 'cat_${DateTime.now().microsecondsSinceEpoch}';
+
+    final normalized = getLocalAnagraficaKey();
+    String salt = box.get(_catechistSaltKey) as String? ?? '';
+    if (salt.isEmpty) {
+      salt = _generateUuidV4();
+      box.put(_catechistSaltKey, salt);
+    }
+    final hash = sha256.convert(utf8.encode('$normalized:$salt')).toString();
+    final newId = 'cat_${hash.substring(0, 16)}';
     box.put(_catechistIdKey, newId);
     return newId;
   }
 
   /// Getter di istanza per il catechistId corrente.
   String get catechistId => getCatechistId();
+
+  /// Numero di telefono facoltativo del catechista (campo `phone_number`).
+  static String getPhoneNumber() {
+    final box = LocalDatabase.auth();
+    return box.get('phone_number', defaultValue: '') as String? ?? '';
+  }
+
+  /// Normalizza una stringa anagrafica per confronti identità:
+  /// lowercase, senza spazi, senza accenti significativi. Due nomi che
+  /// differiscono solo per maiuscole/spazi risultano IDENTICI.
+  ///
+  /// Esempio: "Mario  Rossi" → "mariorossi", "MARIO ROSSI" → "mariorossi".
+  static String normalizeCatechistName(String value) {
+    final lower = value.toLowerCase();
+    // Rimuove gli accenti (à→a, è→e, ...) così "Marìo" == "Mario".
+    const withAccents =
+        'àáâãäåèéêëìíîïòóôõöùúûüñç';
+    const withoutAccents =
+        'aaaaaaeeeeiiiiooooouuuunc';
+    final buffer = StringBuffer();
+    for (final rune in lower.runes) {
+      final ch = String.fromCharCode(rune);
+      final idx = withAccents.indexOf(ch);
+      if (idx >= 0) {
+        buffer.write(withoutAccents[idx]);
+      } else {
+        buffer.write(ch);
+      }
+    }
+    return buffer
+        .toString()
+        .replaceAll(RegExp(r'\s+'), '')
+        .replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
+
+  /// Chiave anagrafica normalizzata del profilo locale ("nome"+"cognome"
+  /// senza spazi e case-insensitive). Stringa vuota se il profilo non è
+  /// ancora configurato.
+  static String getLocalAnagraficaKey() {
+    final box = LocalDatabase.auth();
+    final first = box.get('first_name', defaultValue: '') as String? ?? '';
+    final last = box.get('last_name', defaultValue: '') as String? ?? '';
+    if (first.trim().isEmpty || last.trim().isEmpty) return '';
+    return normalizeCatechistName('$first $last');
+  }
+
+  /// True se il profilo locale è configurato con un'anagrafica completa.
+  static bool hasLocalAnagrafica() => getLocalAnagraficaKey().isNotEmpty;
+
+  /// Chiave anagrafica normalizzata per una coppia nome/cognome arbitraria
+  /// (usata per confrontare l'identità di un dispositivo remoto).
+  static String anagraficaKey(String? firstName, String? lastName) {
+    final first = firstName?.trim() ?? '';
+    final last = lastName?.trim() ?? '';
+    if (first.isEmpty && last.isEmpty) return '';
+    return normalizeCatechistName('$first $last');
+  }
+
+  /// Adotta un `catechistId` esistente come identità stabile di questo
+  /// dispositivo.
+  ///
+  /// Usato quando un dispositivo viene associato come "Mio Dispositivo":
+  /// i dispositivi appartenenti alla STESSA persona devono condividere lo
+  /// stesso `catechistId`, così da essere riconosciuti come "stessa persona"
+  /// (pieni diritti, sincronizzazione di tutte le classi).
+  ///
+  /// L'adozione avviene SOLO se [id] non è vuoto; altrimenti non fa nulla
+  /// e restituisce l'identità corrente.
+  static String adoptCatechistId(String id) {
+    if (id.trim().isEmpty) return getCatechistId();
+    final box = LocalDatabase.auth();
+    final current = box.get(_catechistIdKey) as String?;
+    if (current == id.trim()) return getCatechistId();
+    box.put(_catechistIdKey, id.trim());
+    dev.log('CatechistId adottato: $id');
+    return id.trim();
+  }
 
   final _box = LocalDatabase.auth();
   final _localAuth = LocalAuthentication();
@@ -235,11 +346,13 @@ class AuthService {
   /// Salva nome, cognome. Se [createClass] è true, salva anche [groupName]
   /// e crea la classe iniziale. Se false, salva solo nome/cognome e l'utente
   /// si unirà a una classe esistente via P2P sync.
+  /// [phoneNumber] è facoltativo e viene salvato come `phone_number`.
   /// Sblocca automaticamente la sessione.
   Future<bool> setupInitialProfile({
     required String firstName,
     required String lastName,
     String? groupName,
+    String? phoneNumber,
     bool createClass = true,
   }) async {
     if (firstName.trim().isEmpty || lastName.trim().isEmpty) {
@@ -256,9 +369,21 @@ class AuthService {
 
       await _box.put('first_name', firstName.trim());
       await _box.put('last_name', lastName.trim());
+      await _box.put(
+        'phone_number',
+        (phoneNumber?.trim() ?? '').replaceAll(RegExp(r'\s+'), ' '),
+      );
+      // Il catechistId viene generato DOPO il salvataggio dell'anagrafica,
+      // così la sua derivazione può basarsi su Nome e Cognome normalizzati.
+      getCatechistId(); // Ensure catechistId exists before profile data
       await _box.put('setup_mode', createClass ? 'create' : 'join');
       final fullName = '${firstName.trim()} ${lastName.trim()}';
       await _box.put('local_user_name', fullName);
+
+      // La fase di onboarding dedicata alla gestione multiclasse è pendente:
+      // il router reindirizzerà il catechista alla schermata "/onboarding-classes"
+      // finché non verrà completata (flag impostato a true dalla schermata).
+      await _box.put('onboarding_classes_completed', false);
 
       if (createClass) {
         await _box.put('group_name', groupName!.trim());
@@ -280,11 +405,18 @@ class AuthService {
           catechistDeviceCounts: {getCatechistId(): 1},
         );
         await classBox.put(classId, newClass.toMap());
+        // Forza la scrittura su disco: la classe deve sopravvivere anche a un
+        // kill del processo immediatamente dopo la creazione.
+        await classBox.flush();
+        // La classe creata durante l'onboarding è subito quella corrente,
+        // così al riavvio il router trova una selezione valida e persistente.
+        await _box.put('current_class_id', classId);
       } else {
         await _box.put('group_name', fullName);
       }
 
       await P2PSecurityService().refreshIdentityName();
+      await P2PSecurityService().refreshIdentityAnagrafica();
 
       _sessionUnlocked = true;
       _cachedUser = null;
@@ -307,11 +439,18 @@ class AuthService {
     String? firstName,
     String? lastName,
     String? groupName,
+    String? phoneNumber,
   }) async {
     try {
       if (firstName != null) await _box.put('first_name', firstName.trim());
       if (lastName != null) await _box.put('last_name', lastName.trim());
       if (groupName != null) await _box.put('group_name', groupName.trim());
+      if (phoneNumber != null) {
+        await _box.put(
+          'phone_number',
+          phoneNumber.trim().replaceAll(RegExp(r'\s+'), ' '),
+        );
+      }
 
       if (firstName != null || lastName != null) {
         final fn = firstName ?? _box.get('first_name', defaultValue: '');
@@ -319,6 +458,7 @@ class AuthService {
         await _box.put('local_user_name', '$fn $ln'.trim());
       }
       await P2PSecurityService().refreshIdentityName();
+      await P2PSecurityService().refreshIdentityAnagrafica();
       _cachedUser = null;
       return true;
     } catch (e) {
@@ -341,6 +481,7 @@ class AuthService {
       'name': _box.get('local_user_name', defaultValue: localUserName),
       'firstName': _box.get('first_name', defaultValue: ''),
       'lastName': _box.get('last_name', defaultValue: ''),
+      'phoneNumber': _box.get('phone_number', defaultValue: ''),
       'groupName': _box.get('group_name', defaultValue: ''),
       'email': 'locale@dispositivo',
       'role': 'catechist',

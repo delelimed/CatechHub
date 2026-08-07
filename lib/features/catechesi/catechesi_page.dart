@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/providers/class_scoped_providers.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/models/catechesi_model.dart';
 import '../../shared/widgets/last_modified_info.dart';
@@ -41,7 +42,7 @@ class _CatechesiPageState extends ConsumerState<CatechesiPage> {
 
   @override
   Widget build(BuildContext context) {
-    final repo = ref.watch(catechesiRepositoryProvider);
+    final catechesiAsync = ref.watch(currentClassCatechesiProvider);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -91,14 +92,10 @@ class _CatechesiPageState extends ConsumerState<CatechesiPage> {
             ),
           ),
           Expanded(
-            child: StreamBuilder<List<Catechesi>>(
-              stream: repo.watchCatechesi(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final all = snapshot.data!;
+            child: catechesiAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Errore: $e')),
+              data: (all) {
                 final items = _query.isEmpty
                     ? all
                     : all.where((c) {

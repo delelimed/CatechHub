@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/models/student_model.dart';
 import '../../shared/utils/auth_utils.dart';
@@ -218,6 +219,8 @@ class ClassDetailPage extends ConsumerWidget {
               Navigator.pop(context);
               try {
                 await ref.read(classesRepoProvider).deleteClass(currentClass.id);
+                // Se si eliminava la classe aperta, pulisce la selezione
+                await clearCurrentClassIfDeleted(ref, currentClass.id);
                 if (context.mounted) Navigator.pop(context);
               } catch (e) {
                 if (context.mounted) {

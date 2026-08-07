@@ -182,19 +182,32 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
         var received = 0;
         final sink = file.openWrite();
 
-        await for (final chunk in streamedResponse.stream) {
-          sink.add(chunk);
-          received += chunk.length;
-          if (contentLength > 0 && mounted) {
-            setState(() {
-              _downloadProgress = received / contentLength;
-            });
+        try {
+          await for (final chunk in streamedResponse.stream) {
+            sink.add(chunk);
+            received += chunk.length;
+            if (contentLength > 0 && mounted) {
+              setState(() {
+                _downloadProgress = received / contentLength;
+              });
+            }
           }
+        } finally {
+          await sink.close();
         }
 
-        await sink.close();
+        // Verifica che il download sia COMPLETO. Un APK troncato (es. rete
+        // caduta a metà) passa il controllo sul magic byte ZIP ma non è
+        // installabile: Android risponde con "errore nel parsing del pacchetto".
+        if (contentLength > 0 && received != contentLength) {
+          await file.delete();
+          throw Exception(
+            'Download incompleto (ricevuti $received su $contentLength byte). Riprova.',
+          );
+        }
 
         if (!await file.exists() || await file.length() == 0) {
+          await file.delete();
           throw Exception('File scaricato vuoto o non valido');
         }
 
@@ -224,6 +237,11 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
         _downloadProgress = 1.0;
       });
 
+      // IMPORTANTE: NON chiamare cleanupOldApks() qui. installApk avvia
+      // l'installer di sistema in modo asincrono: cancellare l'APK subito dopo
+      // causerebbe "impossibile aprire il file" / "parsing error" perché
+      // l'installer sta ancora leggendo il file. La pulizia dei residui viene
+      // fatta al prossimo avvio dell'app (MainActivity.onCreate).
       try {
         await UpdateService.installApk(path);
       } catch (e) {
@@ -242,8 +260,6 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
           SnackBar(content: Text('Errore download: $e')),
         );
       }
-    } finally {
-      await UpdateService.cleanupOldApks();
     }
   }
 

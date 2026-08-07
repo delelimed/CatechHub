@@ -46,6 +46,26 @@ class StudentsRepository {
 
   Stream<List<Student>> getStudents() => getAllStudents();
 
+  /// Stream degli studenti filtrati per classe.
+  Stream<List<Student>> getStudentsByClass(String classId) {
+    return LocalDatabase.watchList(
+      _box,
+      (id, data) => Student.fromMap(id, data),
+    ).map((students) => Student.sortedBySurname(
+      students.where((s) => s.classId == classId),
+    ));
+  }
+
+  /// Lista sincrona degli studenti filtrati per classe.
+  List<Student> getStudentsByClassSync(String classId) {
+    return Student.sortedBySurname(
+      LocalDatabase.values(
+        _box,
+        (id, data) => Student.fromMap(id, data),
+      ).where((s) => s.classId == classId),
+    );
+  }
+
   List<Student> getAllStudentsSync() {
     return Student.sortedBySurname(
       LocalDatabase.values(

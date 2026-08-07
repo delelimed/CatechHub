@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/providers/class_scoped_providers.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../../shared/models/avviso_template_model.dart';
 import '../../shared/models/contact_note_model.dart';
 import '../../shared/models/planning_meeting.dart';
 import '../../shared/models/student_model.dart';
 import '../../core/storage/local_database.dart';
 import '../planning/planning_repository.dart';
-import '../students/students_repository.dart';
 import 'avvisi_repository.dart';
 import 'avvisi_utils.dart';
 import 'contact_notes_repository.dart';
@@ -16,7 +17,8 @@ class AvvisiPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final templatesAsync = ref.watch(avvisiTemplatesProvider);
+    final currentClass = ref.watch(currentClassProvider);
+    final templatesAsync = ref.watch(currentClassAvvisiProvider);
     final templates = templatesAsync.asData?.value ?? [];
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -25,12 +27,14 @@ class AvvisiPage extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Condividi avviso'),
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.lightBlue,
-        foregroundColor: Colors.white,
-        onPressed: () => _editTemplate(context, ref, null),
-        child: const Icon(Icons.add_rounded),
-      ),
+      floatingActionButton: currentClass == null || currentClass.isEmpty
+          ? null
+          : FloatingActionButton(
+              backgroundColor: Colors.lightBlue,
+              foregroundColor: Colors.white,
+              onPressed: () => _editTemplate(context, ref, null),
+              child: const Icon(Icons.add_rounded),
+            ),
       body: templates.isEmpty
           ? Center(
               child: Padding(
@@ -198,10 +202,10 @@ class AvvisiPage extends ConsumerWidget {
     if (!hasPlaceholders(text)) return text;
     try {
       String result = text;
-      final students = ref.read(studentsRepositoryProvider).getAllStudentsSync();
-      final classId = students.isNotEmpty ? students.first.classId : null;
+      final classId = ref.read(currentClassProvider);
 
-      final groupName = classId != null ? _getClassName(classId) : '';
+      final groupName =
+          classId != null && classId.isNotEmpty ? _getClassName(classId) : '';
       final nextMeeting = _getNextMeeting(classId);
       if (groupName.isNotEmpty) {
         result = result.replaceAll('{nome_gruppo}', groupName);
@@ -217,7 +221,7 @@ class AvvisiPage extends ConsumerWidget {
   }
 
   Future<Student?> _selectStudent(BuildContext context, WidgetRef ref) async {
-    final students = ref.read(studentsRepositoryProvider).getAllStudentsSync();
+    final students = ref.read(currentClassStudentsSyncProvider);
     if (students.isEmpty) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -703,6 +707,9 @@ class AvvisiPage extends ConsumerWidget {
                             id: existing?.id ?? '',
                             title: titleController.text.trim(),
                             text: textController.text.trim(),
+                            classUniqueCode:
+                                existing?.classUniqueCode ??
+                                    ref.read(currentClassUniqueCodeProvider),
                           );
                           ref.read(avvisiRepoProvider).save(template);
                           Navigator.pop(dialogContext);

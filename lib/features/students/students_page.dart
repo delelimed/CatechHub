@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/providers/class_scoped_providers.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/widgets/last_modified_info.dart';
 import '../../shared/models/student_model.dart';
 import '../documents/documents_provider.dart';
-import 'student_quick_view_page.dart';
-import 'students_repository.dart';
-import 'students_add_page.dart';
-import 'edit_student_page.dart';
-
-final studentsRepoProvider = Provider((ref) => StudentsRepository());
+import 'student_quick_view_page.dart' hide studentsRepoProvider;
+import 'students_add_page.dart' hide studentsRepoProvider;
+import 'edit_student_page.dart' hide studentsRepoProvider;
+import 'students_provider.dart';
 
 /// Schermata principale dell'area ragazzi: elenco completo degli studenti
 /// con cards nominative, indicatori visivi di documenti mancanti (arancione)
 /// e menu contestuale (visualizza, modifica, elimina).
-/// Usa il modello [Student] tramite [StudentsRepository] (Box `students`).
+/// Usa il modello [Student] filtrato per la classe corrente.
 /// Punto di ingresso del flusso "Anagrafica": da qui si naviga verso
 /// [AddStudentPage], [EditStudentPage] e [StudentQuickViewPage].
 class StudentsPage extends ConsumerWidget {
@@ -23,74 +23,113 @@ class StudentsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final repo = ref.watch(studentsRepoProvider);
+    final currentClassId = ref.watch(currentClassProvider);
+    final studentsAsync = ref.watch(currentClassStudentsProvider);
 
     return AppScaffold(
       title: 'Ragazzi',
 
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color(0xFF174A7E),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('Nuovo ragazzo'),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const AddStudentPage(),
+      floatingActionButton: currentClassId == null
+          ? null
+          : FloatingActionButton.extended(
+              backgroundColor: const Color(0xFF174A7E),
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add),
+              label: const Text('Nuovo ragazzo'),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AddStudentPage(),
+                  ),
+                );
+              },
             ),
-          );
-        },
-      ),
 
-      child: StreamBuilder<List<Student>>(
-        stream: repo.getAllStudents(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      child: currentClassId == null
+          ? _NoClassSelected()
+          : studentsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Errore: $e')),
+              data: (students) {
+                if (students.isEmpty) {
+                  return _EmptyState();
+                }
 
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return _EmptyState();
-          }
+                return ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: students.length,
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(height: 12),
+                  itemBuilder: (_, index) {
+                    final s = students[index];
 
-          final students = Student.sortedBySurname(snapshot.data!);
+                    return _StudentCard(
+                      student: s,
+                      onView: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                StudentQuickViewPage(student: s),
+                          ),
+                        );
+                      },
+                      onEdit: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                EditStudentPage(student: s),
+                          ),
+                        );
+                      },
+                      onDelete: () {
+                        final repo = ref.read(studentsRepoProvider);
+                        repo.deleteStudent(s.id);
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+    );
+  }
+}
 
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: students.length,
-            separatorBuilder: (_, __) =>
-                const SizedBox(height: 12),
-            itemBuilder: (_, index) {
-              final s = students[index];
+class _NoClassSelected extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
-              return _StudentCard(
-                student: s,
-                onView: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          StudentQuickViewPage(student: s),
-                    ),
-                  );
-                },
-                onEdit: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          EditStudentPage(student: s),
-                    ),
-                  );
-                },
-                onDelete: () {
-                  repo.deleteStudent(s.id);
-                },
-              );
-            },
-          );
-        },
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.class_outlined,
+            size: 70,
+            color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Nessuna classe selezionata',
+            style: TextStyle(
+              color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Vai in Impostazioni > Cambia classe per selezionare una classe',
+            style: TextStyle(
+              color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
+              fontSize: 13,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }

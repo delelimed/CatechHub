@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/providers/class_scoped_providers.dart';
 import '../../core/providers/data_share_provider.dart';
 import '../../core/services/qr_data_service.dart';
 import '../../shared/widgets/app_scaffold.dart';
@@ -144,6 +145,8 @@ class DataShareSelectionPage extends ConsumerWidget {
     bool includeContactNotes = false;
     bool includeCatechesi = false;
     bool includeAnnotazioni = false;
+    bool onlyCurrentClass = true;
+    final currentClassCode = ref.read(currentClassUniqueCodeProvider);
 
     showDialog(
       context: context,
@@ -235,6 +238,27 @@ class DataShareSelectionPage extends ConsumerWidget {
                     colorScheme: colorScheme,
                     onChanged: (v) => setDialogState(() => includeAnnotazioni = v),
                   ),
+                  if (currentClassCode.isNotEmpty)
+                    const Divider(height: 8),
+                  if (currentClassCode.isNotEmpty)
+                    SwitchListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text(
+                        'Solo la classe corrente',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        'Disattiva per condividere tutte le classi',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                        ),
+                      ),
+                      activeThumbColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                      value: onlyCurrentClass,
+                      onChanged: (v) => setDialogState(() => onlyCurrentClass = v),
+                    ),
                 ],
               ),
             ),
@@ -261,6 +285,7 @@ class DataShareSelectionPage extends ConsumerWidget {
                         includeContactNotes: includeContactNotes,
                         includeCatechesi: includeCatechesi,
                         includeAnnotazioni: includeAnnotazioni,
+                        classUniqueCode: onlyCurrentClass ? currentClassCode : null,
                       );
 
                       ref.read(dataShareOptionsProvider.notifier).state =

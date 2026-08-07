@@ -4,10 +4,11 @@ import 'package:intl/intl.dart';
 
 import 'package:go_router/go_router.dart';
 
+import '../../core/providers/class_scoped_providers.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../../shared/models/student_model.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/widgets/last_modified_info.dart';
-import '../students/students_repository.dart';
 import 'contact_notes_repository.dart';
 import 'student_contact_notes_page.dart';
 
@@ -16,16 +17,21 @@ class ContactNotesPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final studentsRepo = StudentsRepository();
+    final currentClassId = ref.watch(currentClassProvider);
+    final studentsSync = ref.watch(currentClassStudentsSyncProvider);
     final contactNotesRepo = ref.watch(contactNotesRepoProvider);
-    final students = Student.sortedBySurname(studentsRepo.getAllStudentsSync());
+    final students = Student.sortedBySurname(studentsSync);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
     return AppScaffold(
       title: 'Registro di Contatto',
-      child: ListView(
+      child: currentClassId == null
+          ? const Center(
+              child: Text('Nessuna classe selezionata'),
+            )
+          : ListView(
         padding: const EdgeInsets.all(16),
         children: [
           InkWell(

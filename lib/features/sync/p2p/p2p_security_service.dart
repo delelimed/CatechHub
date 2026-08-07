@@ -16,6 +16,8 @@ class P2PIdentity {
   final String publicKeyBase64;
   final String fingerprint;
   final String connectionEndpoint;
+  final String firstName;
+  final String lastName;
 
   const P2PIdentity({
     required this.deviceId,
@@ -24,7 +26,14 @@ class P2PIdentity {
     required this.publicKeyBase64,
     required this.fingerprint,
     required this.connectionEndpoint,
+    this.firstName = '',
+    this.lastName = '',
   });
+
+  /// Chiave anagrafica normalizzata (nome+cognome, senza spazi, lowercase).
+  /// Usata per la validazione dell'identità durante l'associazione.
+  String get anagraficaKey =>
+      '$firstName$lastName'.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '');
 
   Map<String, dynamic> toJson() => {
         'deviceId': deviceId,
@@ -33,7 +42,9 @@ class P2PIdentity {
         'publicKey': publicKeyBase64,
         'fingerprint': fingerprint,
         'endpoint': connectionEndpoint,
-        'v': 3,
+        'firstName': firstName,
+        'lastName': lastName,
+        'v': 4,
       };
 
   factory P2PIdentity.fromJson(Map<String, dynamic> json) {
@@ -44,6 +55,8 @@ class P2PIdentity {
     String publicKey = json['publicKey'] as String;
     String fingerprint = json['fingerprint'] as String;
     String endpoint = json['endpoint'] as String? ?? deviceId;
+    String firstName = json['firstName'] as String? ?? '';
+    String lastName = json['lastName'] as String? ?? '';
 
     if (ver < 2) {
       deviceName = json['deviceName'] as String? ?? '';
@@ -51,6 +64,14 @@ class P2PIdentity {
     }
     if (ver < 3) {
       endpoint = deviceId;
+    }
+    // v < 4: anagrafica assente, fallback su deviceName (spesso "Nome Cognome").
+    if (ver < 4) {
+      final parts = username.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+      if (parts.length >= 2 && firstName.isEmpty && lastName.isEmpty) {
+        firstName = parts.first;
+        lastName = parts.sublist(1).join(' ');
+      }
     }
 
     return P2PIdentity(
@@ -60,6 +81,8 @@ class P2PIdentity {
       publicKeyBase64: publicKey,
       fingerprint: fingerprint,
       connectionEndpoint: endpoint,
+      firstName: firstName,
+      lastName: lastName,
     );
   }
 
@@ -338,10 +361,30 @@ class P2PSecurityService {
       publicKeyBase64: base64Encode(publicKey.bytes),
       fingerprint: fingerprint,
       connectionEndpoint: deviceId,
+      firstName: _getFirstName(),
+      lastName: _getLastName(),
     );
     await _secureStorage.write(
         key: _localIdentityKey, value: jsonEncode(identity.toJson()));
     return identity;
+  }
+
+  String _getFirstName() {
+    try {
+      final authBox = Hive.box('registroBox');
+      return authBox.get('first_name', defaultValue: '').toString().trim();
+    } catch (_) {
+      return '';
+    }
+  }
+
+  String _getLastName() {
+    try {
+      final authBox = Hive.box('registroBox');
+      return authBox.get('last_name', defaultValue: '').toString().trim();
+    } catch (_) {
+      return '';
+    }
   }
 
   Future<String> _getUsername() async {
@@ -399,6 +442,35 @@ class P2PSecurityService {
           publicKeyBase64: identity.publicKeyBase64,
           fingerprint: identity.fingerprint,
           connectionEndpoint: identity.deviceId,
+          firstName: _getFirstName(),
+          lastName: _getLastName(),
+        );
+        await _secureStorage.write(
+          key: _localIdentityKey,
+          value: jsonEncode(updated.toJson()),
+        );
+      }
+    } catch (_) {}
+  }
+
+  /// Aggiorna il nome/cognome salvati nell'identità P2P locale. Necessario
+  /// dopo la modifica del profilo (il QR e l'handshake devono trasportare
+  /// l'anagrafica aggiornata per la validazione dell'identità).
+  Future<void> refreshIdentityAnagrafica() async {
+    try {
+      final identity = await getLocalIdentity();
+      final first = _getFirstName();
+      final last = _getLastName();
+      if (identity.firstName != first || identity.lastName != last) {
+        final updated = P2PIdentity(
+          deviceId: identity.deviceId,
+          deviceName: identity.deviceName,
+          username: identity.username,
+          publicKeyBase64: identity.publicKeyBase64,
+          fingerprint: identity.fingerprint,
+          connectionEndpoint: identity.deviceId,
+          firstName: first,
+          lastName: last,
         );
         await _secureStorage.write(
           key: _localIdentityKey,
@@ -417,6 +489,8 @@ class P2PSecurityService {
       publicKeyBase64: identity.publicKeyBase64,
       fingerprint: identity.fingerprint,
       connectionEndpoint: identity.deviceId,
+      firstName: _getFirstName(),
+      lastName: _getLastName(),
     );
     return updated.encode();
   }

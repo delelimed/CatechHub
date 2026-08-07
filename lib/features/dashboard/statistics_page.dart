@@ -33,13 +33,8 @@ class _StatisticsPageState extends State<StatisticsPage> {
   void _loadData() {
     try {
       final studentsRepo = StudentsRepository();
-      final allStudents = studentsRepo.getAllStudentsSync();
-      final classData = LocalDatabase.classes().get(widget.classId);
-      final classMap = LocalDatabase.toStringDynamicMap(classData);
-      final classStudentIds =
-          (classMap['studentIds'] as List? ?? []).map((e) => e.toString()).toList();
-      _hasStudents = allStudents
-          .any((s) => classStudentIds.contains(s.id));
+      final classStudents = studentsRepo.getStudentsByClassSync(widget.classId);
+      _hasStudents = classStudents.isNotEmpty;
 
       final attendanceRepo = AttendanceRepository();
       final allAttendance = attendanceRepo.getAttendanceSync();

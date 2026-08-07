@@ -18,15 +18,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/auth/auth_service.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/models/student_model.dart';
 
-import '../classes/classes_provider.dart';
 import '../meetings/attendance_repository.dart';
 import '../students/students_provider.dart';
 import 'attendance_print_page.dart';
+import 'quick_count_page.dart';
 import '../students/student_quick_view_page.dart' hide studentsRepoProvider;
 
 /// Modello di supporto locale che unisce lo studente alle sue statistiche e assenze consecutive
@@ -45,7 +45,8 @@ class _StudentWithStats {
 }
 
 final _groupStudentsStatsProvider = StreamProvider.autoDispose
-    .family<List<_StudentWithStats>, List<String>>((ref, studentIds) {
+    .family<List<_StudentWithStats>, ({List<String> studentIds, String classId})>(
+        (ref, args) {
       final studentsRepo = ref.read(studentsRepoProvider);
       final attendanceRepo = AttendanceRepository();
 
@@ -53,6 +54,7 @@ final _groupStudentsStatsProvider = StreamProvider.autoDispose
 
       return studentsStream.asyncMap((allStudents) async {
         final attendance = attendanceRepo.getAttendanceSync()
+          ..removeWhere((r) => r['classId']?.toString() != args.classId)
           ..sort((a, b) {
             final aDate =
                 DateTime.tryParse(a['date']?.toString() ?? '') ??
@@ -63,7 +65,7 @@ final _groupStudentsStatsProvider = StreamProvider.autoDispose
             return bDate.compareTo(aDate);
           });
 
-        final studentIdsSet = studentIds.toSet();
+        final studentIdsSet = args.studentIds.toSet();
         final classStudents = allStudents
             .where((s) => studentIdsSet.contains(s.id))
             .toList();
@@ -121,8 +123,7 @@ class MyGroupPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final classesAsync = ref.watch(classesStreamProvider);
-    const uid = AuthService.localUserId;
+    final currentClass = ref.watch(currentClassDetailsProvider);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -131,30 +132,29 @@ class MyGroupPage extends ConsumerWidget {
 
     return AppScaffold(
       title: 'Il mio gruppo',
-      child: classesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Errore: $e')),
-        data: (classes) {
-          final myClass = classes.firstWhere(
-            (c) => c.catechistIds.contains(uid),
-            orElse: () =>
-                SchoolClass(id: '', name: '', studentIds: [], catechistIds: []),
-          );
+      child: currentClass == null
+          ? const Center(child: Text('Nessun gruppo assegnato'))
+          : Builder(
+              builder: (context) {
+                final myClass = currentClass;
 
-          if (myClass.id.isEmpty) {
-            return const Center(child: Text('Nessun gruppo assegnato'));
-          }
+                if (myClass.id.isEmpty) {
+                  return const Center(child: Text('Nessun gruppo assegnato'));
+                }
 
-          final studentsStatsAsync = ref.watch(
-            _groupStudentsStatsProvider(myClass.studentIds),
-          );
+                final studentsStatsAsync = ref.watch(
+                  _groupStudentsStatsProvider((
+                    studentIds: myClass.studentIds,
+                    classId: myClass.id,
+                  )),
+                );
 
-          return studentsStatsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) =>
-                Center(child: Text('Errore nel caricamento dati: $e')),
-            data: (studentsWithStats) {
-              return Column(
+                return studentsStatsAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, _) =>
+                      Center(child: Text('Errore nel caricamento dati: $e')),
+                  data: (studentsWithStats) {
+                    return Column(
                 children: [
                   const SizedBox(height: 12),
 
@@ -211,8 +211,8 @@ Padding(
               );
             },
           );
-        },
-      ),
+              },
+            ),
     );
   }
 }
@@ -272,6 +272,28 @@ class _MobileActions extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _ActionButton(
+                icon: Icons.fact_check_rounded,
+                label: 'Conteggio rapido',
+                compact: true,
+                isDark: isDark,
+                colorScheme: colorScheme,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const QuickCountPage(),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -321,6 +343,23 @@ class _DesktopActions extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (_) => AttendancePrintPage(schoolClass: schoolClass),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _ActionButton(
+            icon: Icons.fact_check_rounded,
+            label: 'Conteggio rapido',
+            isDark: isDark,
+            colorScheme: colorScheme,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const QuickCountPage(),
                 ),
               );
             },

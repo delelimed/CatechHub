@@ -53,9 +53,26 @@ CatechHub adotta un approccio **defense-in-depth**, dove ogni livello è progett
 
 > **Nessun dato personale lascia mai il tuo telefono** se non durante una sincronizzazione volontaria con un altro catechista di tua fiducia.
 
+## Privacy e GDPR
+
+CatechHub è progettata per **lasciare al catechista il pieno controllo dei propri dati**, in linea con il Regolamento Generale sulla Protezione dei Dati (GDPR — Reg. UE 2016/679):
+
+- **L'app non condivide dati.** CatechHub non dispone di server né di servizi cloud, non invia dati a terzi e non integra sistemi di analytics, tracking o pubblicità. Nessuna informazione lascia il tuo dispositivo se non su tua esplicita iniziativa.
+- **Sei tu a gestire i dati.** L'utente è il soggetto che tratta e gestisce i dati: inserimento, modifica ed eliminazione avvengono direttamente dal tuo dispositivo. Non esistono account remoti, profili online o registri lato server.
+- **Dati sensibili trattati con cautela (art. 9 GDPR).** I dati dei minori sono informazioni "particolari" e come tali vengono trattati: cifrati con AES-256-GCM, custoditi nel secure storage hardware e accessibili solo previa autenticazione all'app.
+- **Privacy by design e by default (art. 25 GDPR).** Minimo, essenziale: vengono raccolti solo i dati strettamente necessari, la crittografia è attiva di default e ogni funzione di condivisione richiede un consenso esplicito (doppio consenso per i catechisti, PIN per QR e backup).
+- **Sincronizzazione solo consensuale e verificata.** L'unico scambio possibile avviene peer-to-peer (Bluetooth/WiFi Direct) esclusivamente con dispositivi di tua fiducia, previo pairing verificato e crittografia end-to-end. Nessun intermediario.
+- **Portabilità (art. 20 GDPR).** Puoi esportare l'intero database in un file `.catechub` protetto da password e ripristinarlo su un altro dispositivo quando vuoi.
+- **Diritto alla cancellazione.** Puoi eliminare definitivamente tutti i dati in qualsiasi momento dalle Impostazioni (cancellazione completa o selettiva).
+- **Mitigazione delle violazioni.** In caso di accesso fisico non autorizzato al dispositivo, i dati restano illeggibili grazie alla crittografia hardware-backed (AndroidKeyStore/TEE/StrongBox), al blocco biometrico e al blocco automatico della sessione.
+- **Nessuna profilazione.** L'app non traccia i comportamenti, non costruisce profili e non invia alcuna statistica di utilizzo.
+
+> CatechHub non è un servizio online: è uno strumento personale. I dati appartengono al catechista che li ha inseriti — e solo a lui.
+
 ## Cosa Puoi Fare
 
 - **Anagrafica ragazzi** — Aggiungi, modifica, cerca e organizza gli iscritti in gruppi
+- **Gestione multigruppo** — Crea, unisciti e gestisci più gruppi di catechismo; passa da un gruppo all'altro con un tap e copia i contenuti (anagrafica, presenze, programmazione) da un gruppo a un altro. Tutti i tuoi gruppi sono sempre accessibili da "I miei gruppi" nelle Impostazioni
 - **Presenze** — Crea giornate, fai l'appello, visualizza statistiche
 - **Programmazione** — Pianifica incontri e associa materiale catechetico
 - **Documenti** — Gestisci il ciclo di vita: crea, consegna, attendi riconsegna, archivia
@@ -65,6 +82,7 @@ CatechHub adotta un approccio **defense-in-depth**, dove ogni livello è progett
 - **Sync P2P Nearby** — Sincronizzazione continua via Bluetooth/WiFi Direct con crittografia end-to-end (X25519 ECDH + HKDF + AES-256-GCM), pairing code a 6 cifre anti-MitM, key pinning per dispositivo, forward secrecy e sync differenziale. **Doppio consenso**: se entrambi i dispositivi sono "Altro Catechista", la sincronizzazione richiede l'autorizzazione esplicita di entrambi i catechisti prima dello scambio dati.
 - **Comunicazioni automatiche** — Template WhatsApp con placeholders (nome ragazzo, assenze consecutive, data incontro, ecc.) e registrazione note di contatto
 - **Tracciabilità modifiche** — Ogni record mostra data, ora e autore dell'ultima modifica, garantendo piena trasparenza su chi ha modificato cosa e quando
+- **Esportazione report PDF** — Genera per la classe attualmente aperta un documento PDF A4 professionale con i moduli che preferisci: anagrafica, note di contatto, composizione del gruppo, presenze, statistiche, documenti, programmazione degli incontri e catechesi. Il PDF viene generato localmente e condiviso tramite il foglio nativo di Android (salva su file, stampa, invia) senza mai passare da server intermedi
 - **PDF e stampa** — Genera report presenze, statistiche assenze e liste gruppi
 - **Allergie e uscite autonome** — Gestisci informazioni sensibili con visibilità immediata
 
@@ -85,6 +103,7 @@ CatechHub adotta un approccio **defense-in-depth**, dove ogni livello è progett
 | PDF | pdf, printing |
 | Sicurezza runtime | freeRASP (Talsec) |
 | Sync status | Indicatore a pallino (verde/rosso/ciano/giallo) in app bar |
+| Multigruppo | Cambio gruppo rapido (class switcher), "I miei gruppi", copia contenuti tra classi |
 
 ## Per Iniziare
 
@@ -116,6 +135,8 @@ Vedi la [roadmap completa](FUTURE.md) per le funzionalità in sviluppo, pianific
 
 ```text
 MIT License — Copyright (c) 2026 CatechHub
+
+CatechHub è stato sviluppato interamente in "vibe coding" con l'ausilio dell'intelligenza artificiale, da un catechista (non da uno sviluppatore di professione). Il codice è aperto, verificabile e migliorabile da chiunque.
 
 Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.
 ```

@@ -25,6 +25,9 @@ import 'package:intl/intl.dart';
 
 import '../../core/auth/auth_provider.dart';
 import '../../core/services/data_export_service.dart';
+import '../../core/providers/current_class_provider.dart';
+import '../../shared/models/class_model.dart';
+import '../../shared/utils/auth_utils.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../classes/classes_provider.dart';
 import '../documents/documents_provider.dart';
@@ -100,6 +103,34 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         return;
       }
 
+      // Scegli se esportare una singola classe oppure tutte le classi
+      final selection = await _askExportScope();
+      if (selection == null) {
+        if (mounted) setState(() => _isExporting = false);
+        return;
+      }
+      final String? exportClassId = selection == 'ALL' ? null : selection;
+      SchoolClass? exportClass;
+      if (exportClassId != null) {
+        final myClasses = ref.read(myClassesProvider);
+        for (final c in myClasses) {
+          if (c.id == exportClassId) {
+            exportClass = c;
+            break;
+          }
+        }
+        if (exportClass == null) {
+          if (mounted) {
+            setState(() {
+              _isExporting = false;
+              _statusMessage = 'Classe selezionata non trovata';
+              _isError = true;
+            });
+          }
+          return;
+        }
+      }
+
       setState(() {
         _statusMessage = 'Raccolta dati in corso…';
         _phaseMessage = 'Esportazione anagrafica, presenze e documenti…';
@@ -110,12 +141,19 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       await Future.delayed(Duration.zero);
 
       // Esporta e cifra
-      final encrypted = await DataExportService.exportEncryptedData(pin);
+      final encrypted = await DataExportService.exportEncryptedData(
+        pin,
+        classId: exportClassId,
+      );
       final bytes = Uint8List.fromList(utf8.encode(encrypted));
 
       // Permetti all'utente di scegliere dove salvare
       final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-      final fileName = 'catechhub_backup_$timestamp.catechhub';
+      final catechistName = getCurrentCatechistName();
+      final className = exportClass != null ? exportClass.name : 'ClassiCompleto';
+      final fileName =
+          'catechhub_backup_${_sanitizeFilename(catechistName)}_'
+          '${_sanitizeFilename(className)}_$timestamp.catechhub';
 
       String? savedPath;
       bool saved = false;
@@ -357,6 +395,89 @@ class _BackupPageState extends ConsumerState<BackupPage> {
     return (result != null && result.isNotEmpty) ? result : null;
   }
 
+  /// Dialog per scegliere lo scope di esportazione: tutte le classi
+  /// oppure una singola classe del catechista.
+  ///
+  /// Ritorna `'ALL'` per tutte le classi, l'id della classe selezionata,
+  /// oppure `null` se l'utente annulla.
+  Future<String?> _askExportScope() async {
+    final myClasses = ref.read(myClassesProvider);
+    var selected = 'ALL';
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: Theme.of(ctx).brightness == Brightness.dark
+              ? Theme.of(ctx).colorScheme.surfaceContainer
+              : null,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                Icons.class_outlined,
+                color: const Color(0xFF174A7E),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(child: Text('Classi da esportare')),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: RadioGroup<String>(
+                groupValue: selected,
+                onChanged: (v) => setDialogState(() => selected = v!),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    RadioListTile<String>(
+                      value: 'ALL',
+                      title: const Text('Tutte le mie classi'),
+                      subtitle: const Text(
+                        'Backup completo di tutte le classi (nome file: ClassiCompleto)',
+                      ),
+                    ),
+                    const Divider(height: 8),
+                    for (final c in myClasses)
+                      RadioListTile<String>(
+                        value: c.id,
+                        title: Text(c.name),
+                        subtitle: Text('${c.studentIds.length} ragazzi'),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Annulla'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF174A7E),
+              ),
+              onPressed: () => Navigator.pop(ctx, selected),
+              child: const Text('Continua'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Rimuove i caratteri non consentiti nei nomi file.
+  String _sanitizeFilename(String value) {
+    return value
+        .replaceAll(RegExp(r'[\\/:*?"<>|]+'), '_')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
   Future<bool?> _showConfirmDialog() {
     return showDialog<bool>(
       context: context,
@@ -456,12 +577,15 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Il backup include tutti i dati dell\'app: anagrafica, '
-                    'presenze, programmazione, catechesi, documenti e allegati (foto e PDF).\n\n'
+                    'Il backup include anagrafica, presenze, programmazione, '
+                    'documenti, allegati (foto e PDF) e catechesi.\n\n'
+                    'Durante l\'esportazione puoi scegliere se salvare una '
+                    'singola classe oppure tutte le tue classi. In entrambi i '
+                    'casi le catechesi sono sempre incluse.\n\n'
                     'Il file è protetto da un PIN che crei al momento dell\'esportazione '
                     'e che dovrai reinserire per importarlo su un altro dispositivo.\n\n'
-                    'L\'importazione inserisce i dati nella classe attualmente aperta '
-                    'sul dispositivo ricevente.\n\n'
+                    'I dati ricevuti via QR code vengono invece inseriti nella classe '
+                    'attualmente aperta sul dispositivo ricevente.\n\n'
                     'L\'accesso alle operazioni di backup richiede l\'autenticazione '
                     'con impronta, volto o PIN del tuo dispositivo.',
                     style: TextStyle(fontSize: 13, color: Colors.blue.shade900),

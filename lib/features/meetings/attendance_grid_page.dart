@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/providers/class_scoped_providers.dart';
 import '../../shared/models/planning_meeting.dart';
 import '../../shared/models/student_model.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/widgets/last_modified_info.dart';
-import '../planning/planning_repository.dart';
-import '../students/students_repository.dart';
-import 'attendance_repository.dart';
 
 class AttendanceGridPage extends ConsumerWidget {
   const AttendanceGridPage({super.key});
@@ -16,11 +14,7 @@ class AttendanceGridPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     try {
-      final studentsRepo = StudentsRepository();
-      final planningRepo = PlanningRepository();
-      final attendanceRepo = AttendanceRepository();
-
-      final allStudents = studentsRepo.getAllStudentsSync();
+      final allStudents = ref.read(currentClassStudentsSyncProvider);
       if (allStudents.isEmpty) {
         return AppScaffold(
           title: 'Registro presenze',
@@ -28,7 +22,7 @@ class AttendanceGridPage extends ConsumerWidget {
         );
       }
 
-      final meetings = planningRepo.getMeetingsSync()
+      final meetings = ref.read(currentClassPlanningSyncProvider)
           .where((m) => !m.isReunion)
           .toList()
         ..sort((a, b) => a.date.compareTo(b.date));
@@ -40,7 +34,7 @@ class AttendanceGridPage extends ConsumerWidget {
         );
       }
 
-      final allAttendance = attendanceRepo.getAttendanceSync();
+      final allAttendance = ref.read(currentClassAttendanceSyncProvider);
       final attendanceByMeeting = <String, Map<String, String>>{};
       DateTime? latestUpdatedAt;
       String latestModifiedBy = '';

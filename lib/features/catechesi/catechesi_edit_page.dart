@@ -212,6 +212,7 @@ class _CatechesiEditPageState extends ConsumerState<CatechesiEditPage> {
                   final now = DateTime.now();
                   final catechesi = Catechesi(
                     id: catechesiId,
+                    classUniqueCode: null,
                     title: titleController.text.trim(),
                     tags: _splitTags(tagsController.text),
                     biblicalReferences: _splitLines(biblicalController.text),

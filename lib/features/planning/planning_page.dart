@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/auth/auth_service.dart';
+import '../../core/providers/class_scoped_providers.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/models/planning_meeting.dart';
-import '../classes/classes_provider.dart';
 import 'planning_provider.dart';
 import 'planning_edit_page.dart';
 
@@ -68,9 +68,9 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
   @override
   Widget build(BuildContext context) {
     final repo = ref.read(planningRepoProvider);
-    final classesAsync = ref.watch(classesStreamProvider);
+    final currentClassId = ref.watch(currentClassProvider);
+    final planningAsync = ref.watch(currentClassPlanningProvider);
 
-    const uid = AuthService.localUserId;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -78,149 +78,135 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
     return AppScaffold(
       title: 'Programmazione',
 
-      floatingActionButton: FloatingActionButton.extended(
-        elevation: 4,
-        backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-        foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text(
-          'Aggiungi',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-        onPressed: () => _showAddMenu(context),
-      ),
+      floatingActionButton: currentClassId == null
+          ? null
+          : FloatingActionButton.extended(
+              elevation: 4,
+              backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+              foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text(
+                'Aggiungi',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              onPressed: () => _showAddMenu(context),
+            ),
 
-      child: classesAsync.when(
-        data: (classes) {
-          final myClass = classes.where((c) => c.catechistIds.contains(uid));
-
-          if (myClass.isEmpty) {
-            return _EmptyState(
+      child: currentClassId == null
+          ? _EmptyState(
               icon: Icons.groups_rounded,
-              title: 'Nessuna classe assegnata',
-              subtitle:
-                  'Non risulti ancora assegnato ad un gruppo di catechismo.',
-            );
-          }
+              title: 'Nessuna classe selezionata',
+              subtitle: 'Seleziona una classe per visualizzare la programmazione.',
+            )
+          : planningAsync.when(
+              data: (meetings) {
+                final now = DateTime.now();
+                final today = DateTime(now.year, now.month, now.day);
 
-          final classId = myClass.first.id;
+                var filteredMeetings = meetings;
 
-          return StreamBuilder<List<PlanningMeeting>>(
-            stream: repo.getMeetings(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
+                // Normalizza le date a mezzanotte locale per evitare problemi di fuso orario/DST
+                // (es. incontri creati in ora legale vs ora solare)
+                DateTime _normalizeDate(DateTime dt) =>
+                    DateTime(dt.year, dt.month, dt.day);
 
-              final now = DateTime.now();
-              final today = DateTime(now.year, now.month, now.day);
-
-              var meetings = snapshot.data!
-                  .where((m) => m.classId == classId)
-                  .toList();
-
-              // Normalizza le date a mezzanotte locale per evitare problemi di fuso orario/DST
-              // (es. incontri creati in ora legale vs ora solare)
-              DateTime _normalizeDate(DateTime dt) =>
-                  DateTime(dt.year, dt.month, dt.day);
-
-              if (_showPast) {
-                meetings = meetings
-                    .where((m) => _normalizeDate(m.date).isBefore(today))
-                    .toList();
-                meetings.sort(
-                  (a, b) =>
-                      _normalizeDate(b.date).compareTo(_normalizeDate(a.date)),
-                );
-              } else {
-                meetings = meetings
-                    .where((m) => !_normalizeDate(m.date).isBefore(today))
-                    .toList();
-                meetings.sort(
-                  (a, b) =>
-                      _normalizeDate(a.date).compareTo(_normalizeDate(b.date)),
-                );
-              }
-
-              final groupedMeetings = <String, List<PlanningMeeting>>{};
-              final monthKeys = <String>[];
-              for (final m in meetings) {
-                final key = DateFormat(
-                  'MMMM yyyy',
-                  'it_IT',
-                ).format(_normalizeDate(m.date));
-                if (!groupedMeetings.containsKey(key)) {
-                  groupedMeetings[key] = [];
-                  monthKeys.add(key);
+                if (_showPast) {
+                  filteredMeetings = filteredMeetings
+                      .where((m) => _normalizeDate(m.date).isBefore(today))
+                      .toList();
+                  filteredMeetings.sort(
+                    (a, b) =>
+                        _normalizeDate(b.date).compareTo(_normalizeDate(a.date)),
+                  );
+                } else {
+                  filteredMeetings = filteredMeetings
+                      .where((m) => !_normalizeDate(m.date).isBefore(today))
+                      .toList();
+                  filteredMeetings.sort(
+                    (a, b) =>
+                        _normalizeDate(a.date).compareTo(_normalizeDate(b.date)),
+                  );
                 }
-                groupedMeetings[key]!.add(m);
-              }
 
-              // Pre-registra tutte le GlobalKey per i mesi PRIMA di costruire i chip,
-              // così _scrollToMonth trova sempre il context anche per i mesi non ancora renderizzati.
-              for (final mk in monthKeys) {
-                _getMonthKey(mk);
-              }
+                final groupedMeetings = <String, List<PlanningMeeting>>{};
+                final monthKeys = <String>[];
+                for (final m in filteredMeetings) {
+                  final key = DateFormat(
+                    'MMMM yyyy',
+                    'it_IT',
+                  ).format(_normalizeDate(m.date));
+                  if (!groupedMeetings.containsKey(key)) {
+                    groupedMeetings[key] = [];
+                    monthKeys.add(key);
+                  }
+                  groupedMeetings[key]!.add(m);
+                }
 
-              return ListView(
-                controller: _scrollController,
-                padding: const EdgeInsets.only(bottom: 100),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: _CatechesiBanner(
-                      onTap: () => context.push('/catechesi'),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: 42,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      children: [
-                        _ToggleChip(
-                          label: _showPast ? 'Prossimi' : 'Passati',
-                          icon: _showPast
-                              ? Icons.upcoming_rounded
-                              : Icons.history_rounded,
-                          onTap: () {
-                            setState(() => _showPast = !_showPast);
-                          },
-                        ),
-                        if (monthKeys.isNotEmpty) const SizedBox(width: 8),
-                        ...monthKeys.map(
-                          (mk) => _MonthChip(
-                            label: mk[0].toUpperCase() + mk.substring(1),
-                            onTap: () =>
-                                _scrollToMonth(mk, monthKeys, groupedMeetings),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (meetings.isEmpty)
+                // Pre-registra tutte le GlobalKey per i mesi PRIMA di costruire i chip,
+                // così _scrollToMonth trova sempre il context anche per i mesi non ancora renderizzati.
+                for (final mk in monthKeys) {
+                  _getMonthKey(mk);
+                }
+
+                return ListView(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.only(bottom: 100),
+                  children: [
                     Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 60,
-                        horizontal: 24,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: _CatechesiBanner(
+                        onTap: () => context.push('/catechesi'),
                       ),
-                      child: Center(
-                        child: Text(
-                          _showPast
-                              ? 'Nessun incontro passato'
-                              : 'Nessun prossimo incontro',
-                          style: TextStyle(
-                            color: isDark
-                                ? Colors.grey.shade400
-                                : Colors.grey.shade600,
-                            fontSize: 15,
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: 42,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        children: [
+                          _ToggleChip(
+                            label: _showPast ? 'Prossimi' : 'Passati',
+                            icon: _showPast
+                                ? Icons.upcoming_rounded
+                                : Icons.history_rounded,
+                            onTap: () {
+                              setState(() => _showPast = !_showPast);
+                            },
+                          ),
+                          if (monthKeys.isNotEmpty) const SizedBox(width: 8),
+                          ...monthKeys.map(
+                            (mk) => _MonthChip(
+                              label: mk[0].toUpperCase() + mk.substring(1),
+                              onTap: () =>
+                                  _scrollToMonth(mk, monthKeys, groupedMeetings),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (filteredMeetings.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 60,
+                          horizontal: 24,
+                        ),
+                        child: Center(
+                          child: Text(
+                            _showPast
+                                ? 'Nessun incontro passato'
+                                : 'Nessun prossimo incontro',
+                            style: TextStyle(
+                              color: isDark
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
+                              fontSize: 15,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ...monthKeys.map((monthKey) {
-                    final monthMeetings = groupedMeetings[monthKey]!;
+                    ...monthKeys.map((monthKey) {
+                      final monthMeetings = groupedMeetings[monthKey]!;
                     return Column(
                       key: _getMonthKey(monthKey),
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -454,29 +440,27 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                   }),
                 ],
               );
-            },
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? colorScheme.errorContainer.withValues(alpha: 0.3)
-                  : Colors.red.shade50,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              'Errore: $e',
-              style: TextStyle(
-                color: isDark ? colorScheme.error : Colors.red.shade700,
-                fontWeight: FontWeight.w600,
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? colorScheme.errorContainer.withValues(alpha: 0.3)
+                    : Colors.red.shade50,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                'Errore: $e',
+                style: TextStyle(
+                  color: isDark ? colorScheme.error : Colors.red.shade700,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
         ),
-      ),
     );
   }
 

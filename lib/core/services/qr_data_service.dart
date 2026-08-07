@@ -45,6 +45,11 @@ class DataShareOptions {
   final bool includeCatechesi;
   final bool includeAnnotazioni;
 
+  /// Se valorizzato, limita la condivisione ai soli record della classe
+  /// identificata dal codice univoco. Se `null`, condivide TUTTE le classi
+  /// (equivalente alla modalità "Mio Dispositivo" del sync Bluetooth).
+  final String? classUniqueCode;
+
   const DataShareOptions({
     this.includeAnagrafica = true,
     this.includeAgenda = true,
@@ -54,6 +59,7 @@ class DataShareOptions {
     this.includeContactNotes = false,
     this.includeCatechesi = false,
     this.includeAnnotazioni = false,
+    this.classUniqueCode,
   });
 }
 
@@ -212,30 +218,31 @@ class QRDataService {
   /// L'indice contiene per ogni record: id, updatedAt, checksum del contenuto.
   static Map<String, dynamic> buildDatabaseIndex(DataShareOptions options) {
     final modules = <String, Map<String, dynamic>>{};
+    final classCode = options.classUniqueCode;
 
     if (options.includeAnagrafica) {
-      modules['anagrafica'] = _indexBox(LocalDatabase.students(), 'students_box');
-      modules['classi'] = _indexBox(LocalDatabase.classes(), 'classes_box');
+      modules['anagrafica'] = _indexBox(LocalDatabase.students(), 'students_box', classUniqueCode: classCode);
+      modules['classi'] = _indexBox(LocalDatabase.classes(), 'classes_box', classUniqueCode: classCode);
     }
     if (options.includeAgenda) {
-      modules['agenda'] = _indexBox(LocalDatabase.attendance(), 'attendance_box');
+      modules['agenda'] = _indexBox(LocalDatabase.attendance(), 'attendance_box', classUniqueCode: classCode);
     }
     if (options.includeProgrammazione) {
-      modules['programmazione'] = _indexBox(LocalDatabase.planning(), 'planning_box');
+      modules['programmazione'] = _indexBox(LocalDatabase.planning(), 'planning_box', classUniqueCode: classCode);
     }
     if (options.includeDocumenti) {
-      modules['documenti'] = _indexBox(LocalDatabase.documents(), 'documents_box');
-      modules['consegne_documenti'] = _indexBox(LocalDatabase.documentDeliveries(), 'document_deliveries_box');
+      modules['documenti'] = _indexBox(LocalDatabase.documents(), 'documents_box', classUniqueCode: classCode);
+      modules['consegne_documenti'] = _indexBox(LocalDatabase.documentDeliveries(), 'document_deliveries_box', classUniqueCode: classCode);
     }
     if (options.includeContactNotes) {
-      modules['note_contatto'] = _indexBox(LocalDatabase.contactNotes(), 'contact_notes_box');
+      modules['note_contatto'] = _indexBox(LocalDatabase.contactNotes(), 'contact_notes_box', classUniqueCode: classCode);
     }
     if (options.includeCatechesi) {
-      modules['catechesi'] = _indexBox(LocalDatabase.catechesi(), 'catechesi_box');
-      modules['associazioni_catechesi'] = _indexBox(LocalDatabase.meetingCatechesi(), 'meeting_catechesi_box');
+      modules['catechesi'] = _indexBox(LocalDatabase.catechesi(), 'catechesi_box', classUniqueCode: classCode);
+      modules['associazioni_catechesi'] = _indexBox(LocalDatabase.meetingCatechesi(), 'meeting_catechesi_box', classUniqueCode: classCode);
     }
     if (options.includeAnnotazioni) {
-      modules['annotazioni'] = _indexBox(LocalDatabase.studentDailyNotes(), 'student_daily_notes_box');
+      modules['annotazioni'] = _indexBox(LocalDatabase.studentDailyNotes(), 'student_daily_notes_box', classUniqueCode: classCode);
     }
 
     return {
@@ -247,7 +254,8 @@ class QRDataService {
 
   /// Indica un singolo box Hive: per ogni record estrae id, updatedAt e checksum.
   /// Supporta sia box Map che box con valori di altro tipo (es. List).
-  static Map<String, dynamic> _indexBox(Box box, String boxName) {
+  /// Se [classUniqueCode] è valorizzato, filtra i record della sola classe.
+  static Map<String, dynamic> _indexBox(Box box, String boxName, {String? classUniqueCode}) {
     final records = <List<dynamic>>[];
     String? globalLatestTs;
 
@@ -255,6 +263,11 @@ class QRDataService {
       final id = key.toString();
       final raw = box.get(key);
       if (raw == null) continue;
+
+      if (classUniqueCode != null &&
+          !_recordInClass(boxName, id, raw, classUniqueCode)) {
+        continue;
+      }
 
       String updatedAt;
       String checksum;
@@ -291,6 +304,63 @@ class QRDataService {
     return DateTime.fromMillisecondsSinceEpoch(0).toUtc().toIso8601String();
   }
 
+  /// Determina se un record appartiene alla classe con [classUniqueCode].
+  /// I record nelle box associative (consegne documenti, associazioni
+  /// catechesi) vengono risolti tramite il record padre.
+  static bool _recordInClass(String boxName, String id, dynamic raw, String classUniqueCode) {
+    try {
+      final data = raw is Map ? LocalDatabase.toStringDynamicMap(raw) : null;
+
+      if (boxName == 'classes_box') {
+        return data?['uniqueCode']?.toString() == classUniqueCode;
+      }
+
+      if (data != null) {
+        final code = data['classUniqueCode']?.toString();
+        if (code != null && code.isNotEmpty) {
+          return code == classUniqueCode;
+        }
+        final classId = data['classId']?.toString();
+        if (classId != null && classId.isNotEmpty) {
+          return _classIdMatchesCode(classId, classUniqueCode);
+        }
+      }
+
+      if (boxName == 'document_deliveries_box') {
+        final docRaw = LocalDatabase.documents().get(id);
+        if (docRaw != null) {
+          final doc = LocalDatabase.toStringDynamicMap(docRaw);
+          return doc['classUniqueCode']?.toString() == classUniqueCode;
+        }
+        return false;
+      }
+
+      if (boxName == 'meeting_catechesi_box') {
+        final meetingRaw = LocalDatabase.planning().get(id);
+        if (meetingRaw != null) {
+          final meeting = LocalDatabase.toStringDynamicMap(meetingRaw);
+          final classId = meeting['classId']?.toString();
+          return classId != null && classId.isNotEmpty &&
+              _classIdMatchesCode(classId, classUniqueCode);
+        }
+        return false;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  /// Risolve se il [classId] appartiene alla classe con [classUniqueCode].
+  static bool _classIdMatchesCode(String classId, String classUniqueCode) {
+    try {
+      final classRaw = LocalDatabase.classes().get(classId);
+      if (classRaw != null) {
+        final classData = LocalDatabase.toStringDynamicMap(classRaw);
+        return classData['uniqueCode']?.toString() == classUniqueCode;
+      }
+    } catch (_) {}
+    return false;
+  }
+
   /// Checksum del contenuto del record (esclude campi temporali).
   static String _recordChecksum(Map<String, dynamic> data) {
     final normalized = Map<String, dynamic>.from(data);
@@ -308,10 +378,11 @@ class QRDataService {
   ) async {
     final remoteModules = (remoteIndex['m'] as Map<String, dynamic>?) ?? {};
     final diff = <String, dynamic>{};
+    final classCode = options.classUniqueCode;
 
     if (options.includeAnagrafica) {
-      final studentsDiff = _computeBoxDiff(remoteModules['anagrafica'], LocalDatabase.students(), 'students_box');
-      final classesDiff = _computeBoxDiff(remoteModules['classi'], LocalDatabase.classes(), 'classes_box');
+      final studentsDiff = _computeBoxDiff(remoteModules['anagrafica'], LocalDatabase.students(), 'students_box', classUniqueCode: classCode);
+      final classesDiff = _computeBoxDiff(remoteModules['classi'], LocalDatabase.classes(), 'classes_box', classUniqueCode: classCode);
       if (studentsDiff.isNotEmpty || classesDiff.isNotEmpty) {
         diff['anagrafica'] = {
           if (studentsDiff.isNotEmpty) 'students': studentsDiff,
@@ -321,22 +392,22 @@ class QRDataService {
     }
 
     if (options.includeAgenda) {
-      final agendaDiff = _computeBoxDiff(remoteModules['agenda'], LocalDatabase.attendance(), 'attendance_box');
+      final agendaDiff = _computeBoxDiff(remoteModules['agenda'], LocalDatabase.attendance(), 'attendance_box', classUniqueCode: classCode);
       if (agendaDiff.isNotEmpty) {
         diff['agenda'] = {'attendance': agendaDiff};
       }
     }
 
     if (options.includeProgrammazione) {
-      final planningDiff = _computeBoxDiff(remoteModules['programmazione'], LocalDatabase.planning(), 'planning_box');
+      final planningDiff = _computeBoxDiff(remoteModules['programmazione'], LocalDatabase.planning(), 'planning_box', classUniqueCode: classCode);
       if (planningDiff.isNotEmpty) {
         diff['programmazione'] = {'planning': planningDiff};
       }
     }
 
     if (options.includeDocumenti) {
-      final docsDiff = _computeBoxDiff(remoteModules['documenti'], LocalDatabase.documents(), 'documents_box');
-      final deliveriesDiff = _computeBoxDiff(remoteModules['consegne_documenti'], LocalDatabase.documentDeliveries(), 'document_deliveries_box');
+      final docsDiff = _computeBoxDiff(remoteModules['documenti'], LocalDatabase.documents(), 'documents_box', classUniqueCode: classCode);
+      final deliveriesDiff = _computeBoxDiff(remoteModules['consegne_documenti'], LocalDatabase.documentDeliveries(), 'document_deliveries_box', classUniqueCode: classCode);
       if (docsDiff.isNotEmpty || deliveriesDiff.isNotEmpty) {
         diff['documenti'] = {
           if (docsDiff.isNotEmpty) 'documents': docsDiff,
@@ -346,25 +417,25 @@ class QRDataService {
     }
 
     if (options.includeContactNotes) {
-      final notesDiff = _computeBoxDiff(remoteModules['note_contatto'], LocalDatabase.contactNotes(), 'contact_notes_box');
+      final notesDiff = _computeBoxDiff(remoteModules['note_contatto'], LocalDatabase.contactNotes(), 'contact_notes_box', classUniqueCode: classCode);
       if (notesDiff.isNotEmpty) {
         diff['note_contatto'] = {'notes': notesDiff};
       }
     }
 
     if (options.includeCatechesi) {
-      final catechesiDiff = _computeBoxDiff(remoteModules['catechesi'], LocalDatabase.catechesi(), 'catechesi_box');
+      final catechesiDiff = _computeBoxDiff(remoteModules['catechesi'], LocalDatabase.catechesi(), 'catechesi_box', classUniqueCode: classCode);
       if (catechesiDiff.isNotEmpty) {
         diff['catechesi'] = {'catechesi': catechesiDiff};
       }
-      final assocDiff = _computeSimpleBoxDiff(remoteModules['associazioni_catechesi'], LocalDatabase.meetingCatechesi());
+      final assocDiff = _computeSimpleBoxDiff(remoteModules['associazioni_catechesi'], LocalDatabase.meetingCatechesi(), classUniqueCode: classCode);
       if (assocDiff.isNotEmpty) {
         diff['associazioni_catechesi'] = {'associazioni': assocDiff};
       }
     }
 
     if (options.includeAnnotazioni) {
-      final annotDiff = _computeBoxDiff(remoteModules['annotazioni'], LocalDatabase.studentDailyNotes(), 'student_daily_notes_box');
+      final annotDiff = _computeBoxDiff(remoteModules['annotazioni'], LocalDatabase.studentDailyNotes(), 'student_daily_notes_box', classUniqueCode: classCode);
       if (annotDiff.isNotEmpty) {
         diff['annotazioni_giornaliere'] = {'notes': annotDiff};
       }
@@ -378,11 +449,12 @@ class QRDataService {
   static List<Map<String, dynamic>> _computeBoxDiff(
     dynamic remoteModuleData,
     Box<Map> localBox,
-    String boxName,
-  ) {
+    String boxName, {
+    String? classUniqueCode,
+  }) {
     if (remoteModuleData == null) {
       // Il modulo non esiste nel remoto: invia TUTTI i record locali
-      return _allLocalRecords(localBox);
+      return _allLocalRecords(localBox, boxName, classUniqueCode: classUniqueCode);
     }
 
     final remoteRecords = _parseRemoteRecords(remoteModuleData);
@@ -393,6 +465,12 @@ class QRDataService {
       final raw = localBox.get(key);
       if (raw == null) continue;
       final data = LocalDatabase.toStringDynamicMap(raw);
+
+      if (classUniqueCode != null &&
+          !_recordInClass(boxName, id, data, classUniqueCode)) {
+        continue;
+      }
+
       final localUpdatedAt = _extractUpdatedAt(data);
       final localChecksum = _recordChecksum(data);
 
@@ -426,15 +504,20 @@ class QRDataService {
   /// Confronta record in un box non-Map (es. meetingCatechesi con valori List).
   static List<Map<String, dynamic>> _computeSimpleBoxDiff(
     dynamic remoteModuleData,
-    Box localBox,
-  ) {
+    Box localBox, {
+    String? classUniqueCode,
+  }) {
     if (remoteModuleData == null) {
       final all = <Map<String, dynamic>>[];
       for (final key in localBox.keys) {
+        final id = key.toString();
         final val = localBox.get(key);
-        if (val != null) {
-          all.add({'meetingId': key.toString(), 'catechesiIds': val is List ? val : []});
+        if (val == null) continue;
+        if (classUniqueCode != null &&
+            !_recordInClass('meeting_catechesi_box', id, val, classUniqueCode)) {
+          continue;
         }
+        all.add({'meetingId': id, 'catechesiIds': val is List ? val : []});
       }
       return all;
     }
@@ -446,6 +529,11 @@ class QRDataService {
       final id = key.toString();
       final raw = localBox.get(key);
       if (raw == null) continue;
+
+      if (classUniqueCode != null &&
+          !_recordInClass('meeting_catechesi_box', id, raw, classUniqueCode)) {
+        continue;
+      }
 
       final localChecksum = sha256.convert(utf8.encode(jsonEncode(raw))).toString().substring(0, 8);
       final remote = remoteRecords[id];
@@ -461,13 +549,18 @@ class QRDataService {
   }
 
   /// Estrae TUTTI i record da un box (usato quando il remoto non ha il modulo).
-  static List<Map<String, dynamic>> _allLocalRecords(Box<Map> box) {
+  static List<Map<String, dynamic>> _allLocalRecords(Box<Map> box, String boxName, {String? classUniqueCode}) {
     final records = <Map<String, dynamic>>[];
     for (final key in box.keys) {
+      final id = key.toString();
       final raw = box.get(key);
       if (raw == null) continue;
       final data = LocalDatabase.toStringDynamicMap(raw);
-      data['id'] = key.toString();
+      if (classUniqueCode != null &&
+          !_recordInClass(boxName, id, data, classUniqueCode)) {
+        continue;
+      }
+      data['id'] = id;
       records.add(data);
     }
     return records;

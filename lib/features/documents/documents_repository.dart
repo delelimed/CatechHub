@@ -1,5 +1,12 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../core/storage/local_database.dart';
 import '../../shared/utils/auth_utils.dart';
+
+/// Provider Riverpod singleton per [DocumentsRepository].
+final documentsRepositoryProvider = Provider<DocumentsRepository>((ref) {
+  return DocumentsRepository();
+});
 
 /// Repository per la gestione dei documenti (certificati, autorizzazioni,
 /// moduli, fogli informativi) e delle loro consegne in CateREG.
@@ -47,6 +54,38 @@ class DocumentsRepository {
       return bDate.compareTo(aDate);
     });
     return documents;
+  }
+
+  /// Stream dei documenti filtrati per codice univoco della classe.
+  Stream<List<Map<String, dynamic>>> getDocumentsByClass(String classUniqueCode) {
+    return LocalDatabase.watchList(
+      _documentsBox,
+      (id, data) => {'id': id, ...data},
+    ).map((documents) => documents
+        .where((d) => d['classUniqueCode'] == classUniqueCode)
+        .toList()
+      ..sort((a, b) {
+        final aDate = DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final bDate = DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        return bDate.compareTo(aDate);
+      }));
+  }
+
+  /// Versione sincrona di [getDocumentsByClass].
+  List<Map<String, dynamic>> getDocumentsByClassSync(String classUniqueCode) {
+    return LocalDatabase.values(
+      _documentsBox,
+      (id, data) => {'id': id, ...data},
+    ).where((d) => d['classUniqueCode'] == classUniqueCode).toList()
+      ..sort((a, b) {
+        final aDate = DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final bDate = DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        return bDate.compareTo(aDate);
+      });
   }
 
   /// Crea un nuovo documento con il titolo indicato e lo persiste su Hive.

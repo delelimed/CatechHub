@@ -5,16 +5,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/auth/auth_service.dart';
+import '../../core/providers/class_scoped_providers.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../../core/security/privacy_settings.dart';
 import '../../shared/models/planning_meeting.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../planning/planning_edit_page.dart';
 import '../auth/bible_quote.dart';
-import '../classes/classes_provider.dart';
 import '../documents/documents_repository.dart';
 import '../meetings/attendance_repository.dart';
-import '../planning/planning_provider.dart';
 import '../students/students_repository.dart';
 
 
@@ -139,8 +138,8 @@ class DashboardPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final classesAsync = ref.watch(classesStreamProvider);
-    final planningRepo = ref.watch(planningRepoProvider);
+    final currentClass = ref.watch(currentClassDetailsProvider);
+    final planningAsync = ref.watch(currentClassPlanningProvider);
     final attendanceRepo = AttendanceRepository();
     final studentsRepo = StudentsRepository();
     final documentsRepo = DocumentsRepository();
@@ -148,120 +147,106 @@ class DashboardPage extends ConsumerWidget {
 
     return AppScaffold(
       title: 'Dashboard',
-      child: classesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Errore caricamento dati: $e')),
-        data: (classes) {
-          final myClassList = classes.where(
-            (c) => c.catechistIds.contains(AuthService.localUserId),
-          );
-
-          if (myClassList.isEmpty) {
-            return const Center(
+      child: currentClass == null || currentClass.id.isEmpty
+          ? const Center(
               child: Padding(
                 padding: EdgeInsets.all(24),
                 child: Text(
-                  'Nessun gruppo assegnato. Aggiungi il catechista locale al gruppo.',
+                  'Nessuna classe selezionata. Seleziona una classe per vedere i dati.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                 ),
               ),
-            );
-          }
+            )
+          : planningAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Errore caricamento dati: $e')),
+              data: (meetings) {
+                final allAttendance = attendanceRepo.getAttendanceSync();
+                final classAttendance = _attendanceForClass(
+                  allAttendance,
+                  currentClass.id,
+                );
+                final allStudents = studentsRepo.getAllStudentsSync();
+                final studentNames = {
+                  for (final student in allStudents)
+                    student.id: '${student.name} ${student.surname}'.trim(),
+                };
+                final presenceRate = _calculatePresenceRate(classAttendance);
+                final highAbsences = _fetchHighAbsenceStudents(
+                  classAttendance,
+                  studentNames,
+                  threshold: privacySettings.absenceThreshold,
+                );
+                final pendingDocuments = _fetchPendingDocuments(
+                  currentClass.studentIds,
+                  documentsRepo.getDocumentsSync(),
+                  documentsRepo,
+                  studentNames,
+                );
 
-          final currentClass = myClassList.first;
-          final allAttendance = attendanceRepo.getAttendanceSync();
-          final classAttendance = _attendanceForClass(
-            allAttendance,
-            currentClass.id,
-          );
-          final allStudents = studentsRepo.getAllStudentsSync();
-          final studentNames = {
-            for (final student in allStudents)
-              student.id: '${student.name} ${student.surname}'.trim(),
-          };
-          final presenceRate = _calculatePresenceRate(classAttendance);
-          final highAbsences = _fetchHighAbsenceStudents(
-            classAttendance,
-            studentNames,
-            threshold: privacySettings.absenceThreshold,
-          );
-          final pendingDocuments = _fetchPendingDocuments(
-            currentClass.studentIds,
-            documentsRepo.getDocumentsSync(),
-            documentsRepo,
-            studentNames,
-          );
+                final nextMeeting = _nextMeeting(
+                  meetings
+                      .where((m) => m.classId == currentClass.id)
+                      .toList(),
+                );
 
-          return StreamBuilder<List<PlanningMeeting>>(
-            stream: planningRepo.getMeetings(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    final width = constraints.maxWidth;
+                    final isWide = width >= 760;
+                    final padding = width < 420 ? 12.0 : 16.0;
 
-              final nextMeeting = _nextMeeting(
-                snapshot.data!
-                    .where((m) => m.classId == currentClass.id)
-                    .toList(),
-              );
-
-              return LayoutBuilder(
-                builder: (context, constraints) {
-                  final width = constraints.maxWidth;
-                  final isWide = width >= 760;
-                  final padding = width < 420 ? 12.0 : 16.0;
-
-                  return Align(
-                    alignment: Alignment.topCenter,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1040),
-                      child: ListView(
-                        padding: EdgeInsets.all(padding),
-                        children: [
-                          _QuoteSnippet(quote: _randomQuote()),
-                          const SizedBox(height: 10),
-                          _SectionTitle('Il tuo prossimo impegno'),
-                          const SizedBox(height: 10),
-                          _NextMeetingCard(
-                            meeting: nextMeeting,
-                            compact: !isWide,
-                          ),
-                          const SizedBox(height: 24),
-                          _SectionTitle('Andamento del gruppo'),
-                          const SizedBox(height: 10),
-                          _OverviewCard(
-                            presenceRate: presenceRate,
-                            highAbsences: highAbsences,
-                            compact: !isWide,
-                            absenceThreshold: privacySettings.absenceThreshold,
-                            currentClassId: currentClass.id,
-                            currentClassName: currentClass.name,
-                            onPresenceTap: () {
-                              context.push('/statistics', extra: {
-                                'className': currentClass.name,
-                                'classId': currentClass.id,
-                              });
-                            },
-                          ),
-                          const SizedBox(height: 24),
-                          _SectionTitle('Documenti in attesa'),
-                          const SizedBox(height: 10),
-                          _PendingDocumentsCard(documents: pendingDocuments),
-                          const SizedBox(height: 24),
-                          _SectionTitle('Azioni rapide'),
-                          const SizedBox(height: 12),
-                          _QuickActionsGrid(),
-                        ],
+                    return Align(
+                      alignment: Alignment.topCenter,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1040),
+                        child: ListView(
+                          padding: EdgeInsets.all(padding),
+                          children: [
+                            _ClassBanner(currentClassName: currentClass.name),
+                            const SizedBox(height: 12),
+                            _QuoteSnippet(quote: _randomQuote()),
+                            const SizedBox(height: 10),
+                            _SectionTitle('Il tuo prossimo impegno'),
+                            const SizedBox(height: 10),
+                            _NextMeetingCard(
+                              meeting: nextMeeting,
+                              compact: !isWide,
+                            ),
+                            const SizedBox(height: 24),
+                            _SectionTitle('Andamento del gruppo'),
+                            const SizedBox(height: 10),
+                            _OverviewCard(
+                              presenceRate: presenceRate,
+                              highAbsences: highAbsences,
+                              compact: !isWide,
+                              absenceThreshold: privacySettings.absenceThreshold,
+                              currentClassId: currentClass.id,
+                              currentClassName: currentClass.name,
+                              onPresenceTap: () {
+                                context.push('/statistics', extra: {
+                                  'className': currentClass.name,
+                                  'classId': currentClass.id,
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 24),
+                            _SectionTitle('Documenti in attesa'),
+                            const SizedBox(height: 10),
+                            _PendingDocumentsCard(documents: pendingDocuments),
+                            const SizedBox(height: 24),
+                            _SectionTitle('Azioni rapide'),
+                            const SizedBox(height: 12),
+                            _QuickActionsGrid(),
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                },
-              );
-            },
-          );
-        },
-      ),
+                    );
+                  },
+                );
+              },
+            ),
     );
   }
 
@@ -424,6 +409,72 @@ class _NextMeetingCard extends StatelessWidget {
               ),
             ),
             const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ClassBanner extends StatelessWidget {
+  final String currentClassName;
+
+  const _ClassBanner({required this.currentClassName});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: () => context.push('/settings/class-switcher'),
+      child: _Panel(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(
+                Icons.groups_rounded,
+                color: isDark ? colorScheme.onPrimary : Colors.white,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Classe aperta',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    currentClassName,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.swap_horiz_rounded,
+              color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+            ),
           ],
         ),
       ),

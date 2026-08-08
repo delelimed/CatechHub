@@ -15,10 +15,21 @@
 import 'package:flutter/foundation.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/storage/local_database.dart';
+import '../../shared/models/audit_action.dart';
+import '../../shared/models/audit_log.dart';
+import '../../shared/models/aula.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/utils/auth_utils.dart';
+import '../responsabile/audit_log_repository.dart';
+import '../responsabile/slot_conflict_service.dart';
 
 class ClassesRepository {
+  /// Ruolo interno "Titolare" per un catechista assegnato a una classe.
+  static const roleTitolare = 'TITOLARE';
+
+  /// Ruolo interno "Co-titolo/Aiuto" per un catechista assegnato a una classe.
+  static const roleAiuto = 'AIUTO';
+
   final _box = LocalDatabase.classes();
 
   Stream<List<SchoolClass>> getClasses() {
@@ -54,6 +65,7 @@ class ClassesRepository {
     // Forza la scrittura su disco: evita la perdita di una classe appena
     // creata se il processo viene terminato dal sistema subito dopo.
     await _box.flush();
+    await _log(AuditActionType.createClass, id, AuditLog.entityClasse);
   }
 
   Future<void> updateClass(String id, SchoolClass c) async {
@@ -108,6 +120,7 @@ class ClassesRepository {
     try {
       await _box.delete(id);
       await _box.flush();
+      await _log(AuditActionType.deleteClass, id, AuditLog.entityClasse);
     } catch (e) {
       debugPrint('[ClassesRepository] Errore eliminazione classe $id: $e');
     }
@@ -179,25 +192,149 @@ class ClassesRepository {
     );
   }
 
-  Future<void> addCatechistToClass(String classId, String catechistId) async {
+  Future<void> addCatechistToClass(String classId, String catechistId,
+      {String role = roleTitolare}) async {
     final current = _getClass(classId);
     if (current == null || current.catechistIds.contains(catechistId)) return;
     await updateClass(
       classId,
-      current.copyWith(catechistIds: [...current.catechistIds, catechistId]),
+      current.copyWith(
+        catechistIds: [...current.catechistIds, catechistId],
+        catechistRoles: {...current.catechistRoles, catechistId: role},
+      ),
     );
+    await _log(AuditActionType.reassignCatechist, classId, AuditLog.entityClasse);
   }
+
+  /// Imposta il ruolo interno di un catechista già assegnato a una classe
+  /// (permessi: "TITOLARE" | "AIUTO").
+  Future<void> setCatechistRole(
+    String classId,
+    String catechistId,
+    String role,
+  ) async {
+    final current = _getClass(classId);
+    if (current == null) return;
+    if (!current.catechistIds.contains(catechistId)) return;
+    await _box.put(classId, current.copyWith(
+      catechistRoles: {...current.catechistRoles, catechistId: role},
+      lastModifiedBy: getCurrentCatechistName(),
+      updatedAt: DateTime.now(),
+    ).toMap());
+    await _box.flush();
+    await _log(AuditActionType.reassignCatechist, classId, AuditLog.entityClasse);
+  }
+
+  /// Restituisce il ruolo interno (TITOLARE/AIUTO) di un catechista in una classe.
+  String roleOf(SchoolClass c, String catechistId) =>
+      c.catechistRoles[catechistId] ?? roleTitolare;
 
   Future<void> removeCatechistFromClass(String classId, String catechistId) async {
     final current = _getClass(classId);
     if (current == null) return;
+    final roles = Map<String, String>.from(current.catechistRoles)
+      ..remove(catechistId);
     await updateClass(
       classId,
       current.copyWith(
         catechistIds:
             current.catechistIds.where((id) => id != catechistId).toList(),
+        catechistRoles: roles,
       ),
     );
+    await _log(AuditActionType.reassignCatechist, classId, AuditLog.entityClasse);
+  }
+
+  /// Assegna uno slot orario settimanale a una classe, verificando i conflitti.
+  /// Ritorna una classe aggiornata se l'assegnazione è stata applicata;
+  /// solleva [SlotConflictException] se ci sono conflitti con altre classi.
+  Future<SchoolClass> assignRoomSlot({
+    required String classId,
+    required RoomSlot slot,
+    List<SchoolClass>? allClasses,
+  }) async {
+    final current = _getClass(classId);
+    if (current == null) {
+      throw ArgumentError('Classe inesistente: $classId');
+    }
+    final classes = allClasses ?? getClassesSync();
+    final conflicts = SlotConflictService.findConflicts(
+      target: current,
+      newSlot: slot,
+      allClasses: classes,
+      aulas: _aulasSync(),
+    );
+    if (conflicts.any((c) => c.classB != null)) {
+      throw SlotConflictException(conflicts);
+    }
+    await updateClass(
+      classId,
+      current.copyWith(
+        roomSlots: [...current.roomSlots, slot],
+      ),
+    );
+    return _getClass(classId) ?? current;
+  }
+
+  /// Dismette uno slot da una classe.
+  Future<SchoolClass?> removeSlotFromClass(String classId, String slotId) async {
+    final current = _getClass(classId);
+    if (current == null) return null;
+    await updateClass(
+      classId,
+      current.copyWith(
+        roomSlots: current.roomSlots.where((s) => s.slotId != slotId).toList(),
+      ),
+    );
+    return _getClass(classId);
+  }
+
+  List<Aula> _aulasSync() {
+    return LocalDatabase.values(
+      LocalDatabase.aula(),
+      (id, data) => Aula.fromMap(id, data),
+    );
+  }
+
+  /// Archivia una classe (chiusura percorso, storico conservato).
+  Future<void> archiveClass(String id) async {
+    final current = _getClass(id);
+    if (current == null) return;
+    await updateClass(id, current.copyWith(archived: true));
+    await _log(AuditActionType.deleteClass, id, AuditLog.entityClasse);
+  }
+
+  /// Ripristina una classe archiviata.
+  Future<void> unarchiveClass(String id) async {
+    final current = _getClass(id);
+    if (current == null) return;
+    await updateClass(id, current.copyWith(archived: false));
+  }
+
+  /// Rinomina una classe conservando tutti gli altri dati.
+  Future<void> renameClass(String id, String nuovoNome) async {
+    final current = _getClass(id);
+    if (current == null) return;
+    final nome = nuovoNome.trim();
+    if (nome.isEmpty || nome == current.name) return;
+    await updateClass(id, current.copyWith(name: nome));
+  }
+
+  /// Registra l'azione nel Registro Trattamenti GDPR in modalità best-effort.
+  Future<void> _log(
+    AuditActionType action,
+    String entityId,
+    String entityType,
+  ) async {
+    try {
+      await AuditLogRepository().record(
+        actionType: action,
+        affectedEntityId: entityId,
+        affectedEntityType: entityType,
+      );
+    } catch (e) {
+      debugPrint('[ClassesRepository] AuditLog non registrato ($action): $e');
+    }
   }
 
   SchoolClass? _getClass(String id) {

@@ -148,6 +148,42 @@ void main() {
         lessThan(2),
       );
     });
+
+    test('toMap/fromMap roundtrip conserva i campi GDPR di iscrizione', () {
+      // Arrange: studente con scheda firmata e contributo volontario
+      final student = Student(
+        id: 's6',
+        name: 'Giorgia',
+        surname: 'Blu',
+        birthDate: DateTime(2014, 3, 15),
+        motherName: 'Elena',
+        motherSurname: 'Viola',
+        fatherName: 'Luca',
+        fatherSurname: 'Blu',
+        motherPhone: '3400000001',
+        fatherPhone: '3400000002',
+        studentPhone: '',
+        consensoPrivacyFirmato: true,
+        dataFirmaConsenso: DateTime(2026, 9, 1),
+        dataScadenzaTrattamento: DateTime(2027, 9, 1, 23, 59, 59),
+        consensoUsciteAutonome: true,
+        contributoVersato: true,
+        contributoEuros: 20,
+        annoContributo: '2026-2027',
+        noteAllergieSalute: 'cilieI1:abc',
+      );
+      // Act: round-trip toMap -> fromMap
+      final map = student.toMap();
+      final back = Student.fromMap('s6', map);
+      // Assert: i campi GDPR sopravvivono alla serializzazione
+      expect(back.consensoPrivacyFirmato, isTrue);
+      expect(back.dataFirmaConsenso, DateTime(2026, 9, 1));
+      expect(back.dataScadenzaTrattamento, DateTime(2027, 9, 1, 23, 59, 59));
+      expect(back.consensoUsciteAutonome, isTrue);
+      expect(back.contributoVersato, isTrue);
+      expect(back.contributoEuros, 20);
+      expect(back.annoContributo, '2026-2027');
+    });
   });
 
   // ── Ordinamento alfabetico ──

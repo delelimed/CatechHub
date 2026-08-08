@@ -19,6 +19,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../storage/local_database.dart';
 import '../../features/sync/p2p/p2p_security_service.dart';
 import '../../shared/models/class_model.dart';
+import '../../shared/models/user_role.dart';
 
 /// Servizio di autenticazione basato ESCLUSIVAMENTE su biometrica nativa Android
 /// (impronta, volto, iride) con fallback automatico a PIN/Pattern/Password del dispositivo.
@@ -484,8 +485,9 @@ class AuthService {
       'phoneNumber': _box.get('phone_number', defaultValue: ''),
       'groupName': _box.get('group_name', defaultValue: ''),
       'email': 'locale@dispositivo',
-      'role': 'catechist',
-      'canManageCatechists': true,
+      'role': UserRole.current().storageKey,
+      'canManageCatechists': UserRole.isResponsabile,
+      'canManageParish': UserRole.isResponsabile,
     };
 
     return _cachedUser;

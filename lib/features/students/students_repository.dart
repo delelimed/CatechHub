@@ -1,11 +1,17 @@
+import 'package:collection/collection.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/services/field_encryption_service.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/attachment_parent_type.dart';
+import '../../shared/models/audit_action.dart';
+import '../../shared/models/audit_log.dart';
 import '../../shared/models/student_model.dart';
 import '../../shared/utils/auth_utils.dart';
 import '../../shared/utils/name_formatting.dart';
 import '../attachments/attachments_repository.dart';
+import '../responsabile/audit_log_repository.dart';
 import 'student_daily_notes_repository.dart';
 
 final studentsRepositoryProvider =
@@ -35,12 +41,13 @@ class StudentsRepository {
       createdAt: now,
       updatedAt: now,
     ).toMap());
+    await _log(AuditActionType.createStudent, id, AuditLog.entityRagazzo);
   }
 
   Stream<List<Student>> getAllStudents() {
     return LocalDatabase.watchList(
       _box,
-      (id, data) => Student.fromMap(id, data),
+      (id, data) => _studentFromBox(id, data),
     ).map(Student.sortedBySurname);
   }
 
@@ -50,7 +57,7 @@ class StudentsRepository {
   Stream<List<Student>> getStudentsByClass(String classId) {
     return LocalDatabase.watchList(
       _box,
-      (id, data) => Student.fromMap(id, data),
+      (id, data) => _studentFromBox(id, data),
     ).map((students) => Student.sortedBySurname(
       students.where((s) => s.classId == classId),
     ));
@@ -61,7 +68,7 @@ class StudentsRepository {
     return Student.sortedBySurname(
       LocalDatabase.values(
         _box,
-        (id, data) => Student.fromMap(id, data),
+        (id, data) => _studentFromBox(id, data),
       ).where((s) => s.classId == classId),
     );
   }
@@ -70,9 +77,22 @@ class StudentsRepository {
     return Student.sortedBySurname(
       LocalDatabase.values(
         _box,
-        (id, data) => Student.fromMap(id, data),
+        (id, data) => _studentFromBox(id, data),
       ),
     );
+  }
+
+  /// Deserializza dal Box decifrando i campi sensibili cifrati a livello
+  /// di campo (es. [Student.noteAllergieSalute]).
+  Student _studentFromBox(String id, Map<String, dynamic> data) {
+    final student = Student.fromMap(id, data);
+    final notaCifrata = data['noteAllergieSalute'] as String?;
+    if (notaCifrata != null && notaCifrata.startsWith('cieI1:')) {
+      return student.copyWith(
+        noteAllergieSalute: FieldEncryptionService.decrypt(notaCifrata),
+      );
+    }
+    return student;
   }
 
   Future<void> updateStudent(String id, Student student) async {
@@ -92,6 +112,7 @@ class StudentsRepository {
       createdAt: existingCreatedAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
     ).toMap());
+    await _log(AuditActionType.updateStudent, id, AuditLog.entityRagazzo);
   }
 
   Student _normalize(Student student) {
@@ -114,6 +135,17 @@ class StudentsRepository {
           : student.allergies?.trim(),
       autonomousExits: student.autonomousExits,
       notes: student.notes?.trim().isEmpty == true ? null : student.notes?.trim(),
+      consensoPrivacyFirmato: student.consensoPrivacyFirmato,
+      dataFirmaConsenso: student.dataFirmaConsenso,
+      dataScadenzaTrattamento: student.dataScadenzaTrattamento,
+      consensoUsciteAutonome: student.consensoUsciteAutonome,
+      contributoVersato: student.contributoVersato,
+      contributoEuros: student.contributoEuros,
+      annoContributo: student.annoContributo,
+      noteAllergieSalute:
+          FieldEncryptionService.encrypt(student.noteAllergieSalute),
+      statoPercorso: student.statoPercorso,
+      annoIscrizione: student.annoIscrizione,
     );
   }
 
@@ -124,6 +156,66 @@ class StudentsRepository {
     if (classData == null) return null;
     final map = LocalDatabase.toStringDynamicMap(classData);
     return map['uniqueCode'] as String?;
+  }
+
+  /// Aggiorna lo stato del percorso (ATTIVO/FERMO/RITIRATO) di uno studente.
+  Future<void> setStatoPercorso(String id, String stato) async {
+    final existing = getAllStudentsSync().where((s) => s.id == id).firstOrNull;
+    if (existing == null) return;
+    await updateStudent(id, existing.copyWith(statoPercorso: stato));
+  }
+
+  /// Aggiorna l'anno di iscrizione di uno studente.
+  Future<void> setAnnoIscrizione(String id, String anno) async {
+    final existing = getAllStudentsSync().where((s) => s.id == id).firstOrNull;
+    if (existing == null) return;
+    await updateStudent(id, existing.copyWith(annoIscrizione: anno));
+  }
+
+  /// Rimuove uno studente dalla classe, liberando classId e aggiornando
+  /// la classe (mantiene lo studente in anagrafica, non lo cancella).
+  Future<void> removeFromClass(String studentId, String classId) async {
+    final existing = getAllStudentsSync().where((s) => s.id == studentId).firstOrNull;
+    if (existing == null) return;
+    final isCurrent = existing.classId == classId;
+    await updateStudent(studentId, Student(
+      id: existing.id,
+      name: existing.name,
+      surname: existing.surname,
+      birthDate: existing.birthDate,
+      classId: isCurrent ? null : existing.classId,
+      classUniqueCode: isCurrent ? null : existing.classUniqueCode,
+      motherName: existing.motherName,
+      motherSurname: existing.motherSurname,
+      fatherName: existing.fatherName,
+      fatherSurname: existing.fatherSurname,
+      motherPhone: existing.motherPhone,
+      fatherPhone: existing.fatherPhone,
+      studentPhone: existing.studentPhone,
+      allergies: existing.allergies,
+      autonomousExits: existing.autonomousExits,
+      notes: existing.notes,
+      consensoPrivacyFirmato: existing.consensoPrivacyFirmato,
+      dataFirmaConsenso: existing.dataFirmaConsenso,
+      dataScadenzaTrattamento: existing.dataScadenzaTrattamento,
+      consensoUsciteAutonome: existing.consensoUsciteAutonome,
+      contributoVersato: existing.contributoVersato,
+      contributoEuros: existing.contributoEuros,
+      annoContributo: existing.annoContributo,
+      noteAllergieSalute: existing.noteAllergieSalute,
+      statoPercorso: existing.statoPercorso,
+      annoIscrizione: existing.annoIscrizione,
+    ));
+    final classesBox = LocalDatabase.classes();
+    for (final classKey in classesBox.keys) {
+      final data = LocalDatabase.toStringDynamicMap(classesBox.get(classKey));
+      final studentIds = (data['studentIds'] as List? ?? [])
+          .map((value) => value.toString())
+          .where((sId) => sId != studentId)
+          .toList();
+      data['studentIds'] = studentIds;
+      await classesBox.put(classKey, data);
+    }
   }
 
   Future<void> deleteStudent(String id) async {
@@ -161,6 +253,27 @@ class StudentsRepository {
       if (data.remove(id) != null) {
         await deliveriesBox.put(deliveryKey, data);
       }
+    }
+
+    await _log(AuditActionType.deleteStudentHard, id, AuditLog.entityRagazzo);
+  }
+
+  /// Registra l'azione nel Registro Trattamenti GDPR in modalità best-effort:
+  /// un eventuale errore di firma/log non deve mai bloccare l'operazione.
+  Future<void> _log(
+    AuditActionType action,
+    String entityId,
+    String entityType,
+  ) async {
+    try {
+      await AuditLogRepository().record(
+        actionType: action,
+        affectedEntityId: entityId,
+        affectedEntityType: entityType,
+      );
+    } catch (e) {
+      // Non bloccante: il log GDPR non deve interrompere le operazioni CRUD.
+      debugPrint('[StudentsRepository] AuditLog non registrato ($action): $e');
     }
   }
 }

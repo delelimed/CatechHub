@@ -10,6 +10,9 @@ import '../../../core/auth/auth_service.dart';
 import '../../../core/services/bluetooth_permission_service.dart';
 import '../../../core/storage/encrypted_file_storage.dart';
 import '../../../core/storage/local_database.dart';
+import '../../gdpr/hard_delete_service.dart';
+import '../../gdpr/tombstone_model.dart';
+import '../../gdpr/tombstone_service.dart';
 import 'p2p_security_service.dart';
 import 'hive_sync_engine.dart';
 
@@ -1842,6 +1845,9 @@ class P2PSyncService {
         case 'p2p_pairing_rejected':
           await _handlePairingRejected(endpointId, decoded);
           break;
+        case 'p2p_tombstone':
+          await _handleTombstone(endpointId, decoded);
+          break;
       }
     } catch (e) {
       addLog('ERROR', 'Errore gestione messaggio da $endpointId: $e');
@@ -3273,12 +3279,17 @@ class P2PSyncService {
         final receiveScope = await _currentReceiveScope(endpointId);
         final recordsData = message['records'] as List<dynamic>? ?? [];
         final records = engine.deserializeRecords(recordsData);
+        // Diritto all'Oblio: ignora record di entita' Tombstoned.
+        final tombstoned = _tombstonedEntityIds();
+        final filtered = records
+            .where((r) => !(r.boxName == LocalDatabase.studentsBox && tombstoned.contains(r.id)))
+            .toList();
         if (records.isNotEmpty) {
-          await engine.applyRemoteRecords(records, scopes: receiveScope);
+          await engine.applyRemoteRecords(filtered, scopes: receiveScope);
           await engine.saveLastSyncTimestamp(DateTime.now().toUtc());
           addLog(
             'DEBUG',
-            'Dati incrementali applicati: ${records.length} record',
+            'Dati incrementali applicati: ${filtered.length} record',
           );
         }
         await _saveReceivedAttachmentFiles(
@@ -3286,7 +3297,7 @@ class P2PSyncService {
         );
         final ack = jsonEncode({
           'type': 'p2p_sync_ack',
-          'received': records.length,
+          'received': filtered.length,
         });
         await _sendEncryptedPayload(endpointId, ack);
       } catch (e) {
@@ -3304,8 +3315,16 @@ class P2PSyncService {
         'Dati sync ricevuti: ${records.length} record da applicare',
       );
 
+      // Diritto all'Oblio: ignora i record delle entità eliminate.
+      final tombstoned = _tombstonedEntityIds();
+      final filtered = records
+          .where((r) =>
+              !(r.boxName == LocalDatabase.studentsBox &&
+                  tombstoned.contains(r.id)))
+          .toList();
+
       final result = await engine.applyRemoteRecords(
-        records,
+        filtered,
         scopes: receiveScope,
       );
       addLog(
@@ -3958,6 +3977,93 @@ class P2PSyncService {
   ) async {
     final payload = jsonEncode({'type': 'p2p_sync_data', ...data});
     await _sendEncryptedPayload(endpointId, payload);
+  }
+
+  /// Propaga un [Tombstone] a tutti i dispositivi attualmente connessi.
+  ///
+  /// Ogni destinatario riceve una copia FIRMATA con il shared secret statico
+  /// del canale P2P dedicato (ECDH static-static), così da poter verificare
+  /// l'autenticità. Best-effort: se un endpoint fallisce, gli altri restano attivi.
+  Future<void> broadcastTombstone(Tombstone tombstone) async {
+    final endpoints = _connectedEndpoints.toList();
+    if (endpoints.isEmpty) {
+      addLog('DEBUG', 'Broadcast tombstone: nessun dispositivo connesso');
+      return;
+    }
+
+    final identity = await _security.getLocalIdentity();
+    final base = tombstone.toMap()
+      ..['signerDeviceId'] = identity.deviceId;
+
+    for (final endpointId in endpoints) {
+      final remoteId = _endpointConnIdMap[endpointId];
+      if (remoteId == null) continue;
+      try {
+        final assoc = await _security.getAssociation(remoteId);
+        if (assoc == null || assoc.publicKeyBase64.isEmpty) continue;
+        final secret =
+            await _security.computeStaticSharedSecret(assoc.publicKeyBase64);
+        final signedPayload =
+            jsonEncode({'type': 'p2p_tombstone', 'tombstone': TombstoneService.withSignature(base, secret)});
+        await _sendEncryptedPayload(endpointId, signedPayload);
+        addLog(
+          'INFO',
+          'Tombstone propagato a $endpointId (${base['entityType']}/${base['entityId']})',
+        );
+      } catch (e) {
+        addLog('ERROR', 'Invio tombstone a $endpointId fallito: $e');
+      }
+    }
+  }
+
+  /// ID delle entità eliminati tramite tombstone (per esclusione durante sync).
+  Set<String> _tombstonedEntityIds() {
+    try {
+      final box = LocalDatabase.tombstones();
+      return box.keys
+          .map((key) =>
+              LocalDatabase.toStringDynamicMap(box.get(key))['entityId'])
+          .whereType<String>()
+          .toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// Riceve e applica un tombstone remoto dopo aver verificato la firma ECDH.
+  Future<void> _handleTombstone(
+    String endpointId,
+    Map<String, dynamic> message,
+  ) async {
+    final remoteId = _endpointConnIdMap[endpointId];
+    final ts = message['tombstone'];
+    if (remoteId == null || ts is! Map<String, dynamic>) {
+      addLog('WARN', 'Tombstone ricevuto senza dati validi da $endpointId');
+      return;
+    }
+
+    try {
+      final assoc = await _security.getAssociation(remoteId);
+      if (assoc == null || assoc.publicKeyBase64.isEmpty) {
+        addLog('WARN', 'Tombstone ignorato: nessuna associazione per $remoteId');
+        return;
+      }
+      final secret =
+          await _security.computeStaticSharedSecret(assoc.publicKeyBase64);
+      if (!TombstoneService.verify(ts, secret)) {
+        addLog('WARN', 'Tombstone con firma non valida da $remoteId — ignorato');
+        return;
+      }
+
+      final applied = await HardDeleteService.applyRemoteTombstone(ts);
+      addLog(
+        applied ? 'INFO' : 'WARN',
+        'Tombstone ${applied ? 'applicato' : 'non applicato'} '
+            '(entity ${ts['entityId']}) da $remoteId',
+      );
+    } catch (e) {
+      addLog('ERROR', 'Errore gestione tombstone: $e');
+    }
   }
 
   Future<void> startBackgroundSync() async {

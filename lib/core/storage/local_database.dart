@@ -72,6 +72,12 @@ class LocalDatabase {
   static const avvisiBox = 'avvisi_box';
   static const syncConflictsBox = 'sync_conflicts_box';
 
+  // ─── Box della modalità "Responsabile Catechistico" ─────────────────────
+  static const parishConfigBox = 'parish_config_box';
+  static const auditLogBox = 'audit_log_box';
+  static const aulaBox = 'aula_box';
+  static const tombstoneBox = 'tombstone_box';
+
   static late final HiveAesCipher _cipher;
   static bool _initialized = false;
 
@@ -169,6 +175,11 @@ class LocalDatabase {
       _BoxDefinition(name: meetingNotificationsBox, isMap: true, isCritical: false),
       _BoxDefinition(name: avvisiBox, isMap: true, isCritical: false),
       _BoxDefinition(name: syncConflictsBox, isMap: true, isCritical: false),
+      // Box della modalità "Responsabile Catechistico"
+      _BoxDefinition(name: parishConfigBox, isMap: false, isCritical: false),
+      _BoxDefinition(name: auditLogBox, isMap: true, isCritical: false),
+      _BoxDefinition(name: aulaBox, isMap: true, isCritical: false),
+      _BoxDefinition(name: tombstoneBox, isMap: true, isCritical: false),
     ];
 
     for (final definition in boxDefinitions) {
@@ -297,6 +308,12 @@ class LocalDatabase {
   static Box<Map> meetingNotifications() => Hive.box<Map>(meetingNotificationsBox);
   static Box<Map> avvisi() => Hive.box<Map>(avvisiBox);
   static Box<Map> syncConflicts() => Hive.box<Map>(syncConflictsBox);
+
+  // ─── Accessori Box Responsabile Catechistico ─────────────────────────────
+  static Box parishConfig() => Hive.box(parishConfigBox);
+  static Box<Map> auditLog() => Hive.box<Map>(auditLogBox);
+  static Box<Map> aula() => Hive.box<Map>(aulaBox);
+  static Box<Map> tombstones() => Hive.box<Map>(tombstoneBox);
 
   // ─────────────────────────────────────────────────────────────────────────
   // UTILITÀ DI CIFRATURA BYTES

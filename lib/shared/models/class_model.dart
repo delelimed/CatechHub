@@ -26,6 +26,8 @@
 
 import 'dart:math';
 
+import 'aula.dart';
+
 /// Genera un codice univoco di 40 cifre decimali (invisibile all'utente).
 /// Usato per identificare una classe in modo probabilisticamente unico
 /// a livello globale, senza necessità di un server centrale.
@@ -83,6 +85,29 @@ class SchoolClass {
   /// Aggiornata durante il sync P2P.
   final Map<String, int> catechistDeviceCounts;
 
+  // ─── Campi della modalità "Responsabile Catechistico" ──────────────────
+
+  /// Percorso/percorso catechistico di appartenenza (es. "Prima Comunione",
+  /// "Cresima", "Post-Cresima"). Costituisce il Livello 1 dell'albero parrocchiale.
+  final String percorso;
+
+  /// Contatore del livello all'interno del percorso (es. 1° anno, 2° anno).
+  /// Usato per il passaggio di anno massivo.
+  final int livello;
+
+  /// Anno catechistico di riferimento (es. "2026-2027").
+  final String annoCatechistico;
+
+  /// Se true la classe è archiviata (chiuso il percorso, ma storico conservato).
+  final bool archived;
+
+  /// Ruoli interni dei catechisti assegnati alla classe.
+  /// Mappa catechistId → ruolo (valori: "TITOLARE" | "AIUTO").
+  final Map<String, String> catechistRoles;
+
+  /// Slot settimanali (orari + aule) assegnati a questa classe.
+  final List<RoomSlot> roomSlots;
+
   /// Timestamp di creazione (UTC, ISO 8601).
   final DateTime createdAt;
 
@@ -102,6 +127,12 @@ class SchoolClass {
     this.creatorCatechistId = '',
     this.associatedCatechistIds = const [],
     this.catechistDeviceCounts = const {},
+    this.percorso = '',
+    this.livello = 1,
+    this.annoCatechistico = '',
+    this.archived = false,
+    this.catechistRoles = const {},
+    this.roomSlots = const [],
     DateTime? createdAt,
     DateTime? updatedAt,
   })  : createdAt = createdAt ?? DateTime.now(),
@@ -120,6 +151,12 @@ class SchoolClass {
     String? creatorCatechistId,
     List<String>? associatedCatechistIds,
     Map<String, int>? catechistDeviceCounts,
+    String? percorso,
+    int? livello,
+    String? annoCatechistico,
+    bool? archived,
+    Map<String, String>? catechistRoles,
+    List<RoomSlot>? roomSlots,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -136,6 +173,12 @@ class SchoolClass {
       creatorCatechistId: creatorCatechistId ?? this.creatorCatechistId,
       associatedCatechistIds: associatedCatechistIds ?? this.associatedCatechistIds,
       catechistDeviceCounts: catechistDeviceCounts ?? this.catechistDeviceCounts,
+      percorso: percorso ?? this.percorso,
+      livello: livello ?? this.livello,
+      annoCatechistico: annoCatechistico ?? this.annoCatechistico,
+      archived: archived ?? this.archived,
+      catechistRoles: catechistRoles ?? this.catechistRoles,
+      roomSlots: roomSlots ?? this.roomSlots,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -163,9 +206,24 @@ class SchoolClass {
           .toList(),
       catechistDeviceCounts: (data['catechistDeviceCounts'] as Map? ?? {})
           .map((k, v) => MapEntry(k.toString(), (v as num).toInt())),
+      percorso: data['percorso'] ?? '',
+      livello: (data['livello'] as num?)?.toInt() ?? 1,
+      annoCatechistico: data['annoCatechistico'] ?? '',
+      archived: data['archived'] == true,
+      catechistRoles: (data['catechistRoles'] as Map? ?? {})
+          .map((k, v) => MapEntry(k.toString(), v.toString())),
+      roomSlots: _parseRoomSlots(data['roomSlots']),
       createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
       updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
     );
+  }
+
+  static List<RoomSlot> _parseRoomSlots(Object? raw) {
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((e) => RoomSlot.fromMap(Map<String, dynamic>.from(e)))
+        .toList();
   }
 
   /// Verifica se l'utente identificato da [userId] e [userName] è il creatore
@@ -212,6 +270,12 @@ class SchoolClass {
       'creatorCatechistId': creatorCatechistId,
       'associatedCatechistIds': associatedCatechistIds,
       'catechistDeviceCounts': catechistDeviceCounts,
+      'percorso': percorso,
+      'livello': livello,
+      'annoCatechistico': annoCatechistico,
+      'archived': archived,
+      'catechistRoles': catechistRoles,
+      'roomSlots': roomSlots.map((s) => s.toMap()).toList(),
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };

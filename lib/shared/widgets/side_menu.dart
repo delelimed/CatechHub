@@ -83,6 +83,8 @@ class SideMenu extends StatelessWidget {
           _item(context, location, '/planning', Icons.calendar_month_rounded, 'Programmazione'),
           _item(context, location, '/documents', Icons.description_rounded, 'Documenti'),
           _item(context, location, '/catechesi', Icons.menu_book_rounded, 'Catechesi'),
+          _item(context, location, '/parrocchia/admin', Icons.church_rounded, 'Parrocchia'),
+          _item(context, location, '/parrocchia/consensi', Icons.task_alt_rounded, 'Consensi'),
           _item(context, location, '/settings', Icons.settings_rounded, 'Impostazioni'),
         ],
       ),

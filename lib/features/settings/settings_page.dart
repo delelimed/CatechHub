@@ -22,7 +22,9 @@ import '../../core/auth/auth_provider.dart';
 import '../../core/providers/theme_provider.dart';
 import '../../core/security/privacy_settings.dart';
 import '../../core/services/meeting_notification_service.dart';
+import '../../shared/models/user_role.dart';
 import '../../shared/widgets/app_scaffold.dart';
+import '../responsabile/parish_config_repository.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -101,6 +103,135 @@ class SettingsPage extends ConsumerWidget {
             child: const Text('Salva'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showParishConfigDialog(BuildContext context, WidgetRef ref) {
+    final repo = ref.read(parishConfigRepositoryProvider);
+    final config = repo.getConfig();
+
+    final nomeCtrl = TextEditingController(text: config.nomeParrocchia);
+    final diocesiCtrl = TextEditingController(text: config.diocesi);
+    final annoCtrl = TextEditingController(text: config.annoCatechisticoCorrente);
+    final sogliaCtrl =
+        TextEditingController(text: config.sogliaAssenzeConsecutive.toString());
+    var modoAttivo = config.isResponsabileModeActive;
+    var ruolo = UserRole.current();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Text(
+            'Configura parrocchia',
+            style: TextStyle(
+                color: Color(0xFF174A7E), fontWeight: FontWeight.bold),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Modalità Responsabile attiva'),
+                  subtitle: const Text(
+                      'Sblocca dashboard e funzioni amministrative'),
+                  value: modoAttivo,
+                  activeThumbColor: const Color(0xFF174A7E),
+                  onChanged: (v) => setState(() => modoAttivo = v),
+                ),
+                const SizedBox(height: 4),
+                const Text('Ruolo profilo locale',
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
+                const SizedBox(height: 4),
+                SegmentedButton<UserRole>(
+                  segments: const [
+                    ButtonSegment(
+                      value: UserRole.catechista,
+                      label: Text('Catechista'),
+                      icon: Icon(Icons.person_rounded),
+                    ),
+                    ButtonSegment(
+                      value: UserRole.responsabile,
+                      label: Text('Responsabile'),
+                      icon: Icon(Icons.admin_panel_settings_rounded),
+                    ),
+                  ],
+                  selected: {ruolo},
+                  onSelectionChanged: (sel) => setState(() => ruolo = sel.first),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: nomeCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Nome parrocchia',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: diocesiCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Diocesi',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: annoCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Anno catechistico corrente',
+                    hintText: 'Es. 2026-2027',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: sogliaCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Soglia assenze consecutive (allerta)',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Annulla'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                await UserRole.setCurrent(ruolo);
+                final soglia = int.tryParse(sogliaCtrl.text.trim());
+                await repo.save(config.copyWith(
+                  isResponsabileModeActive: modoAttivo,
+                  nomeParrocchia: nomeCtrl.text.trim(),
+                  diocesi: diocesiCtrl.text.trim(),
+                  annoCatechisticoCorrente: annoCtrl.text.trim(),
+                  sogliaAssenzeConsecutive:
+                      (soglia != null && soglia >= 2) ? soglia : config.sogliaAssenzeConsecutive,
+                ));
+                if (ctx.mounted) Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('Configurazione parrocchia salvata.')),
+                );
+              },
+              child: const Text('Salva'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -202,7 +333,10 @@ class SettingsPage extends ConsumerWidget {
               /// =========================
               /// PROFILE
               /// =========================
-              _ProfileCard(name: data['name'] ?? '', role: 'Catechista'),
+              _ProfileCard(
+                name: data['name'] ?? '',
+                role: UserRole.current().label,
+              ),
 
               const SizedBox(height: 20),
 
@@ -252,7 +386,7 @@ class SettingsPage extends ConsumerWidget {
                 onTap: () => context.push('/delete-data'),
               ),
 
-              const SizedBox(height: 12),
+                            const SizedBox(height: 12),
 
               _SettingsItem(
                 icon: Icons.notifications_active_rounded,
@@ -260,6 +394,53 @@ class SettingsPage extends ConsumerWidget {
                 subtitle: 'Ricevi un promemoria il giorno prima di incontri e riunioni',
                 color: Colors.blue,
                 onTap: () => _showNotificationSettingsDialog(context, ref),
+              ),
+
+              const SizedBox(height: 24),
+
+              /// =========================
+              /// GESTIONE PARROCCHIA (Responsabile Catechistico)
+              /// =========================
+              const _SectionTitle(title: 'Gestione parrocchia'),
+
+              const SizedBox(height: 12),
+
+              _SettingsItem(
+                icon: Icons.church_rounded,
+                title: 'Amministrazione parrocchia',
+                subtitle: 'Classi, iscrizioni, logistica e allarmi assenze',
+                color: const Color(0xFF174A7E),
+                onTap: () => context.push('/parrocchia/admin'),
+              ),
+
+              const SizedBox(height: 12),
+
+              _SettingsItem(
+                icon: Icons.account_tree_rounded,
+                title: 'Dashboard parrocchiale',
+                subtitle: 'Anno catechistico, percorsi, classi, catechisti e ragazzi',
+                color: const Color(0xFF174A7E),
+                onTap: () => context.push('/parrocchia'),
+              ),
+
+              const SizedBox(height: 12),
+
+              _SettingsItem(
+                icon: Icons.gavel_rounded,
+                title: 'Registro Trattamenti',
+                subtitle: 'Registro GDPR (Art. 30) con verifica integrità firme',
+                color: Colors.teal,
+                onTap: () => context.push('/parrocchia/audit'),
+              ),
+
+              const SizedBox(height: 12),
+
+              _SettingsItem(
+                icon: Icons.tune_rounded,
+                title: 'Configura parrocchia',
+                subtitle: 'Nome parrocchia, diocesi, anno catechistico, soglia assenze',
+                color: const Color(0xFF174A7E),
+                onTap: () => _showParishConfigDialog(context, ref),
               ),
 
               const SizedBox(height: 24),

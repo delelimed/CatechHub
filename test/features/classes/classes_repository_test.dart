@@ -120,5 +120,51 @@ void main() {
       final updated = repo.getClassesSync().firstWhere((c) => c.id == classId);
       expect(updated.catechistIds, ['cat_1']);
     });
+
+    test('renameClass cambia il nome conservando gli altri dati', () async {
+      await Hive.openBox<Map>(LocalDatabase.classesBox);
+      final repo = ClassesRepository();
+      const classId = 'class_test_rename';
+
+      await repo.addClass(SchoolClass(
+        id: classId,
+        name: 'Vecchio Nome',
+        studentIds: ['s1', 's2'],
+        catechistIds: ['cat_1', 'cat_2'],
+        percorso: 'Prima Comunione',
+        livello: 2,
+        annoCatechistico: '2026-2027',
+      ));
+
+      await repo.renameClass(classId, '  Nuovo Nome  ');
+
+      final updated = repo.getClassesSync().firstWhere((c) => c.id == classId);
+      expect(updated.name, 'Nuovo Nome');
+      expect(updated.studentIds, ['s1', 's2']);
+      expect(updated.catechistIds, ['cat_1', 'cat_2']);
+      expect(updated.percorso, 'Prima Comunione');
+      expect(updated.livello, 2);
+    });
+
+    test('renameClass ignora nomi vuoti o identici', () async {
+      await Hive.openBox<Map>(LocalDatabase.classesBox);
+      final repo = ClassesRepository();
+      const classId = 'class_test_rename2';
+
+      await repo.addClass(SchoolClass(
+        id: classId,
+        name: 'Nome Stabile',
+        studentIds: [],
+        catechistIds: [],
+      ));
+
+      await repo.renameClass(classId, '   ');
+      expect(repo.getClassesSync().firstWhere((c) => c.id == classId).name,
+          'Nome Stabile');
+
+      await repo.renameClass(classId, 'Nome Stabile');
+      expect(repo.getClassesSync().firstWhere((c) => c.id == classId).name,
+          'Nome Stabile');
+    });
   });
 }

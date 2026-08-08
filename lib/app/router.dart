@@ -54,6 +54,10 @@ import '../features/catechesi/catechesi_page.dart';
 import '../features/catechesi/catechesi_edit_page.dart';
 import '../features/catechesi/catechesi_detail_page.dart';
 import '../shared/models/catechesi_model.dart';
+import '../features/responsabile/responsabile_dashboard_page.dart';
+import '../features/responsabile/responsabile_admin_page.dart';
+import '../features/responsabile/audit_log_page.dart';
+import '../features/responsabile/consensi_page.dart';
 
 /// Restituisce gli ID delle classi a cui appartiene il catechista locale.
 ///
@@ -73,6 +77,12 @@ List<String> _userClassIds() {
   }
   return ids;
 }
+
+/// True se la route corrente appartiene alla gestione parrocchiale del
+/// Responsabile Catechistico. Queste route NON richiedono una classe
+/// selezionata (gestione parrocchia-wide).
+bool _isParrocchiaRoute(String location) =>
+    location.startsWith('/parrocchia');
 
 /// Legge `current_class_id` e lo considera valido solo se non è vuoto e punta
 /// a una classe di cui l'utente fa ancora parte. Un id "stantio" (classe
@@ -338,7 +348,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             // Se l'utente è autenticato ma non ha una classe selezionata e non è su class-selection
             if (location != '/class-selection' &&
                 location != '/onboarding-sync' &&
-                location != '/onboarding-classes') {
+                location != '/onboarding-classes' &&
+                !_isParrocchiaRoute(location)) {
               try {
                 final userClassIds = _userClassIds();
                 final hasClasses = userClassIds.isNotEmpty;
@@ -428,6 +439,34 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // DASHBOARD - Schermata principale
       // ═══════════════════════════════════════════════════════════════════
       GoRoute(path: '/', builder: (context, state) => const DashboardPage()),
+
+      // ═══════════════════════════════════════════════════════════════════
+      // RESPONSABILE CATECHISTICO - Gestione parrocchiale
+      // ═══════════════════════════════════════════════════════════════════
+
+      /// Vista albero parrocchiale (Anno → Percorsi → Classi → Catechisti → Ragazzi)
+      GoRoute(
+        path: '/parrocchia',
+        builder: (context, state) => const ResponsabileDashboardPage(),
+      ),
+
+      /// Hub amministrativo del Responsabile (classi, iscrizioni, logistica, allarmi).
+      GoRoute(
+        path: '/parrocchia/admin',
+        builder: (context, state) => const ResponsabileAdminPage(),
+      ),
+
+      /// Registro Trattamenti GDPR (audit log).
+      GoRoute(
+        path: '/parrocchia/audit',
+        builder: (context, state) => const AuditLogPage(),
+      ),
+
+      /// Gestione scheda di iscrizione firmata e contributi volontari.
+      GoRoute(
+        path: '/parrocchia/consensi',
+        builder: (context, state) => const ConsensiPage(),
+      ),
 
       // ═══════════════════════════════════════════════════════════════════
       // STUDENTS - Anagrafica studenti

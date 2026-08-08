@@ -62,7 +62,7 @@ class Student {
   /// Recapito telefonico diretto del ragazzo (se disponibile).
   final String studentPhone;
 
-  // ─── Dati sanitari e note ───────────────────────────────────────────
+// ─── Dati sanitari e note ───────────────────────────────────────────
   /// Allergie alimentari o farmacologiche (testo libero). Dato critico
   /// per la sicurezza durante incontri con pasti/merende.
   final String? allergies;
@@ -72,6 +72,44 @@ class Student {
 
   /// Note libere del catechista sullo studente.
   final String? notes;
+
+  // ─── Campi GDPR / privacy (modulo di iscrizione unificato) ─────────────
+
+  /// True se il modulo di iscrizione della famiglia è stato firmato
+  /// (equivalente permesso privacy) per il trattamento dei dati.
+  final bool consensoPrivacyFirmato;
+
+  /// Data di firma del modulo di iscrizione (data_firma_consenso).
+  final DateTime? dataFirmaConsenso;
+
+  /// Scadenza del trattamento dei dati, calcolata automaticamente
+  /// (data_firma_consenso + durata validità configurata in ParishConfig).
+  final DateTime? dataScadenzaTrattamento;
+
+  /// Consenso esplicito alle uscite autonome senza accompagnamento.
+  final bool consensoUsciteAutonome;
+
+  /// Contributo volontario versato in occasione dell'iscrizione.
+  final bool contributoVersato;
+
+  /// Importo (in euro, facoltativo) del contributo volontario.
+  final double contributoEuros;
+
+  /// Anno catechistico a cui si riferisce il contributo (es. "2026-2027").
+  final String annoContributo;
+
+  /// Note allergie/salute sensibili, cifrate a livello di campo via
+  /// [FieldEncryptionService] prima della persistenza.
+  final String? noteAllergieSalute;
+
+  // ─── Campi della modalità "Responsabile Catechistico" ──────────────────
+
+  /// Stato del percorso catechistico:
+  ///   "ATTIVO" | "FERMO" | "RITIRATO"
+  final String statoPercorso;
+
+  /// Anno catechistico di iscrizione (es. "2026-2027").
+  final String annoIscrizione;
 
   /// Nome del catechista che ha modificato per ultimo questo record.
   final String lastModifiedBy;
@@ -99,6 +137,16 @@ class Student {
     this.allergies,
     this.autonomousExits,
     this.notes,
+    this.consensoPrivacyFirmato = false,
+    this.dataFirmaConsenso,
+    this.dataScadenzaTrattamento,
+    this.consensoUsciteAutonome = false,
+    this.contributoVersato = false,
+    this.contributoEuros = 0,
+    this.annoContributo = '',
+    this.noteAllergieSalute,
+    this.statoPercorso = 'ATTIVO',
+    this.annoIscrizione = '',
     this.lastModifiedBy = '',
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -126,6 +174,19 @@ class Student {
       allergies: data['allergies'],
       autonomousExits: data['autonomousExits'],
       notes: data['notes'],
+      consensoPrivacyFirmato: data['consensoPrivacyFirmato'] ?? false,
+      dataFirmaConsenso: DateTime.tryParse(
+          data['dataFirmaConsenso']?.toString() ?? ''),
+      dataScadenzaTrattamento: DateTime.tryParse(
+          data['dataScadenzaTrattamento']?.toString() ?? ''),
+      consensoUsciteAutonome: data['consensoUsciteAutonome'] ?? false,
+      contributoVersato: data['contributoVersato'] ?? false,
+      contributoEuros:
+          (data['contributoEuros'] as num?)?.toDouble() ?? 0,
+      annoContributo: data['annoContributo'] ?? '',
+      noteAllergieSalute: data['noteAllergieSalute'],
+      statoPercorso: data['statoPercorso'] ?? 'ATTIVO',
+      annoIscrizione: data['annoIscrizione'] ?? '',
       lastModifiedBy: data['lastModifiedBy'] ?? '',
       createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
       updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
@@ -166,6 +227,16 @@ class Student {
     String? allergies,
     String? autonomousExits,
     String? notes,
+    bool? consensoPrivacyFirmato,
+    DateTime? dataFirmaConsenso,
+    DateTime? dataScadenzaTrattamento,
+    bool? consensoUsciteAutonome,
+    bool? contributoVersato,
+    double? contributoEuros,
+    String? annoContributo,
+    String? noteAllergieSalute,
+    String? statoPercorso,
+    String? annoIscrizione,
     String? lastModifiedBy,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -187,6 +258,19 @@ class Student {
       allergies: allergies ?? this.allergies,
       autonomousExits: autonomousExits ?? this.autonomousExits,
       notes: notes ?? this.notes,
+      consensoPrivacyFirmato:
+          consensoPrivacyFirmato ?? this.consensoPrivacyFirmato,
+      dataFirmaConsenso: dataFirmaConsenso ?? this.dataFirmaConsenso,
+      dataScadenzaTrattamento:
+          dataScadenzaTrattamento ?? this.dataScadenzaTrattamento,
+      consensoUsciteAutonome:
+          consensoUsciteAutonome ?? this.consensoUsciteAutonome,
+      contributoVersato: contributoVersato ?? this.contributoVersato,
+      contributoEuros: contributoEuros ?? this.contributoEuros,
+      annoContributo: annoContributo ?? this.annoContributo,
+      noteAllergieSalute: noteAllergieSalute ?? this.noteAllergieSalute,
+      statoPercorso: statoPercorso ?? this.statoPercorso,
+      annoIscrizione: annoIscrizione ?? this.annoIscrizione,
       lastModifiedBy: lastModifiedBy ?? this.lastModifiedBy,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -212,6 +296,16 @@ class Student {
       'allergies': allergies,
       'autonomousExits': autonomousExits,
       'notes': notes,
+      'consensoPrivacyFirmato': consensoPrivacyFirmato,
+      'dataFirmaConsenso': dataFirmaConsenso?.toIso8601String(),
+      'dataScadenzaTrattamento': dataScadenzaTrattamento?.toIso8601String(),
+      'consensoUsciteAutonome': consensoUsciteAutonome,
+      'contributoVersato': contributoVersato,
+      'contributoEuros': contributoEuros,
+      'annoContributo': annoContributo,
+      'noteAllergieSalute': noteAllergieSalute,
+      'statoPercorso': statoPercorso,
+      'annoIscrizione': annoIscrizione,
       'lastModifiedBy': lastModifiedBy,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),

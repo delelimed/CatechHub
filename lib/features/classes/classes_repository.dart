@@ -12,6 +12,7 @@
 ///
 /// Integrazione CateREG: usato da [classesRepoProvider] e da tutte le
 /// pagine che necessitano di leggere o modificare i dati delle classi.
+library;
 import 'package:flutter/foundation.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/storage/local_database.dart';

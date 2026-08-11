@@ -9,6 +9,7 @@
 /// - L'utente ha il pieno controllo dei propri dati
 /// - **PROTEZIONE RUNTIME freeRASP: anti-root, anti-emulatore, anti-tamper, anti-hooking**
 ///
+library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';

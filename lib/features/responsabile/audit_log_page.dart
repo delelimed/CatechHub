@@ -69,7 +69,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
                   onPressed: () async {
                     final tampered =
                         await AuditLogRepository().findTampered();
-                    if (!mounted) return;
+                    if (!context.mounted) return;
                     setState(() {
                       _tamperedIds
                         ..clear()

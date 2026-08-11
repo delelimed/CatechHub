@@ -6,7 +6,7 @@ import 'package:CatechHub/features/responsabile/consensi_service.dart';
 import 'package:CatechHub/shared/models/student_model.dart';
 
 void main() {
-  Student _student({bool firmato = false, DateTime? firma, DateTime? scadenza}) {
+  Student student({bool firmato = false, DateTime? firma, DateTime? scadenza}) {
     return Student(
       id: 's1',
       name: 'Mario',
@@ -27,14 +27,14 @@ void main() {
 
   group('ConsensiService.stato', () {
     test('ritorna nonFirmato se la scheda non e firmata', () {
-      final s = _student(firmato: false);
+      final s = student(firmato: false);
       expect(ConsensiService.stato(s, now: DateTime(2026, 8, 8)),
           StatoConsenso.nonFirmato);
     });
 
     test('ritorna valido se dentro la validita', () {
       final firma = DateTime(2026, 1, 1);
-      final s = _student(
+      final s = student(
         firmato: true,
         firma: firma,
         scadenza: DateTime(2027, 1, 1),
@@ -45,7 +45,7 @@ void main() {
 
     test('ritorna scaduto dopo la scadenza', () {
       final firma = DateTime(2025, 1, 1);
-      final s = _student(
+      final s = student(
         firmato: true,
         firma: firma,
         scadenza: DateTime(2026, 1, 1),
@@ -56,7 +56,7 @@ void main() {
 
     test('calcola la scadenza di fallback (firma + 12 mesi)', () {
       final firma = DateTime(2026, 1, 1);
-      final s = _student(firmato: true, firma: firma);
+      final s = student(firmato: true, firma: firma);
       expect(ConsensiService.stato(s, now: DateTime(2026, 8, 8)),
           StatoConsenso.valido);
       expect(ConsensiService.stato(s, now: DateTime(2027, 2, 1)),
@@ -66,7 +66,7 @@ void main() {
 
   group('ConsensiService.info', () {
     test('esporta firma e scadenza nella rationalizzazione risposta', () {
-      final s = _student(
+      final s = student(
         firmato: true,
         firma: DateTime(2026, 1, 1),
         scadenza: DateTime(2027, 1, 1),

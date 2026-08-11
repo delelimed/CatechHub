@@ -11,6 +11,7 @@
 ///
 /// In caso di errore di lettura, mostra un messaggio in italiano
 /// ("Impossibile aprire il file") con il dettaglio dell'errore.
+library;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';

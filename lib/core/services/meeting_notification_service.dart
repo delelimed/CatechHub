@@ -19,6 +19,7 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -111,7 +112,7 @@ class MeetingNotificationService {
   static void _onNotificationTapped(NotificationResponse response) {
     // Navigazione opzionale alla pagina planning
     // Per ora apriamo l'app alla home
-    print('Notifica incontro toccata: ${response.payload}');
+    debugPrint('Notifica incontro toccata: ${response.payload}');
   }
 
   /// Verifica se le notifiche incontri sono abilitate.
@@ -214,7 +215,7 @@ class MeetingNotificationService {
 
     final hasPermission = await isPermissionGranted;
     if (!hasPermission) {
-      print('Permesso notifiche non concesso, impossibile programmare');
+      debugPrint('Permesso notifiche non concesso, impossibile programmare');
       return;
     }
 
@@ -311,7 +312,7 @@ class MeetingNotificationService {
       );
     } on PlatformException catch (e) {
       if (e.code == 'exact_alarms_not_permitted') {
-        print(
+        debugPrint(
           'Permesso SCHEDULE_EXACT_ALARM non concesso, uso modalità inesatta',
         );
         await _notificationsPlugin.zonedSchedule(

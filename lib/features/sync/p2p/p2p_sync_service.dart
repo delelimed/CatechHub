@@ -13,6 +13,9 @@ import '../../../core/storage/local_database.dart';
 import '../../gdpr/hard_delete_service.dart';
 import '../../gdpr/tombstone_model.dart';
 import '../../gdpr/tombstone_service.dart';
+import '../class_channel_service.dart';
+import '../data/association_models.dart';
+import '../parish_channel_service.dart';
 import 'p2p_security_service.dart';
 import 'hive_sync_engine.dart';
 
@@ -344,6 +347,13 @@ class P2PSyncService {
 
   /// Mappa endpoint → classi condivise con un catechista diverso.
   final Map<String, Set<String>> _endpointSharedClassIds = {};
+
+  /// Capacità del canale classe (cifratura per-classe) dell'endpoint remoto.
+  /// Default `false` = peer non aggiornato → si usa il formato legacy in chiaro.
+  final Map<String, bool> _endpointSupportsClassChannel = {};
+
+  /// Capacità del canale parrocchiale globale dell'endpoint remoto.
+  final Map<String, bool> _endpointSupportsParishChannel = {};
 
   /// Stato della risoluzione di un conflitto di catechistId tra due dispositivi
   /// della stessa persona ("Mio Dispositivo"). Quando entrambi i dispositivi
@@ -795,7 +805,7 @@ class P2PSyncService {
     }
     addLog('DEBUG', 'Watch attivato su ${_boxControllers.length} box Hive');
 
-    DateTime _lastChangeEmit = DateTime.now();
+    DateTime lastChangeEmit = DateTime.now();
     _mergedController = StreamController<BoxEvent>.broadcast();
     for (final ctrl in _boxControllers) {
       ctrl.stream.listen((event) {
@@ -806,8 +816,8 @@ class P2PSyncService {
     }
     _hiveBoxesSub = _mergedController!.stream.listen((event) {
       final now = DateTime.now();
-      if (now.difference(_lastChangeEmit).inMilliseconds >= 500) {
-        _lastChangeEmit = now;
+      if (now.difference(lastChangeEmit).inMilliseconds >= 500) {
+        lastChangeEmit = now;
         _onLocalDataChanged();
       }
     });
@@ -1184,6 +1194,8 @@ class P2PSyncService {
     _endpointRemoteCatechistId.clear();
     _endpointRemoteHasClasses.clear();
     _endpointSharedClassIds.clear();
+    _endpointSupportsClassChannel.clear();
+    _endpointSupportsParishChannel.clear();
     _pendingChoiceEndpoint = null;
     _pendingChoiceRemoteIdentity = null;
 
@@ -1339,6 +1351,8 @@ class P2PSyncService {
     _endpointRemoteCatechistId.remove(endpointId);
     _endpointRemoteHasClasses.remove(endpointId);
     _endpointSharedClassIds.remove(endpointId);
+    _endpointSupportsClassChannel.remove(endpointId);
+    _endpointSupportsParishChannel.remove(endpointId);
     _isSyncing = false;
     if (_pendingEndpointId == endpointId) {
       _pendingEndpointId = null;
@@ -1377,6 +1391,8 @@ class P2PSyncService {
     _endpointRemoteCatechistId.remove(endpointId);
     _endpointRemoteHasClasses.remove(endpointId);
     _endpointSharedClassIds.remove(endpointId);
+    _endpointSupportsClassChannel.remove(endpointId);
+    _endpointSupportsParishChannel.remove(endpointId);
     if (_pendingEndpointId == endpointId) {
       _pendingEndpointId = null;
     }
@@ -1494,9 +1510,7 @@ class P2PSyncService {
           }
         } catch (_) {}
       }
-      if (remoteCatechistId == null) {
-        remoteCatechistId = _endpointRemoteCatechistId[endpointId];
-      }
+      remoteCatechistId ??= _endpointRemoteCatechistId[endpointId];
     }
 
     // Stesso catechista (su un suo altro dispositivo): tutte le classi.
@@ -1628,6 +1642,7 @@ class P2PSyncService {
         16,
       ).map((b) => b.toRadixString(16).padLeft(2, '0')).join();
       final localIdentity = await _security.getLocalIdentity();
+      final localApproval = await _security.getLocalApproval();
       final handshakeMsg = jsonEncode({
         'type': 'p2p_handshake',
         'senderId': localIdentity.deviceId,
@@ -1641,6 +1656,13 @@ class P2PSyncService {
         'sharedClassIds': _handshakeSharedClassIds(),
         'catechistId': AuthService.getCatechistId(),
         'hasClasses': _hasCatechistIdentity(AuthService.getCatechistId()),
+        'supportsClassChannel': true,
+        'supportsParishChannel': true,
+        // Certificato di approvazione del Responsabile (se il dispositivo è
+        // già stato approvato): il peer lo verifica con il segreto della
+        // parrocchia quando la modalità Responsabile è attiva.
+        if (localApproval != null && localApproval.isApproved)
+          'approvalCert': localApproval.toJson(),
       });
       addLog(
         'DEBUG',
@@ -1848,6 +1870,9 @@ class P2PSyncService {
         case 'p2p_tombstone':
           await _handleTombstone(endpointId, decoded);
           break;
+        case 'p2p_parish_channel':
+          await _handleParishChannel(endpointId, decoded);
+          break;
       }
     } catch (e) {
       addLog('ERROR', 'Errore gestione messaggio da $endpointId: $e');
@@ -1912,6 +1937,10 @@ class P2PSyncService {
       }
       final remoteHasClasses = message['hasClasses'] == true;
       _endpointRemoteHasClasses[endpointId] = remoteHasClasses;
+      _endpointSupportsClassChannel[endpointId] =
+          message['supportsClassChannel'] == true;
+      _endpointSupportsParishChannel[endpointId] =
+          message['supportsParishChannel'] == true;
       final remoteShared = _resolveSharedClassIdsForEndpoint(
         endpointId,
         (message['sharedClassIds'] as List<dynamic>? ?? [])
@@ -1963,6 +1992,38 @@ class P2PSyncService {
       return;
     }
     addLog('DEBUG', 'Handshake da: $remoteName ($remoteId)');
+
+    // ─── Catena di fiducia (modalità Responsabile) ─────────────────────────
+    // Se il peer trasporta un certificato di approvazione del Responsabile,
+    // lo verifichiamo e lo alleghiamo all'associazione (se la modalità
+    // Responsabile è attiva e il segreto della parrocchia è disponibile).
+    await _attachApprovalFromHandshake(remoteId, message);
+
+    // Quando la modalità Responsabile è ATTIVA, il dispositivo remoto deve
+    // essere stato preventivamente approvato dal Responsabile. Se non lo è
+    // (o la sua approvazione non è verificabile), il sync viene rifiutato.
+    final syncAllowed = await _security.isSyncAllowedFromDevice(remoteId);
+    if (!syncAllowed) {
+      addLog(
+        'ERROR',
+        'Catena di fiducia: $remoteName ($remoteId) non è stato approvato '
+        'dal Responsabile. Sincronizzazione rifiutata.',
+      );
+      try {
+        await _nearby.disconnectFromEndpoint(endpointId);
+      } catch (_) {}
+      _connectedEndpoints.remove(endpointId);
+      _pendingEndpointId = null;
+      _updateState(
+        _state.copyWith(
+          status: P2PSyncStatus.error,
+          errorMessage:
+              'Sincronizzazione rifiutata: $remoteName non è stato approvato '
+              'dal Responsabile per la sync delle classi.',
+        ),
+      );
+      return;
+    }
 
     final remoteRoleStr = message['role'] as String?;
     final remoteRole = remoteRoleStr != null
@@ -2051,6 +2112,8 @@ class P2PSyncService {
         'sharedClassIds': _handshakeSharedClassIds(),
         'catechistId': AuthService.getCatechistId(),
         'hasClasses': _hasCatechistIdentity(AuthService.getCatechistId()),
+        'supportsClassChannel': true,
+        'supportsParishChannel': true,
       });
       await _sendEncryptedPayload(endpointId, ack);
       _updateState(
@@ -2089,6 +2152,8 @@ class P2PSyncService {
         'sharedClassIds': _handshakeSharedClassIds(),
         'catechistId': AuthService.getCatechistId(),
         'hasClasses': _hasCatechistIdentity(AuthService.getCatechistId()),
+        'supportsClassChannel': true,
+        'supportsParishChannel': true,
       });
       await _sendPayload(endpointId, ack);
 
@@ -2179,6 +2244,10 @@ class P2PSyncService {
         _endpointRemoteCatechistId[endpointId] = ackRemoteCatechistId;
       }
       _endpointRemoteHasClasses[endpointId] = message['hasClasses'] == true;
+      _endpointSupportsClassChannel[endpointId] =
+          message['supportsClassChannel'] == true;
+      _endpointSupportsParishChannel[endpointId] =
+          message['supportsParishChannel'] == true;
       final ackSharedClasses = _resolveSharedClassIdsForEndpoint(
         endpointId,
         (message['sharedClassIds'] as List<dynamic>? ?? [])
@@ -2265,6 +2334,10 @@ class P2PSyncService {
       _endpointRemoteCatechistId[endpointId] = ackRemoteCatechistId;
     }
     _endpointRemoteHasClasses[endpointId] = message['hasClasses'] == true;
+    _endpointSupportsClassChannel[endpointId] =
+        message['supportsClassChannel'] == true;
+    _endpointSupportsParishChannel[endpointId] =
+        message['supportsParishChannel'] == true;
     final ackSharedClasses = _resolveSharedClassIdsForEndpoint(
       endpointId,
       (message['sharedClassIds'] as List<dynamic>? ?? [])
@@ -2336,6 +2409,54 @@ class P2PSyncService {
           remoteDeviceFingerprint: association.fingerprint,
         ),
       );
+    }
+  }
+
+  /// Verifica il certificato di approvazione trasportato nell'handshake e, se
+  /// valido, lo allega all'associazione locale. Senza segreto della parrocchia
+  /// (dispositivo non configurato come verifica) il certificato viene comunque
+  /// salvato come metadato, così il device potrà essere approvato in seguito.
+  Future<void> _attachApprovalFromHandshake(
+    String remoteId,
+    Map<String, dynamic> message,
+  ) async {
+    try {
+      final rawCert = message['approvalCert'];
+      if (rawCert is! Map) return;
+      final cert =
+          AssociatedDevice.fromJson(Map<String, dynamic>.from(rawCert));
+      if (!cert.isApproved) return;
+
+      final assoc = await _security.getAssociation(remoteId);
+      if (assoc == null) return;
+      if (assoc.authorizedByResponsabile) return;
+
+      final responsabileMode = await _security.isResponsabileModeActive();
+      final hasSecret = await _security.hasParishApprovalSecret();
+      var valid = false;
+      if (responsabileMode && hasSecret) {
+        valid = await _security.verifyApprovalWithParishSecret(cert);
+      }
+
+      final updated = assoc.copyWith(
+        authorizedByResponsabile: true,
+        timestampApproval: cert.timestampApproval,
+        approvedByDeviceId: cert.approvedByDeviceId,
+        approvalSignature: cert.approvalSignature,
+        approvalSignerPublicKey: cert.signerPublicKey,
+      );
+      await _security.saveAssociation(updated);
+
+      addLog(
+        valid
+            ? 'INFO'
+            : 'WARN',
+        valid
+            ? 'Certificato di approvazione verificato e allegato per $remoteId'
+            : 'Certificato di approvazione ricevuto per $remoteId (segreto parrocchia non disponibile, verifica differita)',
+      );
+    } catch (e) {
+      addLog('WARN', 'Errore attach approval da handshake: $e');
     }
   }
 
@@ -2592,11 +2713,9 @@ class P2PSyncService {
     // Se il nonce remoto non è ancora disponibile dall'handshake,
     // usa la variabile di istanza che viene aggiornata quando
     // il messaggio di handshake viene ricevuto.
-    if (remoteNonce == null) {
-      remoteNonce = _remoteSessionPairingNonce?.isNotEmpty == true
-          ? _remoteSessionPairingNonce
-          : null;
-    }
+    remoteNonce ??= _remoteSessionPairingNonce?.isNotEmpty == true
+        ? _remoteSessionPairingNonce
+        : null;
     if (remoteNonce != null) {
       _remoteSessionPairingNonce = remoteNonce;
     }
@@ -3120,6 +3239,10 @@ class P2PSyncService {
       final sendScope = await _currentSyncScope(endpointId);
       final localIndex = engine.buildLocalIndex(sendScope);
 
+      // Canale parrocchiale globale: scambia riunioni e avvisi parrocchiali
+      // (in chiaro per la rete) insieme all'indice delle classi.
+      await sendParishChannel(endpointId);
+
       final remoteIndexData = message['index'] as List<dynamic>? ?? [];
       final remoteIndex = remoteIndexData
           .map((e) => SyncIndexEntry.fromJson(Map<String, dynamic>.from(e)))
@@ -3165,9 +3288,13 @@ class P2PSyncService {
         addLog('INFO', 'Invio ${localRecords.length} record al remoto');
         _updateState(_state.copyWith(sentRecordsCount: localRecords.length));
         final attachmentBytes = await _collectAttachmentBytes(localRecords);
+        final channelPayload = await _buildSyncDataPayload(
+          records: localRecords,
+          endpointId: endpointId,
+        );
         final recordsPayload = jsonEncode({
           'type': 'p2p_sync_data',
-          'records': engine.serializeRecords(localRecords),
+          ...channelPayload,
           if (attachmentBytes.isNotEmpty) 'attachments': attachmentBytes,
         });
         await _sendEncryptedPayload(endpointId, recordsPayload);
@@ -3247,9 +3374,13 @@ class P2PSyncService {
         ),
       );
       final attachmentBytes = await _collectAttachmentBytes(records);
+      final channelPayload = await _buildSyncDataPayload(
+        records: records,
+        endpointId: endpointId,
+      );
       final recordsPayload = jsonEncode({
         'type': 'p2p_sync_data',
-        'records': engine.serializeRecords(records),
+        ...channelPayload,
         if (attachmentBytes.isNotEmpty) 'attachments': attachmentBytes,
       });
       await _sendEncryptedPayload(endpointId, recordsPayload);
@@ -3277,15 +3408,20 @@ class P2PSyncService {
       try {
         final engine = HiveSyncEngine();
         final receiveScope = await _currentReceiveScope(endpointId);
-        final recordsData = message['records'] as List<dynamic>? ?? [];
-        final records = engine.deserializeRecords(recordsData);
+        final records =
+            await _deserializeChannelRecords(endpointId, message['records']);
         // Diritto all'Oblio: ignora record di entita' Tombstoned.
         final tombstoned = _tombstonedEntityIds();
         final filtered = records
             .where((r) => !(r.boxName == LocalDatabase.studentsBox && tombstoned.contains(r.id)))
             .toList();
         if (records.isNotEmpty) {
-          await engine.applyRemoteRecords(filtered, scopes: receiveScope);
+          final secretKey = await _secretKeyForEndpoint(endpointId);
+          await engine.applyRemoteRecords(
+            filtered,
+            scopes: receiveScope,
+            secretKey: secretKey,
+          );
           await engine.saveLastSyncTimestamp(DateTime.now().toUtc());
           addLog(
             'DEBUG',
@@ -3308,8 +3444,8 @@ class P2PSyncService {
     try {
       final engine = HiveSyncEngine();
       final receiveScope = await _currentReceiveScope(endpointId);
-      final recordsData = message['records'] as List<dynamic>? ?? [];
-      final records = engine.deserializeRecords(recordsData);
+      final records =
+          await _deserializeChannelRecords(endpointId, message['records']);
       addLog(
         'DEBUG',
         'Dati sync ricevuti: ${records.length} record da applicare',
@@ -3323,9 +3459,11 @@ class P2PSyncService {
                   tombstoned.contains(r.id)))
           .toList();
 
+      final secretKey = await _secretKeyForEndpoint(endpointId);
       final result = await engine.applyRemoteRecords(
         filtered,
         scopes: receiveScope,
+        secretKey: secretKey,
       );
       addLog(
         'INFO',
@@ -3977,6 +4115,329 @@ class P2PSyncService {
   ) async {
     final payload = jsonEncode({'type': 'p2p_sync_data', ...data});
     await _sendEncryptedPayload(endpointId, payload);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CANALE CLASSE: cifratura per-classe dei record sync (Rete Parrocchiale)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Determina il codice univoco della classe a cui appartiene un record,
+  /// o `null` per record non legati a una classe (inclusi i record della
+  /// classe stessa, che restano in chiaro per il bootstrap del titolo).
+  String? _recordClassUniqueCode(SyncRecord record) {
+    try {
+      if (record.boxName == LocalDatabase.classesBox) return null;
+      final data = record.data;
+      final code = data['classUniqueCode']?.toString();
+      if (code != null && code.isNotEmpty) return code;
+      final classId = data['classId']?.toString();
+      if (classId != null && classId.isNotEmpty) {
+        final raw = LocalDatabase.classes().get(classId);
+        if (raw != null) {
+          final code2 =
+              LocalDatabase.toStringDynamicMap(raw)['uniqueCode']?.toString();
+          if (code2 != null && code2.isNotEmpty) return code2;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Risolve classId + nome dal codice univoco di una classe.
+  ({String classId, String name})? _classInfoByUniqueCode(
+      String classUniqueCode) {
+    try {
+      final box = LocalDatabase.classes();
+      for (final key in box.keys) {
+        final data = LocalDatabase.toStringDynamicMap(box.get(key));
+        if (data['uniqueCode']?.toString() == classUniqueCode) {
+          return (
+            classId: key.toString(),
+            name: data['name']?.toString() ?? '',
+          );
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// true se il dispositivo remoto ha TITOLO sulla classe [classUniqueCode]
+  /// (è un membro riconosciuto della classe), oppure se sta facendo onboarding
+  /// senza classi (bootstrap del titolo da parte di chi condivide la classe).
+  bool _remoteHasClassTitle(String endpointId, String classUniqueCode) {
+    final remoteCat = _endpointRemoteCatechistId[endpointId];
+    if (remoteCat == null || remoteCat.isEmpty) {
+      return _endpointRemoteHasClasses[endpointId] == false;
+    }
+    try {
+      final box = LocalDatabase.classes();
+      for (final key in box.keys) {
+        final data = LocalDatabase.toStringDynamicMap(box.get(key));
+        if (data['uniqueCode']?.toString() != classUniqueCode) continue;
+        final creator = data['creatorCatechistId']?.toString() ?? '';
+        final catechists = (data['catechistIds'] as List? ?? [])
+            .map((e) => e.toString())
+            .toList();
+        final associated = (data['associatedCatechistIds'] as List? ?? [])
+            .map((e) => e.toString())
+            .toList();
+        return remoteCat == creator ||
+            catechists.contains(remoteCat) ||
+            associated.contains(remoteCat);
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  /// Shared secret dell'associazione verso [endpointId], usato per
+  /// verificare i timestamp firmati ricevuti (SignedLww). Null se il peer
+  /// non è associato.
+  Future<String?> _secretKeyForEndpoint(String endpointId) async {
+    final deviceId = _endpointConnIdMap[endpointId] ??
+        _nearbyEndpointToDevice[endpointId];
+    if (deviceId == null) return null;
+    try {
+      return await _security.getSharedSecret(deviceId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Firma i timestamp dei [records] con il shared secret dell'associazione
+  /// verso [endpointId]. Se il peer non è ancora associato (o non c'è una
+  /// chiave condivisa) i record partono senza firma: il ricevente userà il
+  /// confronto timestamp legacy.
+  Future<List<SyncRecord>> _signRecordsForEndpoint(
+    String? endpointId,
+    List<SyncRecord> records,
+  ) async {
+    if (endpointId == null || records.isEmpty) return records;
+    final deviceId = _endpointConnIdMap[endpointId] ??
+        _nearbyEndpointToDevice[endpointId];
+    if (deviceId == null) return records;
+    String? secretKey;
+    try {
+      secretKey = await _security.getSharedSecret(deviceId);
+    } catch (_) {}
+    if (secretKey == null || secretKey.isEmpty) return records;
+    final engine = HiveSyncEngine();
+    return engine.signRecordsForChannel(records, secretKey);
+  }
+
+  /// Costruisce il campo `records` del messaggio `p2p_sync_data`.
+  ///
+  /// - Se il peer supporta il canale classe (cifratura per-classe), i record
+  ///   vengono raggruppati per classe e cifrati con la Class_Encryption_Key.
+  ///   Ai membri riconosciuti della classe viene allegata anche la chiave
+  ///   (bootstrap del titolo); agli altri solo il blob opaco (relay).
+  /// - Se il peer è vecchio (nessun flag), si usa il formato legacy in chiaro.
+  Future<Map<String, dynamic>> _buildSyncDataPayload({
+    required List<SyncRecord> records,
+    String? endpointId,
+  }) async {
+    final targetEndpoint = endpointId;
+    final classChannelEnabled = targetEndpoint != null &&
+        _endpointSupportsClassChannel[targetEndpoint] == true;
+
+    // Firma i timestamp prima dell'invio: il ricevente accetta il LWW solo
+    // con firma valida (vedi SignedLww.remoteWins).
+    final signed = await _signRecordsForEndpoint(endpointId, records);
+
+    if (!classChannelEnabled || records.isEmpty) {
+      final engine = HiveSyncEngine();
+      return {'records': engine.serializeRecords(signed)};
+    }
+
+    final plain = <Map<String, dynamic>>[];
+    final grouped = <String, List<Map<String, dynamic>>>{};
+    for (final record in signed) {
+      final code = _recordClassUniqueCode(record);
+      if (code == null) {
+        plain.add(record.toJson());
+      } else {
+        grouped.putIfAbsent(code, () => []).add(record.toJson());
+      }
+    }
+
+    final enc = <String, dynamic>{};
+    for (final entry in grouped.entries) {
+      final code = entry.key;
+      final classInfo = _classInfoByUniqueCode(code);
+      if (classInfo != null &&
+          ClassChannelService.getKeyByUniqueCode(code) == null) {
+        ClassChannelService.getOrCreateKey(
+          classId: classInfo.classId,
+          classUniqueCode: code,
+          className: classInfo.name,
+        );
+      }
+      final blob = ClassChannelService.encryptRecords(code, entry.value);
+      if (blob == null) {
+        plain.addAll(entry.value);
+        continue;
+      }
+      if (_remoteHasClassTitle(targetEndpoint, code)) {
+        final key = ClassChannelService.getKeyByUniqueCode(code);
+        if (key != null) {
+          blob['key'] = key.toMap();
+        }
+      }
+      enc[code] = blob;
+    }
+
+    if (enc.isEmpty && plain.isEmpty) {
+      return {'records': <dynamic>[]};
+    }
+    return {
+      'records': {
+        'enc': enc,
+        'plain': plain,
+      },
+    };
+  }
+
+  /// Deserializza il campo `records` di un messaggio `p2p_sync_data`,
+  /// gestendo sia il formato legacy (List) sia quello del canale classe
+  /// (Map `{enc, plain}`). I blob delle classi senza titolo vengono
+  /// conservati in relay e NON applicati.
+  Future<List<SyncRecord>> _deserializeChannelRecords(
+    String endpointId,
+    dynamic recordsField,
+  ) async {
+    final engine = HiveSyncEngine();
+    if (recordsField is List) {
+      return engine.deserializeRecords(recordsField);
+    }
+    if (recordsField is! Map) return [];
+    final map = Map<String, dynamic>.from(recordsField);
+    final results = <SyncRecord>[];
+
+    results.addAll(engine.deserializeRecords(
+      map['plain'] as List<dynamic>? ?? const [],
+    ));
+
+    final enc = map['enc'] as Map<String, dynamic>? ?? {};
+    for (final entry in enc.entries) {
+      final code = entry.key;
+      if (entry.value is! Map) continue;
+      final blob = Map<String, dynamic>.from(entry.value as Map);
+
+      final keyData = blob['key'];
+      if (keyData is Map) {
+        final keyMap = Map<String, dynamic>.from(keyData);
+        ClassChannelService.storeKey(
+          classId: keyMap['classId']?.toString() ?? '',
+          classUniqueCode: code,
+          className: keyMap['className']?.toString() ?? '',
+          keyBase64: keyMap['keyBase64']?.toString() ?? '',
+          grantorCatechistId: keyMap['grantorCatechistId']?.toString() ?? '',
+        );
+        blob.remove('key');
+      }
+
+      final decrypted = ClassChannelService.decryptRecords(code, blob);
+      if (decrypted != null) {
+        results.addAll(engine.deserializeRecords(decrypted));
+      } else {
+        // Nessun titolo (o chiave non disponibile): relay-only.
+        ClassChannelService.storeRelayedCiphertext(code, blob);
+        addLog('INFO', 'Relay: blob classe $code ricevuto senza titolo');
+      }
+    }
+    return results;
+  }
+
+  /// Applica gli eventuali blob cifrati "relay" della classe [classUniqueCode]
+  /// una volta ottenuto il titolo. Usato dopo l'import di un grant QR.
+  Future<void> tryApplyRelayedCiphertext(
+    String classUniqueCode,
+  ) async {
+    final blob = ClassChannelService.takeRelayedCiphertext(classUniqueCode);
+    if (blob == null) return;
+    final decrypted = ClassChannelService.decryptRecords(classUniqueCode, blob);
+    if (decrypted == null) {
+      addLog(
+        'WARN',
+        'Relay blob per $classUniqueCode non decifrabile dopo il grant',
+      );
+      return;
+    }
+    try {
+      final engine = HiveSyncEngine();
+      final records = engine.deserializeRecords(decrypted);
+      final result = await engine.applyRemoteRecords(records, scopes: null);
+      addLog(
+        'INFO',
+        'Applicati ${result.receivedRecords} record relayed della classe '
+        '$classUniqueCode dopo acquisizione titolo',
+      );
+    } catch (e) {
+      addLog('ERROR', 'Errore applicazione record relayed: $e');
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CANALE PARROCCHIALE GLOBALE (riunioni + avvisi, in chiaro per la rete)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Invia il payload del canale parrocchiale globale all'endpoint.
+  Future<void> sendParishChannel(String endpointId) async {
+    if (_endpointSupportsParishChannel[endpointId] != true) {
+      addLog(
+        'DEBUG',
+        'Canale parrocchiale saltato: peer non aggiornato ($endpointId)',
+      );
+      return;
+    }
+    try {
+      final payload = ParishChannelService.buildChannelPayload();
+      final msg = jsonEncode({
+        'type': 'p2p_parish_channel',
+        'payload': payload,
+      });
+      await _sendEncryptedPayload(endpointId, msg);
+      addLog('INFO', 'Canale parrocchiale inviato a $endpointId');
+    } catch (e) {
+      addLog('ERROR', 'Invio canale parrocchiale fallito: $e');
+    }
+  }
+
+  /// Invia il canale parrocchiale globale a tutti i dispositivi connessi.
+  /// Best-effort: gli endpoint non aggiornati vengono saltati.
+  Future<void> sendParishChannelToAll() async {
+    final endpoints = _connectedEndpoints.toList();
+    if (endpoints.isEmpty) {
+      addLog('DEBUG', 'Canale parrocchiale: nessun dispositivo connesso');
+      return;
+    }
+    for (final endpointId in endpoints) {
+      await sendParishChannel(endpointId);
+    }
+  }
+
+  /// Riceve e applica il payload del canale parrocchiale globale.
+  Future<void> _handleParishChannel(
+    String endpointId,
+    Map<String, dynamic> message,
+  ) async {
+    final payload = message['payload'];
+    if (payload is! Map) {
+      addLog('WARN', 'Canale parrocchiale ricevuto senza payload valido');
+      return;
+    }
+    try {
+      final applied = await ParishChannelService.applyChannelPayload(
+        Map<String, dynamic>.from(payload),
+      );
+      addLog(
+        'INFO',
+        'Canale parrocchiale applicato: $applied record da $endpointId',
+      );
+      // Risposta bidirezionale: il remoto riceve anche i nostri dati.
+      await sendParishChannel(endpointId);
+    } catch (e) {
+      addLog('ERROR', 'Errore applicazione canale parrocchiale: $e');
+    }
   }
 
   /// Propaga un [Tombstone] a tutti i dispositivi attualmente connessi.

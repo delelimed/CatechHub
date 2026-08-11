@@ -107,13 +107,13 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
         _catechesi = updated;
         _isEditing = false;
       });
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Catechesi aggiornata')),
         );
       }
     } catch (e) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Errore: $e')),
         );
@@ -252,7 +252,7 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
                           final uri = Uri.tryParse(w);
                           if (uri != null) {
                             final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-                            if (!ok && context.mounted) {
+                            if (!ok && mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text('Impossibile aprire: $w')),
                               );

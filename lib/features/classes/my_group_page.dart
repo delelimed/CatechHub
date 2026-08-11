@@ -14,6 +14,7 @@
 /// Navigazione CateREG: toccando uno studente si apre [StudentQuickViewPage];
 /// i pulsanti azione portano a gestione appelli (/attendance-meetings) e
 /// alla pagina di stampa [AttendancePrintPage].
+library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -190,7 +191,7 @@ Padding(
                         : ListView.separated(
                             padding: const EdgeInsets.all(12),
                             itemCount: studentsWithStats.length,
-                            separatorBuilder: (_, __) =>
+                            separatorBuilder: (_, _) =>
                                 const SizedBox(height: 8),
                             itemBuilder: (_, i) {
                               final item = studentsWithStats[i];

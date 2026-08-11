@@ -3,7 +3,11 @@
 //
 // FLUSSO:
 // 1. App avviata → controlla isProfileConfigured
-// 2. Se NON configurato → Form profilo (nome, cognome, gruppo) → setupInitialProfile → sblocca
+// 2. Se NON configurato → Form profilo:
+//    - Modalità RESPONSABILE (ruolo scelto in onboarding) → solo Nome,
+//      Cognome, Telefono; nessuna classe iniziale.
+//    - Altrimenti → Nome, Cognome, Telefono + creazione classe o unione P2P.
+//    → setupInitialProfile → sblocca
 // 3. Se configurato → Verifica hasSecureLockScreen()
 //    - Se FALSE → HardLockScreen (bloccante, non chiudibile)
 //    - Se TRUE → Mostra pulsante "Accedi con Impronta/Faccia/PIN Telefono"
@@ -23,6 +27,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'bible_quote.dart';
 import '../../core/auth/auth_provider.dart';
+import '../../shared/models/user_role.dart';
 
 /// Animated gradient background with flowing colors
 class _AnimatedGradientBackground extends StatefulWidget {
@@ -236,6 +241,34 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
   }
 
+  Future<void> _handleCreateResponsabileProfile() async {
+    HapticFeedback.mediumImpact();
+    setState(() => _errorMessage = null);
+
+    final firstName = _firstNameController.text.trim();
+    final lastName = _lastNameController.text.trim();
+
+    if (firstName.isEmpty || lastName.isEmpty) {
+      setState(() => _errorMessage = 'Nome e cognome sono obbligatori.');
+      return;
+    }
+
+    final auth = ref.read(authStateProvider.notifier);
+    final ok = await auth.setupInitialProfile(
+      firstName: firstName,
+      lastName: lastName,
+      phoneNumber: _phoneController.text.trim(),
+      createClass: false,
+      role: UserRole.responsabile,
+    );
+
+    if (!ok && mounted) {
+      setState(
+        () => _errorMessage = 'Errore durante la configurazione. Riprova.',
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
@@ -277,7 +310,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                     Image.asset(
                                       'assets/images/logo.png',
                                       height: isLandscape ? 140 : 100,
-                                      errorBuilder: (_, __, ___) =>
+                                      errorBuilder: (_, _, _) =>
                                           const Icon(Icons.menu_book, size: 80),
                                     ),
                                     const SizedBox(height: 12),
@@ -338,7 +371,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               Image.asset(
                                 'assets/images/logo.png',
                                 height: 120,
-                                errorBuilder: (_, __, ___) =>
+                                errorBuilder: (_, _, _) =>
                                     const Icon(Icons.menu_book, size: 80),
                               ),
                               const SizedBox(height: 16),
@@ -443,6 +476,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   Widget _buildFirstSetupForm(bool isLoading, bool isLandscape) {
+    // Modalità Responsabile scelta in onboarding: solo profilo (nome, cognome,
+    // telefono), nessuna classe iniziale. La dashboard Responsabile gestirà
+    // centralmente classi, catechisti e luoghi.
+    if (UserRole.isResponsabile) {
+      return _buildResponsabileSetupForm(isLoading, isLandscape);
+    }
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -618,6 +657,82 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               ),
             ),
           ],
+        ],
+      ],
+    );
+  }
+
+  Widget _buildResponsabileSetupForm(bool isLoading, bool isLandscape) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Profilo Responsabile Catechistico',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF174A7E),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Gestirai la struttura della parrocchia: classi, catechisti, '
+          'luoghi e registro GDPR. L\'app usa il blocco schermo del telefono '
+          '(impronta, volto, PIN) per proteggere i dati.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: isLandscape ? 13 : 12, color: Colors.grey),
+        ),
+        const SizedBox(height: 24),
+        if (isLoading) ...[
+          const SizedBox(height: 8),
+          const CircularProgressIndicator(strokeWidth: 3),
+        ] else ...[
+          if (_errorMessage != null) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.red.shade700, fontSize: 14),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          _buildTextField(_firstNameController, 'Nome', Icons.person, isLandscape),
+          const SizedBox(height: 12),
+          _buildTextField(_lastNameController, 'Cognome', Icons.person_outline, isLandscape),
+          const SizedBox(height: 12),
+          _buildTextField(
+            _phoneController,
+            'Telefono (facoltativo)',
+            Icons.phone_outlined,
+            isLandscape,
+            TextInputType.phone,
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: _handleCreateResponsabileProfile,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF174A7E),
+              foregroundColor: Colors.white,
+              minimumSize: Size(double.infinity, isLandscape ? 56 : 50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: Text(
+              'Crea profilo e accedi',
+              style: TextStyle(
+                fontSize: isLandscape ? 17 : 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ],
       ],
     );

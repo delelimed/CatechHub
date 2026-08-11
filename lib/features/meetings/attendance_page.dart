@@ -7,6 +7,7 @@
 /// - pulsanti "Presente" (verde) e "Assente" (rosso) per ogni studente
 /// - supporto a futuri swipe gesture per cambiare stato rapidamente
 /// Le presenze vengono salvate su Hive tramite [AttendanceRepository].
+library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -211,7 +212,7 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
                     return ListView.separated(
                       padding: const EdgeInsets.only(bottom: 100),
                       itemCount: students.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      separatorBuilder: (_, _) => const SizedBox(height: 12),
                       itemBuilder: (context, index) {
                         final s = students[index];
                         final value = presence[s.id];

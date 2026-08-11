@@ -40,7 +40,17 @@ enum AuditActionType {
   tombstoneReceived('TOMBSTONE_RECEIVED'),
 
   /// Passaggio di anno catechistico (archiviazione/roll-over).
-  passaggioAnno('PASSAGGIO_ANNO');
+  passaggioAnno('PASSAGGIO_ANNO'),
+
+  /// Conclusione dell'anno catechistico: snapshot dello storico e
+  /// preparazione del database per le nuove iscrizioni dell'anno successivo.
+  concludiAnno('CONCLUDI_ANNO'),
+
+  /// Promozione singola di un ragazzo all'anno catechistico successivo.
+  promuoviStudente('PROMUOVI_STUDENTE'),
+
+  /// Archiviazione di un ragazzo ad anno catechistico concluso.
+  archiviaStudente('ARCHIVIA_STUDENTE');
 
   const AuditActionType(this.storageValue);
 
@@ -60,6 +70,9 @@ enum AuditActionType {
         AuditActionType.exportData => 'Esportazione dati',
         AuditActionType.tombstoneReceived => 'Tombstone ricevuto',
         AuditActionType.passaggioAnno => 'Passaggio di anno',
+        AuditActionType.concludiAnno => 'Conclusione anno catechistico',
+        AuditActionType.promuoviStudente => 'Promozione ragazzo',
+        AuditActionType.archiviaStudente => 'Archiviazione ragazzo',
       };
 
   static AuditActionType fromStorageValue(String? value) {

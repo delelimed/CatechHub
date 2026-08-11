@@ -1,4 +1,4 @@
-﻿/// Pagina principale delle Impostazioni dell'app CateREG (CatechHub).
+/// Pagina principale delle Impostazioni dell'app CateREG (CatechHub).
 ///
 /// Funge da hub di navigazione per tutte le sezioni di configurazione:
 /// - **Profilo**: card con nome e ruolo del catechista autenticato
@@ -11,6 +11,7 @@
 ///
 /// Dipende da [authStateProvider] per i dati dell'account e da
 /// [privacySettingsProvider] per verificare se il feedback remoto è abilitato.
+library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -223,6 +224,7 @@ class SettingsPage extends ConsumerWidget {
                       (soglia != null && soglia >= 2) ? soglia : config.sogliaAssenzeConsecutive,
                 ));
                 if (ctx.mounted) Navigator.pop(ctx);
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                       content: Text('Configurazione parrocchia salvata.')),
@@ -368,6 +370,16 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: 12),
 
               _SettingsItem(
+                icon: Icons.swap_horiz_rounded,
+                title: 'Supplenze',
+                subtitle: 'Delega temporanea del registro a un altro catechista',
+                color: const Color(0xFF174A7E),
+                onTap: () => context.push('/substitutes'),
+              ),
+
+              const SizedBox(height: 12),
+
+              _SettingsItem(
                 icon: Icons.warning_amber_rounded,
                 title: 'Soglia assenze',
                 subtitle: 'Minimo assenze per la dashboard: ${privacy.absenceThreshold}',
@@ -426,11 +438,41 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: 12),
 
               _SettingsItem(
+                icon: Icons.verified_user_rounded,
+                title: 'Catena di fiducia',
+                subtitle: 'Approva i dispositivi abilitati alla sync e gestisci il QR di fiducia',
+                color: Colors.teal,
+                onTap: () => context.push('/settings/approval-center'),
+              ),
+
+              const SizedBox(height: 12),
+
+              _SettingsItem(
                 icon: Icons.gavel_rounded,
                 title: 'Registro Trattamenti',
                 subtitle: 'Registro GDPR (Art. 30) con verifica integrità firme',
                 color: Colors.teal,
                 onTap: () => context.push('/parrocchia/audit'),
+              ),
+
+              const SizedBox(height: 12),
+
+              _SettingsItem(
+                icon: Icons.history_rounded,
+                title: 'Archivio storico',
+                subtitle: 'Progresso dei ragazzi negli anni e chiusura anno catechistico',
+                color: const Color(0xFF174A7E),
+                onTap: () => context.push('/parrocchia/archivio'),
+              ),
+
+              const SizedBox(height: 12),
+
+              _SettingsItem(
+                icon: Icons.upload_file_rounded,
+                title: 'Importa Dati Ragazzi',
+                subtitle: 'Importazione massiva anagrafica da Excel o CSV',
+                color: const Color(0xFF174A7E),
+                onTap: () => context.push('/parrocchia/import-ragazzi'),
               ),
 
               const SizedBox(height: 12),

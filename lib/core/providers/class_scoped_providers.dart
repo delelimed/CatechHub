@@ -176,6 +176,6 @@ final classByIdProvider = Provider.family<SchoolClass?, String>((ref, classId) {
       orElse: () => SchoolClass(id: '', name: '', studentIds: [], catechistIds: []),
     ),
     loading: () => null,
-    error: (_, __) => null,
+    error: (_, _) => null,
   );
 });

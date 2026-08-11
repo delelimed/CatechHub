@@ -111,7 +111,7 @@ void main() {
       final r = record(date: '2026-08-04', classId: 'c1', presence: {
         's1': 'Presente',
         's2': 'Assente',
-        's3': 'Giustificato',
+        's3': 'Assente',
         's4': 'Presente',
       });
       expect(QuickCountLogic.presentCount(r), 2);

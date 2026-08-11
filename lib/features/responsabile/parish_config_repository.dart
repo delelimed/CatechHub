@@ -49,6 +49,16 @@ class ParishConfigRepository {
     return save(updated);
   }
 
+  /// Imposta forzatamente la modalità Responsabile durante l'ONBOARDING,
+  /// prima ancora che il profilo (e quindi il ruolo) sia configurato.
+  /// Non controlla la matrice dei permessi: l'utente non è ancora autenticato.
+  Future<ParishConfig> forceResponsabileMode(bool active) async {
+    final updated = getConfig().copyWith(isResponsabileModeActive: active);
+    await _box.put(ParishConfig.storageKey, updated.toMap());
+    await _box.flush();
+    return updated;
+  }
+
   /// Storale, riporta alla configurazione vuota (disattivando la modalità).
   Future<void> reset() async {
     await _box.delete(ParishConfig.storageKey);

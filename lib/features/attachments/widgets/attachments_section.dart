@@ -19,6 +19,7 @@
 ///
 /// Il parametro [readOnly] disabilita tutte le azioni modificative (aggiungi,
 /// rinomina, elimina), utile in contesti di sola consultazione.
+library;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -225,6 +226,7 @@ class AttachmentsSection extends ConsumerWidget {
         : 'file_${DateTime.now().millisecondsSinceEpoch}';
 
     // Chiedi all'utente di confermare o modificare il nome
+    if (!context.mounted) return;
     final finalName = await _askForFileName(context, fileName);
 
     final repo = ref.read(attachmentsRepositoryProvider);
@@ -254,10 +256,11 @@ class AttachmentsSection extends ConsumerWidget {
     final path = file.path;
 
     // Chiedi all'utente di confermare o modificare il nome
+    if (!context.mounted) return;
     final finalName = await _askForFileName(context, file.name);
 
     final repo = ref.read(attachmentsRepositoryProvider);
-    final saved;
+    final Attachment saved;
     if (path != null) {
       saved = await repo.addFromPath(
         parentId: parentId,

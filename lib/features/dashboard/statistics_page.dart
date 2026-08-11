@@ -281,9 +281,11 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
   String _meetingTitle(String meetingId) {
     final planning = LocalDatabase.planning().get(meetingId);
-    if (planning == null) return meetingId.length > 8
-        ? meetingId.substring(0, 8)
-        : meetingId;
+    if (planning == null) {
+      return meetingId.length > 8
+          ? meetingId.substring(0, 8)
+          : meetingId;
+    }
     final data = Map<String, dynamic>.from(planning);
     return data['title']?.toString() ?? data['date']?.toString() ?? meetingId;
   }

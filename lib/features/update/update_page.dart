@@ -139,6 +139,7 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
     if (!await Permission.requestInstallPackages.isGranted) {
       final status = await Permission.requestInstallPackages.request();
       if (!status.isGranted) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Permesso di installazione negato')),
         );
@@ -152,9 +153,7 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
     } catch (_) {
       directory = null;
     }
-    if (directory == null) {
-      directory = await getApplicationDocumentsDirectory();
-    }
+    directory ??= await getApplicationDocumentsDirectory();
 
     setState(() {
       _isDownloading = true;
@@ -351,7 +350,7 @@ class _LogoHeader extends StatelessWidget {
             child: Image.asset(
               'assets/images/logo.png',
               height: 64,
-              errorBuilder: (_, __, ___) => const Icon(
+              errorBuilder: (_, _, _) => const Icon(
                 Icons.system_update_rounded,
                 color: Colors.white,
                 size: 48,

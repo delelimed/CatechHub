@@ -138,7 +138,7 @@ class _CatechesiPageState extends ConsumerState<CatechesiPage> {
                 return ListView.separated(
                   padding: const EdgeInsets.only(bottom: 100),
                   itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
                   itemBuilder: (context, i) {
                     final c = items[i];
                     return _CatechesiCard(

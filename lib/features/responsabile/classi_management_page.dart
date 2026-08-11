@@ -171,7 +171,7 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
             return Column(
               children: [
                 for (final c in archived)
-                  _manageClassCard(c, Archived: true),
+                  _manageClassCard(c, archived: true),
               ],
             );
           },
@@ -232,7 +232,7 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
     );
   }
 
-  Widget _manageClassCard(SchoolClass c, {bool Archived = false}) {
+  Widget _manageClassCard(SchoolClass c, {bool archived = false}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = isDark
         ? Theme.of(context).colorScheme.surfaceContainer
@@ -270,7 +270,7 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
                   ],
                 ),
               ),
-              if (!Archived) ...[
+              if (!archived) ...[
                 IconButton(
                   tooltip: 'Rinomina',
                   icon: const Icon(Icons.edit_outlined),

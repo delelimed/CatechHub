@@ -10,6 +10,7 @@ import '../../shared/models/student_daily_note_model.dart';
 import '../../shared/models/student_model.dart';
 import '../../shared/widgets/last_modified_info.dart';
 import '../attachments/widgets/attachments_section.dart';
+import '../archive/widgets/student_history_card.dart';
 import '../contact_notes/contact_notes_repository.dart';
 import '../contact_notes/student_contact_notes_page.dart';
 import '../documents/documents_provider.dart';
@@ -64,10 +65,6 @@ final _studentAbsencesProvider = StreamProvider.autoDispose
           'isReunion': meeting?.isReunion ?? false,
         });
 
-        if (countingConsecutive) {
-          consecutiveAbsences++;
-        }
-      } else if (studentStatus == 'Giustificato') {
         if (countingConsecutive) {
           consecutiveAbsences++;
         }
@@ -147,6 +144,8 @@ class _StudentQuickViewPageState extends ConsumerState<StudentQuickViewPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _HeaderCard(student: _student, isDark: isDark, colorScheme: colorScheme),
+            const SizedBox(height: 16),
+            StudentHistoryCard(student: _student),
             const SizedBox(height: 16),
             _PersonalInfoCard(student: _student, isDark: isDark, colorScheme: colorScheme),
             const SizedBox(height: 16),
@@ -525,7 +524,7 @@ class _DocumentsCard extends ConsumerWidget {
       children: [
         docsAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => const Text('Errore caricamento documenti'),
+          error: (_, _) => const Text('Errore caricamento documenti'),
           data: (documents) {
             if (documents.isEmpty) {
               return Text(
@@ -542,7 +541,7 @@ class _DocumentsCard extends ConsumerWidget {
 
                 return deliveriesAsync.when(
                   loading: () => const SizedBox(height: 30),
-                  error: (_, __) => const SizedBox(height: 30),
+                  error: (_, _) => const SizedBox(height: 30),
                   data: (deliveries) {
                     final delivery = deliveries[studentId];
                     final isReceived = delivery != null && delivery['receivedAt'] != null;
@@ -1246,7 +1245,7 @@ class _AbsencesCard extends ConsumerWidget {
                           ],
                         ),
                       );
-                    }).toList(),
+                    }),
                     if (absences.length > 3)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
@@ -1460,7 +1459,7 @@ class _InfoCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (trailing != null) trailing!,
+                ?trailing,
               ],
             ),
           ),

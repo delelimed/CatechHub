@@ -817,7 +817,7 @@ class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSecti
                       ),
                     ),
                   );
-                }).toList(),
+                }),
                 const SizedBox(height: 8),
                 if (!widget.readOnly)
                   Align(

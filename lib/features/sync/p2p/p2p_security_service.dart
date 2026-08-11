@@ -1,13 +1,14 @@
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 
-import 'package:crypto/crypto.dart' show sha256;
+import 'package:crypto/crypto.dart' as crypto show Hmac, sha256;
 import 'package:cryptography/cryptography.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive/hive.dart';
 
 import '../../../core/storage/local_database.dart';
+import '../data/association_models.dart';
 
 class P2PIdentity {
   final String deviceId;
@@ -133,6 +134,25 @@ class P2PDeviceAssociation {
   final String? catechistId;
   final DateTime? lastSyncAt;
 
+  /// ─── Catena di fiducia (modalità Responsabile) ──────────────────────────
+  /// True se il dispositivo remoto è stato firmato/approvato dal Responsabile
+  /// (via QR Code o scambio P2P diretto) per avviare la sync delle classi.
+  final bool authorizedByResponsabile;
+
+  /// Timestamp dell'approvazione del Responsabile.
+  final DateTime? timestampApproval;
+
+  /// ID del dispositivo del Responsabile che ha firmato l'approvazione.
+  final String? approvedByDeviceId;
+
+  /// Firma HMAC-SHA256 del certificato di approvazione (catena di fiducia).
+  final String? approvalSignature;
+
+  /// Chiave pubblica di firma del dispositivo del Responsabile che ha emesso
+  /// l'approvazione (base64). Usata per verificare la firma in modo
+  /// asimmetrico (chiave pubblica distribuita via parrocchia).
+  final String? approvalSignerPublicKey;
+
   const P2PDeviceAssociation({
     required this.deviceId,
     required this.deviceName,
@@ -146,6 +166,11 @@ class P2PDeviceAssociation {
     this.remoteRole,
     this.catechistId,
     this.lastSyncAt,
+    this.authorizedByResponsabile = false,
+    this.timestampApproval,
+    this.approvedByDeviceId,
+    this.approvalSignature,
+    this.approvalSignerPublicKey,
   });
 
   bool get isValid => DateTime.now().difference(associatedAt).inDays < 30;
@@ -156,7 +181,16 @@ class P2PDeviceAssociation {
     return remaining > 0 ? remaining : 0;
   }
 
-  P2PDeviceAssociation copyWith({DateTime? lastSyncAt, String? catechistId}) {
+  P2PDeviceAssociation copyWith({
+    DateTime? lastSyncAt,
+    String? catechistId,
+    bool? authorizedByResponsabile,
+    DateTime? timestampApproval,
+    String? approvedByDeviceId,
+    String? approvalSignature,
+    String? approvalSignerPublicKey,
+    bool clearApproval = false,
+  }) {
     return P2PDeviceAssociation(
       deviceId: deviceId,
       deviceName: deviceName,
@@ -170,6 +204,21 @@ class P2PDeviceAssociation {
       remoteRole: remoteRole,
       catechistId: catechistId ?? this.catechistId,
       lastSyncAt: lastSyncAt ?? this.lastSyncAt,
+      authorizedByResponsabile: clearApproval
+          ? false
+          : (authorizedByResponsabile ?? this.authorizedByResponsabile),
+      timestampApproval: clearApproval
+          ? null
+          : (timestampApproval ?? this.timestampApproval),
+      approvedByDeviceId: clearApproval
+          ? null
+          : (approvedByDeviceId ?? this.approvedByDeviceId),
+      approvalSignature: clearApproval
+          ? null
+          : (approvalSignature ?? this.approvalSignature),
+      approvalSignerPublicKey: clearApproval
+          ? null
+          : (approvalSignerPublicKey ?? this.approvalSignerPublicKey),
     );
   }
 
@@ -186,6 +235,14 @@ class P2PDeviceAssociation {
         if (remoteRole != null) 'remoteRole': remoteRole,
         if (catechistId != null) 'catechistId': catechistId,
         if (lastSyncAt != null) 'lastSyncAt': lastSyncAt!.toUtc().toIso8601String(),
+        'authorizedByResponsabile': authorizedByResponsabile,
+        if (timestampApproval != null)
+          'timestampApproval':
+              timestampApproval!.toUtc().toIso8601String(),
+        if (approvedByDeviceId != null) 'approvedByDeviceId': approvedByDeviceId,
+        if (approvalSignature != null) 'approvalSignature': approvalSignature,
+        if (approvalSignerPublicKey != null)
+          'approvalSignerPublicKey': approvalSignerPublicKey,
       };
 
   factory P2PDeviceAssociation.fromJson(Map<String, dynamic> json) =>
@@ -204,6 +261,14 @@ class P2PDeviceAssociation {
         lastSyncAt: json['lastSyncAt'] != null
             ? DateTime.parse(json['lastSyncAt'] as String).toLocal()
             : null,
+        authorizedByResponsabile: json['authorizedByResponsabile'] == true,
+        timestampApproval: json['timestampApproval'] != null
+            ? DateTime.parse(json['timestampApproval'] as String).toLocal()
+            : null,
+        approvedByDeviceId: json['approvedByDeviceId'] as String?,
+        approvalSignature: json['approvalSignature'] as String?,
+        approvalSignerPublicKey:
+            json['approvalSignerPublicKey'] as String?,
       );
 
   SimpleKeyPairData? get keyPair {
@@ -304,7 +369,7 @@ class P2PSecurityService {
           type: KeyPairType.x25519,
         );
       } catch (e) {
-        print('P2PSecurityService.getOrCreateIdentityKeyPair: stored key corrupted, regenerating: $e');
+        debugPrint('P2PSecurityService.getOrCreateIdentityKeyPair: stored key corrupted, regenerating: $e');
       }
     }
     return _generateAndStoreIdentityKeyPair();
@@ -339,7 +404,7 @@ class P2PSecurityService {
       try {
         return P2PIdentity.fromJson(jsonDecode(stored) as Map<String, dynamic>);
       } catch (e) {
-        print('P2PSecurityService.getLocalIdentity: stored identity corrupted, regenerating: $e');
+        debugPrint('P2PSecurityService.getLocalIdentity: stored identity corrupted, regenerating: $e');
       }
     }
     return _createAndStoreIdentity();
@@ -565,10 +630,10 @@ class P2PSecurityService {
     // Questo garantisce che ogni sessione usi una chiave diversa.
     final Uint8List handshakeNonce;
     if (sessionNonce != null && sessionNonce.isNotEmpty) {
-      final nonceHash = sha256.convert(utf8.encode(sessionNonce));
+      final nonceHash = crypto.sha256.convert(utf8.encode(sessionNonce));
       handshakeNonce = Uint8List.fromList(nonceHash.bytes.sublist(0, 32));
     } else {
-      final hkdfInput = sha256.convert(sharedBytes).bytes;
+      final hkdfInput = crypto.sha256.convert(sharedBytes).bytes;
       handshakeNonce = Uint8List.fromList(hkdfInput.sublist(0, 32));
     }
 
@@ -735,7 +800,7 @@ class P2PSecurityService {
       }
       return assoc;
     } catch (e) {
-      print('P2PSecurityService.getAssociation error for $deviceId: $e');
+      debugPrint('P2PSecurityService.getAssociation error for $deviceId: $e');
       return null;
     }
   }
@@ -860,9 +925,9 @@ class P2PSecurityService {
   static String computePairingCode(String sharedSecretBase64, {String? sessionNonce}) {
     final secretBytes = base64Decode(sharedSecretBase64);
     final combined = sessionNonce != null
-        ? sha256.convert(utf8.encode(sessionNonce)).bytes + secretBytes
+        ? crypto.sha256.convert(utf8.encode(sessionNonce)).bytes + secretBytes
         : secretBytes;
-    final hash = sha256.convert(combined);
+    final hash = crypto.sha256.convert(combined);
     final code = ((hash.bytes[0] << 16) | (hash.bytes[1] << 8) | hash.bytes[2]) % 1000000;
     return code.toString().padLeft(6, '0');
   }
@@ -875,6 +940,206 @@ class P2PSecurityService {
     String receivedPublicKeyBase64,
   ) {
     return assoc.publicKeyBase64 == receivedPublicKeyBase64;
+  }
+
+  // ─── Catena di fiducia del Responsabile ────────────────────────────────
+  //
+  // Quando la modalità Responsabile è ATTIVA, ogni dispositivo che sincronizza
+  // una classe deve essere preventivamente approvato (firmato) dal dispositivo
+  // del Responsabile. L'approvazione è un certificato firmato con HMAC-SHA256
+  // (segreto del Responsabile). Il segreto viene distribuito una sola volta al
+  // dispositivo che funge da PRIMARY tramite il "QR di fiducia" del
+  // Responsabile; gli altri dispositivi verificano il certificato ricevuto.
+
+  static const _parishApprovalSecretKey = 'parish_approval_secret';
+  static const _responsabileTrustInfoKey = 'responsabile_trust_info';
+  static const _localApprovalKey = 'local_device_approval';
+
+  Future<String?> getParishApprovalSecret() =>
+      _secureStorage.read(key: _parishApprovalSecretKey);
+
+  /// Genera (e memorizza) il segreto di approvazione della parrocchia.
+  /// Chiamato dal dispositivo del Responsabile alla prima approvazione.
+  Future<String> getOrCreateParishApprovalSecret() async {
+    final existing = await getParishApprovalSecret();
+    if (existing != null && existing.isNotEmpty) return existing;
+    final secret = base64Encode(secureRandom(32));
+    await _secureStorage.write(
+        key: _parishApprovalSecretKey, value: secret);
+    return secret;
+  }
+
+  Future<bool> hasParishApprovalSecret() async =>
+      (await getParishApprovalSecret())?.isNotEmpty ?? false;
+
+  /// Firma un certificato di approvazione per un nuovo dispositivo.
+  /// Il segreto viene creato alla prima chiamata. Usato dal dispositivo
+  /// del Responsabile per approvare (via QR o scambio P2P diretto) i
+  /// dispositivi autorizzati a sincronizzare le classi.
+  Future<AssociatedDevice> signDeviceApproval({
+    required String deviceId,
+    required String catechistId,
+    required String publicKeyBase64,
+    String? deviceName,
+  }) async {
+    final secret = await getOrCreateParishApprovalSecret();
+    final identity = await getLocalIdentity();
+    final certificate = AssociatedDevice(
+      deviceId: deviceId,
+      catechistId: catechistId,
+      publicKey: publicKeyBase64,
+      authorizedByResponsabile: true,
+      timestampApproval: DateTime.now(),
+      deviceName: deviceName ?? '',
+      approvedByDeviceId: identity.deviceId,
+      approvedByName: identity.username,
+      signerPublicKey: identity.publicKeyBase64,
+    );
+    final signature = _signApprovalCertificate(certificate, secret);
+    return certificate.copyWith(approvalSignature: signature);
+  }
+
+  static String _signApprovalCertificate(
+      AssociatedDevice cert, String secret) {
+    return signApprovalPayload(cert.canonicalPayload, secret);
+  }
+
+  /// Firma HMAC-SHA256 (base64) di un payload canonico con [secret].
+  /// Esposto staticamente per essere testabile senza secure storage.
+  static String signApprovalPayload(String canonicalPayload, String secret) {
+    final mac = crypto.Hmac(crypto.sha256, utf8.encode(secret));
+    return base64Encode(mac.convert(utf8.encode(canonicalPayload)).bytes);
+  }
+
+  /// Verifica (tempo-costante) una firma HMAC-SHA256 di un payload canonico.
+  static bool verifyApprovalSignature({
+    required String canonicalPayload,
+    required String signature,
+    required String secret,
+  }) {
+    if (signature.isEmpty || secret.isEmpty) return false;
+    return _constantTimeEquals(
+      signApprovalPayload(canonicalPayload, secret),
+      signature,
+    );
+  }
+
+  static bool _constantTimeEquals(String a, String b) {
+    if (a.length != b.length) return false;
+    var diff = 0;
+    for (var i = 0; i < a.length; i++) {
+      diff |= a.codeUnitAt(i) ^ b.codeUnitAt(i);
+    }
+    return diff == 0;
+  }
+
+  /// Verifica il certificato di approvazione usando il segreto del
+  /// Responsabile. Richiede che il dispositivo possieda il segreto (es.
+  /// il dispositivo primario che ha scansionato il QR di fiducia).
+  Future<bool> verifyApprovalWithParishSecret(
+      AssociatedDevice cert) async {
+    if (!cert.authorizedByResponsabile ||
+        cert.approvalSignature == null ||
+        cert.approvalSignature!.isEmpty) {
+      return false;
+    }
+    final secret = await getParishApprovalSecret();
+    if (secret == null || secret.isEmpty) return false;
+    final expected = _signApprovalCertificate(cert, secret);
+    return _constantTimeEquals(expected, cert.approvalSignature!);
+  }
+
+  /// Salva le informazioni di fiducia del Responsabile su un dispositivo
+  /// verificatore (es. il PRIMARY che scansiona il QR di fiducia).
+  Future<void> storeResponsabileTrustInfo({
+    required String responsabileDeviceId,
+    required String approvalSecret,
+    String? responsabileName,
+  }) async {
+    await _secureStorage.write(
+      key: _responsabileTrustInfoKey,
+      value: jsonEncode({
+        'responsabileDeviceId': responsabileDeviceId,
+        'approvalSecret': approvalSecret,
+        'responsabileName': responsabileName ?? '',
+        'storedAt': DateTime.now().toUtc().toIso8601String(),
+      }),
+    );
+  }
+
+  Future<Map<String, dynamic>?> getResponsabileTrustInfo() async {
+    final raw = await _secureStorage.read(key: _responsabileTrustInfoKey);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return jsonDecode(raw) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Salva il certificato di approvazione ricevuto dal Responsabile
+  /// (sul dispositivo approvato).
+  Future<void> storeLocalApproval(AssociatedDevice cert) async {
+    await _secureStorage.write(
+        key: _localApprovalKey, value: jsonEncode(cert.toJson()));
+  }
+
+  Future<AssociatedDevice?> getLocalApproval() async {
+    final raw = await _secureStorage.read(key: _localApprovalKey);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return AssociatedDevice.fromJson(
+          jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> clearLocalApproval() async {
+    await _secureStorage.delete(key: _localApprovalKey);
+  }
+
+  /// True se la modalità Responsabile è attiva nella configurazione della
+  /// parrocchia. In tal caso la sincronizzazione richiede l'approvazione
+  /// preventiva del dispositivo da parte del Responsabile.
+  Future<bool> isResponsabileModeActive() async {
+    try {
+      final raw = LocalDatabase.parishConfig().get('parish_config');
+      final map = LocalDatabase.toStringDynamicMap(raw);
+      return map['isResponsabileModeActive'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Applica la catena di fiducia alla sincronizzazione:
+  /// - Modalità Responsabile ATTIVA: il dispositivo remoto deve avere
+  ///   un'associazione valida E un certificato di approvazione firmato dal
+  ///   Responsabile (verificato con il segreto locale, se presente).
+  /// - Modalità Responsabile DISATTIVA: basta un'associazione valida.
+  Future<bool> isSyncAllowedFromDevice(String deviceId) async {
+    final assoc = await getAssociation(deviceId);
+    if (assoc == null || !assoc.isValid) return false;
+    final responsabileMode = await isResponsabileModeActive();
+    if (!responsabileMode) return true;
+
+    if (!assoc.authorizedByResponsabile ||
+        assoc.approvalSignature == null ||
+        assoc.approvalSignature!.isEmpty) {
+      return false;
+    }
+
+    final cert = AssociatedDevice(
+      deviceId: assoc.deviceId,
+      catechistId: assoc.catechistId ?? '',
+      publicKey: assoc.publicKeyBase64,
+      authorizedByResponsabile: assoc.authorizedByResponsabile,
+      timestampApproval: assoc.timestampApproval,
+      approvedByDeviceId: assoc.approvedByDeviceId,
+      signerPublicKey: assoc.approvalSignerPublicKey,
+      approvalSignature: assoc.approvalSignature,
+    );
+    return verifyApprovalWithParishSecret(cert);
   }
 }
 

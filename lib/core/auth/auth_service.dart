@@ -347,6 +347,9 @@ class AuthService {
   /// Salva nome, cognome. Se [createClass] è true, salva anche [groupName]
   /// e crea la classe iniziale. Se false, salva solo nome/cognome e l'utente
   /// si unirà a una classe esistente via P2P sync.
+  /// [role] determina il ruolo locale (Catechista / Responsabile): con ruolo
+  /// Responsabile non viene creata alcuna classe iniziale e la fase multiclasse
+  /// dell'onboarding viene considerata già completata.
   /// [phoneNumber] è facoltativo e viene salvato come `phone_number`.
   /// Sblocca automaticamente la sessione.
   Future<bool> setupInitialProfile({
@@ -355,6 +358,7 @@ class AuthService {
     String? groupName,
     String? phoneNumber,
     bool createClass = true,
+    UserRole role = UserRole.catechista,
   }) async {
     if (firstName.trim().isEmpty || lastName.trim().isEmpty) {
       dev.log('Campi profilo vuoti');
@@ -368,6 +372,8 @@ class AuthService {
     try {
       getCatechistId(); // Ensure catechistId exists before profile data
 
+      final isResponsabile = role == UserRole.responsabile;
+
       await _box.put('first_name', firstName.trim());
       await _box.put('last_name', lastName.trim());
       await _box.put(
@@ -377,14 +383,33 @@ class AuthService {
       // Il catechistId viene generato DOPO il salvataggio dell'anagrafica,
       // così la sua derivazione può basarsi su Nome e Cognome normalizzati.
       getCatechistId(); // Ensure catechistId exists before profile data
-      await _box.put('setup_mode', createClass ? 'create' : 'join');
+
+      // Modalità operativa (spec: app_mode = RESPONSABILE | NORMAL | REPLICATED_PEER)
+      // e setup_mode (create | join | responsabile) coerenti con la scelta
+      // effettuata durante l'onboarding.
+      await _box.put(
+        'app_mode',
+        isResponsabile
+            ? 'RESPONSABILE'
+            : createClass
+                ? 'NORMAL'
+                : 'REPLICATED_PEER',
+      );
+      await _box.put(
+        'setup_mode',
+        isResponsabile ? 'responsabile' : createClass ? 'create' : 'join',
+      );
+      await UserRole.setCurrent(role);
+
       final fullName = '${firstName.trim()} ${lastName.trim()}';
       await _box.put('local_user_name', fullName);
 
       // La fase di onboarding dedicata alla gestione multiclasse è pendente:
       // il router reindirizzerà il catechista alla schermata "/onboarding-classes"
       // finché non verrà completata (flag impostato a true dalla schermata).
-      await _box.put('onboarding_classes_completed', false);
+      // Per il Responsabile questa fase non si applica (gestione centralizzata
+      // in /parrocchia): viene marcata come completata.
+      await _box.put('onboarding_classes_completed', isResponsabile);
 
       if (createClass) {
         await _box.put('group_name', groupName!.trim());

@@ -10,7 +10,7 @@
 ///
 /// Il formato di ogni record è quello della box Hive `attendance`:
 ///   { 'date': ISO8601, 'classId': String, 'presence': {studentId: stato} }
-/// con stato in 'Presente' | 'Assente' | 'Giustificato'.
+/// con stato in 'Presente' | 'Assente'.
 class QuickCountLogic {
   QuickCountLogic._();
 

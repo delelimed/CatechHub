@@ -41,6 +41,7 @@ import '../../shared/models/planning_meeting.dart';
 import '../../shared/models/attachment_model.dart';
 import '../../shared/models/contact_note_model.dart';
 import '../../shared/models/student_daily_note_model.dart';
+import '../../shared/models/parish_config.dart';
 import 'encryption_service.dart';
 
 typedef PhaseCallback = void Function(String phase);
@@ -69,8 +70,19 @@ class DataExportService {
       'associazioni_catechesi': _exportAssociazioniCatechesi(scope),
       'allegati_catechesi': await _exportAllegatiPerTipo('catechesi'),
       'annotazioni_giornaliere': _exportStudentDailyNotes(scope),
+      'parishConfig': _exportParishConfig(),
     };
     return allData;
+  }
+
+  /// Configurazione parrocchiale (incl. modalità Responsabile attiva).
+  ///
+  /// Viene inclusa in ogni backup così il ripristino ricrea anche lo stato
+  /// della dashboard Responsabile Catechistico.
+  static Map<String, dynamic>? _exportParishConfig() {
+    final raw = LocalDatabase.parishConfig().get(ParishConfig.storageKey);
+    if (raw == null) return null;
+    return ParishConfig.fromMap(LocalDatabase.toStringDynamicMap(raw)).toMap();
   }
 
   /// Esporta solo i moduli selezionati (per condivisione selettiva).
@@ -233,8 +245,22 @@ class DataExportService {
     if (receivedData.containsKey('allegati_catechesi')) await _importAllegati(receivedData['allegati_catechesi'], 'catechesi');
     onPhase?.call('Importazione annotazioni...');
     if (receivedData.containsKey('annotazioni_giornaliere')) await _importStudentDailyNotes(receivedData['annotazioni_giornaliere']);
+    onPhase?.call('Aggiornamento configurazione parrocchiale...');
+    if (receivedData['parishConfig'] is Map) {
+      await _importParishConfig(receivedData['parishConfig'] as Map);
+    }
     onPhase?.call('Aggiornamento classi...');
     await _ensureLocalCatechistInClasses();
+  }
+
+  /// Ripristina la configurazione parrocchiale ricevuta (incl. la modalità
+  /// Responsabile Catechistico). Il payload del backup è autoritativo: un
+  /// ripristino completo ricrea anche lo stato della dashboard Responsabile.
+  static Future<void> _importParishConfig(Map config) async {
+    final incoming = ParishConfig.fromMap(LocalDatabase.toStringDynamicMap(config));
+    final box = LocalDatabase.parishConfig();
+    await box.put(ParishConfig.storageKey, incoming.toMap());
+    await box.flush();
   }
 
   /// Riassegna tutti i record classe-scoped alla [targetClass].
@@ -423,7 +449,7 @@ class DataExportService {
         final existingIds = (targetData['studentIds'] as List? ?? [])
             .map((e) => e.toString())
             .toSet();
-        targetData['studentIds'] = [...existingIds, ...incomingIds].toSet().toList();
+        targetData['studentIds'] = {...existingIds, ...incomingIds}.toList();
         await classesBox.put(targetClass.id, targetData);
       }
     }

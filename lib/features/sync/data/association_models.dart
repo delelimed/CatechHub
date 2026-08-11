@@ -39,6 +39,132 @@ class DeviceAssociation {
       );
 }
 
+/// Dispositivo associato e la sua posizione nella catena di fiducia impostata
+/// dal Responsabile Catechistico.
+///
+/// Quando la modalità Responsabile è ATTIVA, un dispositivo può avviare la
+/// sincronizzazione di una classe SOLO se è stato preventivamente firmato dal
+/// dispositivo del Responsabile (via QR Code o scambio P2P diretto). Questo
+/// record rappresenta quella firma/approvazione.
+///
+/// Campi (per specifica):
+///   - [deviceId]: identificatore univoco del dispositivo.
+///   - [catechistId]: identità stabile del catechista che usa il dispositivo.
+///   - [publicKey]: chiave pubblica del dispositivo (base64).
+///   - [authorizedByResponsabile]: true se il Responsabile ha approvato il
+///     dispositivo per la sincronizzazione delle classi.
+///   - [timestampApproval]: data/ora dell'approvazione da parte del Responsabile.
+class AssociatedDevice {
+  final String deviceId;
+  final String catechistId;
+  final String publicKey;
+  final bool authorizedByResponsabile;
+  final DateTime? timestampApproval;
+
+  /// Nome visualizzato del dispositivo (per le UI).
+  final String deviceName;
+
+  /// ID del dispositivo del Responsabile che ha firmato l'approvazione.
+  final String? approvedByDeviceId;
+
+  /// Nome del Responsabile che ha firmato l'approvazione (per le UI).
+  final String? approvedByName;
+
+  /// Firma HMAC-SHA256 della catena di fiducia (su [canonicalPayload]).
+  final String? approvalSignature;
+
+  /// Chiave pubblica di firma del dispositivo del Responsabile che ha emesso
+  /// il certificato (base64). Permette al dispositivo primario di verificare
+  /// la firma senza dipendere dalla distribuzione della chiave segreta.
+  final String? signerPublicKey;
+
+  const AssociatedDevice({
+    required this.deviceId,
+    required this.catechistId,
+    required this.publicKey,
+    this.authorizedByResponsabile = false,
+    this.timestampApproval,
+    this.deviceName = '',
+    this.approvedByDeviceId,
+    this.approvedByName,
+    this.approvalSignature,
+    this.signerPublicKey,
+  });
+
+  bool get isApproved => authorizedByResponsabile;
+
+  /// Payload canonico firmabile del certificato di approvazione.
+  String get canonicalPayload {
+    final ts = timestampApproval?.toUtc().millisecondsSinceEpoch ?? 0;
+    return [
+      deviceId,
+      catechistId,
+      publicKey,
+      approvedByDeviceId ?? '',
+      ts.toString(),
+    ].join('|');
+  }
+
+  AssociatedDevice copyWith({
+    bool? authorizedByResponsabile,
+    DateTime? timestampApproval,
+    String? deviceName,
+    String? approvedByDeviceId,
+    String? approvedByName,
+    String? approvalSignature,
+    String? signerPublicKey,
+    bool clearApproval = false,
+  }) {
+    return AssociatedDevice(
+      deviceId: deviceId,
+      catechistId: catechistId,
+      publicKey: publicKey,
+      authorizedByResponsabile:
+          clearApproval ? false : (authorizedByResponsabile ?? this.authorizedByResponsabile),
+      timestampApproval:
+          clearApproval ? null : (timestampApproval ?? this.timestampApproval),
+      deviceName: deviceName ?? this.deviceName,
+      approvedByDeviceId:
+          clearApproval ? null : (approvedByDeviceId ?? this.approvedByDeviceId),
+      approvedByName:
+          clearApproval ? null : (approvedByName ?? this.approvedByName),
+      approvalSignature:
+          clearApproval ? null : (approvalSignature ?? this.approvalSignature),
+      signerPublicKey:
+          clearApproval ? null : (signerPublicKey ?? this.signerPublicKey),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'deviceId': deviceId,
+        'catechistId': catechistId,
+        'publicKey': publicKey,
+        'authorizedByResponsabile': authorizedByResponsabile,
+        'timestampApproval': timestampApproval?.toUtc().toIso8601String(),
+        'deviceName': deviceName,
+        'approvedByDeviceId': approvedByDeviceId,
+        'approvedByName': approvedByName,
+        'approvalSignature': approvalSignature,
+        'signerPublicKey': signerPublicKey,
+      };
+
+  factory AssociatedDevice.fromJson(Map<String, dynamic> json) =>
+      AssociatedDevice(
+        deviceId: json['deviceId'] as String,
+        catechistId: json['catechistId'] as String? ?? '',
+        publicKey: json['publicKey'] as String? ?? '',
+        authorizedByResponsabile: json['authorizedByResponsabile'] == true,
+        timestampApproval: json['timestampApproval'] != null
+            ? DateTime.parse(json['timestampApproval'] as String).toLocal()
+            : null,
+        deviceName: json['deviceName'] as String? ?? '',
+        approvedByDeviceId: json['approvedByDeviceId'] as String?,
+        approvedByName: json['approvedByName'] as String?,
+        approvalSignature: json['approvalSignature'] as String?,
+        signerPublicKey: json['signerPublicKey'] as String?,
+      );
+}
+
 class QrHandshake {
   final String deviceId;
   final String deviceName;

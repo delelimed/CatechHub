@@ -13,6 +13,7 @@
 /// (es. [MyGroupPage]); la pagina usa [AttendanceRepository],
 /// [PlanningRepository] e [StudentsRepository] tramite i rispettivi
 /// provider per l'accesso offline ai dati Hive.
+library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

@@ -13,6 +13,7 @@
 ///
 /// IMPORTANTE: questa funzione NON salva nulla e NON modifica l'appello
 /// svolto: è solo un supporto di verifica in presenza.
+library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

@@ -148,10 +148,12 @@ class _DataShareSendPageState extends ConsumerState<DataShareSendPage> {
       final diffData = await QRDataService.computeDiffExport(_remoteIndex!, options);
 
       if (diffData.isEmpty) {
-        if (mounted) setState(() {
-          _isPreparingDiff = false;
-          _preparationMessage = 'Nessun dato da aggiornare — i database sono già sincronizzati.';
-        });
+        if (mounted) {
+          setState(() {
+            _isPreparingDiff = false;
+            _preparationMessage = 'Nessun dato da aggiornare — i database sono già sincronizzati.';
+          });
+        }
         return;
       }
 
@@ -615,7 +617,7 @@ class _DataShareSendPageState extends ConsumerState<DataShareSendPage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Comunica questo PIN ${_diffChunks.length > 0 ? "e ${_diffChunks.length} chunk inviati" : ""}',
+                      'Comunica questo PIN ${_diffChunks.isNotEmpty ? "e ${_diffChunks.length} chunk inviati" : ""}',
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 13, color: Colors.grey),
                     ),

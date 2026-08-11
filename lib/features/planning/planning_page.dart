@@ -107,24 +107,24 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
 
                 // Normalizza le date a mezzanotte locale per evitare problemi di fuso orario/DST
                 // (es. incontri creati in ora legale vs ora solare)
-                DateTime _normalizeDate(DateTime dt) =>
+                DateTime normalizeDate(DateTime dt) =>
                     DateTime(dt.year, dt.month, dt.day);
 
                 if (_showPast) {
                   filteredMeetings = filteredMeetings
-                      .where((m) => _normalizeDate(m.date).isBefore(today))
+                      .where((m) => normalizeDate(m.date).isBefore(today))
                       .toList();
                   filteredMeetings.sort(
                     (a, b) =>
-                        _normalizeDate(b.date).compareTo(_normalizeDate(a.date)),
+                        normalizeDate(b.date).compareTo(normalizeDate(a.date)),
                   );
                 } else {
                   filteredMeetings = filteredMeetings
-                      .where((m) => !_normalizeDate(m.date).isBefore(today))
+                      .where((m) => !normalizeDate(m.date).isBefore(today))
                       .toList();
                   filteredMeetings.sort(
                     (a, b) =>
-                        _normalizeDate(a.date).compareTo(_normalizeDate(b.date)),
+                        normalizeDate(a.date).compareTo(normalizeDate(b.date)),
                   );
                 }
 
@@ -134,7 +134,7 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                   final key = DateFormat(
                     'MMMM yyyy',
                     'it_IT',
-                  ).format(_normalizeDate(m.date));
+                  ).format(normalizeDate(m.date));
                   if (!groupedMeetings.containsKey(key)) {
                     groupedMeetings[key] = [];
                     monthKeys.add(key);
@@ -337,7 +337,7 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                                           Text(
                                             DateFormat(
                                               'dd',
-                                            ).format(_normalizeDate(m.date)),
+                                            ).format(normalizeDate(m.date)),
                                             style: const TextStyle(
                                               color: Colors.white,
                                               fontSize: 17,
@@ -346,7 +346,7 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                                           ),
                                           Text(
                                             DateFormat('MMM', 'it_IT')
-                                                .format(_normalizeDate(m.date))
+                                                .format(normalizeDate(m.date))
                                                 .toUpperCase(),
                                             style: const TextStyle(
                                               color: Colors.white70,
@@ -396,6 +396,7 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                                         if (v == 'delete') {
                                           await repo.deleteMeeting(m.id);
                                         }
+                                        if (!context.mounted) return;
                                         if (v == 'edit') {
                                           Navigator.push(
                                             context,
@@ -434,7 +435,7 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                               ),
                             ),
                           );
-                        }).toList(),
+                        }),
                       ],
                     );
                   }),

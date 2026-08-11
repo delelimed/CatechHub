@@ -191,10 +191,12 @@ class AvvisiPage extends ConsumerWidget {
 
     final student = await _selectStudent(context, ref);
     if (student == null) return;
+    if (!context.mounted) return;
 
     final parentInfo = await _selectParent(context, student);
     if (parentInfo == null) return;
 
+    if (!context.mounted) return;
     _openWhatsAppForTemplate(context, ref, template, student, parentInfo.$1, parentInfo.$2);
   }
 
@@ -234,13 +236,13 @@ class AvvisiPage extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     String query = '';
 
-    String? _studentMeetingDate(String classId) {
+    String? studentMeetingDate(String classId) {
       final m = _getNextMeeting(classId);
       if (m == null) return null;
       return '${m.date.day.toString().padLeft(2, '0')}/${m.date.month.toString().padLeft(2, '0')}/${m.date.year}';
     }
 
-    String _studentAbsenceInfo(Student s) {
+    String studentAbsenceInfo(Student s) {
       if (s.classId == null) return '';
       final data = computeAbsenceData(s.id, s.classId!);
       final parts = <String>[];
@@ -305,8 +307,8 @@ class AvvisiPage extends ConsumerWidget {
                       itemCount: filtered.length,
                       itemBuilder: (context, index) {
                         final s = filtered[index];
-                        final meetingDate = s.classId != null ? _studentMeetingDate(s.classId!) : null;
-                        final absInfo = _studentAbsenceInfo(s);
+                        final meetingDate = s.classId != null ? studentMeetingDate(s.classId!) : null;
+                        final absInfo = studentAbsenceInfo(s);
                         return ListTile(
                           leading: CircleAvatar(
                             backgroundColor: Colors.green.withValues(alpha: 0.1),

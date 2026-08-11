@@ -54,7 +54,7 @@ class ConflictResolutionPage extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => const Center(child: Text('Errore')),
+        error: (_, _) => const Center(child: Text('Errore')),
       ),
     );
   }
@@ -181,7 +181,7 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
       await box.put(recordId, existing);
 
       final conflictsBox = LocalDatabase.syncConflicts();
-      final key = '${boxName}:$recordId';
+      final key = '$boxName:$recordId';
       final stored = Map<String, dynamic>.from(conflictsBox.get(key) ?? {});
       stored['resolved'] = true;
       stored['resolvedAt'] = DateTime.now().toUtc().toIso8601String();

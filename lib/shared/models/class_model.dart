@@ -37,7 +37,7 @@ String generateClassUniqueCode() {
 }
 
 class SchoolClass {
-  /// ID univoco (formato: "class_<microsecondsSinceEpoch>").
+  /// ID univoco (formato: `class_<microsecondsSinceEpoch>`).
   final String id;
 
   /// Nome del gruppo (es. "Prima elementare", "Cresima 2026").

@@ -84,10 +84,6 @@ AbsenceData computeAbsenceData(String studentId, String classId) {
         if (countingConsecutive) {
           consecutiveAbsences++;
         }
-      } else if (studentStatus == 'Giustificato') {
-        if (countingConsecutive) {
-          consecutiveAbsences++;
-        }
       } else if (studentStatus == 'Presente') {
         if (lastPresenceDate == null) {
           final date = DateTime.tryParse(record['date']?.toString() ?? '');

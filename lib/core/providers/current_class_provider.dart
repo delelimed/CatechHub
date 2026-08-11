@@ -74,7 +74,7 @@ final currentClassDetailsProvider = Provider<SchoolClass?>((ref) {
       orElse: () => SchoolClass(id: '', name: '', studentIds: [], catechistIds: []),
     ),
     loading: () => null,
-    error: (_, __) => null,
+    error: (_, _) => null,
   );
 });
 
@@ -85,6 +85,6 @@ final myClassesProvider = Provider<List<SchoolClass>>((ref) {
   return classesAsync.when(
     data: (classes) => classes.where((c) => c.catechistIds.contains(uid)).toList(),
     loading: () => [],
-    error: (_, __) => [],
+    error: (_, _) => [],
   );
 });

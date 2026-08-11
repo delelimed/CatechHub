@@ -8,6 +8,10 @@
 //   2. Spostamento dei ragazzi tra classi (passaggio singolo).
 //   3. Passaggio di anno massivo (promozione in blocco) tramite
 //      [PassaggioAnnoService].
+//   4. "Concludi Anno Catechistico" (riservato al Responsabile): trasforma
+//      le classi attive in record [HistoricalRecord] immutabili dell'archivio
+//      storico e prepara il database per le nuove iscrizioni dell'anno
+//      successivo (chiusura massiva, vedi [ConcludiAnnoService]).
 // ══════════════════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
@@ -21,6 +25,7 @@ import '../../shared/models/student_model.dart';
 import '../classes/classes_provider.dart';
 import '../classes/classes_repository.dart';
 import '../students/students_repository.dart';
+import '../archive/concludi_anno_service.dart';
 import 'passaggio_anno_service.dart';
 import 'responsabile_providers.dart';
 
@@ -564,9 +569,71 @@ class _IscrizioniPageState extends ConsumerState<IscrizioniPage> {
             icon: const Icon(Icons.play_arrow_rounded, size: 18),
             label: const Text('Passaggio'),
           ),
+          const SizedBox(width: 8),
+          FilledButton.tonalIcon(
+            onPressed: currentAnno.isEmpty
+                ? null
+                : () => _startConcludiAnno(classes),
+            icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+            label: const Text('Concludi anno'),
+          ),
         ],
       ),
     );
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // CONCLUDI ANNO CATECHISTICO (archivio storico + preparazione nuove iscrizioni)
+  // ═════════════════════════════════════════════════════════════════════════
+  Future<void> _startConcludiAnno(List<SchoolClass> classes) async {
+    final config = ref.read(parishConfigRepositoryProvider).getConfig();
+    final currentAnno = config.annoCatechisticoCorrente.trim();
+    if (currentAnno.isEmpty) {
+      _snack('Configura prima l\'anno catechistico corrente nella parrocchia.');
+      return;
+    }
+    final targetAnno = PassaggioAnnoService.annoSuccessivo(currentAnno);
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Concludi Anno Catechistico'),
+        content: Text(
+          'Trasformo le classi attive dell\'anno "$currentAnno" in record '
+          'storici immutabili (archivio storico e progresso dei ragazzi) e '
+          'preparo il database per le nuove iscrizioni dell\'anno '
+          '"$targetAnno". Le classi saranno promosse al livello successivo '
+          'del percorso.\n\nL\'operazione non è reversibile.',
+          style: const TextStyle(fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annulla'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Concludi anno'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    try {
+      final result = await ConcludiAnnoService().concludiAnno(
+        soloPercorsi: null,
+        archiviaRitirati: true,
+        nuovoAnno: targetAnno,
+      );
+      _snack(
+        'Anno concluso: ${result.records.length} record archiviati, '
+        '${result.promozioni.length} classi promosse. '
+        'Nuovo anno: ${result.nuovoAnno}.',
+      );
+    } catch (e) {
+      _snack('Errore nella conclusione dell\'anno: $e');
+    }
   }
 
   Widget _classCard(SchoolClass c, List<SchoolClass> classes) {

@@ -82,7 +82,7 @@ class _AssociateDeviceScreenState
   bool _isFirstToShowQr = false;
 
   P2PSyncRole _selectedRole = P2PSyncRole.mioDispositivo;
-  bool _isOnboarding = false;
+  final bool _isOnboarding = false;
 
   /// Classi scelte quando il ruolo è "Altro Catechista": solo queste classi
   /// vengono condivise/sincronizzate con il dispositivo remoto.
@@ -1416,7 +1416,7 @@ class _AssociateDeviceScreenState
             const SizedBox(height: 8),
             if (_remoteIdentity != null) ...[
               Text(
-                '${_remoteIdentity!.username}',
+                _remoteIdentity!.username,
                 style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,

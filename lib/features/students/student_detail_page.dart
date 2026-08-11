@@ -37,12 +37,12 @@ class StudentDetailPage extends StatelessWidget {
           /// =========================
           _Section(
             title: 'Dati ragazzo',
+            isDark: isDark,
+            colorScheme: colorScheme,
             children: [
               _InfoRow(label: 'Telefono', value: '3331234567', isDark: isDark, colorScheme: colorScheme),
               _InfoRow(label: 'Classe', value: '3ª Elementare', isDark: isDark, colorScheme: colorScheme),
             ],
-            isDark: isDark,
-            colorScheme: colorScheme,
           ),
 
           const SizedBox(height: 16),
@@ -52,6 +52,8 @@ class StudentDetailPage extends StatelessWidget {
           /// =========================
           _Section(
             title: 'Genitori',
+            isDark: isDark,
+            colorScheme: colorScheme,
             children: [
               _InfoRow(label: 'Madre', value: 'Maria Rossi', isDark: isDark, colorScheme: colorScheme),
               _InfoRow(label: 'Cellulare madre', value: '333222111', isDark: isDark, colorScheme: colorScheme),
@@ -61,8 +63,6 @@ class StudentDetailPage extends StatelessWidget {
               _InfoRow(label: 'Padre', value: 'Luca Rossi', isDark: isDark, colorScheme: colorScheme),
               _InfoRow(label: 'Cellulare padre', value: '333444555', isDark: isDark, colorScheme: colorScheme),
             ],
-            isDark: isDark,
-            colorScheme: colorScheme,
           ),
 
           const SizedBox(height: 16),

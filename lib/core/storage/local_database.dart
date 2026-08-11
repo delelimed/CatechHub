@@ -71,12 +71,34 @@ class LocalDatabase {
   static const meetingNotificationsBox = 'meeting_notifications_box';
   static const avvisiBox = 'avvisi_box';
   static const syncConflictsBox = 'sync_conflicts_box';
-
   // ─── Box della modalità "Responsabile Catechistico" ─────────────────────
+
   static const parishConfigBox = 'parish_config_box';
   static const auditLogBox = 'audit_log_box';
   static const aulaBox = 'aula_box';
   static const tombstoneBox = 'tombstone_box';
+  static const historicalRecordsBox = 'historical_records_box';
+
+  // ─── Box della "Rete Catechistica Parrocchiale" ─────────────────────────
+
+  /// Chiavi di canale per-classe (Class_Encryption_Key) possedute da questo
+  /// dispositivo. Map, chiave = classId.
+  static const classChannelKeysBox = 'class_channel_keys_box';
+
+  /// Blob cifrati delle classi senza titolo ricevuti in relay. Map,
+  /// chiave = classUniqueCode. Vengono decifrati quando si ottiene il titolo.
+  static const classChannelCiphertextBox = 'class_channel_ciphertext_box';
+
+  /// Riunioni/eventi del canale parrocchiale globale (in chiaro per la rete).
+  static const parishEventsBox = 'parish_events_box';
+
+  // ─── Box del modulo "Supplenze Temporanee e Delega Sicura" ─────────────
+
+  /// Deleghe di supplenza (Map, chiave = delegationId).
+  static const substituteDelegationsBox = 'substitute_delegations_box';
+
+  /// Note di lezione registrate durante una supplenza (Map, chiave = noteId).
+  static const substituteLessonNotesBox = 'substitute_lesson_notes_box';
 
   static late final HiveAesCipher _cipher;
   static bool _initialized = false;
@@ -180,6 +202,14 @@ class LocalDatabase {
       _BoxDefinition(name: auditLogBox, isMap: true, isCritical: false),
       _BoxDefinition(name: aulaBox, isMap: true, isCritical: false),
       _BoxDefinition(name: tombstoneBox, isMap: true, isCritical: false),
+      _BoxDefinition(name: historicalRecordsBox, isMap: true, isCritical: false),
+      // Box della "Rete Catechistica Parrocchiale"
+      _BoxDefinition(name: classChannelKeysBox, isMap: true, isCritical: false),
+      _BoxDefinition(name: classChannelCiphertextBox, isMap: true, isCritical: false),
+      _BoxDefinition(name: parishEventsBox, isMap: true, isCritical: false),
+      // Box del modulo "Supplenze Temporanee e Delega Sicura"
+      _BoxDefinition(name: substituteDelegationsBox, isMap: true, isCritical: false),
+      _BoxDefinition(name: substituteLessonNotesBox, isMap: true, isCritical: false),
     ];
 
     for (final definition in boxDefinitions) {
@@ -314,6 +344,19 @@ class LocalDatabase {
   static Box<Map> auditLog() => Hive.box<Map>(auditLogBox);
   static Box<Map> aula() => Hive.box<Map>(aulaBox);
   static Box<Map> tombstones() => Hive.box<Map>(tombstoneBox);
+  static Box<Map> historicalRecords() => Hive.box<Map>(historicalRecordsBox);
+
+  // ─── Accessori Box Rete Catechistica Parrocchiale ───────────────────────
+  static Box<Map> classChannelKeys() => Hive.box<Map>(classChannelKeysBox);
+  static Box<Map> classChannelCiphertext() =>
+      Hive.box<Map>(classChannelCiphertextBox);
+  static Box<Map> parishEvents() => Hive.box<Map>(parishEventsBox);
+
+  // ─── Accessori Box Modulo Supplenze ─────────────────────────────────────
+  static Box<Map> substituteDelegations() =>
+      Hive.box<Map>(substituteDelegationsBox);
+  static Box<Map> substituteLessonNotes() =>
+      Hive.box<Map>(substituteLessonNotesBox);
 
   // ─────────────────────────────────────────────────────────────────────────
   // UTILITÀ DI CIFRATURA BYTES

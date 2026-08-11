@@ -49,7 +49,7 @@ class PlanningMeeting {
   final String? time;
 
   /// Titolo (es. "Incontro sulla Pasqua"). Se vuoto in fromMap,
-  /// viene generato automaticamente "Giornata del <gg>/<mm>/<aaaa>".
+  /// viene generato automaticamente `Giornata del <gg>/<mm>/<aaaa>`.
   final String title;
 
   /// Descrizione delle attività previste per l'incontro.

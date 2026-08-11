@@ -408,21 +408,18 @@ class _ParishTreeState extends State<_ParishTree> {
   IconData _statoIcon(String stato) => switch (stato) {
         'Presente' => Icons.check_circle_rounded,
         'Assente' => Icons.cancel_rounded,
-        'Giustificato' => Icons.event_available_rounded,
         _ => Icons.help_outline_rounded,
       };
 
   Color _statoColor(String stato) => switch (stato) {
         'Presente' => Colors.green,
         'Assente' => Colors.red,
-        'Giustificato' => Colors.orange,
         _ => Colors.grey,
       };
 
   String _statoLabel(String stato) => switch (stato) {
         'Presente' => 'Ultima presenza: Presente',
         'Assente' => 'Ultima presenza: Assente',
-        'Giustificato' => 'Ultima presenza: Giustificato',
         _ => 'Nessuna presenza registrata',
       };
 }
@@ -576,7 +573,7 @@ class _TreeCard extends StatelessWidget {
               ],
             ),
           ),
-          if (trailing != null) trailing!,
+          ?trailing,
         ],
       ),
     );

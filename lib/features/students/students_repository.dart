@@ -8,8 +8,10 @@ import '../../shared/models/attachment_parent_type.dart';
 import '../../shared/models/audit_action.dart';
 import '../../shared/models/audit_log.dart';
 import '../../shared/models/student_model.dart';
+import '../../shared/models/historical_record.dart';
 import '../../shared/utils/auth_utils.dart';
 import '../../shared/utils/name_formatting.dart';
+import '../archive/historical_record_repository.dart';
 import '../attachments/attachments_repository.dart';
 import '../responsabile/audit_log_repository.dart';
 import 'student_daily_notes_repository.dart';
@@ -130,6 +132,7 @@ class StudentsRepository {
       motherPhone: student.motherPhone.trim(),
       fatherPhone: student.fatherPhone.trim(),
       studentPhone: student.studentPhone.trim(),
+      parentEmail: student.parentEmail.trim(),
       allergies: student.allergies?.trim().isEmpty == true
           ? null
           : student.allergies?.trim(),
@@ -146,6 +149,7 @@ class StudentsRepository {
           FieldEncryptionService.encrypt(student.noteAllergieSalute),
       statoPercorso: student.statoPercorso,
       annoIscrizione: student.annoIscrizione,
+      sacraments: student.sacraments,
     );
   }
 
@@ -172,6 +176,13 @@ class StudentsRepository {
     await updateStudent(id, existing.copyWith(annoIscrizione: anno));
   }
 
+  /// Aggiorna l'elenco dei sacramenti ricevuti da uno studente.
+  Future<void> setSacraments(String id, List<Sacrament> sacraments) async {
+    final existing = getAllStudentsSync().where((s) => s.id == id).firstOrNull;
+    if (existing == null) return;
+    await updateStudent(id, existing.copyWith(sacraments: sacraments));
+  }
+
   /// Rimuove uno studente dalla classe, liberando classId e aggiornando
   /// la classe (mantiene lo studente in anagrafica, non lo cancella).
   Future<void> removeFromClass(String studentId, String classId) async {
@@ -192,6 +203,7 @@ class StudentsRepository {
       motherPhone: existing.motherPhone,
       fatherPhone: existing.fatherPhone,
       studentPhone: existing.studentPhone,
+      parentEmail: existing.parentEmail,
       allergies: existing.allergies,
       autonomousExits: existing.autonomousExits,
       notes: existing.notes,
@@ -205,6 +217,7 @@ class StudentsRepository {
       noteAllergieSalute: existing.noteAllergieSalute,
       statoPercorso: existing.statoPercorso,
       annoIscrizione: existing.annoIscrizione,
+      sacraments: existing.sacraments,
     ));
     final classesBox = LocalDatabase.classes();
     for (final classKey in classesBox.keys) {
@@ -225,6 +238,7 @@ class StudentsRepository {
     );
     await StudentDailyNotesRepository().deleteAllForStudent(id);
     await _box.delete(id);
+    await HistoricalRecordRepository().deleteRecordsForStudent(id);
 
     final classesBox = LocalDatabase.classes();
     for (final classKey in classesBox.keys) {

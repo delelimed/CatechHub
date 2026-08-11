@@ -12,6 +12,7 @@
 /// Integrazione CateREG: si aggancia a [classesStreamProvider] per ricevere
 /// in tempo reale l'elenco aggiornato delle classi e a [classesRepoProvider]
 /// per le operazioni di scrittura (add/delete/update).
+library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -55,7 +56,7 @@ class ClassesPage extends ConsumerWidget {
               : ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: classes.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
                   itemBuilder: (_, index) {
                     final c = classes[index];
                     final isActive = c.id == activeClassId;
@@ -158,6 +159,7 @@ class ClassesPage extends ConsumerWidget {
                     ),
                   );
 
+              if (!context.mounted) return;
               Navigator.pop(context);
             },
             child: const Text('Crea'),

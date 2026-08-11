@@ -7,6 +7,7 @@ import 'package:cryptography/cryptography.dart';
 import 'package:hive/hive.dart';
 
 import '../../../core/storage/local_database.dart';
+import '../crdt/sync_crdt.dart';
 import 'p2p_security_service.dart';
 
 final _syncAad = Uint8List.fromList(
@@ -452,7 +453,7 @@ class HiveSyncEngine {
   }) async {
     try {
       final box = Hive.box<Map>(LocalDatabase.syncConflictsBox);
-      final conflictKey = '${boxName}:$recordId';
+      final conflictKey = '$boxName:$recordId';
       await box.put(conflictKey, {
         'boxName': boxName,
         'recordId': recordId,
@@ -467,39 +468,71 @@ class HiveSyncEngine {
 
   /// Esegue un merge field-by-field tra dati locali e remoti.
   /// Restituisce la mappa mergiata e l'elenco dei campi in conflitto.
+  ///
+  /// Quando [secretKey] è fornita (canale P2P associato), i campi divergenti
+  /// vengono risolti con il Last-Write-Wins FIRMATO ([SignedLww.remoteWins]):
+  /// il timestamp più recente vince solo se la sua firma HMAC è valida, così
+  /// un dispositivo non può "inventare" un aggiornamento più recente di
+  /// quello reale. Senza chiave si usa il confronto timestamp legacy.
   Map<String, dynamic> _mergeFields({
+    required String boxName,
+    required String recordId,
     required Map<String, dynamic> localData,
     required Map<String, dynamic> remoteData,
     required DateTime localUpdatedAt,
     required DateTime remoteUpdatedAt,
+    String? secretKey,
+    Set<String> excludeFields = const {},
   }) {
     final merged = Map<String, dynamic>.from(localData);
     final conflictFields = <String>[];
+
+    final localUpdatedIso = localUpdatedAt.toUtc().toIso8601String();
+    final remoteUpdatedIso = remoteUpdatedAt.toUtc().toIso8601String();
+    final localSignature = localData['updatedAtSignature'] as String?;
+    final remoteSignature = remoteData['updatedAtSignature'] as String?;
+
+    final remoteWins = (secretKey != null && secretKey.isNotEmpty)
+        ? SignedLww.remoteWins(
+            boxName: boxName,
+            recordId: recordId,
+            localUpdatedAtIso: localUpdatedIso,
+            localSignature: localSignature,
+            remoteUpdatedAtIso: remoteUpdatedIso,
+            remoteSignature: remoteSignature,
+            secretKey: secretKey,
+          )
+        : remoteUpdatedAt.isAfter(localUpdatedAt);
+
+    final nearConcurrent =
+        localUpdatedAt.difference(remoteUpdatedAt).inSeconds.abs() <= 5;
 
     for (final entry in remoteData.entries) {
       final field = entry.key;
       final remoteValue = entry.value;
 
       // Campi tecnici da non considerare nei conflitti
-      if (field == 'updatedAt' || field == 'createdAt' || field == 'lastModifiedBy') continue;
+      if (field == 'updatedAt' ||
+          field == 'createdAt' ||
+          field == 'lastModifiedBy' ||
+          field == 'updatedAtSignature' ||
+          excludeFields.contains(field)) {
+        continue;
+      }
 
       if (!merged.containsKey(field)) {
         // Solo remoto ha questo campo: lo prendiamo
         merged[field] = remoteValue;
       } else if (merged[field] != remoteValue) {
-        // Stesso campo, valori diversi: potenziale conflitto
+        // Stesso campo, valori diversi: potenziale conflitto.
+        // La priorità è decisa dal LWW firmato (o dal timestamp legacy).
+        if (remoteWins) {
+          merged[field] = remoteValue;
+        }
+        // else: keep local value (already in merged)
 
-        // Se la differenza è solo nel timestamp dell'intero record,
-        // diamo priorità al record più recente per i campi divergenti
-        if (remoteUpdatedAt.isAfter(localUpdatedAt) &&
-            localUpdatedAt.difference(remoteUpdatedAt).inSeconds.abs() > 5) {
-          merged[field] = remoteValue;
-        } else if (localUpdatedAt.isAfter(remoteUpdatedAt) &&
-            localUpdatedAt.difference(remoteUpdatedAt).inSeconds.abs() > 5) {
-          // Keep local value (already in merged)
-        } else {
-          // Timestamp ravvicinati o uguali: conflitto reale
-          merged[field] = remoteValue;
+        // Timestamp ravvicinati o uguali: conflitto reale da mostrare.
+        if (nearConcurrent) {
           conflictFields.add(field);
         }
       }
@@ -516,6 +549,7 @@ class HiveSyncEngine {
   Future<SyncResult> applyRemoteRecords(
     List<SyncRecord> records, {
     List<SyncClassScope>? scopes,
+    String? secretKey,
   }) async {
     var appliedCount = 0;
     var conflictsResolved = 0;
@@ -528,6 +562,7 @@ class HiveSyncEngine {
         final box = Hive.box<Map>(remote.boxName);
         final localRaw = box.get(remote.id);
         final isClassBox = remote.boxName == 'classes';
+        final isAttendanceBox = remote.boxName == LocalDatabase.attendanceBox;
 
         if (!_recordMatchesScope(
           boxName: remote.boxName,
@@ -579,15 +614,34 @@ class HiveSyncEngine {
         }
 
         final merged = _mergeFields(
+          boxName: remote.boxName,
+          recordId: remote.id,
           localData: localData,
           remoteData: remote.data,
           localUpdatedAt: localUpdatedAt,
           remoteUpdatedAt: remote.updatedAt,
+          secretKey: secretKey,
+          excludeFields:
+              isAttendanceBox ? const {'presence', 'presenceMeta'} : const {},
         );
+
+        if (isAttendanceBox) {
+          // Merge CRDT delle presenze: per-studente Last-Write-Wins usando
+          // i meta-dati `presenceMeta` (due tablet possono inserire presenze
+          // sullo stesso incontro e i risultati convergono senza conflitti).
+          final crdt = AttendanceCrdt.mergePresence(
+            localData: localData,
+            remoteData: remote.data,
+          );
+          merged['presence'] = crdt['presence'];
+          merged['presenceMeta'] = crdt['presenceMeta'];
+        }
 
         final conflictFields =
             (merged['_conflicts'] as List<String>?) ?? [];
         merged.remove('_conflicts');
+        // La firma del timestamp è un dato di trasporto: non va persistita.
+        merged.remove('updatedAtSignature');
 
         if (isClassBox) {
           merged['nameLocked'] = (localData['nameLocked'] ?? true) ||
@@ -629,6 +683,35 @@ class HiveSyncEngine {
     return records.map((r) => r.toJson()).toList();
   }
 
+  /// Firma i timestamp (`updatedAt`) dei record con il shared secret del
+  /// canale P2P, prima dell'invio. Inserisce `updatedAtSignature` nella
+  /// mappa `data` di ogni record; il ricevente la usa in [SignedLww.remoteWins]
+  /// per accettare il LWW solo se il timestamp più recente è autentico.
+  List<SyncRecord> signRecordsForChannel(
+    List<SyncRecord> records,
+    String? secretKey,
+  ) {
+    if (secretKey == null || secretKey.isEmpty) return records;
+    return records.map((r) {
+      if (r.isDeleted) return r;
+      final data = Map<String, dynamic>.from(r.data);
+      data['updatedAtSignature'] = SignedLww.sign(
+        boxName: r.boxName,
+        recordId: r.id,
+        updatedAtIso: r.updatedAt.toUtc().toIso8601String(),
+        secretKey: secretKey,
+      );
+      return SyncRecord(
+        id: r.id,
+        boxName: r.boxName,
+        data: data,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+        isDeleted: r.isDeleted,
+      );
+    }).toList();
+  }
+
   List<SyncRecord> deserializeRecords(List<dynamic> jsonList) {
     return jsonList.map((j) {
       final map = Map<String, dynamic>.from(j as Map);
@@ -642,6 +725,7 @@ class HiveSyncEngine {
     required Future<List<SyncRecord>> Function(List<String> neededKeys)
         fetchRemoteRecords,
     List<SyncClassScope>? scopes,
+    String? secretKey,
   }) async {
     try {
       final neededFromRemote = computeNeededRecords(remoteIndex);
@@ -660,6 +744,7 @@ class HiveSyncEngine {
         final result = await applyRemoteRecords(
           remoteRecords,
           scopes: scopes,
+          secretKey: secretKey,
         );
         receivedCount = result.receivedRecords;
       }

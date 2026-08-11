@@ -10,6 +10,7 @@
 /// Questi provider sono il punto di accesso principale per tutte le pagine
 /// del feature `classes` (e pagine esterne) che necessitano di dati sulle
 /// classi.
+library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'classes_repository.dart';
 

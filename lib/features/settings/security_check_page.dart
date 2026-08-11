@@ -487,7 +487,7 @@ class _SecurityCheckPageState extends ConsumerState<SecurityCheckPage>
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
             sliver: SliverList.separated(
               itemCount: _checks.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 final check = _checks[index];
                 return _buildAnimatedCheckCard(context, check, index, colorScheme, isDark);

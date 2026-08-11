@@ -15,7 +15,7 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 class Tombstone {
-  /// ID univoco del tombstone (formato: "ts_<microunix>_<suffisso>").
+  /// ID univoco del tombstone (formato: `ts_<microunix>_<suffisso>`).
   final String id;
 
   /// Tipo di entità eliminata (es. AuditLog.entityRagazzo).

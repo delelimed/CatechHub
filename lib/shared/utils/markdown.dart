@@ -13,7 +13,7 @@ TextSpan _buildTextSpan(String text, TextStyle? baseStyle) {
     final italicMatch = italic.matchAsPrefix(text, i);
     final codeMatch = code.matchAsPrefix(text, i);
 
-    int? earliest = boldMatch != null ? boldMatch.start : null;
+    int? earliest = boldMatch?.start;
     String? type;
     Match? match;
 

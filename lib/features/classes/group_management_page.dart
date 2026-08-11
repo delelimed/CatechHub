@@ -11,6 +11,7 @@
 ///
 /// Navigazione CateREG: dalla scheda ragazzo si può andare a
 /// [EditStudentPage] (modifica) o eliminare lo studente con conferma.
+library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -425,7 +426,7 @@ class _StudentsList extends StatelessWidget {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: classStudents.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
               itemBuilder: (_, index) {
                 final student = classStudents[index];
 

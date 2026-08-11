@@ -89,7 +89,6 @@ class PdfExportService {
   static final PdfColor _orange = PdfColor.fromInt(0xFFE76F51);
   static final PdfColor _green = PdfColor.fromInt(0xFF27AE60);
   static final PdfColor _red = PdfColor.fromInt(0xFFE74C3C);
-  static final PdfColor _amber = PdfColor.fromInt(0xFFF4A62A);
   static final PdfColor _bgSoft = PdfColor.fromInt(0xFFF0F5FB);
   static final PdfColor _bgZebra = PdfColor.fromInt(0xFFF7FAFD);
   static final PdfColor _line = PdfColor.fromInt(0xFFDCE6F0);
@@ -964,10 +963,6 @@ class PdfExportService {
         case 'Assente':
           text = 'A';
           color = _red;
-          break;
-        case 'Giustificato':
-          text = 'G';
-          color = _amber;
           break;
         default:
           text = '';

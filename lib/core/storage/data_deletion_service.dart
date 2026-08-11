@@ -1,5 +1,6 @@
 import 'package:hive_flutter/hive_flutter.dart';
 
+import '../../features/archive/historical_record_repository.dart';
 import '../../features/sync/p2p/p2p_security_service.dart';
 import '../../shared/models/attachment_model.dart';
 import '../../shared/models/attachment_parent_type.dart';
@@ -231,6 +232,8 @@ class DataDeletionService {
 
     if (categories.contains(DataDeletionCategory.anagrafica)) {
       await _deleteAnagrafica();
+      // L'archivio storico è legato agli studenti: lo svuoto con l'anagrafica.
+      await LocalDatabase.historicalRecords().clear();
     }
 
     if (categories.contains(DataDeletionCategory.associazioni)) {
@@ -249,6 +252,9 @@ class DataDeletionService {
       for (final sid in studentIdsInClass) {
         await LocalDatabase.students().delete(sid);
       }
+      // Rimuove anche gli snapshot storici dei ragazzi cancellati.
+      await HistoricalRecordRepository()
+          .deleteRecordsForStudents(studentIdsInClass);
       if (classMap != null) {
         classMap['studentIds'] = <String>[];
         await LocalDatabase.classes().put(classId, classMap);
@@ -422,6 +428,8 @@ class DataDeletionService {
     await LocalDatabase.trustedDevices().clear();
     await LocalDatabase.meetingNotifications().clear();
     await LocalDatabase.avvisi().clear();
+    await LocalDatabase.parishConfig().clear();
+    await LocalDatabase.historicalRecords().clear();
 
     // 3. Rimuove tutte le associazioni P2P, identità locale e chiavi crittografiche
     await P2PSecurityService().resetAllSecurityData();

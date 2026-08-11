@@ -11,6 +11,7 @@
 /// Flusso CateREG: l'utente arriva qui da [ClassesPage] cliccando su una
 /// scheda classe; le modifiche alle assegnazioni vengono salvate su Hive
 /// tramite [classesRepoProvider].
+library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

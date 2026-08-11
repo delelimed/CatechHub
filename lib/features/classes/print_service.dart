@@ -12,6 +12,7 @@
 /// Integrazione CateREG: utilizzato da [AttendancePrintPage] per esportare
 /// gli appelli; [PrintStudentData] è il DTO che veicola i dati di uno
 /// studente dal layer dati al layout PDF.
+library;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -147,7 +148,7 @@ class PrintService {
                           ),
                         ],
                       );
-                    }).toList(),
+                    }),
                   ],
                 ),
               ),
@@ -242,7 +243,7 @@ class PrintService {
                               style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold),
                             ),
                           );
-                        }).toList(),
+                        }),
                       ],
                     ),
 
@@ -302,10 +303,10 @@ class PrintService {
                                 ),
                               ),
                             );
-                          }).toList(),
+                          }),
                         ],
                       );
-                    }).toList(),
+                    }),
                   ],
                 ),
               ),

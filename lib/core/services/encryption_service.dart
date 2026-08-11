@@ -3,7 +3,6 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:pointycastle/export.dart' as pc;
-import 'package:pointycastle/src/utils.dart';
 
 class EncryptionService {
   static const int currentVersion = 2;
@@ -53,7 +52,7 @@ class EncryptionService {
     final remotePublicKey = pc.ECPublicKey(point, _ecDomain);
     final agreement = pc.ECDHBasicAgreement()..init(localPrivateKey);
     final sharedSecret = agreement.calculateAgreement(remotePublicKey);
-    final secretBytes = encodeBigIntAsUnsigned(sharedSecret);
+    final secretBytes = _encodeBigIntAsUnsigned(sharedSecret);
     if (secretBytes.length >= 32) {
       return Uint8List.fromList(secretBytes.sublist(secretBytes.length - 32));
     }
@@ -296,4 +295,18 @@ class _DartSecureRandom implements pc.SecureRandom {
       List<int>.generate(count, (_) => _random.nextInt(256)),
     );
   }
+}
+
+Uint8List _encodeBigIntAsUnsigned(BigInt number) {
+  if (number == BigInt.zero) {
+    return Uint8List.fromList([0]);
+  }
+  var size = (number.bitLength + (number.isNegative ? 8 : 7)) >> 3;
+  var result = Uint8List(size);
+  var n = number;
+  for (var i = 0; i < size; i++) {
+    result[size - i - 1] = (n & BigInt.from(0xFF)).toInt();
+    n = n >> 8;
+  }
+  return result;
 }

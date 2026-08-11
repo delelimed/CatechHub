@@ -59,7 +59,7 @@ class StudentsPage extends ConsumerWidget {
                 return ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: students.length,
-                  separatorBuilder: (_, __) =>
+                  separatorBuilder: (_, _) =>
                       const SizedBox(height: 12),
                   itemBuilder: (_, index) {
                     final s = students[index];
@@ -232,7 +232,7 @@ class _StudentCard extends ConsumerWidget {
                       // Indicatore documenti mancanti
                       docsAsync.when(
                         loading: () => const SizedBox(),
-                        error: (_, __) => const SizedBox(),
+                        error: (_, _) => const SizedBox(),
                         data: (documents) {
                           if (documents.isEmpty) return const SizedBox();
 
@@ -341,7 +341,7 @@ class _DocumentWarningIndicator extends ConsumerWidget {
 
       deliveriesAsync.when(
         loading: () {},
-        error: (_, __) {},
+        error: (_, _) {},
         data: (deliveries) {
           final delivery = deliveries[studentId];
           if (delivery == null || delivery['receivedAt'] == null) {

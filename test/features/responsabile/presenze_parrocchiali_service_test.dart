@@ -53,7 +53,7 @@ void main() {
     tempDir.deleteSync(recursive: true);
   });
 
-  Future<void> _setup() async {
+  Future<void> setup() async {
     await ClassesRepository().addClass(SchoolClass(
       id: 'class_al_1',
       name: 'Prima Comunione',
@@ -67,7 +67,7 @@ void main() {
 
   group('PresenzeParrocchialiService.rilevaIstanza', () {
     test('nessun allarme sotto soglia', () async {
-      await _setup();
+      await setup();
       await LocalDatabase.attendance().put('m1', {
         'classId': 'class_al_1',
         'date': '2026-10-01',
@@ -80,7 +80,7 @@ void main() {
 
     test('segnala il ragazzo con N assenze consecutive partendo dalla più recente',
         () async {
-      await _setup();
+      await setup();
       final attendance = LocalDatabase.attendance();
       for (var i = 1; i <= 4; i++) {
         await attendance.put('m$i', {

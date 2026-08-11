@@ -14,6 +14,7 @@
 /// Entrambe le operazioni verificano il PIN dell'utente prima di procedere.
 /// L'importazione sostituisce completamente i dati esistenti in modo
 /// irreversibile.
+library;
 import 'dart:convert';
 import 'dart:io';
 

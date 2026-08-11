@@ -55,8 +55,8 @@ const _updateChannel = MethodChannel('com.delelimed.catechhub/update');
 /// Aggiornare alla rotazione dei certificati GitHub.
 /// 
 /// Per ottenere il fingerprint corrente, usare:
-///   openssl s_client -connect api.github.com:443 -showcerts </dev/null 2>/dev/null \
-///     | openssl x509 -outform DER | openssl dgst -sha256 -binary | base64
+///   `openssl s_client -connect api.github.com:443 -showcerts &lt;/dev/null 2&gt;/dev/null` \
+///     `| openssl x509 -outform DER | openssl dgst -sha256 -binary | base64`
 const _pinnedGitHubFingerprints = <String>[
   // *.github.com — Let's Encrypt / DigiCert
   // Ottenuto da api.github.com. Da aggiornare periodicamente.
@@ -152,7 +152,7 @@ class UpdateService {
         await _showUpdateNotification(latestVersion);
       }
     } catch (e) {
-      print('Errore controllo aggiornamenti: $e');
+      debugPrint('Errore controllo aggiornamenti: $e');
     }
   }
 
@@ -197,7 +197,7 @@ static Future<void> _showUpdateNotification(String version) async {
     try {
       await _updateChannel.invokeMethod('installApk', {'apkPath': apkPath});
     } on PlatformException catch (e) {
-      print('Errore installazione APK: ${e.message}');
+      debugPrint('Errore installazione APK: ${e.message}');
       rethrow;
     }
   }
@@ -208,7 +208,7 @@ static Future<void> _showUpdateNotification(String version) async {
     try {
       await _updateChannel.invokeMethod('cleanupOldApks');
     } on PlatformException catch (e) {
-      print('Errore cleanup APK: ${e.message}');
+      debugPrint('Errore cleanup APK: ${e.message}');
     }
   }
 }

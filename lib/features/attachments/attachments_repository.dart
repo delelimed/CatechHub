@@ -21,6 +21,7 @@
 /// Ogni allegato è associato a un'entità padre tramite [parentId] e [parentType],
 /// permettendo di recuperare tutti gli allegati di una pratica, fattura, o altra
 /// entità del gestionale CateREG.
+library;
 import 'dart:io';
 import 'dart:typed_data';
 

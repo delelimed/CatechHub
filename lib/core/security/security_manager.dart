@@ -58,7 +58,7 @@ class _StorageKeys {
 }
 
 /// Versione corrente del formato chiave master.
-const int _CURRENT_KEY_VERSION = 1;
+const int _currentKeyVersion = 1;
 
 /// Configurazione FlutterSecureStorage per Android HARDWARE-ONLY.
 ///
@@ -190,7 +190,7 @@ class SecurityManager {
     );
     await _secureStorage.write(
       key: _StorageKeys.keyVersion,
-      value: _CURRENT_KEY_VERSION.toString(),
+      value: _currentKeyVersion.toString(),
       aOptions: _androidOptions,
     );
 
@@ -394,7 +394,7 @@ class SecurityManager {
     // Incrementa versione
     await _secureStorage.write(
       key: _StorageKeys.keyVersion,
-      value: (_CURRENT_KEY_VERSION + 1).toString(),
+      value: (_currentKeyVersion + 1).toString(),
       aOptions: _androidOptions,
     );
   }

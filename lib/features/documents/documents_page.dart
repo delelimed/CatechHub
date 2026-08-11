@@ -192,7 +192,7 @@ class DocumentsPage extends ConsumerWidget {
 
                   return deliveriesAsync.when(
                     loading: () => const SizedBox(height: 70),
-                    error: (_, __) => const Text('Errore dati'),
+                    error: (_, _) => const Text('Errore dati'),
                     data: (deliveries) {
                       // Calcolo dei mancanti focalizzato unicamente sulla classe del catechista
                       int mancanti = 0;

@@ -297,6 +297,7 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
                       Navigator.pop(context);
                     }
                   } catch (e) {
+                    if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Errore: $e')),
                     );

@@ -9,7 +9,7 @@
 
 /// Entità Aula/Stanza della parrocchia.
 class Aula {
-  /// ID univoco stanza (formato: "stanza_<microsecondsSinceEpoch>").
+  /// ID univoco stanza (formato: `stanza_<microsecondsSinceEpoch>`).
   final String stanzaId;
 
   /// Nome della stanza (es. "Aula San Biuseppe", "Sala parrocchiale").
@@ -91,7 +91,7 @@ class Aula {
 /// [giornoSettimana] usa la convenzione Dart: 1=Lunedì … 7=Domenica
 /// (DateTime.monday=1 .. sunday=7).
 class RoomSlot {
-  /// ID dello slot (formato "slot_<microsecondsSinceEpoch>").
+  /// ID dello slot (formato `slot_<microsecondsSinceEpoch>`).
   final String slotId;
 
   /// ID dell'aula assegnata.

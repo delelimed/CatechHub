@@ -322,6 +322,7 @@ class SettingsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final privacy = ref.watch(privacySettingsProvider);
     final authAsync = ref.watch(authStateProvider);
+    final isResponsabile = UserRole.isResponsabile;
 
     return authAsync.when(
       data: (map) {
@@ -349,45 +350,47 @@ class SettingsPage extends ConsumerWidget {
 
               const SizedBox(height: 12),
 
-              _SettingsItem(
-                icon: Icons.list_alt_rounded,
-                title: 'Visualizza Gruppi',
-                subtitle: 'Vedi tutti i gruppi di cui fai parte',
-                color: const Color(0xFF174A7E),
-                onTap: () => context.push('/view-groups'),
-              ),
+              if (!isResponsabile) ...[
+                _SettingsItem(
+                  icon: Icons.list_alt_rounded,
+                  title: 'Visualizza Gruppi',
+                  subtitle: 'Vedi tutti i gruppi di cui fai parte',
+                  color: const Color(0xFF174A7E),
+                  onTap: () => context.push('/view-groups'),
+                ),
 
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              _SettingsItem(
-                icon: Icons.groups_rounded,
-                title: 'Gestione Gruppo',
-                subtitle: 'Gestisci il gruppo e i ragazzi',
-                color: const Color(0xFF174A7E),
-                onTap: () => context.push('/group-management'),
-              ),
+                _SettingsItem(
+                  icon: Icons.groups_rounded,
+                  title: 'Gestione Gruppo',
+                  subtitle: 'Gestisci il gruppo e i ragazzi',
+                  color: const Color(0xFF174A7E),
+                  onTap: () => context.push('/group-management'),
+                ),
 
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              _SettingsItem(
-                icon: Icons.swap_horiz_rounded,
-                title: 'Supplenze',
-                subtitle: 'Delega temporanea del registro a un altro catechista',
-                color: const Color(0xFF174A7E),
-                onTap: () => context.push('/substitutes'),
-              ),
+                _SettingsItem(
+                  icon: Icons.swap_horiz_rounded,
+                  title: 'Supplenze',
+                  subtitle: 'Delega temporanea del registro a un altro catechista',
+                  color: const Color(0xFF174A7E),
+                  onTap: () => context.push('/substitutes'),
+                ),
 
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              _SettingsItem(
-                icon: Icons.warning_amber_rounded,
-                title: 'Soglia assenze',
-                subtitle: 'Minimo assenze per la dashboard: ${privacy.absenceThreshold}',
-                color: Colors.red,
-                onTap: () => _showAbsenceThresholdDialog(context, ref),
-              ),
+                _SettingsItem(
+                  icon: Icons.warning_amber_rounded,
+                  title: 'Soglia assenze',
+                  subtitle: 'Minimo assenze per la dashboard: ${privacy.absenceThreshold}',
+                  color: Colors.red,
+                  onTap: () => _showAbsenceThresholdDialog(context, ref),
+                ),
 
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
+              ],
 
               _SettingsItem(
                 icon: Icons.delete_forever_rounded,
@@ -398,99 +401,113 @@ class SettingsPage extends ConsumerWidget {
                 onTap: () => context.push('/delete-data'),
               ),
 
-                            const SizedBox(height: 12),
+              if (!isResponsabile) ...[
+                const SizedBox(height: 12),
 
-              _SettingsItem(
-                icon: Icons.notifications_active_rounded,
-                title: 'Notifiche incontri',
-                subtitle: 'Ricevi un promemoria il giorno prima di incontri e riunioni',
-                color: Colors.blue,
-                onTap: () => _showNotificationSettingsDialog(context, ref),
-              ),
+                _SettingsItem(
+                  icon: Icons.notifications_active_rounded,
+                  title: 'Notifiche incontri',
+                  subtitle: 'Ricevi un promemoria il giorno prima di incontri e riunioni',
+                  color: Colors.blue,
+                  onTap: () => _showNotificationSettingsDialog(context, ref),
+                ),
+              ],
 
               const SizedBox(height: 24),
 
               /// =========================
               /// GESTIONE PARROCCHIA (Responsabile Catechistico)
               /// =========================
-              const _SectionTitle(title: 'Gestione parrocchia'),
+              if (isResponsabile) ...[
+                const _SectionTitle(title: 'Gestione parrocchia'),
 
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              _SettingsItem(
-                icon: Icons.church_rounded,
-                title: 'Amministrazione parrocchia',
-                subtitle: 'Classi, iscrizioni, logistica e allarmi assenze',
-                color: const Color(0xFF174A7E),
-                onTap: () => context.push('/parrocchia/admin'),
-              ),
+                _SettingsItem(
+                  icon: Icons.church_rounded,
+                  title: 'Amministrazione parrocchia',
+                  subtitle: 'Classi, iscrizioni, logistica e allarmi assenze',
+                  color: const Color(0xFF174A7E),
+                  onTap: () => context.push('/parrocchia/admin'),
+                ),
 
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              _SettingsItem(
-                icon: Icons.account_tree_rounded,
-                title: 'Dashboard parrocchiale',
-                subtitle: 'Anno catechistico, percorsi, classi, catechisti e ragazzi',
-                color: const Color(0xFF174A7E),
-                onTap: () => context.push('/parrocchia'),
-              ),
+                _SettingsItem(
+                  icon: Icons.account_tree_rounded,
+                  title: 'Dashboard parrocchiale',
+                  subtitle: 'Anno catechistico, percorsi, classi, catechisti e ragazzi',
+                  color: const Color(0xFF174A7E),
+                  onTap: () => context.push('/parrocchia'),
+                ),
 
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              _SettingsItem(
-                icon: Icons.verified_user_rounded,
-                title: 'Catena di fiducia',
-                subtitle: 'Approva i dispositivi abilitati alla sync e gestisci il QR di fiducia',
-                color: Colors.teal,
-                onTap: () => context.push('/settings/approval-center'),
-              ),
+                _SettingsItem(
+                  icon: Icons.verified_user_rounded,
+                  title: 'Catena di fiducia',
+                  subtitle: 'Approva i dispositivi abilitati alla sync e gestisci il QR di fiducia',
+                  color: Colors.teal,
+                  onTap: () => context.push('/settings/approval-center'),
+                ),
 
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              _SettingsItem(
-                icon: Icons.gavel_rounded,
-                title: 'Registro Trattamenti',
-                subtitle: 'Registro GDPR (Art. 30) con verifica integrità firme',
-                color: Colors.teal,
-                onTap: () => context.push('/parrocchia/audit'),
-              ),
+                _SettingsItem(
+                  icon: Icons.gavel_rounded,
+                  title: 'Registro Trattamenti',
+                  subtitle: 'Registro GDPR (Art. 30) con verifica integrità firme',
+                  color: Colors.teal,
+                  onTap: () => context.push('/parrocchia/audit'),
+                ),
 
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              _SettingsItem(
-                icon: Icons.history_rounded,
-                title: 'Archivio storico',
-                subtitle: 'Progresso dei ragazzi negli anni e chiusura anno catechistico',
-                color: const Color(0xFF174A7E),
-                onTap: () => context.push('/parrocchia/archivio'),
-              ),
+                _SettingsItem(
+                  icon: Icons.history_rounded,
+                  title: 'Archivio storico',
+                  subtitle: 'Progresso dei ragazzi negli anni e chiusura anno catechistico',
+                  color: const Color(0xFF174A7E),
+                  onTap: () => context.push('/parrocchia/archivio'),
+                ),
 
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              _SettingsItem(
-                icon: Icons.upload_file_rounded,
-                title: 'Importa Dati Ragazzi',
-                subtitle: 'Importazione massiva anagrafica da Excel o CSV',
-                color: const Color(0xFF174A7E),
-                onTap: () => context.push('/parrocchia/import-ragazzi'),
-              ),
+                _SettingsItem(
+                  icon: Icons.upload_file_rounded,
+                  title: 'Importa Dati Ragazzi',
+                  subtitle: 'Importazione massiva anagrafica da Excel o CSV',
+                  color: const Color(0xFF174A7E),
+                  onTap: () => context.push('/parrocchia/import-ragazzi'),
+                ),
 
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              _SettingsItem(
-                icon: Icons.tune_rounded,
-                title: 'Configura parrocchia',
-                subtitle: 'Nome parrocchia, diocesi, anno catechistico, soglia assenze',
-                color: const Color(0xFF174A7E),
-                onTap: () => _showParishConfigDialog(context, ref),
-              ),
+                _SettingsItem(
+                  icon: Icons.tune_rounded,
+                  title: 'Configura parrocchia',
+                  subtitle: 'Nome parrocchia, diocesi, anno catechistico, soglia assenze',
+                  color: const Color(0xFF174A7E),
+                  onTap: () => _showParishConfigDialog(context, ref),
+                ),
 
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
+              ],
 
               /// =========================
               /// ASSISTENZA & FEEDBACK
               /// =========================
               const _SectionTitle(title: 'Supporto'),
+
+              const SizedBox(height: 12),
+
+              _SettingsItem(
+                icon: Icons.tour_rounded,
+                title: 'Guida alle funzioni',
+                subtitle: 'Rivedi la guida all\'uso dell\'app in qualsiasi momento',
+                color: Colors.blue,
+                onTap: () => context.push('/guide?mode=review'),
+              ),
 
               const SizedBox(height: 12),
 
@@ -529,19 +546,21 @@ class SettingsPage extends ConsumerWidget {
               /// =========================
               /// CONDIVISIONE E BACKUP
               /// =========================
-              const _SectionTitle(title: 'Condivisione e backup'),
+              if (!isResponsabile) ...[
+                const _SectionTitle(title: 'Condivisione e backup'),
 
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              _SettingsItem(
-                icon: Icons.qr_code_rounded,
-                title: 'Condivisione e Backup',
-                subtitle: 'Condividi dati, sincronizza e gestisci backup',
-                color: Colors.orange,
-                onTap: () => context.push('/data-share'),
-              ),
+                _SettingsItem(
+                  icon: Icons.qr_code_rounded,
+                  title: 'Condivisione e Backup',
+                  subtitle: 'Condividi dati, sincronizza e gestisci backup',
+                  color: Colors.orange,
+                  onTap: () => context.push('/data-share'),
+                ),
 
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
+              ],
 
               /// =========================
               /// APP

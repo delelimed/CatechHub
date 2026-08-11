@@ -27,6 +27,7 @@ import 'core/services/update_service.dart';
 import 'core/services/meeting_notification_service.dart';
 import 'core/storage/local_database.dart';
 import 'core/config/env_config.dart';
+import 'features/guide/demo_guide_service.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // main.dart — CatechHub (punto di ingresso Dart)
@@ -427,6 +428,11 @@ Future<void> main() async {
         ));
         return;
       }
+
+      // Guida live post-onboarding: se nella sessione precedente erano presenti
+      // dati di esempio (guida in corso o non completata), vengono rimossi al
+      // riavvio per lasciare spazio ai dati reali.
+      await DemoGuideService.handleAppStart();
 
       // ═══════════════════════════════════════════════════════════════════════
       // FASE 4 - IMPOSTAZIONI PRIVACY

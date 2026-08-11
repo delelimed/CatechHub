@@ -33,6 +33,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../models/user_role.dart';
+
 class SideMenu extends StatelessWidget {
   /// true = sidebar desktop (sfondo scuro, testo bianco, usato in
   /// AppScaffold). false = variante chiara per potenziale drawer.
@@ -83,10 +85,13 @@ class SideMenu extends StatelessWidget {
           _item(context, location, '/planning', Icons.calendar_month_rounded, 'Programmazione'),
           _item(context, location, '/documents', Icons.description_rounded, 'Documenti'),
           _item(context, location, '/catechesi', Icons.menu_book_rounded, 'Catechesi'),
-          _item(context, location, '/parrocchia/admin', Icons.church_rounded, 'Parrocchia'),
-          _item(context, location, '/parrocchia/rete', Icons.network_check_rounded, 'Rete parrocchiale'),
-          _item(context, location, '/parrocchia/consensi', Icons.task_alt_rounded, 'Consensi'),
-          _item(context, location, '/parrocchia/archivio', Icons.history_rounded, 'Archivio storico'),
+          // Le voci parrocchiali sono riservate al Responsabile Catechistico.
+          if (UserRole.isResponsabile) ...[
+            _item(context, location, '/parrocchia/admin', Icons.church_rounded, 'Parrocchia'),
+            _item(context, location, '/parrocchia/rete', Icons.network_check_rounded, 'Rete parrocchiale'),
+            _item(context, location, '/parrocchia/consensi', Icons.task_alt_rounded, 'Consensi'),
+            _item(context, location, '/parrocchia/archivio', Icons.history_rounded, 'Archivio storico'),
+          ],
           _item(context, location, '/settings', Icons.settings_rounded, 'Impostazioni'),
         ],
       ),

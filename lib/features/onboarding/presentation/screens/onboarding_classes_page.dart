@@ -26,6 +26,7 @@ import '../../../../core/auth/auth_service.dart';
 import '../../../../core/providers/current_class_provider.dart';
 import '../../../../core/storage/local_database.dart';
 import '../../../../features/classes/classes_provider.dart';
+import '../../../../features/guide/demo_guide_service.dart';
 import '../../../../shared/models/class_model.dart';
 import '../../../../shared/utils/auth_utils.dart';
 
@@ -139,6 +140,7 @@ class _OnboardingClassesPageState extends ConsumerState<OnboardingClassesPage> {
     }
     HapticFeedback.mediumImpact();
     await LocalDatabase.auth().put('onboarding_classes_completed', true);
+    await DemoGuideService.scheduleGuide();
     if (mounted) context.go('/');
   }
 

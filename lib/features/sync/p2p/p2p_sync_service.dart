@@ -335,6 +335,17 @@ class P2PSyncService {
   /// Viene azzerato al termine della modalità associazione.
   Set<String> _associationSharedClassIds = {};
 
+  /// Profilo anagrafico che il MITTENTE imposta per l'altro catechista
+  /// quando il ruolo è "Altro Catechista" (nome, cognome, numero). Viene
+  /// trasmesso al dispositivo ricevente così che l'account venga configurato
+  /// con i dati inseriti da chi condivide.
+  Map<String, String> _associationRemoteProfile = {};
+
+  /// Profilo anagrafico RICEVUTO dall'handshake del dispositivo remoto
+  /// (caso "Altro Catechista"): il ricevente lo applica al proprio account
+  /// al termine dell'associazione se non ha ancora un profilo configurato.
+  Map<String, String>? _pendingHandshakeRemoteProfile;
+
   /// Mappa endpoint → catechistId del dispositivo remoto, raccolto dall'handshake.
   /// Permette di distinguere un altro dispositivo dello STESSO catechista
   /// (stesso catechistId → sincronizza tutte le classi) da un catechista
@@ -907,6 +918,40 @@ class P2PSyncService {
     );
   }
 
+  /// Imposta il profilo anagrafico (nome, cognome, numero) che il mittente
+  /// fornisce per l'ALTRO catechista durante l'associazione con ruolo
+  /// "Altro Catechista". Il profilo viene trasmesso all'handshake e applicato
+  /// dal dispositivo ricevente per configurare il proprio account.
+  Future<void> setAssociationRemoteProfile({
+    String? firstName,
+    String? lastName,
+    String? phoneNumber,
+  }) async {
+    _associationRemoteProfile = {
+      if (firstName != null && firstName.trim().isNotEmpty)
+        'firstName': firstName.trim(),
+      if (lastName != null && lastName.trim().isNotEmpty)
+        'lastName': lastName.trim(),
+      if (phoneNumber != null && phoneNumber.trim().isNotEmpty)
+        'phoneNumber': phoneNumber.trim(),
+    };
+    addLog(
+      'INFO',
+      'Profilo remoto associazione: '
+      '${_associationRemoteProfile['firstName']} '
+      '${_associationRemoteProfile['lastName']} '
+      '(${_associationRemoteProfile['phoneNumber'] ?? 'senza numero'})',
+    );
+  }
+
+  /// Profilo anagrafico ricevuto dall'handshake del dispositivo remoto
+  /// (caso "Altro Catechista"). `null` se il mittente non lo ha fornito.
+  Map<String, String>? get pendingRemoteProfile =>
+      _pendingHandshakeRemoteProfile == null ||
+          _pendingHandshakeRemoteProfile!.isEmpty
+      ? null
+      : Map.unmodifiable(_pendingHandshakeRemoteProfile!);
+
   Future<void> startPairingMode() async {
     addLog('INFO', 'Modalità associazione avviata');
     if (!_initialized) await init();
@@ -1191,6 +1236,8 @@ class P2PSyncService {
     _sessionPairingNonce = null;
     _remoteSessionPairingNonce = null;
     _associationSharedClassIds = {};
+    _associationRemoteProfile = {};
+    _pendingHandshakeRemoteProfile = null;
     _endpointRemoteCatechistId.clear();
     _endpointRemoteHasClasses.clear();
     _endpointSharedClassIds.clear();
@@ -1460,6 +1507,24 @@ class P2PSyncService {
     return ids.isNotEmpty ? ids.first : '';
   }
 
+  /// Estrae il profilo anagrafico (nome, cognome, numero) che il mittente
+  /// ha impostato per l'altro catechista (ruolo "Altro Catechista").
+  /// Restituisce una mappa vuota se non presente o non valida.
+  Map<String, String> _parseRemoteProfile(Map<String, dynamic> message) {
+    final raw = message['remoteProfile'];
+    if (raw is! Map) return const {};
+    final profile = <String, String>{};
+    final firstName = (raw['firstName'] as String?)?.trim() ?? '';
+    final lastName = (raw['lastName'] as String?)?.trim() ?? '';
+    final phoneNumber = (raw['phoneNumber'] as String?)?.trim() ?? '';
+    if (firstName.isNotEmpty || lastName.isNotEmpty) {
+      if (firstName.isNotEmpty) profile['firstName'] = firstName;
+      if (lastName.isNotEmpty) profile['lastName'] = lastName;
+      if (phoneNumber.isNotEmpty) profile['phoneNumber'] = phoneNumber;
+    }
+    return profile;
+  }
+
   /// Determina le classi condivise con l'endpoint [endpointId].
   ///
   /// Priorità:
@@ -1658,6 +1723,10 @@ class P2PSyncService {
         'hasClasses': _hasCatechistIdentity(AuthService.getCatechistId()),
         'supportsClassChannel': true,
         'supportsParishChannel': true,
+        // Profilo anagrafico dell'altro catechista (ruolo "Altro Catechista"):
+        // il ricevente lo usa per configurare il proprio account.
+        if (_associationRemoteProfile.isNotEmpty)
+          'remoteProfile': _associationRemoteProfile,
         // Certificato di approvazione del Responsabile (se il dispositivo è
         // già stato approvato): il peer lo verifica con il segreto della
         // parrocchia quando la modalità Responsabile è attiva.
@@ -1941,6 +2010,7 @@ class P2PSyncService {
           message['supportsClassChannel'] == true;
       _endpointSupportsParishChannel[endpointId] =
           message['supportsParishChannel'] == true;
+      _pendingHandshakeRemoteProfile = _parseRemoteProfile(message);
       final remoteShared = _resolveSharedClassIdsForEndpoint(
         endpointId,
         (message['sharedClassIds'] as List<dynamic>? ?? [])
@@ -2114,6 +2184,8 @@ class P2PSyncService {
         'hasClasses': _hasCatechistIdentity(AuthService.getCatechistId()),
         'supportsClassChannel': true,
         'supportsParishChannel': true,
+        if (_associationRemoteProfile.isNotEmpty)
+          'remoteProfile': _associationRemoteProfile,
       });
       await _sendEncryptedPayload(endpointId, ack);
       _updateState(
@@ -2154,6 +2226,8 @@ class P2PSyncService {
         'hasClasses': _hasCatechistIdentity(AuthService.getCatechistId()),
         'supportsClassChannel': true,
         'supportsParishChannel': true,
+        if (_associationRemoteProfile.isNotEmpty)
+          'remoteProfile': _associationRemoteProfile,
       });
       await _sendPayload(endpointId, ack);
 
@@ -2164,6 +2238,7 @@ class P2PSyncService {
           remoteNonce: _remoteSessionPairingNonce,
         );
 
+        _pendingHandshakeRemoteProfile = _parseRemoteProfile(message);
         _pendingHandshakeIdentity = P2PIdentity(
           deviceId: remoteId,
           deviceName: remoteName,
@@ -2256,6 +2331,7 @@ class P2PSyncService {
         message['classId'] as String?,
       );
       _endpointSharedClassIds[endpointId] = ackSharedClasses;
+      _pendingHandshakeRemoteProfile = _parseRemoteProfile(message);
 
       _pendingHandshakeData[endpointId] ??= _PendingHandshakeData(
         endpointId: endpointId,
@@ -2382,6 +2458,7 @@ class P2PSyncService {
         remoteNonce: _remoteSessionPairingNonce,
       );
 
+      _pendingHandshakeRemoteProfile = _parseRemoteProfile(message);
       _pendingHandshakeIdentity = P2PIdentity(
         deviceId: remoteId,
         deviceName: remoteName,
@@ -2946,7 +3023,7 @@ class P2PSyncService {
     }
   }
 
-  void _checkSyncComplete(String endpointId) {
+  Future<void> _checkSyncComplete(String endpointId) async {
     final phase = _endpointSyncPhase[endpointId];
     if (phase == null || phase.complete) return;
     if (phase.sendDone && phase.receiveDone) {
@@ -2971,6 +3048,8 @@ class P2PSyncService {
 
       _ensureLocalCatechistInClasses();
 
+      await _applyPendingRemoteProfileIfNeeded();
+
       final now = DateTime.now();
       _updateState(
         _state.copyWith(
@@ -2985,6 +3064,42 @@ class P2PSyncService {
 
       _updateAssociationLastSync(endpointId, now);
     }
+  }
+
+  /// Applica il profilo anagrafico ricevuto dall'handshake (ruolo "Altro
+  /// Catechista") al dispositivo ricevente: configura l'account locale con
+  /// nome, cognome e numero inseriti da chi condivide. Viene eseguito SOLO
+  /// se il profilo locale non è ancora configurato (dispositivo nuovo / join).
+  Future<void> _applyPendingRemoteProfileIfNeeded() async {
+    final profile = _pendingHandshakeRemoteProfile;
+    if (profile == null || profile.isEmpty) return;
+
+    final auth = AuthService();
+    if (auth.isProfileConfigured) return;
+
+    final firstName = profile['firstName'] ?? '';
+    final lastName = profile['lastName'] ?? '';
+    if (firstName.trim().isEmpty || lastName.trim().isEmpty) return;
+
+    addLog(
+      'INFO',
+      'Configuro account del dispositivo ricevente con il profilo '
+      'fornito dal mittente: $firstName $lastName',
+    );
+
+    final ok = await auth.setupInitialProfile(
+      firstName: firstName,
+      lastName: lastName,
+      phoneNumber: profile['phoneNumber'],
+      createClass: false,
+    );
+
+    if (ok) {
+      addLog('INFO', 'Account configurato con i dati del mittente');
+    } else {
+      addLog('WARN', 'Impossibile configurare l\'account con il profilo remoto');
+    }
+    _pendingHandshakeRemoteProfile = null;
   }
 
   Future<void> _updateAssociationLastSync(
@@ -3330,7 +3445,7 @@ class P2PSyncService {
         });
         await _sendEncryptedPayload(endpointId, emptyRequest);
         phase.receiveDone = true;
-        _checkSyncComplete(endpointId);
+        await _checkSyncComplete(endpointId);
       }
     } catch (e) {
       addLog('ERROR', 'Errore elaborazione indice: $e');
@@ -3362,7 +3477,7 @@ class P2PSyncService {
 
       if (keys.isEmpty) {
         phase.sendDone = true;
-        _checkSyncComplete(endpointId);
+        await _checkSyncComplete(endpointId);
         return;
       }
 
@@ -3387,7 +3502,7 @@ class P2PSyncService {
       addLog('INFO', 'Invio ${records.length} record completato');
 
       phase.sendDone = true;
-      _checkSyncComplete(endpointId);
+      await _checkSyncComplete(endpointId);
     } catch (e) {
       addLog('ERROR', 'Errore risposta richiesta sync: $e');
       _endpointSyncPhase.remove(endpointId);
@@ -3498,7 +3613,7 @@ class P2PSyncService {
       await _sendEncryptedPayload(endpointId, ack);
       addLog('DEBUG', 'Sync ACK inviato a $endpointId');
 
-      _checkSyncComplete(endpointId);
+      await _checkSyncComplete(endpointId);
     } catch (e) {
       addLog('ERROR', 'Errore applicazione dati: $e');
       if (_endpointSyncPhase.containsKey(endpointId)) {
@@ -3525,7 +3640,7 @@ class P2PSyncService {
     }
     phase.sendDone = true;
     addLog('DEBUG', 'Sync ACK ricevuto per $endpointId, sendDone=true');
-    _checkSyncComplete(endpointId);
+    await _checkSyncComplete(endpointId);
   }
 
   Future<void> _handleAssociationConfirmed(

@@ -79,6 +79,9 @@ class LocalDatabase {
   static const tombstoneBox = 'tombstone_box';
   static const historicalRecordsBox = 'historical_records_box';
 
+  /// Rubrica dei catechisti della parrocchia (nome, cognome, telefono).
+  static const catechistsBox = 'catechists_box';
+
   // ─── Box della "Rete Catechistica Parrocchiale" ─────────────────────────
 
   /// Chiavi di canale per-classe (Class_Encryption_Key) possedute da questo
@@ -203,6 +206,7 @@ class LocalDatabase {
       _BoxDefinition(name: aulaBox, isMap: true, isCritical: false),
       _BoxDefinition(name: tombstoneBox, isMap: true, isCritical: false),
       _BoxDefinition(name: historicalRecordsBox, isMap: true, isCritical: false),
+      _BoxDefinition(name: catechistsBox, isMap: true, isCritical: false),
       // Box della "Rete Catechistica Parrocchiale"
       _BoxDefinition(name: classChannelKeysBox, isMap: true, isCritical: false),
       _BoxDefinition(name: classChannelCiphertextBox, isMap: true, isCritical: false),
@@ -345,6 +349,7 @@ class LocalDatabase {
   static Box<Map> aula() => Hive.box<Map>(aulaBox);
   static Box<Map> tombstones() => Hive.box<Map>(tombstoneBox);
   static Box<Map> historicalRecords() => Hive.box<Map>(historicalRecordsBox);
+  static Box<Map> catechists() => Hive.box<Map>(catechistsBox);
 
   // ─── Accessori Box Rete Catechistica Parrocchiale ───────────────────────
   static Box<Map> classChannelKeys() => Hive.box<Map>(classChannelKeysBox);

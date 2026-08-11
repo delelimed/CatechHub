@@ -57,10 +57,13 @@ import '../features/catechesi/catechesi_detail_page.dart';
 import '../shared/models/catechesi_model.dart';
 import '../features/responsabile/responsabile_dashboard_page.dart';
 import '../features/responsabile/responsabile_admin_page.dart';
+import '../features/responsabile/admin_section_pages.dart';
+import '../features/responsabile/catechisti_page.dart';
 import '../features/responsabile/audit_log_page.dart';
 import '../features/responsabile/consensi_page.dart';
 import '../features/responsabile/parish_network_page.dart';
 import '../features/responsabile/import_ragazzi/import_ragazzi_page.dart';
+import '../features/guide/guide_page.dart';
 import '../features/archive/pages/historical_archive_page.dart';
 import '../features/substitutes/substitute_center_page.dart';
 import '../features/substitutes/create_substitute_delegation_page.dart';
@@ -145,6 +148,46 @@ bool _isJoinPending() {
   } catch (_) {
     return false;
   }
+}
+
+/// True se la "Guida live alle funzioni" è ancora da completare (post-onboarding).
+bool _isGuidePending() {
+  try {
+    return LocalDatabase.auth().get('guide_pending', defaultValue: false) as bool;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Route raggiungibili durante la guida live per provare le funzioni reali.
+/// Tutte le altre (home, login, onboarding, class-selection) vengono
+/// reindirizzate alla guida finché non viene completata.
+bool _isGuideDemoRoute(String location) {
+  const allowed = {
+    '/parrocchia',
+    '/students',
+    '/student-detail',
+    '/attendance-meetings',
+    '/attendance',
+    '/attendance-grid',
+    '/planning',
+    '/documents',
+    '/document-detail',
+    '/contact-notes',
+    '/avvisi',
+    '/catechesi',
+    '/catechesi/edit',
+    '/catechesi/detail',
+    '/my-group',
+    '/view-groups',
+    '/allergies',
+    '/autonomous-exits',
+    '/verify-number',
+    '/statistics',
+    '/settings',
+  };
+  if (allowed.contains(location)) return true;
+  return location.startsWith('/parrocchia/');
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -371,6 +414,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           // Non passa mai dalla selezione classe né dalla gestione classi
           // dell'onboarding (gestione centralizzata in /parrocchia).
           if (UserRole.isResponsabile) {
+            if (_isGuidePending() &&
+                location != '/guide' &&
+                !_isGuideDemoRoute(location)) {
+              return '/guide';
+            }
             if (isLoginPath) return '/parrocchia';
             if (location == '/' ||
                 location == '/class-selection' ||
@@ -447,6 +495,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               }
             } catch (_) {}
           }
+          if (_isGuidePending() &&
+              location != '/guide' &&
+              !_isGuideDemoRoute(location)) {
+            return '/guide';
+          }
           return null;
         },
       );
@@ -514,6 +567,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/', builder: (context, state) => const DashboardPage()),
 
       // ═══════════════════════════════════════════════════════════════════
+      // GUIDE - Guida live post-onboarding (dati di esempio)
+      // ── review: richiamata dalle Impostazioni, usa i dati in memoria
+      //    e non effettua mai il purge dei dati di esempio.
+      // ═══════════════════════════════════════════════════════════════════
+      GoRoute(
+        path: '/guide',
+        builder: (context, state) {
+          final mode = state.uri.queryParameters['mode'] ?? 'first';
+          return GuidePage(reviewMode: mode == 'review');
+        },
+      ),
+
+      // ═══════════════════════════════════════════════════════════════════
       // RESPONSABILE CATECHISTICO - Gestione parrocchiale
       // ═══════════════════════════════════════════════════════════════════
 
@@ -523,10 +589,40 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ResponsabileDashboardPage(),
       ),
 
-      /// Hub amministrativo del Responsabile (classi, iscrizioni, logistica, allarmi).
+      /// Hub amministrativo del Responsabile (menu a schede).
       GoRoute(
         path: '/parrocchia/admin',
         builder: (context, state) => const ResponsabileAdminPage(),
+      ),
+
+      /// Gestione classi e assegnazione catechisti (schermata autonoma).
+      GoRoute(
+        path: '/parrocchia/classi',
+        builder: (context, state) => const ClassiRoutePage(),
+      ),
+
+      /// Rubrica catechisti: anagrafica, telefono, classi e dispositivi.
+      GoRoute(
+        path: '/parrocchia/catechisti',
+        builder: (context, state) => const CatechistiPage(),
+      ),
+
+      /// Iscrizioni, censimento e passaggio d'anno (schermata autonoma).
+      GoRoute(
+        path: '/parrocchia/iscrizioni',
+        builder: (context, state) => const IscrizioniRoutePage(),
+      ),
+
+      /// Aule e orari settimanali (schermata autonoma).
+      GoRoute(
+        path: '/parrocchia/logistica',
+        builder: (context, state) => const LogisticaRoutePage(),
+      ),
+
+      /// Allarme assenze prolungate (schermata autonoma).
+      GoRoute(
+        path: '/parrocchia/allarmi',
+        builder: (context, state) => const AllarmiRoutePage(),
       ),
 
       /// Registro Trattamenti GDPR (audit log).

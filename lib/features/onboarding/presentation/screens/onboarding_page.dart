@@ -3,9 +3,9 @@
 //
 // Struttura a 2 schermate:
 //   STEP 0 — Informativa e richiesta permessi CONTESTUALI:
-//     illustra i permessi necessari (Notifiche, P2P/Bluetooth, Fotocamera)
-//     SENZA attivarli in blocco: la richiesta nativa del sistema operativo
-//     parte esclusivamente al click dell'utente sul relativo pulsante.
+//     illustra i permessi necessari (Notifiche, P2P/Bluetooth, Fotocamera,
+//     Foto/media) SENZA attivarli in blocco: la richiesta nativa del sistema
+//     operativo parte esclusivamente al click dell'utente sul relativo pulsante.
 //   STEP 1 — Selezione della modalità operativa (3 pulsanti):
 //     [Modalità Responsabile Catechistico]
 //     [Modalità Normale (Senza Responsabile)]
@@ -14,6 +14,10 @@
 // A seconda della modalità scelta vengono salvati ruolo, modalità operativa
 // (app_mode) e configurazione parrocchiale, poi l'utente viene reindirizzato
 // al flusso successivo (login/profilo oppure associazione P2P).
+//
+// MODALITÀ RESPONSABILE:
+//   Prima di procedere al login viene chiesto subito il NOME della parrocchia,
+//   la DIOCESI e l'ANNO CATECHISTICO corrente (passo "Dati della parrocchia").
 // ══════════════════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
@@ -47,22 +51,37 @@ class OnboardingPage extends ConsumerStatefulWidget {
 }
 
 class _OnboardingPageState extends ConsumerState<OnboardingPage> {
-  /// 0 = permessi contestuali, 1 = selezione modalità.
+  /// 0 = permessi contestuali, 1 = selezione modalità,
+  /// 2 = dati della parrocchia (solo Modalità Responsabile).
   int _step = 0;
 
   bool _notificationGranted = false;
   bool _cameraGranted = false;
   bool _locationGranted = false;
   bool _bluetoothGranted = false;
+  bool _photosGranted = false;
 
   bool _notificationRequested = false;
   bool _cameraRequested = false;
   bool _locationRequested = false;
   bool _bluetoothRequested = false;
+  bool _photosRequested = false;
 
   String? _errorMessage;
 
   _OnboardingMode? _selectedMode;
+
+  final _nomeParrocchiaCtrl = TextEditingController();
+  final _diocesiCtrl = TextEditingController();
+  final _annoCatechisticoCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _nomeParrocchiaCtrl.dispose();
+    _diocesiCtrl.dispose();
+    _annoCatechisticoCtrl.dispose();
+    super.dispose();
+  }
 
   // ─────────────────────────────────────────────────────────────────────────────
   // RICHIESTA PERMESSI (OS prompt SOLO su interazione utente)
@@ -146,6 +165,25 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     }
   }
 
+  Future<void> _requestPhotosPermission() async {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _photosRequested = true;
+      _errorMessage = null;
+    });
+
+    final status = await Permission.photos.request();
+    if (mounted && (status.isGranted || status.isLimited)) {
+      setState(() => _photosGranted = true);
+    } else if (mounted && (status.isPermanentlyDenied || status.isRestricted)) {
+      await _showSettingsDialog(
+        'Galleria non autorizzata',
+        'Per allegare foto di ragazzi, documenti e verbali dagli allegati, '
+        'autorizza l\'accesso alla galleria dalle impostazioni del dispositivo.',
+      );
+    }
+  }
+
   Future<void> _showSettingsDialog(String title, String content) async {
     if (!mounted) return;
     await showDialog<void>(
@@ -192,6 +230,21 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       return;
     }
 
+    // In Modalità Responsabile si chiede subito il nome della parrocchia,
+    // la diocesi e l'anno catechistico corrente (STEP 2).
+    if (mode == _OnboardingMode.responsabile) {
+      setState(() {
+        _step = 2;
+        _errorMessage = null;
+      });
+      return;
+    }
+
+    await _applyMode(mode);
+  }
+
+  /// Salva ruolo, app_mode e configurazione parrocchiale, poi reindirizza.
+  Future<void> _applyMode(_OnboardingMode mode) async {
     final box = LocalDatabase.auth();
     final configRepo = ParishConfigRepository();
 
@@ -229,6 +282,30 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     }
   }
 
+  /// Conferma i dati della parrocchia (Modalità Responsabile) e procede
+  /// con il salvataggio del profilo.
+  Future<void> _confirmParishData() async {
+    final nome = _nomeParrocchiaCtrl.text.trim();
+    if (nome.isEmpty) {
+      setState(() => _errorMessage = 'Inserisci il nome della parrocchia.');
+      return;
+    }
+
+    // Salva i dati della parrocchia PRIMA di lasciare l'onboarding: la
+    // modalità Responsabile viene forzata così da superare il controllo
+    // di scrittura del repository (l'utente non è ancora autenticato).
+    await UserRole.setCurrent(UserRole.responsabile);
+    final configRepo = ParishConfigRepository();
+    await configRepo.forceResponsabileMode(true);
+    await configRepo.save(configRepo.getConfig().copyWith(
+          nomeParrocchia: nome,
+          diocesi: _diocesiCtrl.text.trim(),
+          annoCatechisticoCorrente: _annoCatechisticoCtrl.text.trim(),
+        ));
+
+    await _applyMode(_OnboardingMode.responsabile);
+  }
+
   // ─────────────────────────────────────────────────────────────────────────────
   // UI
   // ─────────────────────────────────────────────────────────────────────────────
@@ -241,7 +318,11 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           children: [
             _buildTopBar(),
             Expanded(
-              child: _step == 0 ? _buildPermissionsStep() : _buildModeStep(),
+              child: _step == 0
+                  ? _buildPermissionsStep()
+                  : _step == 1
+                      ? _buildModeStep()
+                      : _buildParishStep(),
             ),
           ],
         ),
@@ -254,9 +335,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
       child: Row(
         children: [
-          if (_step == 1)
+          if (_step > 0)
             IconButton(
-              onPressed: () => setState(() => _step = 0),
+              onPressed: () => setState(() => _step = _step - 1),
               icon: const Icon(Icons.arrow_back_rounded),
               tooltip: 'Indietro',
             )
@@ -265,7 +346,11 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           Expanded(
             child: Center(
               child: Text(
-                _step == 0 ? 'Benvenuto in CatechHub' : 'Scegli la modalità',
+                switch (_step) {
+                  0 => 'Benvenuto in CatechHub',
+                  1 => 'Scegli la modalità',
+                  _ => 'Dati della parrocchia',
+                },
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -356,6 +441,16 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
               requested: _cameraRequested,
               buttonLabel: 'Attiva la fotocamera',
               onRequest: _requestCameraPermission,
+            ),
+            _buildPermissionCard(
+              icon: Icons.photo_library_rounded,
+              title: 'Foto e media',
+              description: 'Per allegare foto di ragazzi, documenti e verbali '
+                  'dalla galleria del dispositivo.',
+              granted: _photosGranted,
+              requested: _photosRequested,
+              buttonLabel: 'Attiva l\'accesso alla galleria',
+              onRequest: _requestPhotosPermission,
             ),
             const SizedBox(height: 24),
             SizedBox(
@@ -666,6 +761,138 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  // ─── STEP 2: DATI DELLA PARROCCHIA (SOLO MODALITÀ RESPONSABILE) ──────────
+
+  Widget _buildParishStep() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 430),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 16),
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: const Color(0xFF174A7E).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(
+                Icons.account_balance_rounded,
+                size: 40,
+                color: Color(0xFF174A7E),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'La tua parrocchia',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF174A7E),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Per completare la configurazione da Responsabile Catechistico '
+              'inserisci le informazioni principali della parrocchia. Potrai '
+              'modificarle in qualsiasi momento dalle impostazioni.',
+              style: TextStyle(
+                fontSize: 13.5,
+                color: Colors.grey.shade700,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _nomeParrocchiaCtrl,
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(
+                labelText: 'Nome della parrocchia *',
+                hintText: 'Es. Parrocchia San Francesco',
+                prefixIcon: const Icon(Icons.church_rounded),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _diocesiCtrl,
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(
+                labelText: 'Diocesi',
+                hintText: 'Es. Diocesi di Roma',
+                prefixIcon: const Icon(Icons.account_balance_rounded),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _annoCatechisticoCtrl,
+              textInputAction: TextInputAction.done,
+              decoration: InputDecoration(
+                labelText: 'Anno catechistico corrente',
+                hintText: 'Es. 2026-2027',
+                prefixIcon: const Icon(Icons.calendar_month_rounded),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                isDense: true,
+              ),
+              onSubmitted: (_) => _confirmParishData(),
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Text(
+                  _errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: _confirmParishData,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF174A7E),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 2,
+                ),
+                icon: const Icon(Icons.arrow_forward_rounded, size: 20),
+                label: const Text(
+                  'Continua',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
         ),
       ),
     );

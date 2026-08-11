@@ -27,6 +27,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'bible_quote.dart';
 import '../../core/auth/auth_provider.dart';
+import '../../core/storage/local_database.dart';
+import '../../features/guide/demo_guide_service.dart';
 import '../../shared/models/user_role.dart';
 
 /// Animated gradient background with flowing colors
@@ -167,6 +169,18 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
   }
 
+  /// Modalità operativa scelta in onboarding: in "Modalità Normale"
+  /// (setup_mode = 'create') la creazione di una nuova classe è diretta e
+  /// obbligatoria, quindi la scelta "crea / unisciti" viene saltata.
+  bool get _skipsCreateJoinChoice {
+    try {
+      return LocalDatabase.auth().get('setup_mode', defaultValue: 'create') ==
+          'create';
+    } catch (_) {
+      return true;
+    }
+  }
+
   void _nextStep() {
     if (_setupStep == 0) {
       final firstName = _firstNameController.text.trim();
@@ -177,7 +191,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       }
       setState(() {
         _errorMessage = null;
-        _setupStep = 1;
+        // In Modalità Normale si passa direttamente alla creazione della classe.
+        _setupStep = _skipsCreateJoinChoice ? 2 : 1;
       });
     }
   }
@@ -185,8 +200,15 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   void _previousStep() {
     setState(() {
       _errorMessage = null;
-      _setupStep = _setupStep - 1;
-      if (_setupStep == 1) _groupController.clear();
+      // Se la scelta "crea / unisciti" è stata saltata, dal passo di
+      // creazione della classe si torna direttamente al profilo.
+      if (_skipsCreateJoinChoice && _setupStep == 2) {
+        _setupStep = 0;
+        _groupController.clear();
+      } else {
+        _setupStep = _setupStep - 1;
+        if (_setupStep == 1) _groupController.clear();
+      }
     });
   }
 
@@ -252,6 +274,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       setState(() => _errorMessage = 'Nome e cognome sono obbligatori.');
       return;
     }
+
+    // La guida live viene pianificata PRIMA di completare il profilo: al
+    // termine della configurazione il router reindirizza alla guida.
+    await DemoGuideService.scheduleGuide();
 
     final auth = ref.read(authStateProvider.notifier);
     final ok = await auth.setupInitialProfile(

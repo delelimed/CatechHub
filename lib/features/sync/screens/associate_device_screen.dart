@@ -84,6 +84,15 @@ class _AssociateDeviceScreenState
   P2PSyncRole _selectedRole = P2PSyncRole.mioDispositivo;
   final bool _isOnboarding = false;
 
+  /// Profilo anagrafico dell'altro catechista (ruolo "Altro Catechista"):
+  /// nome, cognome e numero che verranno usati per configurare l'account
+  /// del dispositivo ricevente.
+  final TextEditingController _remoteFirstNameController =
+      TextEditingController();
+  final TextEditingController _remoteLastNameController =
+      TextEditingController();
+  final TextEditingController _remotePhoneController = TextEditingController();
+
   /// Classi scelte quando il ruolo è "Altro Catechista": solo queste classi
   /// vengono condivise/sincronizzate con il dispositivo remoto.
   Set<String> _selectedSharedClassIds = {};
@@ -173,6 +182,7 @@ class _AssociateDeviceScreenState
   }
 
   void _chooseShowQrFirst() {
+    _applyRemoteProfile();
     _isFirstToShowQr = true;
     setState(() {
       _errorMessage = null;
@@ -183,6 +193,7 @@ class _AssociateDeviceScreenState
   }
 
   void _chooseScanFirst() {
+    _applyRemoteProfile();
     _isFirstToShowQr = false;
     setState(() {
       _errorMessage = null;
@@ -190,6 +201,17 @@ class _AssociateDeviceScreenState
       _currentStep = _AssociationStep.scanFirstQr;
     });
     _openScanner();
+  }
+
+  /// Trasmette i dati anagrafici inseriti nel modulo "Altro Catechista" al
+  /// servizio P2P, così da includerli nell'handshake per configurare
+  /// l'account del dispositivo ricevente.
+  void _applyRemoteProfile() {
+    ref.read(nearbySyncServiceProvider).setAssociationRemoteProfile(
+          firstName: _remoteFirstNameController.text,
+          lastName: _remoteLastNameController.text,
+          phoneNumber: _remotePhoneController.text,
+        );
   }
 
   void _openScanner() {
@@ -950,8 +972,10 @@ class _AssociateDeviceScreenState
                 ],
               ),
             ),
-            if (_selectedRole == P2PSyncRole.altroCatechista)
+            if (_selectedRole == P2PSyncRole.altroCatechista) ...[
+              _buildRemoteProfileForm(theme, colorScheme),
               _buildSharedClassSelector(theme, colorScheme),
+            ],
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
@@ -990,6 +1014,92 @@ class _AssociateDeviceScreenState
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Modulo dati anagrafici dell'altro catechista: nome, cognome e numero
+  /// che configureranno l'account del dispositivo ricevente.
+  Widget _buildRemoteProfileForm(
+      ThemeData theme, ColorScheme colorScheme) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: colorScheme.primary.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.badge_outlined,
+                  size: 18, color: colorScheme.primary),
+              const SizedBox(width: 6),
+              Text(
+                'Dati dell\'altro catechista',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Questi dati configureranno l\'account del dispositivo del collega.\n'
+            'Nome e cognome sono obbligatori.',
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.3,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _remoteFirstNameController,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              labelText: 'Nome *',
+              isDense: true,
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _remoteLastNameController,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              labelText: 'Cognome *',
+              isDense: true,
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _remotePhoneController,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+              labelText: 'Numero di telefono (facoltativo)',
+              isDense: true,
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'I dati vengono inviati in modo sicuro al dispositivo del collega.',
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey.shade500,
+            ),
+          ),
+        ],
       ),
     );
   }

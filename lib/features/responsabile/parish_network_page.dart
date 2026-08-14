@@ -42,10 +42,16 @@ class _ParishNetworkPageState extends State<ParishNetworkPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(_onTabChanged);
+  }
+
+  void _onTabChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -53,22 +59,25 @@ class _ParishNetworkPageState extends State<ParishNetworkPage>
   Widget? get _fab {
     switch (_tabController.index) {
       case 0:
-        return FloatingActionButton(
+        return FloatingActionButton.extended(
           tooltip: 'Nuova riunione',
+          icon: const Icon(Icons.add),
+          label: const Text('Nuova riunione'),
           onPressed: () => _newEventDialog(context),
-          child: const Icon(Icons.add),
         );
       case 1:
-        return FloatingActionButton(
+        return FloatingActionButton.extended(
           tooltip: 'Nuovo avviso',
+          icon: const Icon(Icons.add),
+          label: const Text('Nuovo avviso'),
           onPressed: () => _newAvvisoDialog(context),
-          child: const Icon(Icons.add),
         );
       case 2:
         return FloatingActionButton.extended(
-          icon: const Icon(Icons.sync_rounded),
-          label: const Text('Sincronizza rete'),
-          onPressed: () => _syncParishChannel(context),
+          tooltip: 'Concedi titolo di classe',
+          icon: const Icon(Icons.qr_code_rounded),
+          label: const Text('Concedi titolo'),
+          onPressed: () => _grantTitlePicker(context),
         );
       default:
         return null;
@@ -89,6 +98,63 @@ class _ParishNetworkPageState extends State<ParishNetworkPage>
       messenger.showSnackBar(
         SnackBar(content: Text('Sincronizzazione fallita: $e')),
       );
+    }
+  }
+
+  /// Apre un selettore di classe e concede il titolo di trattamento alla
+  /// classe scelta (flusso di creazione dei titoli, tab dedicato).
+  Future<void> _grantTitlePicker(BuildContext context) async {
+    final classes = LocalDatabase.values(
+      LocalDatabase.classes(),
+      (id, data) => SchoolClass.fromMap(id, data),
+    );
+    if (classes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Nessuna classe presente su questo dispositivo.',
+          ),
+        ),
+      );
+      return;
+    }
+    String selectedId = classes.first.id;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (d) => StatefulBuilder(
+        builder: (d, setState) => AlertDialog(
+          title: const Text('Concedi titolo'),
+          content: DropdownButtonFormField<String>(
+            initialValue: selectedId,
+            decoration: const InputDecoration(
+              labelText: 'Classe',
+              border: OutlineInputBorder(),
+            ),
+            items: [
+              for (final c in classes)
+                DropdownMenuItem(value: c.id, child: Text(c.name)),
+            ],
+            onChanged: (v) {
+              if (v != null) setState(() => selectedId = v);
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(d, false),
+              child: const Text('Annulla'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(d, true),
+              child: const Text('Continua'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok == true) {
+      if (!context.mounted) return;
+      final c = classes.firstWhere((x) => x.id == selectedId);
+      await _grantTitleForClass(context, c);
     }
   }
 
@@ -294,10 +360,10 @@ class _ParishNetworkPageState extends State<ParishNetworkPage>
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: const [
-                _RiunioniTab(),
-                _AvvisiTab(),
-                _TitoliTab(),
+              children: [
+                _RiunioniTab(onSync: () => _syncParishChannel(context)),
+                const _AvvisiTab(),
+                const _TitoliTab(),
               ],
             ),
           ),
@@ -312,13 +378,31 @@ class _ParishNetworkPageState extends State<ParishNetworkPage>
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _RiunioniTab extends ConsumerWidget {
-  const _RiunioniTab();
+  final Future<void> Function()? onSync;
+  const _RiunioniTab({this.onSync});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final events = ref.watch(_parishEventsProvider);
     return Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: onSync,
+                  icon: const Icon(Icons.sync_rounded, size: 18),
+                  label: const Text('Sincronizza rete'),
+                ),
+              ],
+            ),
+          ),
+        ),
         Expanded(
           child: events.when(
             data: (list) => list.isEmpty
@@ -625,36 +709,42 @@ class _ClassTitleTile extends ConsumerWidget {
 
   /// Genera un QR grant del titolo della classe (PIN protetto).
   Future<void> _grantTitleFlow(BuildContext context) async {
-    final key = ClassChannelService.getKeyByClassId(classModel.id);
-    if (key == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Nessuna chiave disponibile: solo il Responsabile o il Titolare '
-            'della classe può concedere il titolo.',
-          ),
+    await _grantTitleForClass(context, classModel);
+  }
+}
+
+/// Genera un QR grant del titolo della classe [classModel] (PIN protetto).
+/// Condiviso tra il pulsante della riga classe e il FAB "Concedi titolo".
+Future<void> _grantTitleForClass(BuildContext context, SchoolClass classModel) async {
+  final key = ClassChannelService.getKeyByClassId(classModel.id);
+  if (key == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Nessuna chiave disponibile: solo il Responsabile o il Titolare '
+          'della classe può concedere il titolo.',
         ),
-      );
-      return;
-    }
-
-    final pin = QRDataService.generatePin();
-    final grantMap = ClassChannelService.buildGrantMap(
-      key: key,
-      grantorName: _localDisplayName(),
-    );
-    final chunks = ClassChannelService.createKeyGrantChunks(grantMap, pin);
-
-    if (!context.mounted) return;
-    await showDialog(
-      context: context,
-      builder: (d) => _GrantQrDialog(
-        className: classModel.name,
-        pin: pin,
-        chunks: chunks,
       ),
     );
+    return;
   }
+
+  final pin = QRDataService.generatePin();
+  final grantMap = ClassChannelService.buildGrantMap(
+    key: key,
+    grantorName: _localDisplayName(),
+  );
+  final chunks = ClassChannelService.createKeyGrantChunks(grantMap, pin);
+
+  if (!context.mounted) return;
+  await showDialog(
+    context: context,
+    builder: (d) => _GrantQrDialog(
+      className: classModel.name,
+      pin: pin,
+      chunks: chunks,
+    ),
+  );
 }
 
 String _localDisplayName() {

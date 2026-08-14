@@ -24,6 +24,7 @@ import '../../core/providers/theme_provider.dart';
 import '../../core/security/privacy_settings.dart';
 import '../../core/services/meeting_notification_service.dart';
 import '../../shared/models/user_role.dart';
+import '../../shared/utils/anno_catechistico.dart';
 import '../../shared/utils/app_mode.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../responsabile/parish_config_repository.dart';
@@ -115,12 +116,15 @@ class SettingsPage extends ConsumerWidget {
 
     final nomeCtrl = TextEditingController(text: config.nomeParrocchia);
     final diocesiCtrl = TextEditingController(text: config.diocesi);
-    final annoCtrl = TextEditingController(text: config.annoCatechisticoCorrente);
+    final annoCtrl = TextEditingController(
+      text: config.annoCatechisticoCorrente.trim().isNotEmpty
+          ? config.annoCatechisticoCorrente
+          : currentCatechisticYear(),
+    );
     final sogliaCtrl =
         TextEditingController(text: config.sogliaAssenzeConsecutive.toString());
     final durataCtrl =
         TextEditingController(text: config.durataValiditaConsensoMesi.toString());
-    var modoAttivo = config.isResponsabileModeActive;
     var ruolo = UserRole.current();
 
     showDialog(
@@ -139,17 +143,6 @@ class SettingsPage extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _ConfigSectionLabel('Modalità'),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Modalità Responsabile attiva'),
-                  subtitle: const Text(
-                      'Sblocca dashboard e funzioni amministrative'),
-                  value: modoAttivo,
-                  activeThumbColor: const Color(0xFF174A7E),
-                  onChanged: (v) => setState(() => modoAttivo = v),
-                ),
-                const SizedBox(height: 4),
                 const Text('Ruolo profilo locale',
                     style: TextStyle(fontSize: 12, color: Colors.grey)),
                 const SizedBox(height: 4),
@@ -236,7 +229,6 @@ class SettingsPage extends ConsumerWidget {
                 final soglia = int.tryParse(sogliaCtrl.text.trim());
                 final durata = int.tryParse(durataCtrl.text.trim());
                 await repo.save(config.copyWith(
-                  isResponsabileModeActive: modoAttivo,
                   nomeParrocchia: nomeCtrl.text.trim(),
                   diocesi: diocesiCtrl.text.trim(),
                   annoCatechisticoCorrente: annoCtrl.text.trim(),

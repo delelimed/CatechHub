@@ -33,41 +33,103 @@ class AulaManagementSection extends ConsumerStatefulWidget {
 }
 
 class _AulaManagementSectionState extends ConsumerState<AulaManagementSection> {
-  final _nomeCtrl = TextEditingController();
-  final _capienzaCtrl = TextEditingController();
-  final _noteCtrl = TextEditingController();
-
-  @override
-  void dispose() {
-    _nomeCtrl.dispose();
-    _capienzaCtrl.dispose();
-    _noteCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _createAula() async {
-    final nome = _nomeCtrl.text.trim();
-    if (nome.isEmpty) {
+  Future<void> _createAula(
+    String nome,
+    String capienza,
+    String note,
+  ) async {
+    if (nome.trim().isEmpty) {
       _snack('Inserisci il nome della stanza.');
       return;
     }
-    final capienza = int.tryParse(_capienzaCtrl.text.trim()) ?? 0;
+    final capienzaNum = int.tryParse(capienza.trim()) ?? 0;
     try {
       final repo = AulaRepository();
       await repo.saveAula(Aula(
         stanzaId: LocalDatabase.newId('stanza'),
-        nomeStanza: nome,
-        capienzaMassima: capienza,
-        noteAccessibilita: _noteCtrl.text.trim(),
+        nomeStanza: nome.trim(),
+        capienzaMassima: capienzaNum,
+        noteAccessibilita: note.trim(),
         lastModifiedBy: getCurrentCatechistName(),
       ));
-      _nomeCtrl.clear();
-      _capienzaCtrl.clear();
-      _noteCtrl.clear();
-      _snack('Aula "$nome" creata.');
+      _snack('Aula "${nome.trim()}" creata.');
     } catch (e) {
       _snack('Errore: $e');
     }
+  }
+
+  /// Apre la finestra di creazione di una nuova stanza (nome, capienza, note).
+  Future<void> _openCreateAulaDialog() async {
+    final nomeCtrl = TextEditingController();
+    final capienzaCtrl = TextEditingController();
+    final noteCtrl = TextEditingController();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: const Text('Nuova stanza'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: nomeCtrl,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Nome stanza *',
+                  hintText: 'Es. Aula San Giuseppe, Sala parrocchiale',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: capienzaCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Capienza massima',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: noteCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Note accessibilità (piano, barriere...)',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(d, false),
+            child: const Text('Annulla'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (nomeCtrl.text.trim().isEmpty) {
+                _snack('Inserisci il nome della stanza.');
+                return;
+              }
+              Navigator.pop(d, true);
+            },
+            child: const Text('Crea stanza'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok == true) {
+      await _createAula(nomeCtrl.text, capienzaCtrl.text, noteCtrl.text);
+    }
+    nomeCtrl.dispose();
+    capienzaCtrl.dispose();
+    noteCtrl.dispose();
   }
 
   Future<void> _deleteAula(Aula aula) async {
@@ -112,13 +174,13 @@ class _AulaManagementSectionState extends ConsumerState<AulaManagementSection> {
     final aulasAsync = ref.watch(aulasStreamProvider);
     final classesAsync = ref.watch(classesStreamProvider);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 4),
       children: [
         if (readOnly)
           _readOnlyBanner()
         else ...[
-          _createForm(),
+          _createAulaButton(),
           const SizedBox(height: 16),
         ],
         classesAsync.when(
@@ -409,63 +471,26 @@ class _AulaManagementSectionState extends ConsumerState<AulaManagementSection> {
     );
   }
 
-  Widget _createForm() {
+  Widget _createAulaButton() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(
-        color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
-      ),
-    );
-    return _panel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Nuova stanza',
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            'Aule e stanze',
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 16,
               color: isDark ? Colors.white : const Color(0xFF174A7E),
             ),
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _nomeCtrl,
-            decoration: InputDecoration(
-              labelText: 'Nome stanza *',
-              border: border,
-              hintText: "Es. Aula San Giuseppe, Sala parrocchiale",
-            ),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _capienzaCtrl,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: 'Capienza massima',
-              border: border,
-            ),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _noteCtrl,
-            decoration: InputDecoration(
-              labelText: 'Note accessibilità (piano, barriere...)',
-              border: border,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(
-              onPressed: _createAula,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Crea aula'),
-            ),
-          ),
-        ],
-      ),
+        ),
+        FilledButton.icon(
+          onPressed: _openCreateAulaDialog,
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('Crea stanza'),
+        ),
+      ],
     );
   }
 
@@ -503,23 +528,6 @@ class _AulaManagementSectionState extends ConsumerState<AulaManagementSection> {
           ),
         );
       },
-    );
-  }
-
-  Widget _panel({required Widget child}) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Theme.of(context).colorScheme.surfaceContainer
-            : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
-        ),
-      ),
-      child: child,
     );
   }
 }

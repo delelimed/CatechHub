@@ -58,6 +58,7 @@ import '../shared/models/catechesi_model.dart';
 import '../features/responsabile/responsabile_dashboard_page.dart';
 import '../features/responsabile/responsabile_admin_page.dart';
 import '../features/responsabile/admin_section_pages.dart';
+import '../features/responsabile/classe_detail_page.dart';
 import '../features/responsabile/catechisti_page.dart';
 import '../features/responsabile/audit_log_page.dart';
 import '../features/responsabile/consensi_page.dart';
@@ -608,6 +609,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/parrocchia/classi',
         builder: (context, state) => const ClassiRoutePage(),
+      ),
+
+      /// Dettaglio di una classe: catechisti, ragazzi e azioni di gestione.
+      GoRoute(
+        path: '/parrocchia/classi/:classId',
+        builder: (context, state) => ClasseDetailPage(
+          classId: state.pathParameters['classId'] ?? '',
+        ),
       ),
 
       /// Rubrica catechisti: anagrafica, telefono, classi e dispositivi.

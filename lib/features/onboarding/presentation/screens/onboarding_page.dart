@@ -30,6 +30,7 @@ import '../../../../core/services/bluetooth_permission_service.dart';
 import '../../../../core/storage/local_database.dart';
 import '../../../../features/responsabile/parish_config_repository.dart';
 import '../../../../shared/models/user_role.dart';
+import '../../../../shared/utils/anno_catechistico.dart';
 
 /// Modalità operativa scelta durante l'onboarding (spec: app_mode).
 enum _OnboardingMode {
@@ -54,6 +55,13 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   /// 0 = permessi contestuali, 1 = selezione modalità,
   /// 2 = dati della parrocchia (solo Modalità Responsabile).
   int _step = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Precompila l'anno catechistico corrente (es. "2026-2027").
+    _annoCatechisticoCtrl.text = currentCatechisticYear();
+  }
 
   bool _notificationGranted = false;
   bool _cameraGranted = false;

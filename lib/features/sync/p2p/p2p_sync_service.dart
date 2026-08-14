@@ -267,6 +267,15 @@ class _PendingAssociationData {
   });
 }
 
+/// Chiave di sessione a breve scadenza, valida per una specifica finestra
+/// temporale. Viene rigenerata a ogni rotazione (30 minuti).
+class _EndpointSessionKey {
+  final int windowIndex;
+  final SecretKeyData key;
+
+  const _EndpointSessionKey({required this.windowIndex, required this.key});
+}
+
 class P2PSyncService {
   static final P2PSyncService _instance = P2PSyncService._();
   factory P2PSyncService() => _instance;
@@ -318,6 +327,7 @@ class P2PSyncService {
   Timer? _pairingTimeoutTimer;
   Timer? _periodicSyncTimer;
   Timer? _confirmationTimeoutTimer;
+  Timer? _sessionKeyRotationTimer;
   bool _initialized = false;
   bool _isSyncing = false;
   DateTime? _lastSyncStartTime;
@@ -373,7 +383,11 @@ class P2PSyncService {
   String? _pendingChoiceEndpoint;
   P2PIdentity? _pendingChoiceRemoteIdentity;
 
-  final Map<String, SecretKeyData> _endpointSessionKeys = {};
+  /// Chiavi di sessione per endpoint, con rotazione per finestra temporale:
+  /// per ogni endpoint manteniamo solo le chiavi della finestra corrente e
+  /// della finestra precedente (per gestire i messaggi in transito al confine
+  /// della rotazione). Ogni chiave scade dopo `sessionKeyRotation`.
+  final Map<String, List<_EndpointSessionKey>> _endpointSessionKeys = {};
 
   bool _continuousModeActive = false;
   final Set<String> _connectedEndpoints = {};
@@ -488,6 +502,7 @@ class P2PSyncService {
     _watchLocalChanges();
     _scheduleReconnectCycle();
     _startPeriodicSync();
+    _startSessionKeyRotation();
 
     _updateState(
       _state.copyWith(isBackgroundSyncActive: true, clearError: true),
@@ -510,6 +525,8 @@ class P2PSyncService {
     _mergedController = null;
     _periodicSyncTimer?.cancel();
     _periodicSyncTimer = null;
+    _sessionKeyRotationTimer?.cancel();
+    _sessionKeyRotationTimer = null;
     _nearbyDiscoveredDevices.clear();
     _nearbyEndpointToDevice.clear();
     _endpointSyncPhase.clear();
@@ -1843,44 +1860,50 @@ class P2PSyncService {
     String endpointId,
     String rawMessage,
   ) async {
-    final sessionKey = _endpointSessionKeys[endpointId];
-    if (sessionKey != null) {
-      try {
-        final encrypted = P2PEncryptedPayload.decode(rawMessage);
-        final decrypted = await _security.decryptPayload(encrypted, sessionKey);
-        final wrapper = jsonDecode(decrypted);
-        if (wrapper is Map<String, dynamic>) {
-          final senderId = wrapper['senderId'] as String?;
-          final senderPublicKey = wrapper['senderPublicKey'] as String?;
-          final expectedDeviceId = _endpointConnIdMap[endpointId];
-          if (senderId != null &&
-              expectedDeviceId != null &&
-              senderId != expectedDeviceId) {
-            addLog(
-              'ERROR',
-              'Mittente non corrisponde: $senderId vs $expectedDeviceId',
-            );
-            return rawMessage;
-          }
-          if (senderPublicKey != null && expectedDeviceId != null) {
-            final assoc = await _security.getAssociation(expectedDeviceId);
-            if (assoc != null &&
-                !P2PSecurityService.publicKeyMatchesAssociation(
-                  assoc,
-                  senderPublicKey,
-                )) {
+    final keys = _endpointSessionKeys[endpointId];
+    if (keys != null && keys.isNotEmpty) {
+      // Tenta con tutte le chiavi della finestra corrente e precedente:
+      // i messaggi in transito al confine della rotazione sono decifrabili
+      // con la chiave della finestra in cui sono stati cifrati.
+      for (final entry in keys) {
+        try {
+          final encrypted = P2PEncryptedPayload.decode(rawMessage);
+          final decrypted =
+              await _security.decryptPayload(encrypted, entry.key);
+          final wrapper = jsonDecode(decrypted);
+          if (wrapper is Map<String, dynamic>) {
+            final senderId = wrapper['senderId'] as String?;
+            final senderPublicKey = wrapper['senderPublicKey'] as String?;
+            final expectedDeviceId = _endpointConnIdMap[endpointId];
+            if (senderId != null &&
+                expectedDeviceId != null &&
+                senderId != expectedDeviceId) {
               addLog(
                 'ERROR',
-                'Chiave pubblica mittente non corrisponde per $senderId',
+                'Mittente non corrisponde: $senderId vs $expectedDeviceId',
               );
               return rawMessage;
             }
+            if (senderPublicKey != null && expectedDeviceId != null) {
+              final assoc = await _security.getAssociation(expectedDeviceId);
+              if (assoc != null &&
+                  !P2PSecurityService.publicKeyMatchesAssociation(
+                    assoc,
+                    senderPublicKey,
+                  )) {
+                addLog(
+                  'ERROR',
+                  'Chiave pubblica mittente non corrisponde per $senderId',
+                );
+                return rawMessage;
+              }
+            }
+            final data = wrapper['data'] as String?;
+            if (data != null) return data;
           }
-          final data = wrapper['data'] as String?;
-          if (data != null) return data;
-        }
-        return wrapper is String ? wrapper : decrypted;
-      } catch (_) {}
+          return wrapper is String ? wrapper : decrypted;
+        } catch (_) {}
+      }
     }
     return rawMessage;
   }
@@ -3236,7 +3259,7 @@ class P2PSyncService {
     return local ?? remote ?? '';
   }
 
-  Future<SecretKeyData> _deriveSessionKey(String deviceId) async {
+  Future<SecretKeyData> _deriveSessionKey(String deviceId, {DateTime? at}) async {
     final assoc = await _security.getAssociation(deviceId);
     if (assoc == null) {
       throw Exception('Associazione non trovata per $deviceId');
@@ -3249,42 +3272,106 @@ class P2PSyncService {
       remotePublicKeyBase64: assoc.publicKeyBase64,
       isInitiator: isInitiator,
       sessionNonce: _getCombinedSessionNonce(),
+      at: at,
     );
     return session.sessionKey;
   }
 
-  Future<void> _ensureSessionKey(String endpointId) async {
-    if (_endpointSessionKeys.containsKey(endpointId)) return;
+  /// Garantisce che per [endpointId] siano disponibili le chiavi di sessione
+  /// della finestra corrente e di quella precedente, rimuovendo le chiavi
+  /// scadute. La rotazione è quindi "pigra" (avviene alla prima trasmissione
+  /// della nuova finestra) e viene completata periodicamente dal timer di
+  /// rotazione.
+  Future<void> _ensureSessionKey(String endpointId, {DateTime? at}) async {
+    final currentWindow = P2PSecurityService.sessionWindowIndex(at);
+    final keepWindows = <int>{
+      currentWindow,
+      P2PSecurityService.previousWindowIndex(currentWindow),
+    };
+
+    final existing = _endpointSessionKeys[endpointId];
+    if (existing != null && existing.any((k) => k.windowIndex == currentWindow)) {
+      final stale = existing.where((k) => !keepWindows.contains(k.windowIndex));
+      if (stale.isNotEmpty) {
+        _endpointSessionKeys[endpointId] =
+            existing.where((k) => keepWindows.contains(k.windowIndex)).toList();
+      }
+      return;
+    }
+
     final deviceId = _endpointConnIdMap[endpointId];
     if (deviceId == null) {
       throw Exception('Nessun deviceId mappato per endpoint $endpointId');
     }
 
-    final assoc = await _security.getAssociation(deviceId);
-    if (assoc != null) {
-      final key = await _deriveSessionKey(deviceId);
-      _endpointSessionKeys[endpointId] = key;
-      return;
-    }
-
     final pending = _pendingAssociations[deviceId];
-    if (pending != null) {
-      final localIdentity = await _security.getLocalIdentity();
-      final isInitiator = localIdentity.deviceId.compareTo(deviceId) < 0;
-      final session = await _security.createEphemeralSession(
-        remoteDeviceId: deviceId,
-        remoteDeviceName: pending.deviceName,
-        remotePublicKeyBase64: pending.publicKeyBase64,
-        isInitiator: isInitiator,
-        sessionNonce: _getCombinedSessionNonce(),
+    if (pending == null && await _security.getAssociation(deviceId) == null) {
+      throw Exception(
+        'Impossibile derivare chiave sessione: associazione non trovata per $deviceId',
       );
-      _endpointSessionKeys[endpointId] = session.sessionKey;
-      return;
     }
 
-    throw Exception(
-      'Impossibile derivare chiave sessione: associazione non trovata per $deviceId',
+    // Deriva le chiavi per finestra corrente e precedente (convergenza tra i
+    // due peer senza handshake aggiuntivi: stessa finestra → stessa chiave).
+    final keys = <_EndpointSessionKey>[];
+    for (final window in keepWindows) {
+      final windowStart = P2PSecurityService.sessionWindowStart(window);
+      if (pending != null) {
+        final localIdentity = await _security.getLocalIdentity();
+        final isInitiator = localIdentity.deviceId.compareTo(deviceId) < 0;
+        final session = await _security.createEphemeralSession(
+          remoteDeviceId: deviceId,
+          remoteDeviceName: pending.deviceName,
+          remotePublicKeyBase64: pending.publicKeyBase64,
+          isInitiator: isInitiator,
+          sessionNonce: _getCombinedSessionNonce(),
+          at: windowStart,
+        );
+        keys.add(
+          _EndpointSessionKey(windowIndex: window, key: session.sessionKey),
+        );
+      } else {
+        keys.add(
+          _EndpointSessionKey(
+            windowIndex: window,
+            key: await _deriveSessionKey(deviceId, at: windowStart),
+          ),
+        );
+      }
+    }
+    _endpointSessionKeys[endpointId] = keys;
+  }
+
+  /// Restituisce la chiave di sessione attiva (finestra corrente) per
+  /// [endpointId], o null se non disponibile.
+  SecretKeyData? _currentSessionKey(String endpointId, {DateTime? at}) {
+    final keys = _endpointSessionKeys[endpointId];
+    if (keys == null || keys.isEmpty) return null;
+    final currentWindow = P2PSecurityService.sessionWindowIndex(at);
+    for (final k in keys) {
+      if (k.windowIndex == currentWindow) return k.key;
+    }
+    return null;
+  }
+
+  /// Rotazione periodica: rigenera la chiave di sessione di tutti gli endpoint
+  /// connessi alla scadenza della finestra corrente.
+  void _startSessionKeyRotation() {
+    _sessionKeyRotationTimer?.cancel();
+    _sessionKeyRotationTimer = Timer.periodic(
+      P2PSecurityService.sessionKeyRotation,
+      (_) => _rotateSessionKeys(),
     );
+  }
+
+  Future<void> _rotateSessionKeys() async {
+    for (final endpointId in _endpointConnIdMap.keys.toList()) {
+      try {
+        await _ensureSessionKey(endpointId);
+      } catch (e) {
+        addLog('WARN', 'Rotazione chiave fallita per $endpointId: $e');
+      }
+    }
   }
 
   Future<void> _sendEncryptedPayload(
@@ -3292,7 +3379,7 @@ class P2PSyncService {
     String plainText,
   ) async {
     await _ensureSessionKey(endpointId);
-    final sessionKey = _endpointSessionKeys[endpointId];
+    final sessionKey = _currentSessionKey(endpointId);
     if (sessionKey == null) {
       addLog('ERROR', 'Nessuna chiave di sessione per $endpointId');
       throw Exception('Nessuna chiave di sessione per $endpointId');
@@ -4722,6 +4809,7 @@ class P2PSyncService {
   void dispose() {
     _pairingTimeoutTimer?.cancel();
     _periodicSyncTimer?.cancel();
+    _sessionKeyRotationTimer?.cancel();
     _confirmationTimeoutTimer?.cancel();
     _hiveBoxesSub?.cancel();
     stopPairingMode();

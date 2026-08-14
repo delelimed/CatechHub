@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/current_class_provider.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/attachment_parent_type.dart';
+import '../../shared/models/class_model.dart';
 import '../../shared/models/student_model.dart';
 import '../attachments/widgets/attachments_section.dart';
 import 'students_repository.dart';
@@ -18,9 +19,25 @@ final classesRepoProvider = Provider((ref) => ClassesRepository());
 /// genitori, altro) e sezione allegati.
 /// Usa il modello [Student] e salva tramite [StudentsRepository] (Box `students`).
 /// Alla creazione assegna automaticamente lo studente alla classe del
-/// catechista corrente. Flusso: accessibile dal FAB di [StudentsPage].
+/// catechista corrente. Se [classId] è fornito (es. censimento iscrizioni del
+/// Responsabile), lo studente viene iscritto a quella specifica classe invece
+/// che alla classe corrente. Flusso: accessibile dal FAB di [StudentsPage].
 class AddStudentPage extends ConsumerStatefulWidget {
-  const AddStudentPage({super.key});
+  /// Classe di destinazione (id). Se null si usa la classe corrente.
+  final String? classId;
+
+  /// Codice univoco della classe di destinazione (con [classId]).
+  final String? classUniqueCode;
+
+  /// Etichetta mostrata nell'header quando si iscrive a una classe specifica.
+  final String? classLabel;
+
+  const AddStudentPage({
+    super.key,
+    this.classId,
+    this.classUniqueCode,
+    this.classLabel,
+  });
 
   @override
   ConsumerState<AddStudentPage> createState() =>
@@ -86,7 +103,11 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _HeaderCard(isDark: isDark, colorScheme: colorScheme),
+            _HeaderCard(
+              isDark: isDark,
+              colorScheme: colorScheme,
+              classLabel: widget.classLabel,
+            ),
 
             const SizedBox(height: 16),
 
@@ -258,8 +279,16 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
                     }
                   }
 
-                  final currentClass =
-                      ref.read(currentClassDetailsProvider);
+                  final currentClass = widget.classId != null &&
+                          widget.classId!.isNotEmpty
+                      ? SchoolClass(
+                          id: widget.classId!,
+                          name: widget.classLabel ?? '',
+                          studentIds: const [],
+                          catechistIds: const [],
+                          uniqueCode: widget.classUniqueCode ?? '',
+                        )
+                      : ref.read(currentClassDetailsProvider);
 
                   final student = Student(
                     id: studentId,
@@ -319,8 +348,13 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
 class _HeaderCard extends StatelessWidget {
   final bool isDark;
   final ColorScheme colorScheme;
+  final String? classLabel;
 
-  const _HeaderCard({required this.isDark, required this.colorScheme});
+  const _HeaderCard({
+    required this.isDark,
+    required this.colorScheme,
+    this.classLabel,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -354,12 +388,33 @@ class _HeaderCard extends StatelessWidget {
           Icon(Icons.person_add_alt_1,
               color: isDark ? colorScheme.primary : const Color(0xFF174A7E), size: 30),
           const SizedBox(width: 12),
-          Text(
-            'Nuovo profilo ragazzo',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Nuovo profilo ragazzo',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                  ),
+                ),
+                if (classLabel != null && classLabel!.trim().isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'Iscrizione in: $classLabel',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontStyle: FontStyle.italic,
+                        color: isDark
+                            ? colorScheme.onSurfaceVariant
+                            : Colors.black54,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],

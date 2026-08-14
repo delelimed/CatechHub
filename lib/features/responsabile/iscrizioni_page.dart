@@ -16,14 +16,13 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
-import '../../core/storage/local_database.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/models/parish_config.dart';
 import '../../shared/models/student_model.dart';
 import '../classes/classes_provider.dart';
 import '../classes/classes_repository.dart';
+import '../students/students_add_page.dart';
 import '../students/students_repository.dart';
 import '../archive/concludi_anno_service.dart';
 import 'passaggio_anno_service.dart';
@@ -45,293 +44,16 @@ class _IscrizioniPageState extends ConsumerState<IscrizioniPage> {
   // CENSIMENTO COMPLETO (nuova anagrafica Student con validazione)
   // ═══════════════════════════════════════════════════════════════════════
   Future<void> _addStudentDialog(SchoolClass c) async {
-    final formKey = GlobalKey<FormState>();
-    final nomeCtrl = TextEditingController();
-    final cognomeCtrl = TextEditingController();
-    final madreNomeCtrl = TextEditingController();
-    final madreCognomeCtrl = TextEditingController();
-    final madreTelefonoCtrl = TextEditingController();
-    final padreNomeCtrl = TextEditingController();
-    final padreCognomeCtrl = TextEditingController();
-    final padreTelefonoCtrl = TextEditingController();
-    final telefonoCtrl = TextEditingController();
-    final allergieCtrl = TextEditingController();
-    final noteCtrl = TextEditingController();
-    final contributoCtrl = TextEditingController(text: '20.00');
-    DateTime? birthDate;
-    var schedaFirmata = false;
-    var contributoVersato = false;
-    String annoContributo = '';
-
-    await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setState) {
-          final isDark = Theme.of(dialogContext).brightness == Brightness.dark;
-          final border = OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(
-              color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
-            ),
-          );
-
-          Widget field(TextEditingController ctrl, String label,
-              {TextInputType? keyboard, String? hint, bool required = false}) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: TextFormField(
-                controller: ctrl,
-                keyboardType: keyboard,
-                decoration: InputDecoration(
-                  labelText: required ? '$label *' : label,
-                  hintText: hint,
-                  border: border,
-                  isDense: true,
-                ),
-                validator: (v) =>
-                    required && (v == null || v.trim().isEmpty) ? 'Obbligatorio' : null,
-              ),
-            );
-          }
-
-          return AlertDialog(
-            title: Text('Censimento nuovo ragazzo'),
-            content: SizedBox(
-              width: 420,
-              child: SingleChildScrollView(
-                child: Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Iscrizione in: ${c.name}',
-                          style: const TextStyle(
-                              fontSize: 12, fontStyle: FontStyle.italic)),
-                      const Divider(height: 16),
-                      const _SectionLabel('Anagrafica'),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                              child: field(nomeCtrl, 'Nome',
-                                  hint: 'Es. Marco', required: true)),
-                          const SizedBox(width: 8),
-                          Expanded(
-                              child: field(cognomeCtrl, 'Cognome',
-                                  hint: 'Es. Rossi', required: true)),
-                        ],
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: InkWell(
-                          onTap: () async {
-                            final picked = await showDatePicker(
-                              context: dialogContext,
-                              initialDate: birthDate ?? DateTime.now(),
-                              firstDate: DateTime(2000),
-                              lastDate: DateTime.now(),
-                            );
-                            if (picked != null) setState(() => birthDate = picked);
-                          },
-                          child: InputDecorator(
-                            decoration: InputDecoration(
-                              labelText: 'Data di nascita *',
-                              border: border,
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 6),
-                              suffixIcon:
-                                  const Icon(Icons.calendar_month_rounded),
-                            ),
-                            child: Text(
-                              birthDate == null
-                                  ? 'Seleziona la data'
-                                  : DateFormat('dd/MM/yyyy').format(birthDate!),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const Divider(height: 8),
-                      const _SectionLabel('Madre'),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(child: field(madreNomeCtrl, 'Nome madre')),
-                          const SizedBox(width: 8),
-                          Expanded(
-                              child: field(madreCognomeCtrl, 'Cognome madre')),
-                        ],
-                      ),
-                      field(madreTelefonoCtrl, 'Telefono madre',
-                          keyboard: TextInputType.phone),
-                      const _SectionLabel('Padre'),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(child: field(padreNomeCtrl, 'Nome padre')),
-                          const SizedBox(width: 8),
-                          Expanded(
-                              child: field(padreCognomeCtrl, 'Cognome padre')),
-                        ],
-                      ),
-                      field(padreTelefonoCtrl, 'Telefono padre',
-                          keyboard: TextInputType.phone),
-                      field(telefonoCtrl, 'Cellulare ragazzo',
-                          keyboard: TextInputType.phone),
-                      field(allergieCtrl, 'Allergie alimentari/farmacologiche'),
-                      field(noteCtrl, 'Note'),
-                      const SizedBox(height: 4),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Checkbox(
-                            value: schedaFirmata,
-                            onChanged: (v) =>
-                                setState(() => schedaFirmata = v ?? false),
-                          ),
-                          Expanded(
-                            child: Text(
-                              'Scheda di iscrizione unificata FIRMATA dalla '
-                              'famiglia (include l\'autorizzazione al '
-                              'trattamento dei dati del minore per finalità '
-                              'pastorali). Obbligatoria per la registrazione.',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                height: 1.35,
-                                color: isDark
-                                    ? Colors.grey.shade400
-                                    : Colors.black54,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Divider(height: 16),
-                      Row(
-                        children: [
-                          Checkbox(
-                            value: contributoVersato,
-                            onChanged: (v) => setState(
-                                () => contributoVersato = v ?? false),
-                          ),
-                          const Expanded(
-                            child: Text(
-                              'Contributo volontario versato dalla famiglia',
-                              style: TextStyle(fontSize: 13),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (contributoVersato) ...[
-                        Row(
-                          children: [
-                            Expanded(
-                              child: field(
-                                  contributoCtrl, 'Importo (€)',
-                                  keyboard: const TextInputType
-                                      .numberWithOptions(decimal: true)),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                // L'anno corrente viene precompilato dalla
-                                // configurazione se il campo è ancora vuoto.
-                                controller: TextEditingController(
-                                  text: annoContributo,
-                                ),
-                                onChanged: (v) => annoContributo = v,
-                                decoration: InputDecoration(
-                                  labelText: 'Anno catechistico',
-                                  border: border,
-                                  isDense: true,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('Annulla'),
-              ),
-              FilledButton(
-                onPressed: () async {
-                  if (birthDate == null) {
-                    _snack('Seleziona la data di nascita del ragazzo.');
-                    return;
-                  }
-                  if (!(formKey.currentState?.validate() ?? false)) {
-                    _snack('Compila i campi obbligatori (nome, cognome).');
-                    return;
-                  }
-                  if (!schedaFirmata) {
-                    _snack('La scheda di iscrizione unificata deve essere '
-                        'firmata dalla famiglia.');
-                    return;
-                  }
-                  final config =
-                      ref.read(parishConfigRepositoryProvider).getConfig();
-                  final consensoMesi =
-                      config.durataValiditaConsensoMesi > 0
-                          ? config.durataValiditaConsensoMesi
-                          : 12;
-                  final now = DateTime.now();
-                  final student = Student(
-                    id: LocalDatabase.newId('student'),
-                    name: nomeCtrl.text.trim(),
-                    surname: cognomeCtrl.text.trim(),
-                    birthDate: birthDate!,
-                    classId: c.id,
-                    classUniqueCode: c.uniqueCode,
-                    motherName: madreNomeCtrl.text.trim(),
-                    motherSurname: madreCognomeCtrl.text.trim(),
-                    motherPhone: madreTelefonoCtrl.text.trim(),
-                    fatherName: padreNomeCtrl.text.trim(),
-                    fatherSurname: padreCognomeCtrl.text.trim(),
-                    fatherPhone: padreTelefonoCtrl.text.trim(),
-                    studentPhone: telefonoCtrl.text.trim(),
-                    allergies: allergieCtrl.text.trim().isEmpty
-                        ? null
-                        : allergieCtrl.text.trim(),
-                    notes: noteCtrl.text.trim().isEmpty
-                        ? null
-                        : noteCtrl.text.trim(),
-                    consensoPrivacyFirmato: true,
-                    dataFirmaConsenso: now,
-                    dataScadenzaTrattamento: DateTime(now.year,
-                        now.month + consensoMesi, now.day, 23, 59, 59),
-                    contributoVersato: contributoVersato,
-                    contributoEuros: contributoVersato
-                        ? (double.tryParse(contributoCtrl.text.trim()
-                                  .replaceAll(',', '.')) ??
-                              0)
-                        : 0,
-                    annoContributo: annoContributo,
-                    statoPercorso: 'ATTIVO',
-                    annoIscrizione: config.annoCatechisticoCorrente.trim(),
-                  );
-
-                  await StudentsRepository().addStudent(student);
-                  await ClassesRepository().addStudentToClass(c.id, student.id);
-                  if (dialogContext.mounted) {
-                    Navigator.pop(dialogContext, true);
-                  }
-                  _snack(
-                      '${student.name} ${student.surname} iscritto a "${c.name}".');
-                },
-                child: const Text('Iscrivi'),
-              ),
-            ],
-          );
-        },
+    // Riusa lo stesso identico form di inserimento usato in modalità
+    // normale/associata (AddStudentPage), iscrivendo il ragazzo alla classe
+    // target selezionata.
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AddStudentPage(
+          classId: c.id,
+          classUniqueCode: c.uniqueCode,
+          classLabel: c.name,
+        ),
       ),
     );
   }
@@ -804,23 +526,6 @@ class _IscrizioniPageState extends ConsumerState<IscrizioniPage> {
                   ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Etichetta di sezione nel form di censimento.
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  const _SectionLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Text(
-        text,
-        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
       ),
     );
   }

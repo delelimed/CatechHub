@@ -343,6 +343,33 @@ class P2PSecurityService {
   static const _localKeyPairName = 'p2p_local_keypair';
   static const _localIdentityKey = 'p2p_local_identity';
 
+  /// Durata di vita di ogni chiave di sessione P2P: dopo questo intervallo la
+  /// chiave viene rigenerata (rotazione) in modo che anche i dati in transito
+  /// siano protetti da una chiave a breve scadenza.
+  static const Duration sessionKeyRotation = Duration(minutes: 30);
+
+  /// Indice della finestra temporale corrente: entrambi i peer derivano la
+  /// stessa chiave di sessione per la stessa finestra senza bisogno di un
+  /// handshake aggiuntivo.
+  static int sessionWindowIndex([DateTime? at]) {
+    final now = at ?? DateTime.now();
+    return now.millisecondsSinceEpoch ~/ sessionKeyRotation.inMilliseconds;
+  }
+
+  /// Identificatore stabile della finestra temporale (usato nell'info HKDF).
+  static String sessionWindowId(int windowIndex) => 'w$windowIndex';
+
+  /// Inizio della finestra temporale [windowIndex].
+  static DateTime sessionWindowStart(int windowIndex) {
+    return DateTime.fromMillisecondsSinceEpoch(
+      windowIndex * sessionKeyRotation.inMilliseconds,
+      isUtc: true,
+    );
+  }
+
+  /// Restituisce la finestra temporale precedente all'indice [windowIndex].
+  static int previousWindowIndex(int windowIndex) => windowIndex - 1;
+
   final FlutterSecureStorage _secureStorage;
   final X25519 _x25519 = X25519();
 
@@ -610,6 +637,7 @@ class P2PSecurityService {
     required String remotePublicKeyBase64,
     bool isInitiator = false,
     String? sessionNonce,
+    DateTime? at,
   }) async {
     Uint8List remoteKeyBytes;
     try {
@@ -625,32 +653,18 @@ class P2PSecurityService {
     );
     final sharedBytes = await sharedSecret.extractBytes();
 
-    // Utilizza un nonce unico per sessione derivato dai nonces scambiati
-    // durante l'handshake, invece di un hash deterministico del shared secret.
-    // Questo garantisce che ogni sessione usi una chiave diversa.
-    final Uint8List handshakeNonce;
-    if (sessionNonce != null && sessionNonce.isNotEmpty) {
-      final nonceHash = crypto.sha256.convert(utf8.encode(sessionNonce));
-      handshakeNonce = Uint8List.fromList(nonceHash.bytes.sublist(0, 32));
-    } else {
-      final hkdfInput = crypto.sha256.convert(sharedBytes).bytes;
-      handshakeNonce = Uint8List.fromList(hkdfInput.sublist(0, 32));
-    }
-
-    final hkdf = Hkdf(
-      hmac: Hmac(_sha256Algo),
-      outputLength: 32,
-    );
-
     final localIdentity = await getLocalIdentity();
-    final ids = [localIdentity.deviceId, remoteDeviceId]..sort();
-    final info = utf8.encode(
-        'CatechHub_P2P_Session_v3:${ids[0]}:${ids[1]}');
 
-    final sessionKeyData = await hkdf.deriveKey(
-      secretKey: SecretKey(Uint8List.fromList(sharedBytes)),
-      nonce: handshakeNonce,
-      info: info,
+    final sessionKeyData = await deriveRotatingSessionKey(
+      sharedSecretBytes: sharedBytes,
+      localDeviceId: localIdentity.deviceId,
+      remoteDeviceId: remoteDeviceId,
+      sessionNonce: sessionNonce,
+      at: at,
+    );
+    final handshakeNonce = deriveSessionNonce(
+      sharedSecretBytes: sharedBytes,
+      sessionNonce: sessionNonce,
     );
 
     return P2PSession(
@@ -658,8 +672,58 @@ class P2PSecurityService {
       remoteDeviceName: remoteDeviceName,
       sessionKey: sessionKeyData,
       handshakeNonce: handshakeNonce,
-      createdAt: DateTime.now(),
+      createdAt: at ?? DateTime.now(),
       isInitiator: isInitiator,
+    );
+  }
+
+  /// Deriva il nonce di sessione (unico per sessione) dall'handshake.
+  static Uint8List deriveSessionNonce({
+    required List<int> sharedSecretBytes,
+    String? sessionNonce,
+  }) {
+    // Utilizza un nonce unico per sessione derivato dai nonces scambiati
+    // durante l'handshake, invece di un hash deterministico del shared secret.
+    // Questo garantisce che ogni sessione usi una chiave diversa.
+    if (sessionNonce != null && sessionNonce.isNotEmpty) {
+      final nonceHash = crypto.sha256.convert(utf8.encode(sessionNonce));
+      return Uint8List.fromList(nonceHash.bytes.sublist(0, 32));
+    }
+    final hkdfInput = crypto.sha256.convert(sharedSecretBytes).bytes;
+    return Uint8List.fromList(hkdfInput.sublist(0, 32));
+  }
+
+  /// Deriva la chiave di sessione a breve scadenza (rotazione per finestra
+  /// temporale). Funzione pura: input identici + stessa finestra → stessa
+  /// chiave; finestre diverse → chiavi diverse. La finestra temporale è
+  /// codificata nell'info HKDF, quindi entrambi i peer convergono sulla stessa
+  /// chiave corrente senza messaggi aggiuntivi.
+  static Future<SecretKeyData> deriveRotatingSessionKey({
+    required List<int> sharedSecretBytes,
+    required String localDeviceId,
+    required String remoteDeviceId,
+    String? sessionNonce,
+    DateTime? at,
+  }) async {
+    final handshakeNonce = deriveSessionNonce(
+      sharedSecretBytes: sharedSecretBytes,
+      sessionNonce: sessionNonce,
+    );
+
+    final hkdf = Hkdf(
+      hmac: Hmac(_sha256Algo),
+      outputLength: 32,
+    );
+
+    final windowIndex = sessionWindowIndex(at);
+    final ids = [localDeviceId, remoteDeviceId]..sort();
+    final info = utf8.encode(
+        'CatechHub_P2P_Session_v3:${ids[0]}:${ids[1]}:${sessionWindowId(windowIndex)}');
+
+    return hkdf.deriveKey(
+      secretKey: SecretKey(Uint8List.fromList(sharedSecretBytes)),
+      nonce: handshakeNonce,
+      info: info,
     );
   }
 

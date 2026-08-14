@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../../shared/widgets/app_scaffold.dart';
 import '../data/association_models.dart';
 import '../p2p/p2p_security_service.dart';
 
@@ -35,7 +36,6 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
 
   bool _isLoading = true;
   bool _responsabileMode = false;
-  bool _hasSecret = false;
   List<P2PDeviceAssociation> _associations = [];
   Map<String, dynamic>? _trustInfo;
   AssociatedDevice? _localApproval;
@@ -65,14 +65,12 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
   Future<void> _initData() async {
     setState(() => _isLoading = true);
     final mode = await _security.isResponsabileModeActive();
-    final hasSecret = await _security.hasParishApprovalSecret();
     final associations = await _security.getAllAssociations();
     final trustInfo = await _security.getResponsabileTrustInfo();
     final localApproval = await _security.getLocalApproval();
     if (!mounted) return;
     setState(() {
       _responsabileMode = mode;
-      _hasSecret = hasSecret;
       _associations = associations;
       _trustInfo = trustInfo;
       _localApproval = localApproval;
@@ -101,7 +99,6 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
     if (!mounted) return;
     setState(() {
       _trustQrData = payload;
-      _hasSecret = true;
       _scanTrust = false;
       _scanApproval = false;
     });
@@ -226,7 +223,6 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
         };
         _scanTrust = false;
         _scanMessage = null;
-        _hasSecret = true;
       });
       await _initData();
       if (!mounted) return;
@@ -320,101 +316,80 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Catena di fiducia',
-            style: TextStyle(color: Colors.white)),
-        backgroundColor: colorScheme.primary,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Aggiorna',
-            onPressed: _refresh,
-          ),
-        ],
-      ),
-      body: _isLoading
+    return AppScaffold(
+      title: 'Catena di fiducia',
+      child: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildStatusBanner(theme, colorScheme),
+          : ListView(
+              padding: const EdgeInsets.all(4),
+              children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: IconButton(
+                    icon: const Icon(Icons.refresh_rounded),
+                    tooltip: 'Aggiorna',
+                    onPressed: _refresh,
+                  ),
+                ),
+                _buildStatusBanner(theme, colorScheme),
+                const SizedBox(height: 16),
+                _buildResponsabileSection(theme, colorScheme),
+                const SizedBox(height: 20),
+                _buildVerificationSection(theme, colorScheme),
+                const SizedBox(height: 20),
+                _buildAssociationsSection(theme, colorScheme),
+                if (_localApproval != null) ...[
                   const SizedBox(height: 20),
-                  _buildResponsabileSection(theme, colorScheme),
-                  const SizedBox(height: 24),
-                  _buildVerificationSection(theme, colorScheme),
-                  const SizedBox(height: 24),
-                  _buildAssociationsSection(theme, colorScheme),
-                  if (_localApproval != null) ...[
-                    const SizedBox(height: 24),
-                    _buildLocalApprovalCard(theme),
-                  ],
-                  const SizedBox(height: 32),
+                  _buildLocalApprovalCard(theme),
                 ],
-              ),
+                const SizedBox(height: 24),
+              ],
             ),
     );
   }
 
   Widget _buildStatusBanner(ThemeData theme, ColorScheme colorScheme) {
+    final active = _responsabileMode;
+    final color = active ? Colors.green : Colors.blueGrey;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: _responsabileMode
-            ? Colors.green.withValues(alpha: 0.08)
-            : Colors.blueGrey.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _responsabileMode
-              ? Colors.green.withValues(alpha: 0.4)
-              : Colors.blueGrey.withValues(alpha: 0.2),
-        ),
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Icon(
-                _responsabileMode ? Icons.verified_user : Icons.info_outline,
-                color: _responsabileMode ? Colors.green : Colors.blueGrey,
-                size: 22,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  _responsabileMode
-                      ? 'Modalità Responsabile ATTIVA'
+          Icon(
+            active ? Icons.verified_user : Icons.info_outline,
+            color: color,
+            size: 26,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  active
+                      ? 'Modalità Responsabile attiva'
                       : 'Modalità Responsabile disattivata',
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: _responsabileMode ? Colors.green[800] : Colors.blueGrey,
+                    color: color,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _responsabileMode
-                ? 'I dispositivi possono sincronizzare le classi SOLO dopo '
-                    'essere stati approvati (firmati) dal tuo dispositivo. '
-                    'Approva ogni dispositivo e consegna il QR di approvazione '
-                    'al tablet interessato.'
-                : 'Con la modalità Responsabile disattivata ogni associazione '
-                    'valida può sincronizzare. Attivala dalla configurazione '
-                    'della parrocchia per abilitare la catena di fiducia.',
-            style: TextStyle(fontSize: 13, color: Colors.grey[700], height: 1.4),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Segreto parrocchia: ${_hasSecret ? 'configurato su questo dispositivo' : 'non presente su questo dispositivo'}',
-            style: TextStyle(
-              fontSize: 12,
-              color: _hasSecret ? Colors.green[700] : Colors.orange[800],
+                const SizedBox(height: 4),
+                Text(
+                  active
+                      ? 'Ogni dispositivo deve essere approvato prima di '
+                          'sincronizzare le classi.'
+                      : 'Attiva la modalità Responsabile per gestire la '
+                          'catena di fiducia.',
+                  style: TextStyle(fontSize: 12.5, color: Colors.grey[700], height: 1.4),
+                ),
+              ],
             ),
           ),
         ],
@@ -594,17 +569,23 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
   Widget _buildAssociationCard(
       P2PDeviceAssociation assoc, ThemeData theme) {
     final approved = assoc.authorizedByResponsabile;
+    final isDark = theme.brightness == Brightness.dark;
+    final cardColor =
+        isDark ? theme.colorScheme.surfaceContainer : Colors.white;
     return Container(
+      margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: approved
-            ? Colors.green.withValues(alpha: 0.05)
-            : Colors.grey.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(12),
+            ? Colors.green.withValues(alpha: isDark ? 0.12 : 0.05)
+            : cardColor,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: approved
-              ? Colors.green.withValues(alpha: 0.3)
-              : Colors.grey.withValues(alpha: 0.2),
+              ? Colors.green.withValues(alpha: 0.35)
+              : (isDark
+                  ? theme.colorScheme.outline.withValues(alpha: 0.2)
+                  : Colors.grey.shade200),
         ),
       ),
       child: Column(
@@ -624,6 +605,20 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
+              if (approved)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'Approvato',
+                    style: TextStyle(
+                        color: Colors.green, fontSize: 11, fontWeight: FontWeight.w600),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 6),
@@ -637,13 +632,6 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
               color: approved ? Colors.green[700] : Colors.grey[600],
             ),
           ),
-          if (approved && assoc.approvalSignature != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              'Firma: ${assoc.approvalSignature!.substring(0, 16)}...',
-              style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-            ),
-          ],
           const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modalità Responsabile Catechistico — CatechHub</title>
+<meta name="description" content="La modalità Responsabile Catechistico trasforma CatechHub nel registro parrocchiale: classi, iscrizioni, consensi, logistica delle aule e Registro Trattamenti GDPR.">
+<link rel="icon" href="../logo.png" type="image/png">
+<link rel="stylesheet" href="../style.css">
+<script src="../js/version.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="../logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
+
+<section class="page-header">
+  <div class="container">
+    <h1>Modalità Responsabile Catechistico</h1>
+    <p>Gestisci l'intera parrocchia: classi, iscrizioni, consensi, aule, catechisti e Registro Trattamenti GDPR — tutto offline e sincronizzato peer-to-peer</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+
+    <div class="breadcrumb"><a href="../index.html">Home</a> / <a href="responsabile.html">Responsabile</a> / Panoramica</div>
+
+    <h2>Che cos'è</h2>
+    <p>La <strong>Modalità Responsabile Catechistico</strong> è l'area dedicata al responsabile della parrocchia. Trasforma CatechHub da registro personale a <strong>registro parrocchiale</strong>: un unico punto da cui gestire tutte le classi, gli iscritti, i consensi, le aule e i catechisti. I dati restano sul dispositivo, cifrati, e si allineano con i catechisti tramite la <a href="sync.html">sincronizzazione P2P</a>.</p>
+
+    <div class="alert alert-info">
+      La modalità è disponibile in tre varianti scelte all'avvio: <strong>Modalità Normale</strong> (catechista autonomo), <strong>Modalità Associato</strong> (collegato a una parrocchia gestita) e <strong>Modalità Responsabile</strong>.
+    </div>
+
+    <h2>La dashboard parrocchiale</h2>
+    <p>La schermata iniziale del Responsabile mostra il quadro sintetico della parrocchia: <strong>classi attive</strong>, <strong>ragazzi iscritti</strong> e <strong>catechisti</strong>, seguiti dalle <strong>funzioni rapide</strong> per raggiungere con un tap ogni area di gestione (classi, logistica, iscrizioni, catechisti, rete, consensi, registro trattamenti, archivio storico, import).</p>
+
+    <div class="alert alert-info">
+      La vecchia vista gerarchica ad albero della parrocchia &egrave; stata rimossa: le stesse informazioni sono gi&agrave; disponibili in modo pi&ugrave; efficace nelle singole sezioni (classi per percorso, gestione catechisti, anagrafica ragazzi).
+    </div>
+
+    <h2>Funzionalità</h2>
+
+    <h3>Gestione classi</h3>
+    <p>Le classi sono raggruppate per <strong>percorso</strong> (ad es. Iniziazione, Cresima, Post-Cresima) e organizzate in <strong>attive</strong> e <strong>archiviate</strong>. Crei, modifichi e archivi le classi con pochi tap; ogni classe condivisa con i catechisti resta sincronizzata automaticamente.</p>
+
+    <h3>Iscrizioni</h3>
+    <p>Registri i nuovi iscritti, vedi i totali per classe e gestisci la <strong>promozione</strong> al percorso successivo. Il <strong>passaggio di anno</strong> aggiorna automaticamente l'anno di riferimento: la classe 2026-2027 diventa 2027-2028 (gli iscritti "passano" al nuovo anno), mentre <strong>"Concludi anno"</strong> archivia le classi a fine percorso.</p>
+
+    <h3>Consensi privacy</h3>
+    <p>Ogni iscritto ha un <strong>consenso privacy</strong> con data di sottoscrizione e <strong>durata di validità</strong> (configurabile nelle impostazioni della parrocchia). L'app segnala i consensi in scadenza o scaduti, così sai sempre quali famiglie devi ricontattare per il rinnovo.</p>
+
+    <h3>Registro Trattamenti (GDPR)</h3>
+    <p>Ogni operazione rilevante viene registrata in un <strong>audit log firmato</strong> (HMAC-SHA256, chiave per dispositivo): chi ha inserito, modificato o eliminato cosa e quando. Il Registro Trattamenti è il punto di riferimento per la conformità GDPR della parrocchia.</p>
+
+    <h3>Gestione catechisti</h3>
+    <p>Anagrafica dei catechisti della parrocchia, con ruoli e permessi associati (chi può gestire presenze, documenti, aule, ecc.).</p>
+
+    <h3>Logistica delle aule</h3>
+    <p>Definisci le <strong>aule e stanze</strong> della parrocchia (nome, capienza massima, note di accessibilità) e assegna gli <strong>slot settimanali</strong> alle classi (giorno e orario). Il servizio di controllo <strong>conflitti</strong> segnala sovrapposizioni di orario nella stessa aula o il superamento della capienza. La vista <strong>occupazione tabellare</strong> mostra a colpo d'occhio quale aula è libera o occupata in ogni fascia oraria.</p>
+    <p><strong>Consultazione per gli associati:</strong> quando la modalità Responsabile è attiva, i dispositivi "Associato" (collegati a una classe della parrocchia) possono <strong>vedere</strong> le aule e la tabella orario in <strong>sola lettura</strong> — utile a catechisti e supplenti per sapere dove e quando si svolge ogni incontro. La gestione e la modifica delle aule restano riservate al Responsabile.</p>
+
+    <h3>Import ragazzi</h3>
+    <p>Importa l'anagrafica dei ragazzi in blocco per accelerare l'inserimento a inizio anno.</p>
+
+    <h3>Rete parrocchiale</h3>
+    <p>La <strong>rete parrocchiale</strong> mostra i dispositivi collegati alla parrocchia e i loro stati. Con la <a href="sync.html">catena di fiducia</a>, ogni dispositivo deve essere <strong>approvato dal Responsabile</strong> prima di poter sincronizzare le classi.</p>
+
+    <h2>Catena di fiducia</h2>
+    <p>Dal <strong>Centro approvazioni</strong> il Responsabile approva o revoca i dispositivi dei catechisti. L'approvazione è un certificato firmato (HMAC-SHA256) legato al segreto della parrocchia e viene verificata durante ogni handshake P2P. Un dispositivo non approvato <strong>non può sincronizzarsi</strong> finché la modalità Responsabile è attiva.</p>
+
+    <h2>Allarme assenze</h2>
+    <p>Il Responsabile può monitorare le assenze ripetute dei ragazzi a livello parrocchiale, per intervenire tempestivamente con le famiglie.</p>
+
+    <div class="alert alert-info">
+      La logistica (aule e slot) e le classi condivise si propagano a tutti i dispositivi approvati tramite la sincronizzazione P2P. I dati non passano mai da server esterni.
+    </div>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div>
+      <strong>CatechHub</strong> <span class="version-tag"></span> — Registro Elettronico di Catechismo<br>
+      <small>Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.</small>
+    </div>
+    <div>
+      <small>
+        &#128231; <a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a> &middot;
+        &#128247; Instagram (prossimamente) &middot;
+        &#9992; Telegram (prossimamente)
+      </small><br>
+      <a href="../privacy.html">Privacy</a> &middot;
+      <a href="../terms.html">Termini</a> &middot;
+      <a href="../infos/index.html">GDPR</a> &middot;
+      <a href="../developer.html">Sviluppatore</a> &middot;
+      <a href="https://github.com/delelimed/CatechHub" class="release-url">GitHub</a><br>
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/nav.js"></script></body>
+</html>

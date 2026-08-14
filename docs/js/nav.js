@@ -30,6 +30,7 @@
         ${li('features/catechesi.html', 'Biblioteca catechetica')}
         ${li('features/data-share.html', 'Condivisione QR')}
         ${li('features/backup.html', 'Backup')}
+        ${li('features/responsabile.html', 'Responsabile parrocchiale')}
         ${li('features/sync.html', 'Sync P2P')}
         ${li('features/allergies-exits.html', 'Allergie/Uscite')}
         ${li('features/pdf-printing.html', 'PDF/Stampa')}

@@ -39,7 +39,7 @@ class PassaggioAnnoService {
     final a = int.tryParse(parts[0]);
     final b = int.tryParse(parts[1]);
     if (a == null || b == null) return anno;
-    return '$a-${b + 1}';
+    return '$b-${b + 1}';
   }
 
   /// Promuove in blocco le classi attive al livello successivo.

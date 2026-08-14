@@ -322,12 +322,10 @@ class _RiunioniTab extends ConsumerWidget {
         Expanded(
           child: events.when(
             data: (list) => list.isEmpty
-                ? const Center(
-                    child: Text(
-                      'Nessuna riunione parrocchiale.\nCreane una con il pulsante +.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey),
-                    ),
+                ? const _EmptyTabState(
+                    icon: Icons.event_rounded,
+                    message: 'Nessuna riunione parrocchiale.\nCreane una con '
+                        'il pulsante +.',
                   )
                 : ListView.separated(
                     itemCount: list.length,
@@ -437,11 +435,10 @@ class _AvvisiTab extends ConsumerWidget {
         Expanded(
           child: avvisi.when(
             data: (list) => list.isEmpty
-                ? const Center(
-                    child: Text(
-                      'Nessun avviso parrocchiale.',
-                      style: TextStyle(color: Colors.grey),
-                    ),
+                ? const _EmptyTabState(
+                    icon: Icons.campaign_rounded,
+                    message: 'Nessun avviso parrocchiale.\nCreane uno con il '
+                        'pulsante +.',
                   )
                 : ListView.separated(
                     itemCount: list.length,
@@ -554,11 +551,9 @@ class _TitoliTab extends ConsumerWidget {
         Expanded(
           child: classes.when(
             data: (list) => list.isEmpty
-                ? const Center(
-                    child: Text(
-                      'Nessuna classe presente su questo dispositivo.',
-                      style: TextStyle(color: Colors.grey),
-                    ),
+                ? const _EmptyTabState(
+                    icon: Icons.class_rounded,
+                    message: 'Nessuna classe presente su questo dispositivo.',
                   )
                 : ListView.separated(
                     itemCount: list.length,
@@ -938,6 +933,36 @@ class _ScanTitleDialogState extends State<_ScanTitleDialog> {
           child: const Text('Annulla'),
         ),
       ],
+    );
+  }
+}
+
+/// Stato vuoto con icona per i tab della rete parrocchiale.
+class _EmptyTabState extends StatelessWidget {
+  final IconData icon;
+  final String message;
+
+  const _EmptyTabState({required this.icon, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon,
+                size: 52, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

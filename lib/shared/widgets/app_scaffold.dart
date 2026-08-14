@@ -35,6 +35,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/sync/widgets/sync_status_dot.dart';
+import '../models/user_role.dart';
 import 'side_menu.dart';
 
 class AppScaffold extends StatelessWidget {
@@ -58,13 +59,20 @@ class AppScaffold extends StatelessWidget {
   /// Converte la path della route corrente nell'indice della
   /// bottom navigation bar (mobile) o della sidebar evidenziazione.
   ///
-  /// MANTENERE SINCRONIZZATO CON router.dart:
-  ///   index 0 → '/' (Dashboard)
-  ///   index 1 → '/my-group'
-  ///   index 2 → '/planning'
-  ///   index 3 → '/documents'
-  ///   index 4 → '/settings'
+  /// La mappa route↔indice cambia in base al ruolo:
+  ///   - Catechista: 0 → '/', 1 → '/my-group', 2 → '/planning',
+  ///     3 → '/documents', 4 → '/settings'
+  ///   - Responsabile: 0 → '/parrocchia', 1 → '/parrocchia/classi',
+  ///     2 → '/parrocchia/iscrizioni', 3 → '/parrocchia/consensi',
+  ///     4 → '/settings'
   int _indexFromLocation(String location) {
+    if (UserRole.isResponsabile) {
+      if (location.startsWith('/parrocchia/classi')) return 1;
+      if (location.startsWith('/parrocchia/iscrizioni')) return 2;
+      if (location.startsWith('/parrocchia/consensi')) return 3;
+      if (location.startsWith('/settings')) return 4;
+      return 0;
+    }
     if (location.startsWith('/my-group')) return 1;
     if (location.startsWith('/planning')) return 2;
     if (location.startsWith('/documents')) return 3;
@@ -76,6 +84,27 @@ class AppScaffold extends StatelessWidget {
   /// Converte l'indice della navigation bar nella path della route.
   /// È l'inversa di _indexFromLocation.
   String _routeFromIndex(int index) {
+    if (UserRole.isResponsabile) {
+      switch (index) {
+        case 0:
+          return '/parrocchia';
+
+        case 1:
+          return '/parrocchia/classi';
+
+        case 2:
+          return '/parrocchia/iscrizioni';
+
+        case 3:
+          return '/parrocchia/consensi';
+
+        case 4:
+          return '/settings';
+
+        default:
+          return '/parrocchia';
+      }
+    }
     switch (index) {
       case 0:
         return '/';
@@ -97,6 +126,74 @@ class AppScaffold extends StatelessWidget {
     }
   }
 
+  /// Route principali (senza back button) per il ruolo corrente.
+  List<String> get _mainRoutes => UserRole.isResponsabile
+      ? const [
+          '/parrocchia',
+          '/parrocchia/classi',
+          '/parrocchia/iscrizioni',
+          '/parrocchia/consensi',
+          '/settings',
+        ]
+      : const ['/', '/my-group', '/planning', '/documents', '/settings'];
+
+  /// Destinazioni della bottom navigation per il ruolo corrente.
+  List<NavigationDestination> get _destinations => UserRole.isResponsabile
+      ? const [
+          NavigationDestination(
+            icon: Icon(Icons.dashboard_rounded),
+            selectedIcon: Icon(Icons.dashboard),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.class_rounded),
+            selectedIcon: Icon(Icons.class_rounded),
+            label: 'Classi',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.how_to_reg_rounded),
+            selectedIcon: Icon(Icons.how_to_reg_rounded),
+            label: 'Iscrizioni',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.task_alt_rounded),
+            selectedIcon: Icon(Icons.task_alt_rounded),
+            label: 'Consensi',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Impostazioni',
+          ),
+        ]
+      : const [
+          NavigationDestination(
+            icon: Icon(Icons.dashboard_rounded),
+            selectedIcon: Icon(Icons.dashboard),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.groups_rounded),
+            selectedIcon: Icon(Icons.groups),
+            label: 'Gruppo',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.calendar_month_outlined),
+            selectedIcon: Icon(Icons.calendar_month),
+            label: 'Programma',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.description_outlined),
+            selectedIcon: Icon(Icons.description),
+            label: 'Documenti',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Impostazioni',
+          ),
+        ];
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -113,9 +210,7 @@ class AppScaffold extends StatelessWidget {
     // 2. Se mostrare il pulsante back (solo sottopagine, non sezioni principali)
     final location = GoRouterState.of(context).uri.toString();
     final currentIndex = _indexFromLocation(location);
-    final showBackToHome =
-        !['/', '/my-group', '/planning', '/documents', '/settings']
-            .contains(location);
+    final showBackToHome = !_mainRoutes.contains(location);
 
     // Colori adattivi per il tema
     final scaffoldBg = isDark
@@ -343,33 +438,7 @@ class AppScaffold extends StatelessWidget {
                     onDestinationSelected: (index) {
                       context.go(_routeFromIndex(index));
                     },
-                    destinations: const [
-                      NavigationDestination(
-                        icon: Icon(Icons.dashboard_rounded),
-                        selectedIcon: Icon(Icons.dashboard),
-                        label: 'Home',
-                      ),
-                      NavigationDestination(
-                        icon: Icon(Icons.groups_rounded),
-                        selectedIcon: Icon(Icons.groups),
-                        label: 'Gruppo',
-                      ),
-                      NavigationDestination(
-                        icon: Icon(Icons.calendar_month_outlined),
-                        selectedIcon: Icon(Icons.calendar_month),
-                        label: 'Programma',
-                      ),
-                      NavigationDestination(
-                        icon: Icon(Icons.description_outlined),
-                        selectedIcon: Icon(Icons.description),
-                        label: 'Documenti',
-                      ),
-                      NavigationDestination(
-                        icon: Icon(Icons.settings_outlined),
-                        selectedIcon: Icon(Icons.settings),
-                        label: 'Impostazioni',
-                      ),
-                    ],
+                    destinations: _destinations,
                   ),
                 ),
               ),

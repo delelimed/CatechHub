@@ -131,52 +131,96 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
   @override
   Widget build(BuildContext context) {
     final classesAsync = ref.watch(classesStreamProvider);
-    return ListView(
-      children: [
-        _createForm(),
-        const SizedBox(height: 12),
-        classesAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Text('Errore: $e'),
-          data: (classes) => Column(
-            children: [
-              for (final c in classes.where((c) => !c.archived))
-                _manageClassCard(c),
-            ],
-          ),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sectionColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1040),
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: 24),
+          children: [
+            _createForm(),
+            const SizedBox(height: 16),
+            classesAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Text('Errore: $e'),
+              data: (classes) {
+                final active = classes.where((c) => !c.archived).toList();
+                final archived = classes.where((c) => c.archived).toList();
+                final percorsi = active.map((c) => c.percorso).toSet().toList()
+                  ..sort((a, b) => a.compareTo(b));
+
+                if (active.isEmpty && archived.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Text(
+                      'Nessuna classe presente. Crea la prima classe qui sopra.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontStyle: FontStyle.italic),
+                    ),
+                  );
+                }
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (active.isNotEmpty)
+                      Text(
+                        'Classi attive',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          letterSpacing: 1,
+                          color: sectionColor,
+                        ),
+                      ),
+                    if (active.isNotEmpty) const SizedBox(height: 10),
+                    for (final percorso in percorsi) ...[
+                      if (percorso.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8, bottom: 6),
+                          child: Row(
+                            children: [
+                              Icon(Icons.route_outlined,
+                                  size: 16, color: sectionColor),
+                              const SizedBox(width: 6),
+                              Text(
+                                percorso,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                  color: sectionColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      for (final c in active.where((c) => c.percorso == percorso))
+                        _manageClassCard(c),
+                    ],
+                    if (archived.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        'Archiviate',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          letterSpacing: 1,
+                          color: sectionColor,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      for (final c in archived) _manageClassCard(c, archived: true),
+                    ],
+                  ],
+                );
+              },
+            ),
+          ],
         ),
-        const SizedBox(height: 12),
-        Text(
-          'Archiviate',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 13,
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.grey.shade400
-                : Colors.black54,
-          ),
-        ),
-        classesAsync.when(
-          loading: () => const SizedBox.shrink(),
-          error: (e, _) => const SizedBox.shrink(),
-          data: (classes) {
-            final archived = classes.where((c) => c.archived).toList();
-            if (archived.isEmpty) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: Text('Nessuna classe archiviata.',
-                    style: TextStyle(fontStyle: FontStyle.italic)),
-              );
-            }
-            return Column(
-              children: [
-                for (final c in archived)
-                  _manageClassCard(c, archived: true),
-              ],
-            );
-          },
-        ),
-      ],
+      ),
     );
   }
 

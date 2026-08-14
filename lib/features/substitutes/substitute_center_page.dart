@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/providers/current_class_provider.dart';
 import '../../shared/models/substitute_delegation.dart';
+import '../../shared/utils/app_mode.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../classes/classes_provider.dart';
 import 'substitute_actions.dart';
@@ -18,6 +19,12 @@ class SubstituteCenterPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (!AppModeUtils.supplenzeEnabled()) {
+      return AppScaffold(
+        title: 'Supplenze',
+        child: const _AccessDenied(),
+      );
+    }
     final delegationsAsync = ref.watch(substituteDelegationsProvider);
     final me = AuthService.getCatechistId();
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -56,6 +63,43 @@ class SubstituteCenterPage extends ConsumerWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// Stato di accesso negato quando le supplenze non sono abilitate per
+/// l'account corrente (modalità normale o parrocchia senza modalità
+/// Responsabile).
+class _AccessDenied extends StatelessWidget {
+  const _AccessDenied();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.swap_horiz_rounded,
+                size: 56, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text(
+              'Supplenze non disponibili',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Le supplenze sono disponibili solo per gli account associati '
+              'a una parrocchia che utilizza la modalità Responsabile.',
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }

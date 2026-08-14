@@ -169,6 +169,12 @@ bool _recordMatchesScope({
     if (code.isEmpty) return true;
   }
 
+  // Aule/stanze della parrocchia: dati globali di logistica, condivisi con
+  // qualsiasi scope classe (i catechisti le vedono nello snapshot degli slot).
+  if (boxName == LocalDatabase.aulaBox) {
+    return true;
+  }
+
   for (final scope in scopes) {
     if (_recordMatchesSingleScope(
       boxName: boxName,
@@ -251,6 +257,7 @@ class HiveSyncEngine {
     LocalDatabase.catechesiBox: 'catechesi',
     LocalDatabase.meetingCatechesiBox: 'meeting_catechesi',
     LocalDatabase.studentDailyNotesBox: 'student_daily_notes',
+    LocalDatabase.aulaBox: 'aulas',
   };
 
   static const _lastSyncKey = 'p2p_last_sync_timestamp';

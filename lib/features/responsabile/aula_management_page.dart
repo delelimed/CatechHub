@@ -3,6 +3,9 @@
 //
 // Permette al Responsabile di gestire le aule/stanza parrocchiali e di
 // assegnare slot orari settimanali alle classi, con rilevamento conflitti.
+// I dispositivi "Associato" (modalità Responsabile attiva nella parrocchia)
+// vedono invece una vista in SOLA LETTURA: aule, stanze e tabella orario,
+// senza alcuna azione di modifica.
 // ══════════════════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
@@ -11,6 +14,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/aula.dart';
 import '../../shared/models/class_model.dart';
+import '../../shared/models/user_role.dart';
+import '../../shared/utils/app_mode.dart';
 import '../../shared/utils/auth_utils.dart';
 import '../classes/classes_provider.dart';
 import '../classes/classes_repository.dart';
@@ -98,14 +103,24 @@ class _AulaManagementSectionState extends ConsumerState<AulaManagementSection> {
 
   @override
   Widget build(BuildContext context) {
+    final readOnly = !UserRole.isResponsabile;
+
+    if (readOnly && !AppModeUtils.canViewLogistica()) {
+      return _readOnlyDenied();
+    }
+
     final aulasAsync = ref.watch(aulasStreamProvider);
     final classesAsync = ref.watch(classesStreamProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _createForm(),
-        const SizedBox(height: 16),
+        if (readOnly)
+          _readOnlyBanner()
+        else ...[
+          _createForm(),
+          const SizedBox(height: 16),
+        ],
         classesAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Text('Errore: $e'),
@@ -115,11 +130,13 @@ class _AulaManagementSectionState extends ConsumerState<AulaManagementSection> {
             data: (aulas) => Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _slotAssignmentSection(classes, aulas),
+                if (!readOnly) ...[
+                  _slotAssignmentSection(classes, aulas),
+                  const SizedBox(height: 16),
+                ],
+                _occupazioneTabellare(classes, aulas),
                 const SizedBox(height: 16),
-                _classSlotsSection(classes),
-                const SizedBox(height: 16),
-                _aulaGrid(classes, aulas),
+                _aulaGrid(classes, aulas, readOnly: readOnly),
               ],
             ),
           ),
@@ -128,18 +145,78 @@ class _AulaManagementSectionState extends ConsumerState<AulaManagementSection> {
     );
   }
 
-  String _giornoLabel(int g) {
-    const giorni = [
-      '',
-      'Lunedì',
-      'Martedì',
-      'Mercoledì',
-      'Giovedì',
-      'Venerdì',
-      'Sabato',
-      'Domenica',
-    ];
-    return g >= 1 && g <= 7 ? giorni[g] : 'Giorno';
+  /// Banner informativo mostrato ai dispositivi in sola lettura.
+  Widget _readOnlyBanner() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: (isDark ? Colors.blueGrey.shade900 : Colors.blue.shade50),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? Colors.blueGrey.shade700 : Colors.blue.shade200,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.visibility_rounded,
+            size: 20,
+            color: isDark ? Colors.blueGrey.shade300 : Colors.blue.shade700,
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'Consultazione in sola lettura: la gestione delle aule e degli '
+              'orari è riservata al Responsabile Catechistico.',
+              style: TextStyle(fontSize: 12.5, height: 1.35),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Schermata di accesso negato (modalità normale, parrocchia non gestita).
+  Widget _readOnlyDenied() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? Colors.grey.shade800 : Colors.grey.shade300,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.lock_outline_rounded,
+            size: 44,
+            color: isDark ? Colors.grey.shade500 : Colors.grey,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Logistica non disponibile',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Aule e orari settimanali sono visibili solo ai dispositivi '
+            'collegati a una parrocchia con modalità Responsabile attiva.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12.5),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _slotAssignmentSection(List<SchoolClass> classes, List<Aula> aulas) {
@@ -167,9 +244,22 @@ class _AulaManagementSectionState extends ConsumerState<AulaManagementSection> {
     );
   }
 
-  Widget _classSlotsSection(List<SchoolClass> classes) {
+  /// Visualizzazione tabellare dell'occupazione: una riga per stanza e una
+  /// colonna per giorno della settimana, con gli slot (classe + orario)
+  /// assegnati a ogni cella. Su schermi stretti la tabella scorre in
+  /// orizzontale.
+  Widget _occupazioneTabellare(List<SchoolClass> classes, List<Aula> aulas) {
+    const giorni = [
+      'Lunedì',
+      'Martedì',
+      'Mercoledì',
+      'Giovedì',
+      'Venerdì',
+      'Sabato',
+      'Domenica',
+    ];
     final activeClasses = classes.where((c) => !c.archived).toList();
-    final withSlots = activeClasses.where((c) => c.roomSlots.isNotEmpty).toList();
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -178,59 +268,142 @@ class _AulaManagementSectionState extends ConsumerState<AulaManagementSection> {
             : Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.grey.shade800
-                : Colors.grey.shade200),
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.grey.shade800
+              : Colors.grey.shade200,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Orari assegnati alle classi',
+            'Occupazione delle stanze',
             style: TextStyle(
               fontWeight: FontWeight.bold,
+              fontSize: 15,
               color: Theme.of(context).brightness == Brightness.dark
                   ? Colors.white
                   : const Color(0xFF174A7E),
             ),
           ),
-          const SizedBox(height: 6),
-          if (activeClasses.isEmpty)
-            const Text('Nessuna classe attiva.',
-                style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12))
-          else if (withSlots.isEmpty)
+          const SizedBox(height: 4),
+          Text(
+            'Griglia settimanale: stanze per giorno e orario di occupazione.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.grey.shade400
+                  : Colors.black54,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (aulas.isEmpty || activeClasses.isEmpty)
             const Text(
-              'Nessuno slot assegnato. Usa il pannello sopra per programmare '
-              'aule e orari delle classi.',
-              style: TextStyle(fontSize: 12, height: 1.4),
+              'Crea almeno una classe e un\'aula per visualizzare gli orari.',
+              style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
             )
           else
-            for (final c in activeClasses)
-              if (c.roomSlots.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '• ${c.name}: '
-                          '${c.roomSlots.map((s) => '${_giornoLabel(s.giornoSettimana)} ${s.oraInizio}-${s.oraFine} (${s.nomeStanza.isEmpty ? "Aula assegnata" : s.nomeStanza})').join(', ')}',
-                          style: const TextStyle(fontSize: 12.5),
-                        ),
-                      ),
-                      for (final s in c.roomSlots)
-                        IconButton(
-                          visualDensity: VisualDensity.compact,
-                          tooltip: 'Rimuovi slot ${s.oraInizio}',
-                          icon: const Icon(Icons.close_rounded, size: 16),
-                          onPressed: () async {
-                            await ClassesRepository()
-                                .removeSlotFromClass(c.id, s.slotId);
-                          },
-                        ),
-                    ],
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                headingRowHeight: 44,
+                dataRowMinHeight: 40,
+                dataRowMaxHeight: 64,
+                columns: [
+                  const DataColumn(
+                    label: Text('Stanza',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
-                ),
+                  for (final g in giorni)
+                    DataColumn(
+                      label: Text(g,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                ],
+                rows: [
+                  for (final aula in aulas)
+                    DataRow(
+                      cells: [
+                        DataCell(
+                          SizedBox(
+                            width: 120,
+                            child: Text(
+                              aula.nomeStanza,
+                              style: const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ),
+                        for (var g = 1; g <= 7; g++)
+                          DataCell(
+                            _cellaOccupazione(aula, activeClasses, g),
+                          ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Contenuto di una cella della griglia: gli slot della [aula] nel giorno [g].
+  Widget _cellaOccupazione(Aula aula, List<SchoolClass> classes, int g) {
+    final slots = <(String, String)>[];
+    for (final c in classes) {
+      for (final s in c.roomSlots) {
+        if (s.stanzaId == aula.stanzaId && s.giornoSettimana == g) {
+          slots.add((c.name, '${s.oraInizio}-${s.oraFine}'));
+        }
+      }
+    }
+    slots.sort((a, b) => a.$2.compareTo(b.$2));
+
+    if (slots.isEmpty) {
+      return const SizedBox(
+        width: 90,
+        child: Text('-', style: TextStyle(color: Colors.grey)),
+      );
+    }
+    return SizedBox(
+      width: 130,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final (nome, orario) in slots)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$orario ',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.grey.shade300
+                          : Colors.black87,
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      nome,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.grey.shade400
+                            : Colors.black54,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -296,7 +469,8 @@ class _AulaManagementSectionState extends ConsumerState<AulaManagementSection> {
     );
   }
 
-  Widget _aulaGrid(List<SchoolClass> classes, List<Aula> aulas) {
+  Widget _aulaGrid(List<SchoolClass> classes, List<Aula> aulas,
+      {bool readOnly = false}) {
     if (aulas.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(20),
@@ -324,6 +498,7 @@ class _AulaManagementSectionState extends ConsumerState<AulaManagementSection> {
           itemBuilder: (context, index) => _AulaCard(
             aula: aulas[index],
             classes: classes,
+            readOnly: readOnly,
             onDelete: () => _deleteAula(aulas[index]),
           ),
         );
@@ -352,11 +527,13 @@ class _AulaManagementSectionState extends ConsumerState<AulaManagementSection> {
 class _AulaCard extends StatelessWidget {
   final Aula aula;
   final List<SchoolClass> classes;
+  final bool readOnly;
   final VoidCallback onDelete;
 
   const _AulaCard({
     required this.aula,
     required this.classes,
+    this.readOnly = false,
     required this.onDelete,
   });
 
@@ -395,10 +572,11 @@ class _AulaCard extends StatelessWidget {
                   ),
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline, size: 20),
-                onPressed: onDelete,
-              ),
+              if (!readOnly)
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 20),
+                  onPressed: onDelete,
+                ),
             ],
           ),
           if (aula.capienzaMassima > 0)

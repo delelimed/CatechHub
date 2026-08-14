@@ -67,6 +67,21 @@
       Il doppio consenso garantisce che nessun dato venga trasferito senza la piena consapevolezza di entrambi i catechisti.
     </div>
 
+    <h2>Sincronizzazione continua in background</h2>
+    <p>Oltre alla sincronizzazione manuale, CatechHub può allineare automaticamente i dispositivi fidati: se attivi la sincronizzazione permanente, l'app cerca i dispositivi associati e scambia i dati in modo automatico, anche quando è in background, a intervalli regolari. Un indicatore a pallino in alto mostra lo stato della connessione (verde = allineato, giallo = in corso, rosso = errore).</p>
+
+    <h2>Scope per classe</h2>
+    <p>Quando sincronizzi con un dispositivo fidato, scegli <strong>quali classi condividere</strong>. Vengono scambiati solo i dati delle classi selezionate (anagrafica, presenze, programmazione, documenti, note, catechesi e note giornaliere dei ragazzi). I dati di altre classi non lasciano mai il dispositivo.</p>
+
+    <h2>Catena di fiducia (modalità Responsabile)</h2>
+    <p>Quando la parrocchia è gestita in <strong>Modalità Responsabile</strong>, nessun dispositivo può sincronizzare le classi senza essere stato preventivamente <strong>approvato dal Responsabile</strong>. L'approvazione è un certificato firmato (HMAC-SHA256) legato al segreto della parrocchia:</p>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>Il Responsabile approva (o revoca) i dispositivi dal <strong>Centro approvazioni</strong>.</li>
+      <li>L'approvazione viaggia nell'handshake P2P e viene verificata prima di qualsiasi scambio dati.</li>
+      <li>Se la modalità Responsabile è attiva, un dispositivo non approvato <strong>non può sincronizzarsi</strong>: la richiesta viene rifiutata.</li>
+      <li>I certificati si propagano peer-to-peer: un dispositivo approvato porta l'approvazione agli altri dispositivi della rete parrocchiale.</li>
+    </ul>
+
     <h2>Tracciabilità delle modifiche</h2>
     <p>Ogni record in CatechHub ora mostra chi lo ha modificato e quando. Questa tracciabilità completa permette di sapere sempre chi ha apportato l'ultima modifica a un ragazzo, una presenza o un incontro, garantendo piena trasparenza tra i catechisti.</p>
 
@@ -76,15 +91,18 @@
 
     <h2>Cosa si sincronizza</h2>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
-      <li>Anagrafica ragazzi</li>
+      <li>Anagrafica ragazzi e classi (scope per classe)</li>
       <li>Presenze e appello</li>
       <li>Programmazione incontri</li>
       <li>Documenti e consegne</li>
       <li>Note di contatto</li>
+      <li>Catechesi e note giornaliere dei ragazzi</li>
+      <li>Logistica parrocchiale (aule, stanze e slot settimanali)</li>
+      <li>Certificati di approvazione della catena di fiducia</li>
     </ul>
 
     <h2>Cosa NON si sincronizza</h2>
-    <p>La <strong>Biblioteca Catechetica</strong> (testi, schede, materiale didattico) non viene sincronizzata per rispettare la privacy e il copyright. Ogni catechista ha la sua biblioteca personale. Se vuoi, puoi comunque condividere una risorsa specifica con la <a href="data-share.html">Condivisione QR</a>.</p>
+    <p>La <strong>Biblioteca Catechetica</strong> (testi, schede, materiale didattico) non viene sincronizzata per rispettare la privacy e il copyright. Ogni catechista ha la sua biblioteca personale. Se vuoi, puoi comunque condividere una risorsa specifica con la <a href="data-share.html">Condivisione QR</a>. Il <strong>Registro Trattamenti</strong> (audit log GDPR) resta locale al dispositivo su cui l'operazione è avvenuta: è firmato con una chiave per dispositivo e non può essere verificato da altri apparecchi.</p>
 
     <h2>Dispositivi fidati</h2>
     <p>L'app tiene un elenco dei dispositivi con cui ti sei sincronizzato. Puoi vedere nome, data di prima associazione e data ultima sincronizzazione. Se non ti fidi più di un dispositivo, puoi rimuoverlo con un tap.</p>

@@ -64,7 +64,7 @@ void main() {
 
   group('PassaggioAnnoService.annoSuccessivo', () {
     test('calcola l\'anno successivo', () {
-      expect(PassaggioAnnoService.annoSuccessivo('2026-2027'), '2026-2028');
+      expect(PassaggioAnnoService.annoSuccessivo('2026-2027'), '2027-2028');
     });
 
     test('restituisce l\'input se il formato non è valido', () {

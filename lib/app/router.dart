@@ -70,6 +70,7 @@ import '../features/substitutes/create_substitute_delegation_page.dart';
 import '../features/substitutes/scan_substitute_delegation_page.dart';
 import '../features/substitutes/substitute_register_page.dart';
 import '../shared/models/user_role.dart';
+import '../shared/utils/app_mode.dart';
 
 /// Restituisce gli ID delle classi a cui appartiene il catechista locale.
 ///
@@ -408,6 +409,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             if (isOnboardingSyncPath && _isJoinPending()) return null;
             if (!isLoginPath) return '/login';
             return null;
+          }
+
+          // Le supplenze sono consentite solo in modalità associato con
+          // modalità Responsabile attiva nella parrocchia: chiunque altro
+          // viene allontanato dalle route del modulo.
+          if (location.startsWith('/substitutes') &&
+              !AppModeUtils.supplenzeEnabled()) {
+            return UserRole.isResponsabile ? '/parrocchia' : '/';
           }
 
           // Responsabile Catechistico: la home è la dashboard parrocchiale.

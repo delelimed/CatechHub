@@ -516,15 +516,91 @@ class _IscrizioniPageState extends ConsumerState<IscrizioniPage> {
         final active = classes.where((c) => !c.archived).toList();
         return RefreshIndicator(
           onRefresh: () => ref.refresh(classesStreamProvider.future),
-          child: ListView(
-            children: [
-              _promotionCard(classes, config),
-              const SizedBox(height: 12),
-              for (final c in active) _classCard(c, classes),
-            ],
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1040),
+              child: ListView(
+                padding: const EdgeInsets.all(4),
+                children: [
+                  _summaryCard(active),
+                  const SizedBox(height: 12),
+                  _promotionCard(classes, config),
+                  const SizedBox(height: 12),
+                  for (final c in active) _classCard(c, classes),
+                ],
+              ),
+            ),
           ),
         );
       },
+    );
+  }
+
+  Widget _summaryCard(List<SchoolClass> active) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface =
+        isDark ? Theme.of(context).colorScheme.surfaceContainer : Colors.white;
+    final totRagazzi = active.fold<int>(0, (s, c) => s + c.studentIds.length);
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+            color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          _statTile(
+            Icons.school_rounded,
+            '${active.length}',
+            'Classi attive',
+            isDark,
+          ),
+          _verticalDivider(isDark),
+          _statTile(
+            Icons.groups_rounded,
+            '$totRagazzi',
+            'Ragazzi iscritti',
+            isDark,
+          ),
+          _verticalDivider(isDark),
+          _statTile(
+            Icons.person_add_alt_1_rounded,
+            '${active.length}',
+            'Iscrivi nuovo',
+            isDark,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statTile(IconData icon, String value, String label, bool isDark) {
+    return Expanded(
+      child: Column(
+        children: [
+          Icon(icon, size: 22, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(height: 4),
+          Text(value,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontSize: 10.5,
+                  color: isDark ? Colors.grey.shade400 : Colors.black54)),
+        ],
+      ),
+    );
+  }
+
+  Widget _verticalDivider(bool isDark) {
+    return Container(
+      width: 1,
+      height: 34,
+      color: isDark ? Colors.grey.shade800 : Colors.grey.shade300,
     );
   }
 
@@ -540,42 +616,55 @@ class _IscrizioniPageState extends ConsumerState<IscrizioniPage> {
         ),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.trending_up_rounded, color: Colors.white, size: 30),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Anno ${currentAnno.isEmpty ? '?' : currentAnno}',
-                  style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold),
+          Row(
+            children: [
+              const Icon(Icons.trending_up_rounded,
+                  color: Colors.white, size: 30),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Anno ${currentAnno.isEmpty ? '?' : currentAnno}',
+                      style: const TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Promuovi le classi al prossimo anno catechistico o '
+                      'concludi l\'anno e archivia nello storico.',
+                      style:
+                          const TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${classes.length} classi attive · Promuovile al prossimo '
-                  'anno catechistico.',
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          FilledButton.tonalIcon(
-            onPressed: currentAnno.isEmpty
-                ? null
-                : () => _startPassaggioAnno(classes),
-            icon: const Icon(Icons.play_arrow_rounded, size: 18),
-            label: const Text('Passaggio'),
-          ),
-          const SizedBox(width: 8),
-          FilledButton.tonalIcon(
-            onPressed: currentAnno.isEmpty
-                ? null
-                : () => _startConcludiAnno(classes),
-            icon: const Icon(Icons.auto_awesome_rounded, size: 18),
-            label: const Text('Concludi anno'),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.tonalIcon(
+                onPressed: currentAnno.isEmpty
+                    ? null
+                    : () => _startPassaggioAnno(classes),
+                icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                label: const Text('Passaggio di anno'),
+              ),
+              FilledButton.tonalIcon(
+                onPressed: currentAnno.isEmpty
+                    ? null
+                    : () => _startConcludiAnno(classes),
+                icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                label: const Text('Concludi anno'),
+              ),
+            ],
           ),
         ],
       ),

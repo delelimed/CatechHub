@@ -24,6 +24,7 @@ import '../../core/providers/theme_provider.dart';
 import '../../core/security/privacy_settings.dart';
 import '../../core/services/meeting_notification_service.dart';
 import '../../shared/models/user_role.dart';
+import '../../shared/utils/app_mode.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../responsabile/parish_config_repository.dart';
 
@@ -117,6 +118,8 @@ class SettingsPage extends ConsumerWidget {
     final annoCtrl = TextEditingController(text: config.annoCatechisticoCorrente);
     final sogliaCtrl =
         TextEditingController(text: config.sogliaAssenzeConsecutive.toString());
+    final durataCtrl =
+        TextEditingController(text: config.durataValiditaConsensoMesi.toString());
     var modoAttivo = config.isResponsabileModeActive;
     var ruolo = UserRole.current();
 
@@ -136,6 +139,7 @@ class SettingsPage extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const _ConfigSectionLabel('Modalità'),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Modalità Responsabile attiva'),
@@ -165,7 +169,8 @@ class SettingsPage extends ConsumerWidget {
                   selected: {ruolo},
                   onSelectionChanged: (sel) => setState(() => ruolo = sel.first),
                 ),
-                const SizedBox(height: 16),
+                const Divider(height: 24),
+                const _ConfigSectionLabel('Parrocchia'),
                 TextField(
                   controller: nomeCtrl,
                   decoration: const InputDecoration(
@@ -183,7 +188,8 @@ class SettingsPage extends ConsumerWidget {
                     isDense: true,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const Divider(height: 24),
+                const _ConfigSectionLabel('Anno e presenze'),
                 TextField(
                   controller: annoCtrl,
                   decoration: const InputDecoration(
@@ -199,6 +205,19 @@ class SettingsPage extends ConsumerWidget {
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
                     labelText: 'Soglia assenze consecutive (allerta)',
+                    helperText: 'Almeno 2. Usata per le segnalazioni.',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+                const Divider(height: 24),
+                const _ConfigSectionLabel('Privacy'),
+                TextField(
+                  controller: durataCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Validità consenso GDPR (mesi)',
+                    helperText: 'Durata del consenso al trattamento dei dati.',
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),
@@ -215,13 +234,20 @@ class SettingsPage extends ConsumerWidget {
               onPressed: () async {
                 await UserRole.setCurrent(ruolo);
                 final soglia = int.tryParse(sogliaCtrl.text.trim());
+                final durata = int.tryParse(durataCtrl.text.trim());
                 await repo.save(config.copyWith(
                   isResponsabileModeActive: modoAttivo,
                   nomeParrocchia: nomeCtrl.text.trim(),
                   diocesi: diocesiCtrl.text.trim(),
                   annoCatechisticoCorrente: annoCtrl.text.trim(),
+                  durataValiditaConsensoMesi:
+                      (durata != null && durata > 0)
+                          ? durata
+                          : config.durataValiditaConsensoMesi,
                   sogliaAssenzeConsecutive:
-                      (soglia != null && soglia >= 2) ? soglia : config.sogliaAssenzeConsecutive,
+                      (soglia != null && soglia >= 2)
+                          ? soglia
+                          : config.sogliaAssenzeConsecutive,
                 ));
                 if (ctx.mounted) Navigator.pop(ctx);
                 if (!context.mounted) return;
@@ -371,15 +397,17 @@ class SettingsPage extends ConsumerWidget {
 
                 const SizedBox(height: 12),
 
-                _SettingsItem(
-                  icon: Icons.swap_horiz_rounded,
-                  title: 'Supplenze',
-                  subtitle: 'Delega temporanea del registro a un altro catechista',
-                  color: const Color(0xFF174A7E),
-                  onTap: () => context.push('/substitutes'),
-                ),
+                if (AppModeUtils.supplenzeEnabled()) ...[
+                  _SettingsItem(
+                    icon: Icons.swap_horiz_rounded,
+                    title: 'Supplenze',
+                    subtitle: 'Delega temporanea del registro a un altro catechista',
+                    color: const Color(0xFF174A7E),
+                    onTap: () => context.push('/substitutes'),
+                  ),
 
-                const SizedBox(height: 12),
+                  const SizedBox(height: 12),
+                ],
 
                 _SettingsItem(
                   icon: Icons.warning_amber_rounded,
@@ -429,16 +457,6 @@ class SettingsPage extends ConsumerWidget {
                   subtitle: 'Classi, iscrizioni, logistica e allarmi assenze',
                   color: const Color(0xFF174A7E),
                   onTap: () => context.push('/parrocchia/admin'),
-                ),
-
-                const SizedBox(height: 12),
-
-                _SettingsItem(
-                  icon: Icons.account_tree_rounded,
-                  title: 'Dashboard parrocchiale',
-                  subtitle: 'Anno catechistico, percorsi, classi, catechisti e ragazzi',
-                  color: const Color(0xFF174A7E),
-                  onTap: () => context.push('/parrocchia'),
                 ),
 
                 const SizedBox(height: 12),
@@ -542,6 +560,25 @@ class SettingsPage extends ConsumerWidget {
               ),
 
               const SizedBox(height: 24),
+
+              /// =========================
+              /// PARROCCHIA (Associati)
+              /// =========================
+              if (!isResponsabile && AppModeUtils.canViewLogistica()) ...[
+                const _SectionTitle(title: 'Parrocchia'),
+
+                const SizedBox(height: 12),
+
+                _SettingsItem(
+                  icon: Icons.meeting_room_rounded,
+                  title: 'Aule e orari',
+                  subtitle: 'Consultazione in sola lettura della logistica parrocchiale',
+                  color: const Color(0xFF00695C),
+                  onTap: () => context.push('/parrocchia/logistica'),
+                ),
+
+                const SizedBox(height: 24),
+              ],
 
               /// =========================
               /// CONDIVISIONE E BACKUP
@@ -919,6 +956,29 @@ class _SectionTitle extends StatelessWidget {
         fontWeight: FontWeight.bold,
         letterSpacing: 1,
         color: Colors.grey.shade600,
+      ),
+    );
+  }
+}
+
+/// Etichetta di sezione usata dentro i dialog di configurazione.
+class _ConfigSectionLabel extends StatelessWidget {
+  final String text;
+
+  const _ConfigSectionLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        text.toUpperCase(),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1,
+          color: Theme.of(context).colorScheme.primary,
+        ),
       ),
     );
   }

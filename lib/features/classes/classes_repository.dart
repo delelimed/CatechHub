@@ -20,6 +20,7 @@ import '../../shared/models/audit_action.dart';
 import '../../shared/models/audit_log.dart';
 import '../../shared/models/aula.dart';
 import '../../shared/models/class_model.dart';
+import '../../shared/models/user_role.dart';
 import '../../shared/utils/auth_utils.dart';
 import '../responsabile/audit_log_repository.dart';
 import '../responsabile/slot_conflict_service.dart';
@@ -32,6 +33,17 @@ class ClassesRepository {
   static const roleAiuto = 'AIUTO';
 
   final _box = LocalDatabase.classes();
+
+  /// Difesa in profondità: le operazioni di assegnazione catechisti e di
+  /// logistica (slot) sono operazioni "globali" della parrocchia riservate
+  /// al Responsabile. La guard di pagina/route resta il confine primario.
+  void _requireCanManageClasses() {
+    if (!RolePermissions.currentCan(RolePermission.manageClasses)) {
+      throw UnsupportedError(
+          'Solo il Responsabile Catechistico può gestire le assegnazioni '
+          'e la logistica delle classi.');
+    }
+  }
 
   Stream<List<SchoolClass>> getClasses() {
     return LocalDatabase.watchList(
@@ -123,7 +135,9 @@ class ClassesRepository {
       await _box.flush();
       await _log(AuditActionType.deleteClass, id, AuditLog.entityClasse);
     } catch (e) {
+      if (kDebugMode) {
       debugPrint('[ClassesRepository] Errore eliminazione classe $id: $e');
+    }
     }
 
     try {
@@ -169,7 +183,9 @@ class ClassesRepository {
         } catch (_) {}
       }
     } catch (e) {
+      if (kDebugMode) {
       debugPrint('[ClassesRepository] Errore durante cascata cancellazione classe $id: $e');
+    }
     }
   }
 
@@ -195,6 +211,7 @@ class ClassesRepository {
 
   Future<void> addCatechistToClass(String classId, String catechistId,
       {String role = roleTitolare}) async {
+    _requireCanManageClasses();
     final current = _getClass(classId);
     if (current == null || current.catechistIds.contains(catechistId)) return;
     await updateClass(
@@ -214,6 +231,7 @@ class ClassesRepository {
     String catechistId,
     String role,
   ) async {
+    _requireCanManageClasses();
     final current = _getClass(classId);
     if (current == null) return;
     if (!current.catechistIds.contains(catechistId)) return;
@@ -231,6 +249,7 @@ class ClassesRepository {
       c.catechistRoles[catechistId] ?? roleTitolare;
 
   Future<void> removeCatechistFromClass(String classId, String catechistId) async {
+    _requireCanManageClasses();
     final current = _getClass(classId);
     if (current == null) return;
     final roles = Map<String, String>.from(current.catechistRoles)
@@ -254,6 +273,7 @@ class ClassesRepository {
     required RoomSlot slot,
     List<SchoolClass>? allClasses,
   }) async {
+    _requireCanManageClasses();
     final current = _getClass(classId);
     if (current == null) {
       throw ArgumentError('Classe inesistente: $classId');
@@ -279,6 +299,7 @@ class ClassesRepository {
 
   /// Dismette uno slot da una classe.
   Future<SchoolClass?> removeSlotFromClass(String classId, String slotId) async {
+    _requireCanManageClasses();
     final current = _getClass(classId);
     if (current == null) return null;
     await updateClass(
@@ -334,7 +355,9 @@ class ClassesRepository {
         affectedEntityType: entityType,
       );
     } catch (e) {
+      if (kDebugMode) {
       debugPrint('[ClassesRepository] AuditLog non registrato ($action): $e');
+    }
     }
   }
 

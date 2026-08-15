@@ -7,7 +7,7 @@ import 'package:CatechHub/features/sync/p2p/p2p_security_service.dart';
 
 void main() {
   group('P2PDeviceAssociation', () {
-    test('toJson e fromJson sono reversibili', () {
+    test('toJson NON serializza i segreti (spostati nel secure storage)', () {
       final now = DateTime(2026, 7, 15);
       final original = P2PDeviceAssociation(
         deviceId: 'CH_1743290112345678_a1b2c3',
@@ -23,18 +23,44 @@ void main() {
       );
 
       final json = original.toJson();
+
+      // I segreti non devono MAI finire nel box Hive.
+      expect(json.containsKey('sharedSecret'), isFalse,
+          reason: 'il shared secret non deve essere serializzato nel box');
+      expect(json.containsKey('privKey'), isFalse,
+          reason: 'la chiave privata non deve essere serializzata nel box');
+
       final restored = P2PDeviceAssociation.fromJson(json);
 
       expect(restored.deviceId, original.deviceId);
       expect(restored.deviceName, original.deviceName);
       expect(restored.publicKeyBase64, original.publicKeyBase64);
       expect(restored.fingerprint, original.fingerprint);
-      expect(restored.sharedSecretBase64, original.sharedSecretBase64);
+      expect(restored.sharedSecretBase64, isEmpty);
       expect(restored.associatedAt, original.associatedAt);
-      expect(restored.devicePrivateKeyBase64, original.devicePrivateKeyBase64);
+      expect(restored.devicePrivateKeyBase64, isEmpty);
       expect(restored.devicePublicKeyBase64, original.devicePublicKeyBase64);
       expect(restored.localRole, original.localRole);
       expect(restored.remoteRole, original.remoteRole);
+    });
+
+    test('fromJson migra i segreti dalle associazioni legacy', () {
+      final json = {
+        'deviceId': 'CH_legacy_1',
+        'deviceName': 'Legacy',
+        'publicKey': 'cHVibGlja2V5',
+        'fingerprint': 'fp',
+        'sharedSecret': 'c2VjcmV0MQ==',
+        'associatedAt': '2026-07-15T10:00:00.000Z',
+        'privKey': 'cHJpdmF0ZQ==',
+        'pubKey': 'cHVibGlj',
+      };
+
+      final assoc = P2PDeviceAssociation.fromJson(json);
+
+      expect(assoc.sharedSecretBase64, 'c2VjcmV0MQ==');
+      expect(assoc.devicePrivateKeyBase64, 'cHJpdmF0ZQ==');
+      expect(assoc.devicePublicKeyBase64, 'cHVibGlj');
     });
 
     test('fromJson gestisce campi opzionali mancanti', () {

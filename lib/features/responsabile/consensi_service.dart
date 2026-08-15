@@ -161,7 +161,9 @@ class ConsensiService {
         affectedEntityType: AuditLog.entityRagazzo,
       );
     } catch (e) {
+      if (kDebugMode) {
       debugPrint('[ConsensiService] AuditLog non registrato ($action): $e');
+    }
     }
   }
 }

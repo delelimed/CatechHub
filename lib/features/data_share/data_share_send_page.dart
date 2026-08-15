@@ -60,6 +60,9 @@ class _DataShareSendPageState extends ConsumerState<DataShareSendPage> {
   Timer? _diffTimer;
   bool _isDiffPlaying = false;
   String? _pin;
+  // Il PIN è nascosto di default e mostrato solo su richiesta esplicita
+  // (tap-to-reveal): evita lo shoulder-surfing in ambienti affollati.
+  bool _pinVisible = false;
   int? _filterStartChunk;
   // Comune
   String? _errorMessage;
@@ -611,15 +614,20 @@ class _DataShareSendPageState extends ConsumerState<DataShareSendPage> {
                   children: [
                     const Text('PIN di Sicurezza', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber)),
                     const SizedBox(height: 8),
-                    Text(
-                      _pin ?? '---',
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.amber, letterSpacing: 4),
+                    InkWell(
+                      onTap: () => setState(() => _pinVisible = !_pinVisible),
+                      child: Text(
+                        _pinVisible ? (_pin ?? '---') : '••••••••••',
+                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.amber, letterSpacing: 4),
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Comunica questo PIN ${_diffChunks.isNotEmpty ? "e ${_diffChunks.length} chunk inviati" : ""}',
+                      _pinVisible
+                          ? 'Tocca per nascondere il PIN'
+                          : 'Tocca il PIN per mostrarlo',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 13, color: Colors.grey),
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                   ],
                 ),

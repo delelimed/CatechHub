@@ -23,6 +23,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:crypto/crypto.dart' show Hmac, sha256;
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../shared/models/audit_log.dart';
@@ -42,6 +43,7 @@ class AuditLogService {
 
   /// OVERRIDE SOLO PER TEST: if [debugSecretOverride] != null, il segreto
   /// base viene usato come tale evitando il plugin nativo InsecureStorage.
+  /// Ignorato nelle build release (solo kDebugMode).
   /// @visibleForTesting
   static String? debugSecretOverride;
 
@@ -50,8 +52,10 @@ class AuditLogService {
   /// Il segreto di base è unico per dispositivo, protetto da
   /// FlutterSecureStorage (Android Keystore).
   static Future<String> _getBaseSecret() async {
-    final override = debugSecretOverride;
-    if (override != null) return override;
+    if (kDebugMode) {
+      final override = debugSecretOverride;
+      if (override != null) return override;
+    }
 
     final existing = await _secureStorage.read(key: _hmacSecretKey);
     if (existing != null && existing.isNotEmpty) return existing;

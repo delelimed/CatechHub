@@ -12,9 +12,12 @@
 // - Formato: base64({v, kdf, iter, alg, salt, nonce, ciphertext})
 // - Constant-time password verification
 // - Zero app PIN storage: il PIN backup vive solo nella memoria dell'utente
+// - Entropia aumentata a 12 cifre (10^12 combinazioni): ricerca esaustiva
+//   impractical anche su cluster GPU potenti.
 // ══════════════════════════════════════════════════════════════════════════════
 
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -28,18 +31,40 @@ class BackupEncryptionService {
   static const int _tagLengthBits = 128;
   static const int _keyLength = 32; // AES-256
 
+  /// Lunghezza minima del PIN backup: 10 cifre. Con un PIN a 4 cifre e KDF a
+  /// 210k iterazioni, un attaccante locale potrebbe brute-forzare offline il
+  /// file di backup; a 10 cifre (10^10 combinazioni) la ricerca esaustiva è
+  /// impraticabile anche su GPU.
+  static const int minPinLength = 12;
+
+  /// Numero massimo di tentativi di decifratura prima di bloccare l'import
+  /// (anti brute-force). Anche se il backup offline resta attaccabile con
+  /// brute-force indipendente dall'app, il lockout protegge dal caso in cui
+  /// un PIN debole sia stato scelto e l'attaccante provi a indovinarlo in
+  /// loco tramite l'interfaccia.
+  static const int maxDecryptAttempts = 5;
+
+  /// Intervallo di lockout dopo il superamento di [maxDecryptAttempts].
+  static const Duration lockoutDuration = Duration(minutes: 30);
+
+  /// Registro (in memoria) dei tentativi falliti per backup: la chiave è
+  /// l'hash del pacchetto, così il lockout è legato al singolo file importato
+  /// e non all'utente. La persistenza è volutamente in memoria: un lockout
+  /// persistente su disco sarebbe aggirabile cancellando il file.
+  static final Map<String, int> _failedAttempts = {};
+  static final Map<String, DateTime> _lockedUntil = {};
+
   static final _aad = Uint8List.fromList(
     utf8.encode('CatechHub_Context_Backup_v1'),
   );
 
-/// Genera byte casuali crittograficamente sicuri.
+/// Genera byte casuali crittograficamente sicuri (Random.secure del sistema,
+/// NON seminati dal timestamp: salt/nonce prevedibili romperebbero AES-GCM).
   static Uint8List _secureRandomBytes(int length) {
-    final random = pc.FortunaRandom()
-      ..seed(pc.KeyParameter(Uint8List.fromList(
-        List<int>.generate(32, (_) => DateTime.now().microsecondsSinceEpoch & 0xFF),
-      )));
-
-    return Uint8List.fromList(List<int>.generate(length, (_) => random.nextUint32() & 0xFF));
+    final random = Random.secure();
+    return Uint8List.fromList(
+      List<int>.generate(length, (_) => random.nextInt(256)),
+    );
   }
 
   /// Deriva chiave AES-256 da PIN con PBKDF2-HMAC-SHA256.
@@ -82,6 +107,15 @@ class BackupEncryptionService {
   /// Decifra pacchetto backup con PIN.
   /// Lancia Exception se PIN errato, dati corrotti o formato non valido.
   static String decryptBackup(String encryptedPackage, String pin) {
+    final packageKey = _packageKey(encryptedPackage);
+    final lockedUntil = _lockedUntil[packageKey];
+    if (lockedUntil != null && DateTime.now().isBefore(lockedUntil)) {
+      final remaining = lockedUntil.difference(DateTime.now()).inMinutes + 1;
+      throw Exception(
+        'Troppi tentativi falliti. Riprova tra $remaining minuti.',
+      );
+    }
+
     try {
       final packageStr = utf8.decode(base64Decode(encryptedPackage));
       final package = jsonDecode(packageStr) as Map<String, dynamic>;
@@ -120,19 +154,50 @@ class BackupEncryptionService {
         );
 
       final decrypted = cipher.process(base64Decode(dataB64));
+      // Decifratura riuscita: azzera il contatore di tentativi per questo file.
+      _failedAttempts.remove(packageKey);
+      _lockedUntil.remove(packageKey);
       return utf8.decode(decrypted);
     } on FormatException catch (e) {
+      _recordFailure(packageKey);
       throw Exception('Formato backup non valido: $e');
     } on pc.InvalidCipherTextException catch (_) {
+      _recordFailure(packageKey);
       throw Exception('PIN non corretto o dati corrotti');
     } catch (e) {
+      _recordFailure(packageKey);
       if (e is Exception) rethrow;
       throw Exception('Errore decifratura: $e');
     }
   }
 
+  /// Chiave identificativa del pacchetto (hash SHA-256 troncato) usata per
+  /// il rate-limiting: lega i tentativi al singolo file, non all'utente.
+  static String _packageKey(String encryptedPackage) {
+    return sha256Of(encryptedPackage);
+  }
+
+  static String sha256Of(String value) {
+    final d = pc.SHA256Digest();
+    final bytes = Uint8List.fromList(utf8.encode(value));
+    final out = Uint8List(d.digestSize);
+    d.update(bytes, 0, bytes.length);
+    d.doFinal(out, 0);
+    return base64Encode(out).substring(0, 24);
+  }
+
+  static void _recordFailure(String packageKey) {
+    final now = DateTime.now();
+    _failedAttempts[packageKey] = (_failedAttempts[packageKey] ?? 0) + 1;
+    if (_failedAttempts[packageKey]! >= maxDecryptAttempts) {
+      _lockedUntil[packageKey] = now.add(lockoutDuration);
+      _failedAttempts.remove(packageKey);
+    }
+  }
+
   /// Verifica se [pin] decifra correttamente [encryptedPackage] SENZA restituire i dati.
   /// Usato per validare il PIN prima dell'import completo.
+  /// Rispetta il rate-limiting di [decryptBackup] (lockout dopo tentativi falliti).
   static bool verifyPin(String encryptedPackage, String pin) {
     try {
       decryptBackup(encryptedPackage, pin);
@@ -144,7 +209,7 @@ class BackupEncryptionService {
 
   /// Mostra dialog per inserimento e conferma PIN backup.
   /// Restituisce il PIN scelto dall'utente, o null se annullato.
-  /// Il PIN deve essere almeno 4 cifre, solo numeri.
+  /// Il PIN deve essere almeno [minPinLength] cifre, solo numeri.
   static Future<String?> showBackupPinDialog({
     required BuildContext context,
     required bool isExport, // true = esportazione (crea PIN), false = importazione (inserisci PIN)
@@ -174,7 +239,7 @@ class BackupEncryptionService {
             children: [
               Text(
                 isExport
-                    ? 'Scegli un PIN numerico (min 4 cifre) per proteggere il file di backup. '
+                    ? 'Scegli un PIN numerico (min $minPinLength cifre) per proteggere il file di backup. '
                       'Questo PIN serve SOLO per questo backup e non è il PIN del telefono.'
                     : 'Inserisci il PIN usato per cifrare questo backup.',
                 style: const TextStyle(fontSize: 13, color: Colors.grey),
@@ -245,10 +310,10 @@ class BackupEncryptionService {
             TextButton(
               onPressed: () {
                 final pin = controller.text.trim();
-                if (pin.length < 4) {
+                if (pin.length < minPinLength) {
                   setState(() {
                     showError = true;
-                    errorText = 'Il PIN deve essere di almeno 4 cifre';
+                    errorText = 'Il PIN deve essere di almeno $minPinLength cifre';
                   });
                   return;
                 }

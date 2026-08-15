@@ -55,12 +55,22 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version;
 
-      final response = await http.get(
-        Uri.parse(
-          'https://api.github.com/repos/delelimed/CatechHub/releases/latest',
-        ),
-        headers: {'Accept': 'application/vnd.github.v3+json'},
-      ).timeout(const Duration(seconds: 15));
+      // Client con certificate pinning per i domini GitHub: il controllo
+      // aggiornamenti è sensibile (mitm = APK malevolo), quindi NON usare
+      // un client generico con trust store di sistema.
+      final pinned = UpdateService.createPinnedClient();
+      if (pinned == null) {
+        throw Exception('Pinning TLS non configurato: controllo bloccato');
+      }
+      final response = await pinned
+          .get(
+            Uri.parse(
+              'https://api.github.com/repos/delelimed/CatechHub/releases/latest',
+            ),
+            headers: {'Accept': 'application/vnd.github.v3+json'},
+          )
+          .timeout(const Duration(seconds: 15));
+      pinned.close();
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
@@ -69,14 +79,16 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
         if (UpdateService.isVersionNewerStatic(currentVersion, latestVersion)) {
           final assets = data['assets'] as List<dynamic>;
           String? apkUrl;
-          String? apkDigest;
+          String? apkDigestUrl;
 
           for (final asset in assets) {
-            if (asset['name'] is String &&
-                (asset['name'] as String).endsWith('.apk')) {
+            final name = asset['name'] is String ? asset['name'] as String : '';
+            if (name.isEmpty) continue;
+            // Asset convenzione: "<app>.apk.sha256" contenente "<hex>  <file>".
+            if (name.endsWith('.apk.sha256')) {
+              apkDigestUrl = asset['browser_download_url'] as String? ?? asset['url'] as String?;
+            } else if (name.endsWith('.apk') && apkUrl == null) {
               apkUrl = asset['browser_download_url'] as String? ?? asset['url'] as String?;
-              apkDigest = null;
-              break;
             }
           }
 
@@ -88,7 +100,7 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
               'body': data['body'] as String? ?? '',
               'html_url': data['html_url'] as String? ?? '',
               'apk_url': apkUrl,
-              'apk_digest': apkDigest,
+              'apk_digest_url': apkDigestUrl,
               'published_at': data['published_at'] as String? ?? '',
             };
             _isLoading = false;
@@ -128,11 +140,51 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
 
   Future<void> _downloadAndInstall() async {
     final apkUrl = _releaseInfo?['apk_url'] as String?;
-    final apkDigest = _releaseInfo?['apk_digest'] as String?;
+    final apkDigestUrl = _releaseInfo?['apk_digest_url'] as String?;
     if (apkUrl == null) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: const Text('URL APK non disponibile')));
+      return;
+    }
+
+    // Recupera prima il digest SHA-256 pubblicato per l'APK. Senza digest
+    // NON procediamo (fail-closed): un APK non verificato potrebbe essere
+    // stato alterato tra la pubblicazione e il download.
+    String? expectedDigest;
+    if (apkDigestUrl == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Nessun digest SHA-256 pubblicato: impossibile verificare l\'integrità dell\'APK. Aggiornamento bloccato per sicurezza.',
+          ),
+        ),
+      );
+      return;
+    }
+    try {
+      final pinned = UpdateService.createPinnedClient();
+      if (pinned == null) {
+        throw Exception('Pinning TLS non configurato: verifica bloccata');
+      }
+      final digestResponse = await pinned
+          .get(Uri.parse(apkDigestUrl))
+          .timeout(const Duration(seconds: 15));
+      pinned.close();
+      if (digestResponse.statusCode != 200) {
+        throw Exception('Digest SHA-256 non recuperabile');
+      }
+      final digestText = digestResponse.body.trim();
+      final match = RegExp(r'([0-9a-fA-F]{64})').firstMatch(digestText);
+      if (match == null) {
+        throw Exception('Digest SHA-256 malformato');
+      }
+      expectedDigest = match.group(1)!.toLowerCase();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Errore verifica integrità: $e')),
+      );
       return;
     }
 
@@ -167,7 +219,15 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
         await file.delete();
       }
 
-      final client = http.Client();
+      // Client con certificate pinning: il download dell'APK è il passo più
+      // sensibile del flusso. La verifica del digest protegge dall'alterazione,
+      // ma il pinning protegge dal MitM sull'intero trasferimento.
+      final pinnedClient = UpdateService.createPinnedClient();
+      if (pinnedClient == null) {
+        await file.delete();
+        throw Exception('Pinning TLS non configurato: download bloccato');
+      }
+      final client = pinnedClient;
       try {
         final request = http.Request('GET', Uri.parse(apkUrl));
         request.headers['Accept'] = 'application/octet-stream';
@@ -210,14 +270,14 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
           throw Exception('File scaricato vuoto o non valido');
         }
 
-        if (apkDigest != null && apkDigest.startsWith('sha256:')) {
-          final bytes = await file.readAsBytes();
-          final expectedDigest = apkDigest.substring('sha256:'.length);
-          final actualDigest = sha256.convert(bytes).toString();
-          if (actualDigest != expectedDigest) {
-            await file.delete();
-            throw Exception('Verifica integrita APK fallita');
-          }
+        // Verifica l'integrità del file con il digest SHA-256 pubblicato nella
+        // release: se non corrisponde, l'APK non è autentico e NON si installa.
+        // `expectedDigest` è garantito non-null: senza digest si torna prima.
+        final bytes = await file.readAsBytes();
+        final actualDigest = sha256.convert(bytes).toString();
+        if (actualDigest != expectedDigest) {
+          await file.delete();
+          throw Exception('Verifica integrità APK fallita: il digest non corrisponde.');
         }
 
         final raf = await file.open(mode: FileMode.read);

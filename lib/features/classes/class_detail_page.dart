@@ -140,7 +140,7 @@ class ClassDetailPage extends ConsumerWidget {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                             ),
                             icon: const Icon(Icons.edit),
-                            label: const Text("Modifica assegnazioni"),
+                            label: const Text('Modifica assegnazioni'),
                             onPressed: currentClass.isCreator(AuthService.localUserId, getCurrentCatechistName(),
                                     catechistId: AuthService.getCatechistId())
                                 ? () {
@@ -277,7 +277,7 @@ class ClassDetailPage extends ConsumerWidget {
                     decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(20)),
                   ),
                   const SizedBox(height: 16),
-                  const Text("Gestione assegnazioni", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text('Gestione assegnazioni', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 16),
 
                   /// Input di ricerca testuale per i ragazzi
@@ -357,7 +357,7 @@ class ClassDetailPage extends ConsumerWidget {
                               );
                           if (context.mounted) { Navigator.pop(context); }
                         },
-                        child: const Text("Salva modifiche", style: TextStyle(fontSize: 16)),
+                        child: const Text('Salva modifiche', style: TextStyle(fontSize: 16)),
                       ),
                     ),
                   ),

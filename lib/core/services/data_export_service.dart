@@ -43,6 +43,7 @@ import '../../shared/models/contact_note_model.dart';
 import '../../shared/models/student_daily_note_model.dart';
 import '../../shared/models/parish_config.dart';
 import 'encryption_service.dart';
+import 'field_encryption_service.dart';
 
 typedef PhaseCallback = void Function(String phase);
 
@@ -121,7 +122,14 @@ class DataExportService {
         .where((s) => scope.contains(s.toMap()))
         .toList();
     return {
-      'students': students.map((s) => s.toMap()..['id'] = s.id).toList(),
+      // Egresso backup/export: i campi sensibili (cifrati per-dispositivo)
+      // vengono decifrati PRIMA della serializzazione, così il pacchetto
+      // contiene dati in chiaro leggibili dal PIN del backup / da altri
+      // dispositivi (che li cifreranno con la propria chiave all'import).
+      'students': students.map((s) {
+        final map = s.toMap()..['id'] = s.id;
+        return FieldEncryptionService.decryptStudentMapForTransport(map);
+      }).toList(),
       'classes': scope.classes.map((c) => c.toMap()..['id'] = c.id).toList(),
     };
   }
@@ -392,12 +400,32 @@ class DataExportService {
 
   static Future<void> _mergeBoxRecords(Box<Map> box, List<dynamic>? incomingItems) async {
     if (incomingItems == null) return;
+    // Ingresso backup/import: per la box studenti i campi sensibili vengono
+    // confrontati e mergiati in forma decifrata e poi RICIFRATI con la chiave
+    // locale prima della persistenza (operazione idempotente).
+    final isStudentsBox = box == LocalDatabase.students();
     for (final item in incomingItems) {
-      final record = Map<String, dynamic>.from(item as Map);
+      var record = Map<String, dynamic>.from(item as Map);
       final id = record.remove('id') as String? ?? LocalDatabase.newId();
       final existing = LocalDatabase.toStringDynamicMap(box.get(id));
       if (existing.isEmpty) {
+        if (isStudentsBox) {
+          record = FieldEncryptionService.encryptStudentMapForStorage(record);
+        }
         await box.put(id, record);
+      } else if (isStudentsBox) {
+        // Merge in forma decifrata per non trattare ciphertext vs plaintext
+        // come valori diversi (falso conflitto / doppia cifratura).
+        final existingPlain =
+            FieldEncryptionService.decryptStudentMapForTransport(existing);
+        final recordPlain =
+            FieldEncryptionService.decryptStudentMapForTransport(record);
+        final merged = _mergeMaps(existingPlain, recordPlain);
+        final reEncrypted =
+            FieldEncryptionService.encryptStudentMapForStorage(merged);
+        if (merged.toString() != existingPlain.toString()) {
+          await box.put(id, reEncrypted);
+        }
       } else {
         final merged = _mergeMaps(existing, record);
         if (merged.toString() != existing.toString()) await box.put(id, merged);

@@ -420,6 +420,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             return UserRole.isResponsabile ? '/parrocchia' : '/';
           }
 
+          // La gestione parrocchiale (/parrocchia/*) è riservata al
+          // Responsabile Catechistico. Un Catechista che tenta di accedere
+          // direttamente a una di queste route viene riportato alla home.
+          // Difesa a livello di router: la UI non è il confine di sicurezza.
+          if (_isParrocchiaRoute(location) && !UserRole.isResponsabile) {
+            return '/';
+          }
+
           // Responsabile Catechistico: la home è la dashboard parrocchiale.
           // Non passa mai dalla selezione classe né dalla gestione classi
           // dell'onboarding (gestione centralizzata in /parrocchia).

@@ -250,7 +250,13 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
                       (w) => InkWell(
                         onTap: () async {
                           final uri = Uri.tryParse(w);
-                          if (uri != null) {
+                          // Allowlist: accetta SOLO link http/https. Schemi
+                          // arbitrari (file:, intent:, tel:, ecc.) da dati
+                          // non fidati potrebbero innescare intents di sistema
+                          // o phishing.
+                          if (uri != null &&
+                              (uri.scheme == 'http' || uri.scheme == 'https') &&
+                              uri.host.isNotEmpty) {
                             final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
                             if (!ok && mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(

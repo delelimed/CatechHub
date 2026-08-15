@@ -322,7 +322,9 @@ class ConcludiAnnoService {
         affectedEntityType: entityType,
       );
     } catch (e) {
+      if (kDebugMode) {
       debugPrint('[ConcludiAnnoService] AuditLog non registrato ($action): $e');
+    }
     }
   }
 }

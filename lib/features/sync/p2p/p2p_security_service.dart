@@ -189,6 +189,9 @@ class P2PDeviceAssociation {
     String? approvedByDeviceId,
     String? approvalSignature,
     String? approvalSignerPublicKey,
+    String? sharedSecretBase64,
+    String? devicePrivateKeyBase64,
+    String? devicePublicKeyBase64,
     bool clearApproval = false,
   }) {
     return P2PDeviceAssociation(
@@ -196,10 +199,11 @@ class P2PDeviceAssociation {
       deviceName: deviceName,
       publicKeyBase64: publicKeyBase64,
       fingerprint: fingerprint,
-      sharedSecretBase64: sharedSecretBase64,
+      sharedSecretBase64: sharedSecretBase64 ?? this.sharedSecretBase64,
       associatedAt: associatedAt,
-      devicePrivateKeyBase64: devicePrivateKeyBase64,
-      devicePublicKeyBase64: devicePublicKeyBase64,
+      devicePrivateKeyBase64:
+          devicePrivateKeyBase64 ?? this.devicePrivateKeyBase64,
+      devicePublicKeyBase64: devicePublicKeyBase64 ?? this.devicePublicKeyBase64,
       localRole: localRole,
       remoteRole: remoteRole,
       catechistId: catechistId ?? this.catechistId,
@@ -222,14 +226,19 @@ class P2PDeviceAssociation {
     );
   }
 
+  /// Serializzazione persistente sul box Hive.
+  ///
+  /// I segreti ([sharedSecretBase64], [devicePrivateKeyBase64]) NON vengono
+  /// scritti nel box: risiedono esclusivamente nel FlutterSecureStorage
+  /// (Keystore/Keychain), così un accesso al file Hive (root, forensic) non
+  /// espone le chiavi crittografiche del canale P2P. La chiave pubblica è
+  /// pubblica e resta nel box.
   Map<String, dynamic> toJson() => {
         'deviceId': deviceId,
         'deviceName': deviceName,
         'publicKey': publicKeyBase64,
         'fingerprint': fingerprint,
-        'sharedSecret': sharedSecretBase64,
         'associatedAt': associatedAt.toUtc().toIso8601String(),
-        'privKey': devicePrivateKeyBase64,
         'pubKey': devicePublicKeyBase64,
         if (localRole != null) 'localRole': localRole,
         if (remoteRole != null) 'remoteRole': remoteRole,
@@ -251,7 +260,9 @@ class P2PDeviceAssociation {
         deviceName: json['deviceName'] as String? ?? '',
         publicKeyBase64: json['publicKey'] as String,
         fingerprint: json['fingerprint'] as String? ?? '',
-        sharedSecretBase64: json['sharedSecret'] as String,
+        // Valori legacy: associazioni precedenti serializzavano i segreti nel
+        // box. Vengono letti solo per la migrazione (vedi _hydrateSecrets).
+        sharedSecretBase64: json['sharedSecret'] as String? ?? '',
         associatedAt: DateTime.parse(json['associatedAt'] as String).toLocal(),
         devicePrivateKeyBase64: json['privKey'] as String? ?? '',
         devicePublicKeyBase64: json['pubKey'] as String? ?? '',
@@ -396,7 +407,9 @@ class P2PSecurityService {
           type: KeyPairType.x25519,
         );
       } catch (e) {
-        debugPrint('P2PSecurityService.getOrCreateIdentityKeyPair: stored key corrupted, regenerating: $e');
+        if (kDebugMode) {
+      debugPrint('P2PSecurityService.getOrCreateIdentityKeyPair: stored key corrupted, regenerating: $e');
+    }
       }
     }
     return _generateAndStoreIdentityKeyPair();
@@ -425,13 +438,24 @@ class P2PSecurityService {
     );
   }
 
+  /// Genera una coppia di chiavi EFIMERE per la sessione corrente. Le chiavi
+  /// effimere NON vengono MAI persistite (né in Hive né in secure storage):
+  /// vivono solo in memoria per la durata della connessione e vengono
+  /// scartate alla chiusura. Questo è il fondamento della forward secrecy:
+  /// anche se in futuro le chiavi statiche di identità venissero compromesse,
+  /// le chiavi di sessione passate NON possono essere ricostruite.
+  Future<SimpleKeyPairData> generateEphemeralKeyPair() =>
+      _generateDeviceKeyPair();
+
   Future<P2PIdentity> getLocalIdentity() async {
     final stored = await _secureStorage.read(key: _localIdentityKey);
     if (stored != null && stored.isNotEmpty) {
       try {
         return P2PIdentity.fromJson(jsonDecode(stored) as Map<String, dynamic>);
       } catch (e) {
-        debugPrint('P2PSecurityService.getLocalIdentity: stored identity corrupted, regenerating: $e');
+        if (kDebugMode) {
+      debugPrint('P2PSecurityService.getLocalIdentity: stored identity corrupted, regenerating: $e');
+    }
       }
     }
     return _createAndStoreIdentity();
@@ -638,6 +662,8 @@ class P2PSecurityService {
     bool isInitiator = false,
     String? sessionNonce,
     DateTime? at,
+    SimpleKeyPairData? localEphemeralKeyPair,
+    String? remoteEphemeralPublicKeyBase64,
   }) async {
     Uint8List remoteKeyBytes;
     try {
@@ -647,11 +673,24 @@ class P2PSecurityService {
     }
     final identityKeyPair = await getOrCreateIdentityKeyPair();
 
-    final sharedSecret = await _x25519.sharedSecretKey(
-      keyPair: identityKeyPair,
-      remotePublicKey: SimplePublicKey(remoteKeyBytes, type: KeyPairType.x25519),
-    );
-    final sharedBytes = await sharedSecret.extractBytes();
+    // ─── Forward secrecy (TripleDH) ──────────────────────────────────────
+    // Se entrambi i peer hanno scambiato una chiave EFIMERA durante
+    // l'handshake, il segreto di sessione combina 4 contributi X25519:
+    //   DH1 = static↔static   (autenticazione, chiavi di lungo periodo)
+    //   DH2/3 = static↔efimera (binding dell'identità all'ephem. remoto)
+    //   DH4 = efimera↔efimera  (forward secrecy vera e propria)
+    // I contributi vengono ordinati in modo canonico (sort lexicografico)
+    // così che entrambi i peer convergano sulla stessa concatenazione pur
+    // calcolandola dal proprio punto di vista.
+    final sharedBytes = (localEphemeralKeyPair != null &&
+            remoteEphemeralPublicKeyBase64 != null)
+        ? await _computeForwardSecret(
+            identityKeyPair: identityKeyPair,
+            localEphemeral: localEphemeralKeyPair,
+            remoteStaticPublicKeyBase64: remotePublicKeyBase64,
+            remoteEphemeralPublicKeyBase64: remoteEphemeralPublicKeyBase64,
+          )
+        : await _computeStaticSharedSecret(identityKeyPair, remoteKeyBytes);
 
     final localIdentity = await getLocalIdentity();
 
@@ -675,6 +714,110 @@ class P2PSecurityService {
       createdAt: at ?? DateTime.now(),
       isInitiator: isInitiator,
     );
+  }
+
+  /// Esegue X25519 con la chiave statica locale e la chiave remota [remoteBytes].
+  Future<Uint8List> _computeStaticSharedSecret(
+    SimpleKeyPair keyPair,
+    Uint8List remoteBytes,
+  ) async {
+    final sharedSecret = await _x25519.sharedSecretKey(
+      keyPair: keyPair,
+      remotePublicKey: SimplePublicKey(remoteBytes, type: KeyPairType.x25519),
+    );
+    return Uint8List.fromList(await sharedSecret.extractBytes());
+  }
+
+  /// Calcola il segreto di sessione combinato (TripleDH) per la forward
+  /// secrecy. Le chiavi efimere NON sono persistite; una volta derivate le
+  /// chiavi di sessione della finestra corrente+precedente possono essere
+  /// scartate.
+  Future<Uint8List> _computeForwardSecret({
+    required SimpleKeyPair identityKeyPair,
+    required SimpleKeyPairData localEphemeral,
+    required String remoteStaticPublicKeyBase64,
+    required String remoteEphemeralPublicKeyBase64,
+  }) =>
+      computeForwardSecretKey(
+        x25519: _x25519,
+        localStatic: identityKeyPair,
+        localEphemeral: localEphemeral,
+        remoteStaticPublicKeyBase64: remoteStaticPublicKeyBase64,
+        remoteEphemeralPublicKeyBase64: remoteEphemeralPublicKeyBase64,
+      );
+
+  /// Calcola il segreto combinato TripleDH in forma statica e pura (testabile
+  /// senza secure storage / Hive). Entrambi i peer convergono sullo stesso
+  /// output anche calcolandolo dal proprio punto di vista: i 4 contributi
+  /// X25519 sono un insieme commutativo (DH(A,B) == DH(B,A)) ordinato in modo
+  /// canonico prima della concatenazione.
+  static Future<Uint8List> computeForwardSecretKey({
+    required X25519 x25519,
+    required SimpleKeyPair localStatic,
+    required SimpleKeyPairData localEphemeral,
+    required String remoteStaticPublicKeyBase64,
+    required String remoteEphemeralPublicKeyBase64,
+  }) async {
+    Uint8List remoteStaticBytes;
+    Uint8List remoteEphemeralBytes;
+    try {
+      remoteStaticBytes = base64Decode(remoteStaticPublicKeyBase64);
+      remoteEphemeralBytes = base64Decode(remoteEphemeralPublicKeyBase64);
+    } catch (_) {
+      throw FormatException('Chiave pubblica efimera remota non valida in _computeForwardSecret');
+    }
+    final remoteStaticPub =
+        SimplePublicKey(remoteStaticBytes, type: KeyPairType.x25519);
+    final remoteEphemeralPub =
+        SimplePublicKey(remoteEphemeralBytes, type: KeyPairType.x25519);
+
+    final dh1 = await x25519.sharedSecretKey(
+      keyPair: localStatic,
+      remotePublicKey: remoteStaticPub,
+    );
+    final dh2 = await x25519.sharedSecretKey(
+      keyPair: localStatic,
+      remotePublicKey: remoteEphemeralPub,
+    );
+    final dh3 = await x25519.sharedSecretKey(
+      keyPair: localEphemeral,
+      remotePublicKey: remoteStaticPub,
+    );
+    final dh4 = await x25519.sharedSecretKey(
+      keyPair: localEphemeral,
+      remotePublicKey: remoteEphemeralPub,
+    );
+
+    final contributions = <Uint8List>[
+      Uint8List.fromList(await dh1.extractBytes()),
+      Uint8List.fromList(await dh2.extractBytes()),
+      Uint8List.fromList(await dh3.extractBytes()),
+      Uint8List.fromList(await dh4.extractBytes()),
+    ]..sort((a, b) => _compareBytes(a, b));
+
+    final combined = Uint8List(128);
+    var offset = 0;
+    for (final c in contributions) {
+      combined.setAll(offset, c);
+      offset += c.length;
+    }
+    // Diluisce la concatenazione dei 4 DH con HKDF prima dell'uso (l'input
+    // finale alle funzioni di derivazione delle chiavi di sessione).
+    final hkdf = Hkdf(hmac: Hmac(_sha256Algo), outputLength: 32);
+    final derived = await hkdf.deriveKey(
+      secretKey: SecretKey(combined),
+      nonce: Uint8List(0),
+      info: utf8.encode('CatechHub_P2P_ForwardSecret_v1'),
+    );
+    return Uint8List.fromList(await derived.extractBytes());
+  }
+
+  static int _compareBytes(List<int> a, List<int> b) {
+    final len = a.length < b.length ? a.length : b.length;
+    for (var i = 0; i < len; i++) {
+      if (a[i] != b[i]) return a[i] - b[i];
+    }
+    return a.length - b.length;
   }
 
   /// Deriva il nonce di sessione (unico per sessione) dall'handshake.
@@ -844,8 +987,74 @@ class P2PSecurityService {
 
   Box<Map> get _assocBox => Hive.box<Map>(LocalDatabase.trustedDevicesBox);
 
+  /// Chiavi FlutterSecureStorage per i segreti per-associazione.
+  static String _secretStorageKey(String deviceId) =>
+      '$_storagePrefix${deviceId}_secret';
+  static String _privKeyStorageKey(String deviceId) =>
+      '$_storagePrefix${deviceId}_privkey';
+
   Future<void> saveAssociation(P2PDeviceAssociation association) async {
+    // I segreti (shared secret + chiave privata del canale) vengono
+    // conservati esclusivamente nel FlutterSecureStorage (Keystore/Keychain):
+    // il box Hive contiene solo i metadati non sensibili.
+    await _secureStorage.write(
+      key: _secretStorageKey(association.deviceId),
+      value: association.sharedSecretBase64,
+    );
+    await _secureStorage.write(
+      key: _privKeyStorageKey(association.deviceId),
+      value: association.devicePrivateKeyBase64,
+    );
     await _assocBox.put(association.deviceId, association.toJson());
+  }
+
+  /// Ripristina i segreti di un'associazione dal FlutterSecureStorage.
+  /// Gestisce anche la migrazione delle associazioni legacy che li
+  /// serializzavano nel box Hive.
+  Future<P2PDeviceAssociation> _hydrateSecrets(
+    String deviceId,
+    P2PDeviceAssociation assoc,
+    Map<String, dynamic> raw,
+  ) async {
+    var secret = await _secureStorage.read(key: _secretStorageKey(deviceId));
+    var privKey = await _secureStorage.read(key: _privKeyStorageKey(deviceId));
+
+    var migrated = false;
+    if ((secret == null || secret.isEmpty) &&
+        raw['sharedSecret'] is String &&
+        (raw['sharedSecret'] as String).isNotEmpty) {
+      secret = raw['sharedSecret'] as String;
+      migrated = true;
+    }
+    if ((privKey == null || privKey.isEmpty) &&
+        raw['privKey'] is String &&
+        (raw['privKey'] as String).isNotEmpty) {
+      privKey = raw['privKey'] as String;
+      migrated = true;
+    }
+
+    var hydrated = assoc;
+    if ((secret?.isNotEmpty ?? false) && hydrated.sharedSecretBase64.isEmpty) {
+      hydrated = hydrated.copyWith(sharedSecretBase64: secret);
+    }
+    if ((privKey?.isNotEmpty ?? false) && hydrated.devicePrivateKeyBase64.isEmpty) {
+      hydrated = hydrated.copyWith(devicePrivateKeyBase64: privKey);
+    }
+
+    // Migrazione legacy: sposta i segreti dal box al secure storage e
+    // riscrive il box senza di essi.
+    if (migrated) {
+      await _secureStorage.write(
+        key: _secretStorageKey(deviceId),
+        value: hydrated.sharedSecretBase64,
+      );
+      await _secureStorage.write(
+        key: _privKeyStorageKey(deviceId),
+        value: hydrated.devicePrivateKeyBase64,
+      );
+      await _assocBox.put(deviceId, hydrated.toJson());
+    }
+    return hydrated;
   }
 
   Future<P2PDeviceAssociation?> getAssociation(String deviceId) async {
@@ -858,13 +1067,20 @@ class P2PSecurityService {
       }
       final assoc =
           P2PDeviceAssociation.fromJson(Map<String, dynamic>.from(raw));
-      if (!assoc.isValid) {
+      final hydrated = await _hydrateSecrets(
+        deviceId,
+        assoc,
+        Map<String, dynamic>.from(raw),
+      );
+      if (!hydrated.isValid) {
         await removeAssociation(deviceId);
         return null;
       }
-      return assoc;
+      return hydrated;
     } catch (e) {
+      if (kDebugMode) {
       debugPrint('P2PSecurityService.getAssociation error for $deviceId: $e');
+    }
       return null;
     }
   }
@@ -882,8 +1098,13 @@ class P2PSecurityService {
         final assoc = P2PDeviceAssociation.fromJson(
           Map<String, dynamic>.from(raw),
         );
-        if (assoc.isValid) {
-          associations.add(assoc);
+        final hydrated = await _hydrateSecrets(
+          key.toString(),
+          assoc,
+          Map<String, dynamic>.from(raw),
+        );
+        if (hydrated.isValid) {
+          associations.add(hydrated);
         } else {
           expiredIds.add(key.toString());
         }
@@ -903,6 +1124,8 @@ class P2PSecurityService {
   Future<void> removeAssociation(String deviceId) async {
     await _assocBox.delete(deviceId);
     await _secureStorage.delete(key: '$_storagePrefix$deviceId');
+    await _secureStorage.delete(key: _secretStorageKey(deviceId));
+    await _secureStorage.delete(key: _privKeyStorageKey(deviceId));
   }
 
   Future<void> removeAllAssociations() async {
@@ -1016,11 +1239,23 @@ class P2PSecurityService {
   // Responsabile; gli altri dispositivi verificano il certificato ricevuto.
 
   static const _parishApprovalSecretKey = 'parish_approval_secret';
+  static const _parishApprovalSecretMetaKey = 'parish_approval_secret_meta';
   static const _responsabileTrustInfoKey = 'responsabile_trust_info';
   static const _localApprovalKey = 'local_device_approval';
 
   Future<String?> getParishApprovalSecret() =>
       _secureStorage.read(key: _parishApprovalSecretKey);
+
+  /// Metadati del segreto (generazione + data rotazione) per audit e rotazione.
+  Future<Map<String, dynamic>?> getParishApprovalSecretMeta() async {
+    final raw = await _secureStorage.read(key: _parishApprovalSecretMetaKey);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return jsonDecode(raw) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Genera (e memorizza) il segreto di approvazione della parrocchia.
   /// Chiamato dal dispositivo del Responsabile alla prima approvazione.
@@ -1030,7 +1265,41 @@ class P2PSecurityService {
     final secret = base64Encode(secureRandom(32));
     await _secureStorage.write(
         key: _parishApprovalSecretKey, value: secret);
+    await _writeParishApprovalSecretMeta(
+      generation: 1,
+      rotatedAt: DateTime.now().toUtc(),
+    );
     return secret;
+  }
+
+  /// Ruota il segreto di approvazione: ne genera uno nuovo e incrementa la
+  /// generazione. Dopo la rotazione TUTTI i certificati firmati con il vecchio
+  /// segreto diventano invalidi (la loro firma HMAC non verifica più), quindi
+  /// i dispositivi approvati in precedenza vengono de-autorizzati finché non
+  /// ricevono una nuova approvazione dal Responsabile.
+  Future<String> rotateParishApprovalSecret() async {
+    final meta = await getParishApprovalSecretMeta();
+    final generation = (meta?['generation'] as int? ?? 1) + 1;
+    final secret = base64Encode(secureRandom(32));
+    await _secureStorage.write(key: _parishApprovalSecretKey, value: secret);
+    await _writeParishApprovalSecretMeta(
+      generation: generation,
+      rotatedAt: DateTime.now().toUtc(),
+    );
+    return secret;
+  }
+
+  Future<void> _writeParishApprovalSecretMeta({
+    required int generation,
+    required DateTime rotatedAt,
+  }) {
+    return _secureStorage.write(
+      key: _parishApprovalSecretMetaKey,
+      value: jsonEncode({
+        'generation': generation,
+        'rotatedAt': rotatedAt.toIso8601String(),
+      }),
+    );
   }
 
   Future<bool> hasParishApprovalSecret() async =>
@@ -1120,12 +1389,14 @@ class P2PSecurityService {
     required String approvalSecret,
     String? responsabileName,
   }) async {
+    final meta = await getParishApprovalSecretMeta();
     await _secureStorage.write(
       key: _responsabileTrustInfoKey,
       value: jsonEncode({
         'responsabileDeviceId': responsabileDeviceId,
         'approvalSecret': approvalSecret,
         'responsabileName': responsabileName ?? '',
+        'secretGeneration': meta?['generation'] ?? 1,
         'storedAt': DateTime.now().toUtc().toIso8601String(),
       }),
     );

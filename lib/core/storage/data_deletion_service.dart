@@ -431,6 +431,19 @@ class DataDeletionService {
     await LocalDatabase.parishConfig().clear();
     await LocalDatabase.historicalRecords().clear();
 
+    // 2b. Box della rete parrocchiale, sincronizzazione e supplenze:
+    //     un reset totale DEVE eliminare anche questi (dati residui di
+    //     minori o chiavi crittografiche sopravvissuti al reset sarebbero
+    //     recuperabili da un attaccante locale).
+    await LocalDatabase.catechists().clear();
+    await LocalDatabase.classChannelKeys().clear();
+    await LocalDatabase.classChannelCiphertext().clear();
+    await LocalDatabase.parishEvents().clear();
+    await LocalDatabase.syncConflicts().clear();
+    await LocalDatabase.auditLog().clear();
+    await LocalDatabase.substituteDelegations().clear();
+    await LocalDatabase.substituteLessonNotes().clear();
+
     // 3. Rimuove tutte le associazioni P2P, identità locale e chiavi crittografiche
     await P2PSecurityService().resetAllSecurityData();
 

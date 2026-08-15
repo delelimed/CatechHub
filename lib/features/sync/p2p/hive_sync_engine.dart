@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:cryptography/cryptography.dart';
 import 'package:hive/hive.dart';
 
+import '../../../core/services/field_encryption_service.dart';
 import '../../../core/storage/local_database.dart';
 import '../crdt/sync_crdt.dart';
 import 'p2p_security_service.dart';
@@ -281,7 +282,12 @@ class HiveSyncEngine {
     normalized.remove('updatedAt');
     normalized.remove('createdAt');
     normalized.remove('nameLocked');
-    final json = jsonEncode(normalized);
+    // I campi sensibili sono cifrati con chiave PER-DISPOSITIVO: due
+    // dispositivi con lo stesso dato hanno ciphertext diversi (nonce casuale).
+    // Il checksum deve essere calcolato sulla forma canonica (decifrata) così
+    // che l'indice di sync sia confrontabile tra dispositivi.
+    final canonical = FieldEncryptionService.decryptStudentMapForTransport(normalized);
+    final json = jsonEncode(canonical);
     return sha256.convert(utf8.encode(json)).toString().substring(0, 12);
   }
 
@@ -352,10 +358,17 @@ class HiveSyncEngine {
                   DateTime.fromMillisecondsSinceEpoch(0).toUtc();
 
           if (updatedAt.isAfter(since.toUtc())) {
+            // Egresso P2P: i campi sensibili cifrati per-dispositivo vengono
+            // decifrati PRIMA della trasmissione (il canale è già protetto
+            // AES-GCM con shared secret). Il ricevente li cifrerà di nuovo
+            // con la propria chiave locale.
+            final transportData = boxName == LocalDatabase.studentsBox
+                ? FieldEncryptionService.decryptStudentMapForTransport(data)
+                : data;
             records.add(SyncRecord.fromHiveEntry(
               id: id,
               boxName: boxName,
-              entry: data,
+              entry: transportData,
             ));
           }
         }
@@ -442,7 +455,9 @@ class HiveSyncEngine {
         records.add(SyncRecord.fromHiveEntry(
           id: recordId,
           boxName: boxName,
-          entry: data,
+          entry: boxName == LocalDatabase.studentsBox
+              ? FieldEncryptionService.decryptStudentMapForTransport(data)
+              : data,
         ));
       } catch (_) {}
     }
@@ -514,7 +529,20 @@ class HiveSyncEngine {
     final nearConcurrent =
         localUpdatedAt.difference(remoteUpdatedAt).inSeconds.abs() <= 5;
 
-    for (final entry in remoteData.entries) {
+    // Normalizzazione per il confronto: i campi sensibili dello studente sono
+    // cifrati con chiave per-dispositivo. Per il merge, due valori con lo
+    // stesso contenuto in chiaro (uno locale cifrato, uno remoto in chiaro)
+    // devono essere considerati UGUALI, altrimenti ogni sync genererebbe
+    // falsi conflitti. Il confronto avviene sulla forma decifrata.
+    final isStudentsBox = boxName == LocalDatabase.studentsBox;
+    final localForCompare = isStudentsBox
+        ? FieldEncryptionService.decryptStudentMapForTransport(localData)
+        : localData;
+    final remoteForCompare = isStudentsBox
+        ? FieldEncryptionService.decryptStudentMapForTransport(remoteData)
+        : remoteData;
+
+    for (final entry in remoteForCompare.entries) {
       final field = entry.key;
       final remoteValue = entry.value;
 
@@ -530,9 +558,9 @@ class HiveSyncEngine {
       if (!merged.containsKey(field)) {
         // Solo remoto ha questo campo: lo prendiamo
         merged[field] = remoteValue;
-      } else if (merged[field] != remoteValue) {
-        // Stesso campo, valori diversi: potenziale conflitto.
-        // La priorità è decisa dal LWW firmato (o dal timestamp legacy).
+      } else if (localForCompare[field] != remoteValue) {
+        // Stesso campo, valori diversi (confronto in forma decifrata):
+        // potenziale conflitto. La priorità è decisa dal LWW firmato.
         if (remoteWins) {
           merged[field] = remoteValue;
         }
@@ -543,7 +571,7 @@ class HiveSyncEngine {
           conflictFields.add(field);
         }
       }
-      // Se sono uguali, non fare nulla
+      // Se sono uguali (in forma decifrata), non fare nulla
     }
 
     if (conflictFields.isNotEmpty) {
@@ -582,10 +610,15 @@ class HiveSyncEngine {
 
         if (localRaw == null) {
           if (!remote.isDeleted) {
-            final data = Map<String, dynamic>.from(remote.data);
+            var data = Map<String, dynamic>.from(remote.data);
             data.remove('_conflicts');
             if (isClassBox && data['nameLocked'] != true) {
               data['nameLocked'] = true;
+            }
+            // Ingresso P2P: i campi sensibili arrivano in chiaro e vengono
+            // cifrati con la chiave locale prima della persistenza.
+            if (remote.boxName == LocalDatabase.studentsBox) {
+              data = FieldEncryptionService.encryptStudentMapForStorage(data);
             }
             await box.put(remote.id, data);
             appliedCount++;
@@ -610,17 +643,20 @@ class HiveSyncEngine {
         }
 
         if (localIsDeleted && !remote.isDeleted) {
-          final data = Map<String, dynamic>.from(remote.data);
+          var data = Map<String, dynamic>.from(remote.data);
           data.remove('_conflicts');
           if (isClassBox && data['nameLocked'] != true) {
             data['nameLocked'] = true;
+          }
+          if (remote.boxName == LocalDatabase.studentsBox) {
+            data = FieldEncryptionService.encryptStudentMapForStorage(data);
           }
           await box.put(remote.id, data);
           appliedCount++;
           continue;
         }
 
-        final merged = _mergeFields(
+        var merged = _mergeFields(
           boxName: remote.boxName,
           recordId: remote.id,
           localData: localData,
@@ -657,6 +693,12 @@ class HiveSyncEngine {
 
         final now = DateTime.now().toUtc();
         merged['updatedAt'] = now.toIso8601String();
+        // Ingresso P2P: i campi sensibili arrivati in chiaro (o ereditati dal
+        // merge con dati remoti in chiaro) vengono cifrati con la chiave
+        // locale. L'operazione è idempotente: i campi già cifrati restano.
+        if (remote.boxName == LocalDatabase.studentsBox) {
+          merged = FieldEncryptionService.encryptStudentMapForStorage(merged);
+        }
         await box.put(remote.id, merged);
 
         if (conflictFields.isNotEmpty) {

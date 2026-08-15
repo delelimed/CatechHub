@@ -13,7 +13,10 @@
 //   - checkUpdatesOnStart: controlla aggiornamenti all'avvio/resume
 //   - allowRemoteFeedback: abilita survey Wiredash
 //
-//   Tutti i valori defaultano a true (massima sicurezza). L'utente può
+//   Tutti i valori defaultano a true (massima sicurezza) TRANNE
+//   allowRemoteFeedback, che è OPT-IN (default false): i feedback Wiredash
+//   possono includere screenshot e dati dell'interfaccia, quindi non devono
+//   partire senza un consenso esplicito dell'utente. L'utente può
 //   modificarli da PrivacySecurityPage (route: /privacy-security).
 //   applyNativeOptions() viene chiamato in main.dart all'avvio per
 //   applicare FLAG_SECURE prima ancora che l'utente veda la UI.
@@ -57,7 +60,7 @@ class PrivacySettings {
     lockOnBackground: true,
     blockScreenshots: true,
     checkUpdatesOnStart: true,
-    allowRemoteFeedback: true,
+    allowRemoteFeedback: false,
   );
 }
 
@@ -83,7 +86,7 @@ class PrivacySettingsNotifier extends StateNotifier<PrivacySettings> {
       checkUpdatesOnStart: box.get('privacy_check_updates', defaultValue: true),
       allowRemoteFeedback: box.get(
         'privacy_allow_feedback',
-        defaultValue: true,
+        defaultValue: false,
       ),
       absenceThreshold: box.get(
         'absence_threshold',

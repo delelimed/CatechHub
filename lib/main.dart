@@ -28,6 +28,7 @@ import 'core/services/meeting_notification_service.dart';
 import 'core/storage/local_database.dart';
 import 'core/config/env_config.dart';
 import 'features/guide/demo_guide_service.dart';
+import 'features/gdpr/gdpr_retention_service.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // main.dart — CatechHub (punto di ingresso Dart)
@@ -505,6 +506,16 @@ Future<void> main() async {
           ),
         ),
       );
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // FASE 7 - ENFORCEMENT GDPR (non fatale)
+      //
+      // Job periodico che applica il termine di conservazione dei dati dei
+      // minori (dataScadenzaTrattamento): marca come RITIRATO gli studenti
+      // con trattamento scaduto e registra la scadenza nel Registro
+      // Trattamenti. Non è distruttivo e non deve mai bloccare l'avvio.
+      // ═══════════════════════════════════════════════════════════════════════
+      GdprRetentionService.start();
     },
     // ─────────────────────────────────────────────────────────────────────────
     // CATCH GLOBALE DEL runZonedGuarded:

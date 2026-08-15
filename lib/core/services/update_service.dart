@@ -34,6 +34,7 @@ import 'dart:convert';
 import 'dart:io' show HttpClient, SecurityContext, X509Certificate;
 
 import 'package:crypto/crypto.dart' show sha256;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -50,16 +51,30 @@ GlobalKey<NavigatorState>? navigatorKey;
 /// MethodChannel nativo per operazioni di update (install APK, cleanup)
 const _updateChannel = MethodChannel('com.delelimed.catechhub/update');
 
-/// SHA-256 fingerprints dei certificati attendibili per api.github.com.
-/// Il valore è l'hash SHA-256 della codifica DER del certificato, in Base64.
-/// Aggiornare alla rotazione dei certificati GitHub.
-/// 
-/// Per ottenere il fingerprint corrente, usare:
-///   `openssl s_client -connect api.github.com:443 -showcerts &lt;/dev/null 2&gt;/dev/null` \
-///     `| openssl x509 -outform DER | openssl dgst -sha256 -binary | base64`
+/// SHA-256 fingerprints (base64) dei certificati attendibili per
+/// api.github.com. Il valore è l'hash SHA-256 della codifica DER del
+/// certificato, in Base64.
+///
+/// Aggiornare alla rotazione dei certificati GitHub (solitamente rinnovati
+/// via Sectigo). Per ottenere i fingerprint correnti:
+///   `openssl s_client -connect api.github.com:443 -servername api.github.com -showcerts </dev/null`
+///   quindi per ogni certificato del chain:
+///   `openssl x509 -in cert.pem -outform DER | openssl dgst -sha256 -binary | base64`
+///
+/// La lista contiene il certificato foglia + il certificato intermedio
+/// (Sectigo Public Server Authentication CA DV E36) + la root ECDSA: si
+/// pinna così la catena reale osservata, non un valore fittizio.
 const _pinnedGitHubFingerprints = <String>[
-  // *.github.com — Let's Encrypt / DigiCert
-  // Ottenuto da api.github.com. Da aggiornare periodicamente.
+  // Foglia — api.github.com (Let's Encrypt/Sectigo, verificato da openssl)
+  'tCtq6FIU8x8+9dSOEYCkb7nA19j+j9ICJWZQzVLgWeg=',
+  // Foglia — github.com (download APK e digest: browser_download_url)
+  'F/j9Lj/SwRP8uXctikuruFIt0G3QeUkVpP+YsbaGOgA=',
+  // Foglia — objects.githubusercontent.com (redirect finale download APK)
+  'cfEHfbN3/XuNaDgNpm+mgjijA7KRG8t3CzsqQmaTz4Q=',
+  // Intermedio — Sectigo Public Server Authentication CA DV E36
+  'hz8LqA46wiJlbf0EFYzBXCkn1C1dBfAd7kpH60OpFt8=',
+  // Root — Sectigo USERTrust ECC / Root E46
+  '6muJ7WkHogn/kYhnb7Fk56ztiUuJlt++XOW7zCLeTd0=',
 ];
 
 /// Estrae i byte DER da un certificato in formato PEM.
@@ -82,19 +97,26 @@ bool _checkPinnedCertificate(X509Certificate cert) {
   }
 }
 
-/// Crea un [HttpClient] con certificate pinning per api.github.com.
-/// 
-/// Se [_pinnedGitHubFingerprints] contiene fingerprint, esclude la
-/// trust store di sistema e accetta SOLO certificati con fingerprint
-/// corrispondente (true pinning). Altrimenti usa la trust store di sistema.
-HttpClient _createPinnedHttpClient() {
+/// Crea un [HttpClient] con certificate pinning per i domini GitHub.
+///
+/// Esclude la trust store di sistema e accetta SOLO certificati il cui
+/// fingerprint (leaf o intermedio) è in [_pinnedGitHubFingerprints] (true
+/// pinning). Se la lista è vuota, restituisce `null`: il chiamante deve
+/// saltare la connessione (fail-closed) anziché degradare alla trust store.
+HttpClient? createPinnedHttpClient() {
   if (_pinnedGitHubFingerprints.isEmpty) {
-    return HttpClient();
+    // Fail-closed: mai connettersi senza un allowlist di fingerprint
+    // esplicito. Un fallback alla trust store di sistema con un commento
+    // "pinning" sarebbe una falsa sicurezza (e il check veniva silenziosamente
+    // disabilitato da una lista vuota).
+    return null;
   }
   final context = SecurityContext(withTrustedRoots: false);
   return HttpClient(context: context)
     ..badCertificateCallback = (cert, host, port) {
-      if (host.endsWith('api.github.com')) {
+      if (host.endsWith('api.github.com') ||
+          host.endsWith('github.com') ||
+          host.endsWith('objects.githubusercontent.com')) {
         return _checkPinnedCertificate(cert);
       }
       return false;
@@ -107,6 +129,17 @@ class UpdateService {
       FlutterLocalNotificationsPlugin();
 
   static void setNavigatorKey(GlobalKey<NavigatorState> key) { navigatorKey = key; }
+
+  /// Client HTTP (package:http) con certificate pinning per i domini GitHub
+  /// usati dall'aggiornamento (API, download APK, digest). Restituisce `null`
+  /// se il pinning non è configurato: i chiamanti devono interrompere
+  /// l'operazione (fail-closed) e NON degradare a un client non pinnato.
+  ///
+  /// Il client va chiuso dal chiamante con `close()` al termine.
+  static IOClient? createPinnedClient() {
+    final raw = createPinnedHttpClient();
+    return raw == null ? null : IOClient(raw);
+  }
 
   /// Inizializza il plugin notifiche con callback di navigazione.
   static Future<void> initNotifications() async {
@@ -135,9 +168,16 @@ class UpdateService {
   /// La connessione usa certificate pinning per prevenire MitM.
   static Future<void> checkForUpdates() async {
     try {
+      final pinnedClient = createPinnedHttpClient();
+      if (pinnedClient == null) {
+        // Nessun fingerprint di pinning configurato: non ci colleghiamo.
+        if (kDebugMode) {
+      debugPrint('Controllo aggiornamenti saltato: pinning non configurato');
+    }
+        return;
+      }
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version;
-      final pinnedClient = _createPinnedHttpClient();
       final httpClient = IOClient(pinnedClient);
       final response = await httpClient
           .get(

@@ -22,6 +22,7 @@ import '../../shared/models/avviso_template_model.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/models/parish_event.dart';
 import '../../shared/widgets/app_scaffold.dart';
+import '../../shared/widgets/responsabile_guard.dart';
 import '../sync/class_channel_service.dart';
 import '../sync/p2p/p2p_sync_service.dart';
 import '../sync/parish_channel_service.dart';
@@ -338,36 +339,39 @@ class _ParishNetworkPageState extends State<ParishNetworkPage>
 
   @override
   Widget build(BuildContext context) {
-    return AppScaffold(
+    return ResponsabileGuard(
       title: 'Rete Catechistica',
-      floatingActionButton: _fab,
-      child: Column(
-        children: [
-          Material(
-            color: Colors.transparent,
-            child: TabBar(
-              controller: _tabController,
-              isScrollable: true,
-              tabAlignment: TabAlignment.start,
-              tabs: const [
-                Tab(text: 'Riunioni'),
-                Tab(text: 'Avvisi parrocchia'),
-                Tab(text: 'Titoli di classe'),
-              ],
+      child: AppScaffold(
+        title: 'Rete Catechistica',
+        floatingActionButton: _fab,
+        child: Column(
+          children: [
+            Material(
+              color: Colors.transparent,
+              child: TabBar(
+                controller: _tabController,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                tabs: const [
+                  Tab(text: 'Riunioni'),
+                  Tab(text: 'Avvisi parrocchia'),
+                  Tab(text: 'Titoli di classe'),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _RiunioniTab(onSync: () => _syncParishChannel(context)),
-                const _AvvisiTab(),
-                const _TitoliTab(),
-              ],
+            const SizedBox(height: 8),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _RiunioniTab(onSync: () => _syncParishChannel(context)),
+                  const _AvvisiTab(),
+                  const _TitoliTab(),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -775,6 +779,8 @@ class _GrantQrDialog extends StatefulWidget {
 
 class _GrantQrDialogState extends State<_GrantQrDialog> {
   int _index = 0;
+  // PIN nascosto di default: si mostra solo su tap (anti shoulder-surfing).
+  bool _pinVisible = false;
 
   @override
   Widget build(BuildContext context) {
@@ -792,24 +798,32 @@ class _GrantQrDialogState extends State<_GrantQrDialog> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 10,
-              ),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                widget.pin,
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 6,
-                  color: Theme.of(context).colorScheme.primary,
+            InkWell(
+              onTap: () => setState(() => _pinVisible = !_pinVisible),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _pinVisible ? widget.pin : '••••••••••',
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 6,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                 ),
               ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _pinVisible ? 'Tocca per nascondere' : 'Tocca per mostrare il PIN',
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
             ),
             const SizedBox(height: 16),
             Container(

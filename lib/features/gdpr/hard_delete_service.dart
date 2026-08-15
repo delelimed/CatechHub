@@ -13,6 +13,8 @@
 //   - I tombstone sono append-only e mai cancellati automaticamente.
 // ══════════════════════════════════════════════════════════════════════════════
 
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 
 import '../../core/auth/auth_service.dart';
@@ -41,7 +43,9 @@ class HardDeleteService {
   /// tombstone creato, o null se l'operazione non è permessa.
   static Future<Tombstone?> hardDeleteStudent(Student student) async {
     if (!canHardDelete()) {
+      if (kDebugMode) {
       debugPrint('[HardDelete] Diritto all\'Oblio non consentito per il ruolo corrente');
+    }
       return null;
     }
 
@@ -59,7 +63,9 @@ class HardDeleteService {
     try {
       await P2PSyncService().broadcastTombstone(tombstone);
     } catch (e) {
+      if (kDebugMode) {
       debugPrint('[HardDelete] Broadcast tombstone fallito (non bloccante): $e');
+    }
     }
 
     return tombstone;
@@ -67,36 +73,58 @@ class HardDeleteService {
 
   /// Applica localmente lo tombstone ricevuto da un dispositivo remoto e
   /// registra l'evento [AuditActionType.tombstoneReceived].
+  ///
+  /// Il tombstone viene SEMPRE registrato (append-only) per impedire la
+  /// "resurrezione" del dato via sync. La cancellazione irreversibile del
+  /// dato, invece, viene eseguita SOLO se l'operatore locale possiede il
+  /// Diritto all'Oblio (Responsabile): una firma HMAC simmetrica (segreto
+  /// ECDH condiviso) autentica il mittente come dispositivo associato, ma
+  /// NON è sufficiente per autorizzare la cancellazione definitiva di un
+  /// minore su un dispositivo a privilegio ridotto.
   static Future<bool> applyRemoteTombstone(Map<String, dynamic> ts) async {
     final entityId = ts['entityId'] as String?;
     final entityType = ts['entityType'] as String?;
     if (entityId == null || entityId.isEmpty) return false;
 
     final repo = TombstoneRepository();
-    // Idempotenza: il tombstone di questa entità è già stato applicato.
+    // Idempotenza: il tombstone di questa entità è già stato registrato.
     if (repo.hasTombstone(entityId)) return true;
 
-    // 1. Eliminazione dell'entità nel box di origine.
+    // 0. Conserva SEMPRE il tombstone: impedisce la resurrezione via sync.
+    await repo.put(_buildRemoteTombstone(ts));
+
+    // 1. La cancellazione irreversibile richiede il Diritto all'Oblio.
+    if (!canHardDelete()) {
+if (kDebugMode) {
+      debugPrint('[HardDelete] Tombstone registrato ma cancellazione non '
+          'eseguita: l\'operatore locale non possiede il Diritto all\'Oblio');
+    }
+      return false;
+    }
+
+    // 2. Eliminazione dell'entità nel box di origine.
     var deleted = false;
     if (entityType == AuditLog.entityRagazzo) {
       try {
         await StudentsRepository().deleteStudent(entityId);
         deleted = true;
       } catch (e) {
-        debugPrint('[HardDelete] Errore cancellazione ragazzo remoto: $e');
+        if (kDebugMode) {
+      debugPrint('[HardDelete] Errore cancellazione ragazzo remoto: $e');
+    }
       }
     } else {
       try {
         await LocalDatabase.students().delete(entityId);
         deleted = true;
       } catch (e) {
-        debugPrint('[HardDelete] Errore cancellazione entità generica: $e');
+        if (kDebugMode) {
+      debugPrint('[HardDelete] Errore cancellazione entità generica: $e');
+    }
       }
     }
 
     if (deleted) {
-      // 2. Conserva lo tombstone locale per bloccare future resurrections.
-      await repo.put(_buildRemoteTombstone(ts));
       // 3. Registra l'evento nel Registro Trattamenti.
       try {
         await AuditLogRepository().record(
@@ -105,7 +133,9 @@ class HardDeleteService {
           affectedEntityType: entityType ?? '',
         );
       } catch (e) {
-        debugPrint('[HardDelete] Audit tombstone ricevuto non registrato: $e');
+        if (kDebugMode) {
+      debugPrint('[HardDelete] Audit tombstone ricevuto non registrato: $e');
+    }
       }
     }
 
@@ -134,9 +164,16 @@ class HardDeleteService {
     required String entityId,
   }) async {
     String signer = 'unknown';
+    String signingSecret = _localHello();
     try {
-      final identity = await P2PSecurityService().getLocalIdentity();
+      final security = P2PSecurityService();
+      final identity = await security.getLocalIdentity();
       signer = identity.deviceId;
+      // Firma legata alla chiave privata di identità P2P: solo questo
+      // dispositivo può rigenerare la firma del tombstone locale.
+      final keyPair = await security.getOrCreateIdentityKeyPair();
+      final privBytes = await keyPair.extractPrivateKeyBytes();
+      signingSecret = base64Encode(privBytes);
     } catch (_) {}
     final deletedAt = DateTime.now().toUtc();
     final executedBy = _operatorName();
@@ -150,9 +187,9 @@ class HardDeleteService {
       'executedByCatechistId': executedByCatechistId,
       'signerDeviceId': signer,
     };
-    // Firma locale (chiave deterministica, non transata via rete).
+    // Firma locale (chiave legata al dispositivo, non transata via rete).
     final signature =
-        TombstoneService.sign(TombstoneService.canonical(base), _localHello());
+        TombstoneService.sign(TombstoneService.canonical(base), signingSecret);
 
     return Tombstone(
       id: LocalDatabase.newId('ts'),

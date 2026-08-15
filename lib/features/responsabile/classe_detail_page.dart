@@ -13,7 +13,9 @@ import 'package:go_router/go_router.dart';
 import '../../shared/models/catechist_profile.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/models/student_model.dart';
+import '../../shared/models/user_role.dart';
 import '../../shared/widgets/app_scaffold.dart';
+import '../../shared/widgets/responsabile_guard.dart';
 import '../classes/classes_provider.dart';
 import '../classes/classes_repository.dart';
 import 'catechist_manager_dialog.dart';
@@ -126,6 +128,13 @@ class _ClasseDetailPageState extends ConsumerState<ClasseDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (!RolePermissions.currentCan(RolePermission.manageClasses)) {
+      return const ResponsabileGuard(
+        title: 'Classe',
+        child: SizedBox.shrink(),
+      );
+    }
+
     final classesAsync = ref.watch(classesStreamProvider);
     final studentsAsync = ref.watch(studentsOfClassProvider(widget.classId));
     final catechistsAsync = ref.watch(catechistsStreamProvider);

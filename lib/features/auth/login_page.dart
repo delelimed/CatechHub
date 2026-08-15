@@ -18,15 +18,19 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'bible_quote.dart';
 import '../../core/auth/auth_provider.dart';
+import '../../core/auth/auth_service.dart';
 import '../../core/storage/local_database.dart';
 import '../../features/guide/demo_guide_service.dart';
 import '../../shared/models/user_role.dart';
@@ -126,7 +130,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final authService = ref.read(authServiceProvider);
       final isConfigured = authService.isProfileConfigured;
+      if (kDebugMode) {
       debugPrint('Login initState - Profilo configurato: $isConfigured');
+    }
 
       if (!isConfigured) {
         if (mounted) setState(() => _isFirstSetup = true);
@@ -135,7 +141,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
       // Profilo esiste: verifica se il dispositivo ha lockscreen attivo
       final hasLock = await authService.hasSecureLockScreen();
+      if (kDebugMode) {
       debugPrint('Login initState - Lockscreen attivo: $hasLock');
+    }
 
       if (mounted) {
         setState(() {
@@ -373,7 +381,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                     ] else if (!_checkedLockScreen) ...[
                                       _buildCheckingLockScreen(),
                                     ] else if (!_hasSecureLockScreen) ...[
-                                      const HardLockScreen(),
+                                      HardLockScreen(onRetry: _recheckLockScreen),
                                     ] else ...[
                                       _buildUnlockForm(isLoading, isLandscape),
                                     ],
@@ -429,7 +437,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                 _buildCheckingLockScreen(),
                               ] else if (!_hasSecureLockScreen) ...[
                                 // HARD LOCK SCREEN - Non chiudibile, non bypassabile
-                                const HardLockScreen(),
+                                HardLockScreen(onRetry: _recheckLockScreen),
                               ] else ...[
                                 _buildUnlockForm(isLoading, isLandscape),
                               ],
@@ -499,6 +507,18 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         ),
       ],
     );
+  }
+
+  /// Rilancia il controllo del lockscreen (usato dal pulsante "Riprova"
+  /// della HardLockScreen) e aggiorna lo stato della pagina.
+  Future<void> _recheckLockScreen() async {
+    final authService = ref.read(authServiceProvider);
+    final hasLock = await authService.hasSecureLockScreen();
+    if (!mounted) return;
+    setState(() {
+      _hasSecureLockScreen = hasLock;
+      _checkedLockScreen = true;
+    });
   }
 
   Widget _buildFirstSetupForm(bool isLoading, bool isLandscape) {
@@ -861,8 +881,80 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
 /// Schermata di blocco totale - NON chiudibile, NON bypassabile
 /// Appare se il dispositivo NON ha un lockscreen sicuro attivo.
-class HardLockScreen extends StatelessWidget {
-  const HardLockScreen({super.key});
+/// Pulsanti funzionanti: apre le impostazioni di sicurezza del dispositivo
+/// e riprova la verifica (il pulsante vuoto precedente rendeva il blocco
+/// inutile e frustrante).
+class HardLockScreen extends StatefulWidget {
+  final VoidCallback? onRetry;
+
+  const HardLockScreen({super.key, this.onRetry});
+
+  @override
+  State<HardLockScreen> createState() => _HardLockScreenState();
+}
+
+class _HardLockScreenState extends State<HardLockScreen> {
+  bool _isChecking = false;
+  bool _openingSettings = false;
+
+  /// Apre le impostazioni di sicurezza del dispositivo (stessa logica del
+  /// HardLockScreen core in lib/core/auth/hard_lock_screen.dart).
+  Future<void> _openSecuritySettings() async {
+    setState(() => _openingSettings = true);
+    try {
+      if (Platform.isAndroid) {
+        const MethodChannel channel =
+            MethodChannel('catechhub/security_settings');
+        await channel.invokeMethod('openSecuritySettings');
+      } else if (Platform.isIOS) {
+        final uri = Uri.parse('app-settings:');
+        await launchUrl(uri);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Impossibile aprire le impostazioni: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _openingSettings = false);
+    }
+  }
+
+  Future<void> _retry() async {
+    if (_isChecking) return;
+    setState(() => _isChecking = true);
+    try {
+      final authService = AuthService();
+      final hasLock = await authService.hasSecureLockScreen();
+      if (hasLock && mounted) {
+        widget.onRetry?.call();
+        return;
+      }
+      if (mounted) {
+        setState(() => _isChecking = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Blocco schermo non ancora attivo. Riprova dopo averlo configurato.'),
+            backgroundColor: Color(0xFF174A7E),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isChecking = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Errore verifica sicurezza: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -898,8 +990,17 @@ class HardLockScreen extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               ElevatedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.settings, color: Colors.white),
+                onPressed: _openingSettings ? null : _openSecuritySettings,
+                icon: _openingSettings
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.settings, color: Colors.white),
                 label: const Text(
                   'Apri Impostazioni Sicurezza',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -908,6 +1009,29 @@ class HardLockScreen extends StatelessWidget {
                   backgroundColor: Colors.red.shade700,
                   foregroundColor: Colors.white,
                   minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _isChecking ? null : _retry,
+                icon: _isChecking
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh_rounded, size: 20),
+                label: const Text(
+                  'Ho impostato il blocco schermo → Verifica',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red.shade700,
+                  side: BorderSide(color: Colors.red.shade700, width: 1.5),
+                  minimumSize: const Size(double.infinity, 48),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),

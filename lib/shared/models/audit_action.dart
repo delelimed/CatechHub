@@ -50,7 +50,11 @@ enum AuditActionType {
   promuoviStudente('PROMUOVI_STUDENTE'),
 
   /// Archiviazione di un ragazzo ad anno catechistico concluso.
-  archiviaStudente('ARCHIVIA_STUDENTE');
+  archiviaStudente('ARCHIVIA_STUDENTE'),
+
+  /// Enforcement GDPR: trattamento scaduto (dataScadenzaTrattamento superata),
+  /// il consenso al trattamento dei dati del minore non è più valido.
+  retentionTreatmentExpired('RETENTION_TREATMENT_EXPIRED');
 
   const AuditActionType(this.storageValue);
 
@@ -73,6 +77,8 @@ enum AuditActionType {
         AuditActionType.concludiAnno => 'Conclusione anno catechistico',
         AuditActionType.promuoviStudente => 'Promozione ragazzo',
         AuditActionType.archiviaStudente => 'Archiviazione ragazzo',
+        AuditActionType.retentionTreatmentExpired =>
+          'Trattamento scaduto (GDPR)',
       };
 
   static AuditActionType fromStorageValue(String? value) {

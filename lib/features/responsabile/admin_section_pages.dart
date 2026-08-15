@@ -9,6 +9,7 @@
 import 'package:flutter/material.dart';
 
 import '../../shared/widgets/app_scaffold.dart';
+import '../../shared/widgets/responsabile_guard.dart';
 import 'allarme_assenze_page.dart';
 import 'aula_management_page.dart';
 import 'classi_management_page.dart';
@@ -20,9 +21,12 @@ class ClassiRoutePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const AppScaffold(
+    return const ResponsabileGuard(
       title: 'Classi',
-      child: ClassiManagementPage(),
+      child: AppScaffold(
+        title: 'Classi',
+        child: ClassiManagementPage(),
+      ),
     );
   }
 }
@@ -33,9 +37,12 @@ class IscrizioniRoutePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const AppScaffold(
+    return const ResponsabileGuard(
       title: 'Iscrizioni',
-      child: IscrizioniPage(),
+      child: AppScaffold(
+        title: 'Iscrizioni',
+        child: IscrizioniPage(),
+      ),
     );
   }
 }
@@ -46,9 +53,12 @@ class LogisticaRoutePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const AppScaffold(
+    return const ResponsabileGuard(
       title: 'Logistica',
-      child: AulaManagementSection(),
+      child: AppScaffold(
+        title: 'Logistica',
+        child: AulaManagementSection(),
+      ),
     );
   }
 }
@@ -59,9 +69,12 @@ class AllarmiRoutePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const AppScaffold(
+    return const ResponsabileGuard(
       title: 'Allarme assenze',
-      child: AllarmeAssenzePage(),
+      child: AppScaffold(
+        title: 'Allarme assenze',
+        child: AllarmeAssenzePage(),
+      ),
     );
   }
 }

@@ -8,10 +8,9 @@
 //    - Il Titolare genera una Class_Encryption_Key TEMPORANEA (`tempKey`, AES-256).
 //    - Calcola il segreto condiviso ECDH tra la sua chiave di identità P2P e la
 //      chiave pubblica del dispositivo Supplente.
-//    - Il token di delega (delegationId, classi, catechisti, validità) viene
-//      FIRMATO con HMAC-SHA256 keyed dal segreto condiviso.
-//    - Il payload { tempKey, token firmato, snapshot studenti } viene cifrato
-//      AES-256-GCM con il segreto condiviso (autenticazione garantita dal MAC).
+//    - Il payload { token, tempKey, snapshot studenti } viene CIFRATO intero
+//      AES-256-GCM con il segreto condiviso, quindi FIRMATO con HMAC-SHA256
+//      sull'intero contenuto (AEAD + firma per autenticità e integrità).
 //    - La chiave pubblica del Titolare viaggia IN CHIARO nel wrapper per
 //      permettere al Supplente di ricalcolare lo stesso segreto (ECDH).
 //
@@ -142,13 +141,25 @@ class SubstituteDelegationService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // CANONICAL TOKEN (per la firma)
+  // CANONICAL (per la firma)
   // ─────────────────────────────────────────────────────────────────────────
 
-  static String _canonicalToken(Map<String, dynamic> token) {
-    final sorted = SplayTreeMap<String, dynamic>.from(token);
-    return jsonEncode(sorted);
+  /// Canonicalizza ricorsivamente [value] ordinando le chiavi dei map a ogni
+  /// livello, così due costruzioni uguali producono la stessa stringa JSON.
+  static dynamic _canonicalize(Object? value) {
+    if (value is Map) {
+      final out = SplayTreeMap<String, dynamic>();
+      value.forEach((k, v) => out[k.toString()] = _canonicalize(v));
+      return out;
+    }
+    if (value is List) {
+      return value.map(_canonicalize).toList();
+    }
+    return value;
   }
+
+  static String _canonicalJson(Map<String, dynamic> data) =>
+      jsonEncode(_canonicalize(data));
 
   static Map<String, dynamic> buildTokenMap(SubstituteDelegation d) => {
         'delegationId': d.delegationId,
@@ -207,23 +218,33 @@ class SubstituteDelegationService {
         await _p2p.computeStaticSharedSecret(substitutePublicKeyBase64);
 
     final token = buildTokenMap(delegation);
-    final signature = hmacBase64(_canonicalToken(token), sharedSecret);
 
     final payload = {
       'v': 1,
       'type': kindDelegation,
       'token': token,
-      'sig': signature,
       'temp_key': tempKey,
       'students': students,
       'issuedAt': DateTime.now().toUtc().toIso8601String(),
     };
 
+    // La firma HMAC copre l'INTERO payload (token + temp_key + snapshot
+    // studenti): nessun campo può essere alterato, riordinato o sostituito
+    // senza invalidare la firma.
+    final signature = hmacBase64(_canonicalJson(payload), sharedSecret);
+    payload['sig'] = signature;
+
+    // Il body viene CIFRATO AES-256-GCM con il segreto condiviso ECDH:
+    // chiunque scansiona il QR vede solo ciphertext (niente temp_key, niente
+    // nomi dei minori). L'AEAD garantisce autenticità e integrità in transito.
+    final encryptedBody =
+        await _p2p.encryptPayloadString(jsonEncode(payload), sharedSecret);
+
     final wrapper = {
       'v': 1,
       'kind': kindDelegation,
       'pubkey': await _p2p.getPublicKeyBase64(),
-      'body': base64Encode(utf8.encode(jsonEncode(payload))),
+      'body': encryptedBody,
     };
 
     return (delegation, _chunkTransport(_encodeTransport(wrapper)));
@@ -255,25 +276,13 @@ class SubstituteDelegationService {
     }
 
     final sharedSecret = await _p2p.computeStaticSharedSecret(ownerPublicKey);
-    // Il payload viaggia in chiaro nel wrapper (niente dati sensibili al di
-    // fuori della firma e della tempKey), ma l'accesso al segreto ECDH è solo
-    // dei due dispositivi. La tempKey viene ri-cifrata in transito sotto la
-    // firma: di fatto solo chi possiede il segreto può ricalcolarla.
+    // Il body è cifrato AES-256-GCM con il segreto condiviso ECDH. Solo il
+    // Supplente (in possesso della sua chiave privata) può ricalcolare il
+    // segreto e decifrarlo; l'AEAD garantisce che provenga dal Titolare.
     final Map<String, dynamic> payload;
     try {
-      final raw = Map<String, dynamic>.from(
-        jsonDecode(utf8.decode(base64Decode(body))) as Map,
-      );
-      // Re-cifra il corpo con il segreto condiviso: se la decifratura riesce,
-      // il payload proviene da UN dispositivo in possesso del segreto.
-      // L'AEAD garantisce l'autenticità del contenuto.
-      final protected = await _p2p.encryptPayloadString(
-        jsonEncode(raw),
-        sharedSecret,
-      );
-      payload = Map<String, dynamic>.from(
-        jsonDecode(await _p2p.decryptPayloadString(protected, sharedSecret)) as Map,
-      );
+      final decrypted = await _p2p.decryptPayloadString(body, sharedSecret);
+      payload = Map<String, dynamic>.from(jsonDecode(decrypted) as Map);
     } catch (e) {
       throw Exception('Payload delega illeggibile o non autentico: $e');
     }
@@ -282,15 +291,18 @@ class SubstituteDelegationService {
       throw Exception('Payload delega non valido.');
     }
 
-    final token = Map<String, dynamic>.from(payload['token'] as Map);
+    // Verifica la firma HMAC sull'intero payload (token + temp_key + studenti).
     final signature = payload['sig']?.toString() ?? '';
+    final signed = Map<String, dynamic>.from(payload)..remove('sig');
     if (!hmacValid(
-      canonical: _canonicalToken(token),
+      canonical: _canonicalJson(signed),
       signature: signature,
       sharedSecretBase64: sharedSecret,
     )) {
       throw Exception('Firma della delega non valida.');
     }
+
+    final token = Map<String, dynamic>.from(payload['token'] as Map);
 
     final delegationId = token['delegationId']?.toString() ?? '';
     final classId = token['classId']?.toString() ?? '';

@@ -129,7 +129,9 @@ class MigrationManager {
     } catch (e) {
       // Se non possiamo leggere il flag, assumiamo migrazione NON completata
       // per sicurezza (meglio rimigrare che perdere dati).
+      if (kDebugMode) {
       debugPrint('[MigrationManager] Errore lettura flag migrazione: $e');
+    }
       return false;
     }
   }

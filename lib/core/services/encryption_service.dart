@@ -7,7 +7,14 @@ import 'package:pointycastle/export.dart' as pc;
 class EncryptionService {
   static const int currentVersion = 2;
   static const int defaultIterations = 210000;
-  static const int fastShareIterations = 12000;
+  // Iterazioni per la condivisione QR "fast share". DISTINTO da
+  // defaultIterations: la scelta dell'AAD (QR vs backup) è basata sul
+  // confronto `iterations == fastShareIterations`, quindi i due valori devono
+  // rimanere diversi per non rompere la decifratura dei backup esistenti.
+  // Il valore è stato alzato da 12000 a 60000 per rendere molto più costoso
+  // il brute-force offline del PIN QR (insieme alla lunghezza minima di 10
+  // cifre del PIN, la ricerca esaustiva diventa impraticabile).
+  static const int fastShareIterations = 60000;
   static const int saltLength = 16;
   static const int nonceLength = 12;
   static const int tagLengthBits = 128;
@@ -139,7 +146,15 @@ class EncryptionService {
       final package = jsonDecode(packageStr) as Map<String, dynamic>;
 
       if (package['v'] != currentVersion) {
-        return _decryptLegacyPackage(package, password);
+        // Il formato legacy (v1: AES-CBC senza MAC + KDF a singola iterazione)
+        // è stato RIMOSSO: accettarlo sarebbe una porta di downgrade che
+        // indebolisce la derivazione della chiave e perde l'integrità
+        // autenticata del ciphertext (padding oracle). I backup v1 non sono
+        // più supportati per scelta di sicurezza.
+        throw Exception(
+          'Versione backup non supportata (v${package['v']}). '
+          'Il formato v1 non è più accettato per motivi di sicurezza.',
+        );
       }
 
       final iterations = package['iter'] as int;
@@ -191,36 +206,6 @@ class EncryptionService {
     }
     if (end == -1) throw FormatException('Unbalanced braces');
     return jsonDecode(str.substring(start, end + 1)) as Map<String, dynamic>;
-  }
-
-  static Map<String, dynamic> _decryptLegacyPackage(Map<String, dynamic> package, String password) {
-    final salt = package['salt'] as String;
-    final ivBase64 = package['iv'] as String;
-    final dataBase64 = package['data'] as String;
-    final passwordBytes = utf8.encode(password);
-    final saltBytes = utf8.encode(salt);
-    final hmac = pc.HMac(pc.SHA256Digest(), 64)..init(pc.KeyParameter(Uint8List.fromList(passwordBytes)));
-    final digest = hmac.process(Uint8List.fromList(saltBytes));
-    final keyBytes = Uint8List(32);
-    for (var i = 0; i < keyBytes.length; i++) { keyBytes[i] = digest[i % digest.length]; }
-
-    final iv = base64Decode(ivBase64);
-    final cipher = pc.CBCBlockCipher(pc.AESEngine())..init(false, pc.ParametersWithIV(pc.KeyParameter(keyBytes), iv));
-    final encryptedBytes = base64Decode(dataBase64);
-    final decryptedBytes = cipher.process(encryptedBytes);
-    final unpadded = _pkcs7Unpad(decryptedBytes);
-    return jsonDecode(utf8.decode(unpadded)) as Map<String, dynamic>;
-  }
-
-  static Uint8List _pkcs7Unpad(Uint8List data) {
-    final padLen = data.last;
-    if (padLen < 1 || padLen > 16) return data;
-    var valid = 0;
-    for (var i = data.length - padLen; i < data.length; i++) {
-      valid |= data[i] ^ padLen;
-    }
-    if (valid != 0) return data;
-    return Uint8List.sublistView(data, 0, data.length - padLen);
   }
 }
 

@@ -8,7 +8,7 @@
 //   La condivisione dati è uno dei canali di sincronizzazione (l'alternativa
 //   al Nearby Connections). Il flusso è:
 //   1. L'utente sceglie i dati da condividere (DataShareOptions)
-//   2. I dati vengono cifrati con PIN temporaneo (AES-256-GCM, 12k iterazioni)
+//   2. I dati vengono cifrati con PIN temporaneo (AES-256-GCM, KDF robusto)
 //   3. Il pacchetto cifrato viene segmentato in QRChunk (max 1200 byte cad.)
 //   4. Ogni chunk ha checksum SHA-256 per rilevare corruzione
 //   5. Il destinatario scansiona i QR, riassembla, verifica checksum, decifra
@@ -25,7 +25,7 @@
 //
 // DIPENDENZE:
 //   - crypto (sha256): checksum dei chunk e del pacchetto
-//   - EncryptionService: cifratura AES-256-GCM con fast PBKDF2 (12k iter)
+//   - EncryptionService: cifratura AES-256-GCM con KDF PBKDF2 robusto
 // ══════════════════════════════════════════════════════════════════════════════
 
 import 'dart:convert';
@@ -34,6 +34,7 @@ import 'package:crypto/crypto.dart';
 import 'package:hive/hive.dart';
 import '../storage/local_database.dart';
 import 'encryption_service.dart';
+import 'field_encryption_service.dart';
 
 class DataShareOptions {
   final bool includeAnagrafica;
@@ -94,7 +95,10 @@ class QRChunk {
 
 class QRDataService {
   static const int maxQRSize = 1200;
-  static const int pinLength = 8;
+  // PIN minimo di 10 cifre: con 10^10 combinazioni e KDF PBKDF2-SHA256
+  // (fastShareIterations = 60000) il brute-force offline del PIN QR diventa
+  // impraticabile, anche per un pacchetto QR valido 3 minuti.
+  static const int pinLength = 12;
 
   /// Genera un PIN numerico casuale di [pinLength] cifre (es. "38572014").
   static String generatePin() {
@@ -362,10 +366,23 @@ class QRDataService {
   }
 
   /// Checksum del contenuto del record (esclude campi temporali).
+  /// Per gli studenti i campi sensibili sono cifrati per-dispositivo: il
+  /// checksum è calcolato sulla forma decifrata (canonica) così che la
+  /// differenza tra dispositivi confronti contenuti, non ciphertext.
   static String _recordChecksum(Map<String, dynamic> data) {
     final normalized = Map<String, dynamic>.from(data);
     normalized.remove('updatedAt');
     normalized.remove('createdAt');
+    if (normalized.containsKey('noteAllergieSalute') ||
+        normalized.containsKey('allergies') ||
+        normalized.containsKey('autonomousExits') ||
+        normalized.containsKey('notes')) {
+      return sha256
+          .convert(utf8.encode(jsonEncode(
+              FieldEncryptionService.decryptStudentMapForTransport(normalized))))
+          .toString()
+          .substring(0, 8);
+    }
     return sha256.convert(utf8.encode(jsonEncode(normalized))).toString().substring(0, 8);
   }
 
@@ -479,7 +496,7 @@ class QRDataService {
         // Record non presente nel remoto → invia
         final record = Map<String, dynamic>.from(data);
         record['id'] = id;
-        needed.add(record);
+        needed.add(_egressRecord(boxName, record));
       } else {
         final remoteTs = remote['ts'] as String;
         final remoteChecksum = remote['cs'] as String;
@@ -487,12 +504,12 @@ class QRDataService {
           // Locale più recente → invia
           final record = Map<String, dynamic>.from(data);
           record['id'] = id;
-          needed.add(record);
+          needed.add(_egressRecord(boxName, record));
         } else if (localUpdatedAt == remoteTs && localChecksum != remoteChecksum) {
           // Stesso timestamp ma checksum diverso → invia (conflitto, vince locale)
           final record = Map<String, dynamic>.from(data);
           record['id'] = id;
-          needed.add(record);
+          needed.add(_egressRecord(boxName, record));
         }
         // else: record identico o remoto più recente → salta
       }
@@ -561,9 +578,20 @@ class QRDataService {
         continue;
       }
       data['id'] = id;
-      records.add(data);
+      records.add(_egressRecord(boxName, data));
     }
     return records;
+  }
+
+  /// Egresso QR share: i campi sensibili dello studente (cifrati per
+  /// dispositivo) vengono decifrati prima della trasmissione. Il pacchetto è
+  /// già protetto dal PIN (AES-256-GCM); il ricevente cifrerà con la propria
+  /// chiave all'import ([DataExportService._mergeBoxRecords]).
+  static Map<String, dynamic> _egressRecord(String boxName, Map<String, dynamic> record) {
+    if (boxName == 'students_box') {
+      return FieldEncryptionService.decryptStudentMapForTransport(record);
+    }
+    return record;
   }
 
   /// Converte l'indice remoto in una mappa id → {ts, cs} per confronto veloce.

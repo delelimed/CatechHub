@@ -340,7 +340,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
   //  DIALOGS
   // ────────────────────────────────────────────
 
-  Future<String?> _askPin({
+Future<String?> _askPin({
     required String title,
     required String message,
   }) async {
@@ -365,10 +365,10 @@ class _BackupPageState extends ConsumerState<BackupPage> {
               controller: controller,
               keyboardType: TextInputType.number,
               obscureText: true,
-              maxLength: 8,
+              maxLength: 12,
               decoration: InputDecoration(
                 labelText: 'PIN',
-                hintText: 'Inserisci il PIN',
+                hintText: 'Inserisci il PIN (min 10 cifre)',
                 prefixIcon: const Icon(Icons.security_rounded),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -376,7 +376,6 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                 counterText: '',
               ),
               style: const TextStyle(fontSize: 20, letterSpacing: 8),
-              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -386,7 +385,19 @@ class _BackupPageState extends ConsumerState<BackupPage> {
             child: const Text('Annulla'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            onPressed: () {
+              final pin = controller.text.trim();
+              // Min 10 cifre: rende il brute-force offline del file impraticabile.
+              if (pin.length < 10) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(
+                    content: Text('Il PIN deve essere di almeno 10 cifre.'),
+                  ),
+                );
+                return;
+              }
+              Navigator.pop(ctx, pin);
+            },
             child: const Text('Conferma'),
           ),
         ],

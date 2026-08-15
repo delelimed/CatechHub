@@ -25,6 +25,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:hive/hive.dart';
 import 'package:pointycastle/export.dart' as pc;
 
@@ -69,11 +70,22 @@ class ClassChannelService {
   }
 
   static Uint8List _classKeyBytes(String keyBase64) {
-    final seed = debugSeedOverride;
+    // L'override di test è ammesso SOLO in debug: in release un downgrade a
+    // chiavi deterministiche sarebbe un backdoor.
+    final seed = kDebugMode ? debugSeedOverride : null;
     if (seed != null) {
       return _sha256(utf8.encode('$seed:$keyBase64'));
     }
     return Uint8List.fromList(base64Decode(keyBase64));
+  }
+
+  /// AAD di contesto: vincola ogni ciphertext alla classe a cui appartiene.
+  /// Impedisce la sostituzione di un blob cifrato con uno di un'altra classe
+  /// (ciphertext substitution) anche in presenza di chiavi coincidenti.
+  static Uint8List _aadContext(String classUniqueCode) {
+    return Uint8List.fromList(
+      utf8.encode('CatechHub_ClassChannel_v1:$classUniqueCode'),
+    );
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -226,6 +238,10 @@ class ClassChannelService {
     final keyBytes = _classKeyBytes(key.keyBase64);
     final nonce = _secureBytes(12);
 
+    // AAD di contesto: lega il ciphertext alla classe di provenienza.
+    // Impedisce la sostituzione/cross-class di un blob cifrato.
+    final aad = _aadContext(classUniqueCode);
+
     final cipher = pc.GCMBlockCipher(pc.AESEngine())
       ..init(
         true,
@@ -233,7 +249,7 @@ class ClassChannelService {
           pc.KeyParameter(keyBytes),
           128,
           nonce,
-          Uint8List(0),
+          aad,
         ),
       );
     final out = Uint8List(cipher.getOutputSize(plain.length));
@@ -275,6 +291,8 @@ class ClassChannelService {
       final data = Uint8List.sublistView(sealed, 12);
       final keyBytes = _classKeyBytes(key.keyBase64);
 
+      final aad = _aadContext(classUniqueCode);
+
       final cipher = pc.GCMBlockCipher(pc.AESEngine())
         ..init(
           false,
@@ -282,7 +300,7 @@ class ClassChannelService {
             pc.KeyParameter(keyBytes),
             128,
             nonce,
-            Uint8List(0),
+            aad,
           ),
         );
       final out = Uint8List(cipher.getOutputSize(data.length));

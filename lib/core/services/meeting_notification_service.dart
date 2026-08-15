@@ -112,7 +112,9 @@ class MeetingNotificationService {
   static void _onNotificationTapped(NotificationResponse response) {
     // Navigazione opzionale alla pagina planning
     // Per ora apriamo l'app alla home
-    debugPrint('Notifica incontro toccata: ${response.payload}');
+    if (kDebugMode) {
+      debugPrint('Notifica incontro toccata: ${response.payload}');
+    }
   }
 
   /// Verifica se le notifiche incontri sono abilitate.
@@ -215,7 +217,9 @@ class MeetingNotificationService {
 
     final hasPermission = await isPermissionGranted;
     if (!hasPermission) {
+      if (kDebugMode) {
       debugPrint('Permesso notifiche non concesso, impossibile programmare');
+    }
       return;
     }
 
@@ -312,10 +316,11 @@ class MeetingNotificationService {
       );
     } on PlatformException catch (e) {
       if (e.code == 'exact_alarms_not_permitted') {
-        debugPrint(
-          'Permesso SCHEDULE_EXACT_ALARM non concesso, uso modalità inesatta',
-        );
-        await _notificationsPlugin.zonedSchedule(
+        if (kDebugMode) {
+          debugPrint(
+              'Permesso SCHEDULE_EXACT_ALARM non concesso, uso modalità inesatta',
+            );
+          await _notificationsPlugin.zonedSchedule(
           id: id,
           title: title,
           body: body,
@@ -325,9 +330,9 @@ class MeetingNotificationService {
           matchDateTimeComponents: null,
           payload: payload,
         );
-      } else {
+        } // close kDebugMode if
         rethrow;
-      }
+      } // close e.code if
     }
   }
 

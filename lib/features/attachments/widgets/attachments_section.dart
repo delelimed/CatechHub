@@ -20,6 +20,8 @@
 /// Il parametro [readOnly] disabilita tutte le azioni modificative (aggiungi,
 /// rinomina, elimina), utile in contesti di sola consultazione.
 library;
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -237,6 +239,10 @@ class AttachmentsSection extends ConsumerWidget {
       name: finalName,
       mimeType: _mimeFromPath(file.path, fallback: 'image/jpeg'),
     );
+    // Privacy: il picker copia la foto nella cache dell'app. Dopo aver
+    // trasferito i byte nello storage cifrato, elimina la copia temporanea
+    // in chiaro per evitare che resti su disco (dati sensibili di minori).
+    await _deletePickerTemp(file.path);
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -269,6 +275,9 @@ class AttachmentsSection extends ConsumerWidget {
         name: finalName,
         mimeType: 'application/pdf',
       );
+      // Privacy: elimina la copia temporanea del picker dopo il trasferimento
+      // nello storage cifrato (stesso motivo della foto).
+      await _deletePickerTemp(path);
     } else {
       final bytes = await file.readAsBytes();
       saved = await repo.addFromBytes(
@@ -317,6 +326,22 @@ class AttachmentsSection extends ConsumerWidget {
     );
     controller.dispose();
     return result?.trim().isNotEmpty == true ? result! : defaultName;
+  }
+
+  /// Elimina la copia temporanea del picker (foto/PDF) rimasta nella cache
+  /// dell'app dopo il trasferimento dei byte nello storage cifrato.
+  /// Un errore di cancellazione non deve bloccare il flusso: il file
+  /// temporaneo verrà comunque rimosso dal sistema alla prossima pulizia.
+  Future<void> _deletePickerTemp(String path) async {
+    if (path.isEmpty) return;
+    try {
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {
+      // Ignora: cancellazione best-effort.
+    }
   }
 
   Future<void> _renameAttachment(

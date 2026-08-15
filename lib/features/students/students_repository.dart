@@ -87,13 +87,8 @@ class StudentsRepository {
   /// Deserializza dal Box decifrando i campi sensibili cifrati a livello
   /// di campo (es. [Student.noteAllergieSalute]).
   Student _studentFromBox(String id, Map<String, dynamic> data) {
-    final student = Student.fromMap(id, data);
-    final notaCifrata = data['noteAllergieSalute'] as String?;
-    if (notaCifrata != null && notaCifrata.startsWith('cieI1:')) {
-      return student.copyWith(
-        noteAllergieSalute: FieldEncryptionService.decrypt(notaCifrata),
-      );
-    }
+    final decrypted = FieldEncryptionService.decryptStudentMapForTransport(data);
+    final student = Student.fromMap(id, decrypted);
     return student;
   }
 
@@ -117,7 +112,19 @@ class StudentsRepository {
     await _log(AuditActionType.updateStudent, id, AuditLog.entityRagazzo);
   }
 
-  Student _normalize(Student student) {
+Student _normalize(Student student) {
+    final noteAllergieSalute =
+        student.noteAllergieSalute != null
+            ? FieldEncryptionService.encrypt(student.noteAllergieSalute)!
+            : '';
+    final allergies = _encryptField(student.allergies);
+    final autonomousExits = _encryptField(student.autonomousExits);
+    final notes = _encryptField(student.notes);
+    final studentPhone = _encryptField(student.studentPhone);
+    final motherPhone = _encryptField(student.motherPhone);
+    final fatherPhone = _encryptField(student.fatherPhone);
+    final parentEmail = _encryptField(student.parentEmail);
+
     return Student(
       id: student.id,
       name: NameFormatting.capitalizeWords(student.name),
@@ -129,15 +136,10 @@ class StudentsRepository {
       motherSurname: NameFormatting.capitalizeWords(student.motherSurname),
       fatherName: NameFormatting.capitalizeWords(student.fatherName),
       fatherSurname: NameFormatting.capitalizeWords(student.fatherSurname),
-      motherPhone: student.motherPhone.trim(),
-      fatherPhone: student.fatherPhone.trim(),
-      studentPhone: student.studentPhone.trim(),
-      parentEmail: student.parentEmail.trim(),
-      allergies: student.allergies?.trim().isEmpty == true
-          ? null
-          : student.allergies?.trim(),
-      autonomousExits: student.autonomousExits,
-      notes: student.notes?.trim().isEmpty == true ? null : student.notes?.trim(),
+      motherPhone: motherPhone!,
+      fatherPhone: fatherPhone!,
+      studentPhone: studentPhone!,
+      parentEmail: parentEmail!,
       consensoPrivacyFirmato: student.consensoPrivacyFirmato,
       dataFirmaConsenso: student.dataFirmaConsenso,
       dataScadenzaTrattamento: student.dataScadenzaTrattamento,
@@ -145,12 +147,21 @@ class StudentsRepository {
       contributoVersato: student.contributoVersato,
       contributoEuros: student.contributoEuros,
       annoContributo: student.annoContributo,
-      noteAllergieSalute:
-          FieldEncryptionService.encrypt(student.noteAllergieSalute),
+      noteAllergieSalute: noteAllergieSalute,
+      allergies: allergies,
+      autonomousExits: autonomousExits,
+      notes: notes,
       statoPercorso: student.statoPercorso,
       annoIscrizione: student.annoIscrizione,
       sacraments: student.sacraments,
     );
+  }
+
+  String? _encryptField(String? value) {
+    if (value != null && value.isNotEmpty) {
+      return FieldEncryptionService.encrypt(value);
+    }
+    return null;
   }
 
   /// Cerca il codice univoco di 40 cifre a partire dal [classId].
@@ -287,7 +298,9 @@ class StudentsRepository {
       );
     } catch (e) {
       // Non bloccante: il log GDPR non deve interrompere le operazioni CRUD.
-      debugPrint('[StudentsRepository] AuditLog non registrato ($action): $e');
+      if (kDebugMode) {
+        debugPrint('[StudentsRepository] AuditLog non registrato ($action): $e');
+      }
     }
   }
 }

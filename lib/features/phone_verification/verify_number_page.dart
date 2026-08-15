@@ -16,7 +16,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-//import '../../shared/models/student_model.dart';
+import '../../core/providers/current_class_provider.dart';
+import '../../shared/models/user_role.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../students/students_repository.dart';
 
@@ -71,7 +72,14 @@ class _VerifyNumberPageState extends ConsumerState<VerifyNumberPage> {
     });
 
     final repo = ref.read(studentsRepoProvider);
-    final allStudents = await repo.getAllStudents().first;
+    // La ricerca è limitata alla classe corrente: un Catechista non deve poter
+    // enumerare l'intera directory parrocchiale. Il Responsabile, che gestisce
+    // più classi, continua a cercare su tutte quelle della parrocchia.
+    final classScope = ref.read(currentClassProvider);
+    var allStudents = await repo.getAllStudents().first;
+    if (!UserRole.isResponsabile && classScope != null) {
+      allStudents = allStudents.where((s) => s.classId == classScope).toList();
+    }
 
     final foundMatches = <PhoneMatch>[];
 

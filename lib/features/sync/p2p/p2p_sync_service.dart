@@ -389,6 +389,19 @@ class P2PSyncService {
   /// della rotazione). Ogni chiave scade dopo `sessionKeyRotation`.
   final Map<String, List<_EndpointSessionKey>> _endpointSessionKeys = {};
 
+  /// Chiavi EFIMERE locali per endpoint (forward secrecy). Generata per ogni
+  /// connessione, MAI persistita: vive solo in memoria e viene rimossa alla
+  /// chiusura della sessione. Se un attaccante compromette in futuro le
+  /// chiavi statiche di identità, NON può ricostruire le sessioni passate.
+  final Map<String, SimpleKeyPairData> _endpointLocalEphemeral = {};
+
+  /// Chiave pubblica efimera locale (base64) per endpoint: viene precalcolata
+  /// alla generazione della coppia efimera ed usata nell'handshake/ack.
+  final Map<String, String> _endpointLocalEphemeralPub = {};
+
+  /// Chiave pubblica efimera del peer remoto, ricevuta nell'handshake.
+  final Map<String, String> _endpointRemoteEphemeralPub = {};
+
   bool _continuousModeActive = false;
   final Set<String> _connectedEndpoints = {};
   final Set<String> _nearbyDiscoveredDevices = {};
@@ -531,6 +544,9 @@ class P2PSyncService {
     _nearbyEndpointToDevice.clear();
     _endpointSyncPhase.clear();
     _endpointSessionKeys.clear();
+    _endpointLocalEphemeral.clear();
+    _endpointLocalEphemeralPub.clear();
+    _endpointRemoteEphemeralPub.clear();
     _isSyncing = false;
     _sessionPairingNonce = null;
     _remoteSessionPairingNonce = null;
@@ -952,12 +968,15 @@ class P2PSyncService {
       if (phoneNumber != null && phoneNumber.trim().isNotEmpty)
         'phoneNumber': phoneNumber.trim(),
     };
+    // Privacy: il log NON deve contenere il profilo anagrafico (nome, cognome,
+    // telefono) del catechista remoto — sono dati personali di un collega e
+    // il log è visibile in UI ed esportabile. Si logga solo la presenza.
     addLog(
       'INFO',
-      'Profilo remoto associazione: '
-      '${_associationRemoteProfile['firstName']} '
-      '${_associationRemoteProfile['lastName']} '
-      '(${_associationRemoteProfile['phoneNumber'] ?? 'senza numero'})',
+      'Profilo remoto associazione configurato '
+      '(nome: ${(_associationRemoteProfile['firstName'] ?? '').isNotEmpty}, '
+      'cognome: ${(_associationRemoteProfile['lastName'] ?? '').isNotEmpty}, '
+      'telefono: ${(_associationRemoteProfile['phoneNumber'] ?? '').isNotEmpty})',
     );
   }
 
@@ -1240,6 +1259,9 @@ class P2PSyncService {
     _connectedEndpoints.clear();
     _endpointConnIdMap.clear();
     _endpointSessionKeys.clear();
+    _endpointLocalEphemeral.clear();
+    _endpointLocalEphemeralPub.clear();
+    _endpointRemoteEphemeralPub.clear();
     _endpointSyncPhase.clear();
     _pendingEndpointId = null;
     _pendingHandshakeIdentity = null;
@@ -1410,6 +1432,9 @@ class P2PSyncService {
     _connectedEndpoints.remove(endpointId);
     final deviceId = _endpointConnIdMap.remove(endpointId);
     _endpointSessionKeys.remove(endpointId);
+    _endpointLocalEphemeral.remove(endpointId);
+    _endpointLocalEphemeralPub.remove(endpointId);
+    _endpointRemoteEphemeralPub.remove(endpointId);
     _endpointSyncPhase.remove(endpointId);
     _authRequestSent.remove(endpointId);
     _endpointRemoteCatechistId.remove(endpointId);
@@ -1451,6 +1476,13 @@ class P2PSyncService {
     _connectedEndpoints.remove(endpointId);
     _endpointConnIdMap.remove(endpointId);
     _endpointSessionKeys.remove(endpointId);
+    // Forward secrecy: rimuove la chiave efimera dalla memoria. La chiave
+    // privata efimera NON è mai persistita, quindi una volta scartata la
+    // sessione passata non può essere ricostruita nemmeno con la compromissione
+    // successiva delle chiavi statiche di identità.
+    _endpointLocalEphemeral.remove(endpointId);
+    _endpointLocalEphemeralPub.remove(endpointId);
+    _endpointRemoteEphemeralPub.remove(endpointId);
     _endpointSyncPhase.remove(endpointId);
     _endpointRemoteCatechistId.remove(endpointId);
     _endpointRemoteHasClasses.remove(endpointId);
@@ -1725,6 +1757,13 @@ class P2PSyncService {
       ).map((b) => b.toRadixString(16).padLeft(2, '0')).join();
       final localIdentity = await _security.getLocalIdentity();
       final localApproval = await _security.getLocalApproval();
+      // Forward secrecy: chiave efimera generata per QUESTA connessione.
+      // Non viene mai persistita; la chiave privata resta solo in memoria e
+      // viene scartata alla chiusura della sessione.
+      final ephemeral = await _security.generateEphemeralKeyPair();
+      final ephemeralPub = await ephemeral.extractPublicKey();
+      _endpointLocalEphemeral[endpointId] = ephemeral;
+      _endpointLocalEphemeralPub[endpointId] = base64Encode(ephemeralPub.bytes);
       final handshakeMsg = jsonEncode({
         'type': 'p2p_handshake',
         'senderId': localIdentity.deviceId,
@@ -1734,6 +1773,7 @@ class P2PSyncService {
         'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
         'role': _state.role.name,
         'sessionNonce': _sessionPairingNonce,
+        'ephemeralPub': base64Encode(ephemeralPub.bytes),
         'classId': _handshakeClassId(),
         'sharedClassIds': _handshakeSharedClassIds(),
         'catechistId': AuthService.getCatechistId(),
@@ -1752,7 +1792,7 @@ class P2PSyncService {
       });
       addLog(
         'DEBUG',
-        'Invio handshake a $endpointId (nonce: ${_sessionPairingNonce?.substring(0, 8)}...)',
+        'Invio handshake a $endpointId',
       );
       await _sendPayload(endpointId, handshakeMsg);
       _updateState(_state.copyWith(status: P2PSyncStatus.handshakeSent));
@@ -1761,6 +1801,11 @@ class P2PSyncService {
       addLog('ERROR', 'Errore invio handshake: $e');
     }
   }
+
+  /// Chiave pubblica efimera locale per [endpointId] (forward secrecy),
+  /// precalcolata alla generazione della coppia efimera.
+  String _localEphemeralPubForEndpoint(String endpointId) =>
+      _endpointLocalEphemeralPub[endpointId] ?? '';
 
   /// Deriva il pairing code dal shared secret e dai nonces concordati.
   /// Entrambi i dispositivi devono usare lo stesso nonce concordato per
@@ -1835,7 +1880,9 @@ class P2PSyncService {
       sharedSecret,
       sessionNonce: agreedNonce,
     );
-    addLog('DEBUG', 'Codice pairing calcolato: $code');
+    // Privacy: il codice pairing NON viene loggato. È il segreto di
+    // autenticazione a breve termine per l'associazione; un log (anche
+    // DEBUG) lo esporrebbe a chiunque legga il log di sync.
     return code;
   }
 
@@ -2023,6 +2070,17 @@ class P2PSyncService {
       _remoteSessionPairingNonce = message['sessionNonce'] as String?;
       _endpointConnIdMap[endpointId] = remoteId;
       _connectedEndpoints.add(endpointId);
+      // Forward secrecy: registra la chiave efimera del remoto e genera la
+      // propria chiave efimera per questa connessione (se non già presente).
+      _endpointRemoteEphemeralPub[endpointId] =
+          message['ephemeralPub'] as String? ?? '';
+      if (_endpointLocalEphemeral[endpointId] == null) {
+        final localEphemeral = await _security.generateEphemeralKeyPair();
+        _endpointLocalEphemeral[endpointId] = localEphemeral;
+        final localEphemeralPub = await localEphemeral.extractPublicKey();
+        _endpointLocalEphemeralPub[endpointId] =
+            base64Encode(localEphemeralPub.bytes);
+      }
 
       if (remoteCatechistId != null && remoteCatechistId.isNotEmpty) {
         _endpointRemoteCatechistId[endpointId] = remoteCatechistId;
@@ -2190,6 +2248,17 @@ class P2PSyncService {
     _remoteSessionPairingNonce = message['sessionNonce'] as String?;
     _endpointConnIdMap[endpointId] = remoteId;
     _connectedEndpoints.add(endpointId);
+    // Forward secrecy: registra la chiave efimera del remoto e genera la
+    // propria chiave efimera per questa connessione (se non già presente).
+    _endpointRemoteEphemeralPub[endpointId] =
+        message['ephemeralPub'] as String? ?? '';
+    if (_endpointLocalEphemeral[endpointId] == null) {
+      final localEphemeral = await _security.generateEphemeralKeyPair();
+      _endpointLocalEphemeral[endpointId] = localEphemeral;
+      final localEphemeralPub = await localEphemeral.extractPublicKey();
+      _endpointLocalEphemeralPub[endpointId] =
+          base64Encode(localEphemeralPub.bytes);
+    }
 
     final localIdentity = await _security.getLocalIdentity();
 
@@ -2201,6 +2270,7 @@ class P2PSyncService {
         'senderName': localIdentity.deviceName,
         'role': _state.role.name,
         'sessionNonce': _sessionPairingNonce ?? '',
+        'ephemeralPub': _localEphemeralPubForEndpoint(endpointId),
         'classId': _handshakeClassId(),
         'sharedClassIds': _handshakeSharedClassIds(),
         'catechistId': AuthService.getCatechistId(),
@@ -2243,6 +2313,7 @@ class P2PSyncService {
         'senderName': localIdentity.deviceName,
         'role': _state.role.name,
         'sessionNonce': _sessionPairingNonce ?? '',
+        'ephemeralPub': _localEphemeralPubForEndpoint(endpointId),
         'classId': _handshakeClassId(),
         'sharedClassIds': _handshakeSharedClassIds(),
         'catechistId': AuthService.getCatechistId(),
@@ -2336,6 +2407,17 @@ class P2PSyncService {
           message['sessionNonce'] as String? ?? _remoteSessionPairingNonce;
       _endpointConnIdMap[endpointId] = remoteId;
       _connectedEndpoints.add(endpointId);
+      // Forward secrecy: registra la chiave efimera del remoto e genera la
+      // propria se non già presente.
+      _endpointRemoteEphemeralPub[endpointId] =
+          message['ephemeralPub'] as String? ?? '';
+      if (_endpointLocalEphemeral[endpointId] == null) {
+        final localEphemeral = await _security.generateEphemeralKeyPair();
+        _endpointLocalEphemeral[endpointId] = localEphemeral;
+        final localEphemeralPub = await localEphemeral.extractPublicKey();
+        _endpointLocalEphemeralPub[endpointId] =
+            base64Encode(localEphemeralPub.bytes);
+      }
 
       final ackRemoteCatechistId = message['catechistId'] as String?;
       if (ackRemoteCatechistId != null && ackRemoteCatechistId.isNotEmpty) {
@@ -2448,6 +2530,17 @@ class P2PSyncService {
 
     _endpointConnIdMap[endpointId] = remoteId;
     _connectedEndpoints.add(endpointId);
+    // Forward secrecy: registra la chiave efimera del remoto ricevuta
+    // nell'ack e genera la propria se non già presente.
+    _endpointRemoteEphemeralPub[endpointId] =
+        message['ephemeralPub'] as String? ?? '';
+    if (_endpointLocalEphemeral[endpointId] == null) {
+      final localEphemeral = await _security.generateEphemeralKeyPair();
+      _endpointLocalEphemeral[endpointId] = localEphemeral;
+      final localEphemeralPub = await localEphemeral.extractPublicKey();
+      _endpointLocalEphemeralPub[endpointId] =
+          base64Encode(localEphemeralPub.bytes);
+    }
 
     if (!_state.isPairingMode) {
       _updateState(
@@ -2539,7 +2632,12 @@ class P2PSyncService {
       }
 
       final updated = assoc.copyWith(
-        authorizedByResponsabile: true,
+        // Il flag viene alzato SOLO se il certificato è stato verificato
+        // contro il segreto della parrocchia. In caso contrario il certificato
+        // viene comunque conservato come metadato (verifica differita), ma
+        // senza elevare l'autorizzazione: un certificato non verificato non
+        // deve mai valere come approvazione.
+        authorizedByResponsabile: valid,
         timestampApproval: cert.timestampApproval,
         approvedByDeviceId: cert.approvedByDeviceId,
         approvalSignature: cert.approvalSignature,
@@ -2715,6 +2813,9 @@ class P2PSyncService {
     _connectedEndpoints.remove(endpointId);
     _endpointConnIdMap.remove(endpointId);
     _endpointSessionKeys.remove(endpointId);
+    _endpointLocalEphemeral.remove(endpointId);
+    _endpointLocalEphemeralPub.remove(endpointId);
+    _endpointRemoteEphemeralPub.remove(endpointId);
     _pendingEndpointId = null;
     _pendingHandshakeIdentity = null;
     _pendingHandshakeRemoteRole = null;
@@ -3259,7 +3360,7 @@ class P2PSyncService {
     return local ?? remote ?? '';
   }
 
-  Future<SecretKeyData> _deriveSessionKey(String deviceId, {DateTime? at}) async {
+  Future<SecretKeyData> _deriveSessionKey(String deviceId, {DateTime? at, String? endpointId}) async {
     final assoc = await _security.getAssociation(deviceId);
     if (assoc == null) {
       throw Exception('Associazione non trovata per $deviceId');
@@ -3273,6 +3374,10 @@ class P2PSyncService {
       isInitiator: isInitiator,
       sessionNonce: _getCombinedSessionNonce(),
       at: at,
+      localEphemeralKeyPair:
+          endpointId != null ? _endpointLocalEphemeral[endpointId] : null,
+      remoteEphemeralPublicKeyBase64:
+          endpointId != null ? _endpointRemoteEphemeralPub[endpointId] : null,
     );
     return session.sessionKey;
   }
@@ -3326,6 +3431,9 @@ class P2PSyncService {
           isInitiator: isInitiator,
           sessionNonce: _getCombinedSessionNonce(),
           at: windowStart,
+          localEphemeralKeyPair: _endpointLocalEphemeral[endpointId],
+          remoteEphemeralPublicKeyBase64:
+              _endpointRemoteEphemeralPub[endpointId],
         );
         keys.add(
           _EndpointSessionKey(windowIndex: window, key: session.sessionKey),
@@ -3334,7 +3442,7 @@ class P2PSyncService {
         keys.add(
           _EndpointSessionKey(
             windowIndex: window,
-            key: await _deriveSessionKey(deviceId, at: windowStart),
+            key: await _deriveSessionKey(deviceId, at: windowStart, endpointId: endpointId),
           ),
         );
       }
@@ -4205,6 +4313,9 @@ class P2PSyncService {
     _connectedEndpoints.remove(endpointId);
     _endpointConnIdMap.remove(endpointId);
     _endpointSessionKeys.remove(endpointId);
+    _endpointLocalEphemeral.remove(endpointId);
+    _endpointLocalEphemeralPub.remove(endpointId);
+    _endpointRemoteEphemeralPub.remove(endpointId);
     _endpointSyncPhase.remove(endpointId);
     _pendingEndpointId = null;
     _pendingHandshakeIdentity = null;
@@ -4718,6 +4829,24 @@ class P2PSyncService {
         return;
       }
 
+      // In modalità Responsabile, solo i dispositivi approvati dal
+      // Responsabile possono propagare tombstone: la firma HMAC usa un
+      // segreto ECDH simmetrico, condiviso con TUTTI i dispositivi
+      // associati, quindi un peer a privilegio ridotto non deve poter
+      // iniettare tombstone nell'approval-only mode.
+      final responsabileMode = await _security.isResponsabileModeActive();
+      if (responsabileMode &&
+          (!assoc.authorizedByResponsabile ||
+              assoc.approvalSignature == null ||
+              assoc.approvalSignature!.isEmpty)) {
+        addLog(
+          'WARN',
+          'Tombstone da dispositivo non approvato ($remoteId) in modalità '
+          'Responsabile — ignorato',
+        );
+        return;
+      }
+
       final applied = await HardDeleteService.applyRemoteTombstone(ts);
       addLog(
         applied ? 'INFO' : 'WARN',
@@ -4822,6 +4951,9 @@ class P2PSyncService {
     _pendingAssociations.clear();
     _endpointSyncPhase.clear();
     _endpointSessionKeys.clear();
+    _endpointLocalEphemeral.clear();
+    _endpointLocalEphemeralPub.clear();
+    _endpointRemoteEphemeralPub.clear();
     _initialized = false;
     _stateController.close();
     _syncDataController.close();

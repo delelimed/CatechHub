@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:crypto/crypto.dart' as crypto show Hmac, sha256;
+import 'package:crypto/crypto.dart' as crypto show sha256;
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -153,6 +153,10 @@ class P2PDeviceAssociation {
   /// asimmetrico (chiave pubblica distribuita via parrocchia).
   final String? approvalSignerPublicKey;
 
+  /// Scadenza del certificato di approvazione (coerente con il campo
+  /// `expiresAt` del certificato firmato dal Responsabile).
+  final DateTime? approvalExpiresAt;
+
   const P2PDeviceAssociation({
     required this.deviceId,
     required this.deviceName,
@@ -171,6 +175,7 @@ class P2PDeviceAssociation {
     this.approvedByDeviceId,
     this.approvalSignature,
     this.approvalSignerPublicKey,
+    this.approvalExpiresAt,
   });
 
   bool get isValid => DateTime.now().difference(associatedAt).inDays < 30;
@@ -189,6 +194,7 @@ class P2PDeviceAssociation {
     String? approvedByDeviceId,
     String? approvalSignature,
     String? approvalSignerPublicKey,
+    DateTime? approvalExpiresAt,
     String? sharedSecretBase64,
     String? devicePrivateKeyBase64,
     String? devicePublicKeyBase64,
@@ -223,6 +229,9 @@ class P2PDeviceAssociation {
       approvalSignerPublicKey: clearApproval
           ? null
           : (approvalSignerPublicKey ?? this.approvalSignerPublicKey),
+      approvalExpiresAt: clearApproval
+          ? null
+          : (approvalExpiresAt ?? this.approvalExpiresAt),
     );
   }
 
@@ -252,6 +261,8 @@ class P2PDeviceAssociation {
         if (approvalSignature != null) 'approvalSignature': approvalSignature,
         if (approvalSignerPublicKey != null)
           'approvalSignerPublicKey': approvalSignerPublicKey,
+        if (approvalExpiresAt != null)
+          'approvalExpiresAt': approvalExpiresAt!.toUtc().toIso8601String(),
       };
 
   factory P2PDeviceAssociation.fromJson(Map<String, dynamic> json) =>
@@ -280,6 +291,9 @@ class P2PDeviceAssociation {
         approvalSignature: json['approvalSignature'] as String?,
         approvalSignerPublicKey:
             json['approvalSignerPublicKey'] as String?,
+        approvalExpiresAt: json['approvalExpiresAt'] != null
+            ? DateTime.parse(json['approvalExpiresAt'] as String).toLocal()
+            : null,
       );
 
   SimpleKeyPairData? get keyPair {
@@ -820,6 +834,58 @@ class P2PSecurityService {
     return a.length - b.length;
   }
 
+  /// M5 — Mescola il DH della chiave per-associazione (statica) nella chiave
+  /// di sessione. DH_assoc = X25519(privAssocLoc, pubAssocRem), commutativo
+  /// sui due peer, quindi entrambi convergono sullo stesso output. La chiave
+  /// per-associazione (generata al pairing ma mai usata) diventa un fattore
+  /// di sessione dedicato, separato dalla chiave d'identità globale: la
+  /// compromissione della chiave statica globale non compromette le sessioni
+  /// delle associazioni. Se l'input non è disponibile la chiave resta
+  /// invariata (nessun downgrade rispetto al TripleDH).
+  Future<SecretKeyData> applyAssociationFactor({
+    required SecretKeyData sessionKey,
+    required SimpleKeyPairData localAssociationKeyPair,
+    required String remoteAssociationPublicBase64,
+  }) =>
+      P2PSecurityService.mixAssociationFactor(
+        x25519: _x25519,
+        sessionKey: sessionKey,
+        localAssociationKeyPair: localAssociationKeyPair,
+        remoteAssociationPublicBase64: remoteAssociationPublicBase64,
+      );
+
+  /// Variante statica e pura (testabile senza secure storage / Hive).
+  static Future<SecretKeyData> mixAssociationFactor({
+    required X25519 x25519,
+    required SecretKeyData sessionKey,
+    required SimpleKeyPairData localAssociationKeyPair,
+    required String remoteAssociationPublicBase64,
+  }) async {
+    try {
+      final dh = await x25519.sharedSecretKey(
+        keyPair: localAssociationKeyPair,
+        remotePublicKey: SimplePublicKey(
+          base64Decode(remoteAssociationPublicBase64),
+          type: KeyPairType.x25519,
+        ),
+      );
+      final dhBytes = await dh.extractBytes();
+      final hkdf = Hkdf(
+        hmac: Hmac(_sha256Algo),
+        outputLength: 32,
+      );
+      final combined = <int>[...sessionKey.bytes, ...dhBytes];
+      final derived = await hkdf.deriveKey(
+        secretKey: SecretKey(combined),
+        nonce: Uint8List(0),
+        info: utf8.encode('CatechHub_P2P_AssociationFactor_v1'),
+      );
+      return derived;
+    } catch (_) {
+      return sessionKey;
+    }
+  }
+
   /// Deriva il nonce di sessione (unico per sessione) dall'handshake.
   static Uint8List deriveSessionNonce({
     required List<int> sharedSecretBytes,
@@ -1209,14 +1275,54 @@ class P2PSecurityService {
   /// Derives a 6-digit pairing code from the ECDH shared secret
   /// and a session-specific nonce. Each pairing session gets a different
   /// code even between the same two devices.
-  static String computePairingCode(String sharedSecretBase64, {String? sessionNonce}) {
+  ///
+  /// Fase 2 — item 6: le chiavi efimere (locale e remota) vengono incluse nel
+  /// SAS. Un MitM che sostituisce le chiavi efimere durante l'handshake
+  /// produce un codice di verifica diverso, rendendo visibile l'attacco al
+  /// confronto dei codici. Le chiavi vengono ordinate in modo canonico così
+  /// che entrambi i dispositivi convergano sullo stesso input.
+  static String computePairingCode(
+    String sharedSecretBase64, {
+    String? sessionNonce,
+    String? localEphemeralPub,
+    String? remoteEphemeralPub,
+  }) {
     final secretBytes = base64Decode(sharedSecretBase64);
-    final combined = sessionNonce != null
-        ? crypto.sha256.convert(utf8.encode(sessionNonce)).bytes + secretBytes
+    final hasAuxInput = sessionNonce != null ||
+        localEphemeralPub != null ||
+        remoteEphemeralPub != null;
+    final combined = hasAuxInput
+        ? crypto.sha256
+                .convert(utf8.encode(_pairingAuxInput(
+                  sessionNonce: sessionNonce,
+                  localEphemeralPub: localEphemeralPub,
+                  remoteEphemeralPub: remoteEphemeralPub,
+                )))
+                .bytes +
+            secretBytes
         : secretBytes;
     final hash = crypto.sha256.convert(combined);
     final code = ((hash.bytes[0] << 16) | (hash.bytes[1] << 8) | hash.bytes[2]) % 1000000;
     return code.toString().padLeft(6, '0');
+  }
+
+  /// Input ausiliario canonico per il pairing code: nonce concordato più le
+  /// chiavi efimere ordinate. Entrambi i peer producono lo stesso valore.
+  static String _pairingAuxInput({
+    String? sessionNonce,
+    String? localEphemeralPub,
+    String? remoteEphemeralPub,
+  }) {
+    final parts = <String>[];
+    if (sessionNonce != null && sessionNonce.isNotEmpty) parts.add(sessionNonce);
+    final ephs = <String>[
+      if (localEphemeralPub != null && localEphemeralPub.isNotEmpty)
+        localEphemeralPub,
+      if (remoteEphemeralPub != null && remoteEphemeralPub.isNotEmpty)
+        remoteEphemeralPub,
+    ]..sort();
+    if (ephs.isNotEmpty) parts.add(ephs.join('|'));
+    return parts.join('|');
   }
 
   /// Verifies that the public key received over the air matches the
@@ -1233,89 +1339,132 @@ class P2PSecurityService {
   //
   // Quando la modalità Responsabile è ATTIVA, ogni dispositivo che sincronizza
   // una classe deve essere preventivamente approvato (firmato) dal dispositivo
-  // del Responsabile. L'approvazione è un certificato firmato con HMAC-SHA256
-  // (segreto del Responsabile). Il segreto viene distribuito una sola volta al
-  // dispositivo che funge da PRIMARY tramite il "QR di fiducia" del
-  // Responsabile; gli altri dispositivi verificano il certificato ricevuto.
+  // del Responsabile.
+  //
+  // L'approvazione è un CERTIFICATO firmato in modo ASIMMETRICO (Ed25519):
+  //   - il Responsabile possiede la CHIAVE PRIVATA di firma (Keystore);
+  //   - la CHIAVE PUBBLICA (trust root) viene distribuita ai dispositivi
+  //     verificatori via "QR di fiducia". Il QR NON contiene alcun segreto:
+  //     chiunque lo fotografi ottiene solo una chiave pubblica, inutilizzabile
+  //     per falsificare certificati;
+  //   - ogni verificatore valida firma, scadenza del certificato e blacklist
+  //     delle revoche.
+  //
+  // Revoche: la revoca aggiunge il deviceId alla blacklist locale (propagata
+  // insieme alla trust root nel QR di fiducia rigenerato). Un dispositivo
+  // revocato viene rifiutato da ogni verificatore che possiede la blacklist,
+  // anche se il suo certificato è tecnicamente ancora firmato.
 
-  static const _parishApprovalSecretKey = 'parish_approval_secret';
-  static const _parishApprovalSecretMetaKey = 'parish_approval_secret_meta';
+  static const _parishSignerKeyPairName = 'parish_signer_keypair';
+  static const _parishRevokedDevicesKey = 'parish_revoked_devices';
   static const _responsabileTrustInfoKey = 'responsabile_trust_info';
   static const _localApprovalKey = 'local_device_approval';
 
-  Future<String?> getParishApprovalSecret() =>
-      _secureStorage.read(key: _parishApprovalSecretKey);
+  /// Durata di validità di un certificato di approvazione.
+  static const Duration approvalCertificateValidity = Duration(days: 30);
 
-  /// Metadati del segreto (generazione + data rotazione) per audit e rotazione.
-  Future<Map<String, dynamic>?> getParishApprovalSecretMeta() async {
-    final raw = await _secureStorage.read(key: _parishApprovalSecretMetaKey);
-    if (raw == null || raw.isEmpty) return null;
+  /// M1 — Skew di orologio massimo tollerato sulla data di emissione dei
+  /// certificati di approvazione.
+  static const Duration _clockSkew = Duration(minutes: 5);
+
+  /// Durata di validità della trust root (QR di fiducia).
+  static const Duration trustRootValidity = Duration(days: 365);
+
+  final Ed25519 _ed25519 = Ed25519();
+
+  /// Genera (o recupera) la coppia di chiavi di FIRMA Ed25519 del Responsabile.
+  /// La chiave privata risiede SOLO nel FlutterSecureStorage
+  /// (Keystore/Keychain): mai nel box Hive, mai nel QR. Nel QR di fiducia
+  /// viaggia esclusivamente la chiave pubblica (trust root).
+  Future<SimpleKeyPair> getOrCreateParishSignerKeyPair() async {
+    final stored = await _secureStorage.read(key: _parishSignerKeyPairName);
+    if (stored != null && stored.isNotEmpty) {
+      try {
+        final data = jsonDecode(stored) as Map<String, dynamic>;
+        final seed = base64Decode(data['private'] as String);
+        return await _ed25519.newKeyPairFromSeed(seed);
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('P2PSecurityService.getOrCreateParishSignerKeyPair: '
+              'chiave corrotta, rigenero: $e');
+        }
+      }
+    }
+    final keyPair = await _ed25519.newKeyPair();
+    final privateBytes = await keyPair.extractPrivateKeyBytes();
+    final publicKey = await keyPair.extractPublicKey();
+    await _secureStorage.write(
+      key: _parishSignerKeyPairName,
+      value: jsonEncode({
+        'private': base64Encode(privateBytes),
+        'public': base64Encode(publicKey.bytes),
+        'createdAt': DateTime.now().toUtc().toIso8601String(),
+      }),
+    );
+    return keyPair;
+  }
+
+  /// Chiave pubblica di firma Ed25519 del Responsabile (trust root).
+  Future<String?> getParishSignerPublicKeyBase64() async {
+    final keyPair = await getOrCreateParishSignerKeyPair();
+    final publicKey = await keyPair.extractPublicKey();
+    return base64Encode(publicKey.bytes);
+  }
+
+  /// Firma Ed25519 (base64) di un payload canonico con la chiave privata del
+  /// Responsabile. Esposta staticamente per essere testabile senza secure
+  /// storage.
+  static Future<String> signApprovalPayload(
+    String canonicalPayload,
+    List<int> privateKeyBytes,
+  ) async {
+    final keyPair = await Ed25519().newKeyPairFromSeed(privateKeyBytes);
+    final signature = await Ed25519().sign(
+      utf8.encode(canonicalPayload),
+      keyPair: keyPair,
+    );
+    return base64Encode(signature.bytes);
+  }
+
+  /// Verifica una firma Ed25519 (base64) di un payload canonico con la chiave
+  /// pubblica del firmatario (base64). La verifica è asimmetrica: conoscere la
+  /// sola chiave pubblica non consente di falsificare la firma.
+  static Future<bool> verifyApprovalSignature({
+    required String canonicalPayload,
+    required String signature,
+    required String publicKeyBase64,
+  }) async {
+    if (signature.isEmpty || publicKeyBase64.isEmpty) return false;
     try {
-      return jsonDecode(raw) as Map<String, dynamic>;
+      final publicKey = SimplePublicKey(
+        base64Decode(publicKeyBase64),
+        type: KeyPairType.ed25519,
+      );
+      final sig = Signature(
+        base64Decode(signature),
+        publicKey: publicKey,
+      );
+      return await Ed25519().verify(
+        utf8.encode(canonicalPayload),
+        signature: sig,
+      );
     } catch (_) {
-      return null;
+      return false;
     }
   }
 
-  /// Genera (e memorizza) il segreto di approvazione della parrocchia.
-  /// Chiamato dal dispositivo del Responsabile alla prima approvazione.
-  Future<String> getOrCreateParishApprovalSecret() async {
-    final existing = await getParishApprovalSecret();
-    if (existing != null && existing.isNotEmpty) return existing;
-    final secret = base64Encode(secureRandom(32));
-    await _secureStorage.write(
-        key: _parishApprovalSecretKey, value: secret);
-    await _writeParishApprovalSecretMeta(
-      generation: 1,
-      rotatedAt: DateTime.now().toUtc(),
-    );
-    return secret;
-  }
-
-  /// Ruota il segreto di approvazione: ne genera uno nuovo e incrementa la
-  /// generazione. Dopo la rotazione TUTTI i certificati firmati con il vecchio
-  /// segreto diventano invalidi (la loro firma HMAC non verifica più), quindi
-  /// i dispositivi approvati in precedenza vengono de-autorizzati finché non
-  /// ricevono una nuova approvazione dal Responsabile.
-  Future<String> rotateParishApprovalSecret() async {
-    final meta = await getParishApprovalSecretMeta();
-    final generation = (meta?['generation'] as int? ?? 1) + 1;
-    final secret = base64Encode(secureRandom(32));
-    await _secureStorage.write(key: _parishApprovalSecretKey, value: secret);
-    await _writeParishApprovalSecretMeta(
-      generation: generation,
-      rotatedAt: DateTime.now().toUtc(),
-    );
-    return secret;
-  }
-
-  Future<void> _writeParishApprovalSecretMeta({
-    required int generation,
-    required DateTime rotatedAt,
-  }) {
-    return _secureStorage.write(
-      key: _parishApprovalSecretMetaKey,
-      value: jsonEncode({
-        'generation': generation,
-        'rotatedAt': rotatedAt.toIso8601String(),
-      }),
-    );
-  }
-
-  Future<bool> hasParishApprovalSecret() async =>
-      (await getParishApprovalSecret())?.isNotEmpty ?? false;
-
   /// Firma un certificato di approvazione per un nuovo dispositivo.
-  /// Il segreto viene creato alla prima chiamata. Usato dal dispositivo
-  /// del Responsabile per approvare (via QR o scambio P2P diretto) i
-  /// dispositivi autorizzati a sincronizzare le classi.
+  /// Il certificato include la SCADENZA ([expiresAt]) e viene firmato con la
+  /// chiave privata Ed25519 del Responsabile.
   Future<AssociatedDevice> signDeviceApproval({
     required String deviceId,
     required String catechistId,
     required String publicKeyBase64,
     String? deviceName,
   }) async {
-    final secret = await getOrCreateParishApprovalSecret();
+    final keyPair = await getOrCreateParishSignerKeyPair();
+    final privateKeyBytes = await keyPair.extractPrivateKeyBytes();
+    final publicKey = await keyPair.extractPublicKey();
     final identity = await getLocalIdentity();
     final certificate = AssociatedDevice(
       deviceId: deviceId,
@@ -1326,78 +1475,226 @@ class P2PSecurityService {
       deviceName: deviceName ?? '',
       approvedByDeviceId: identity.deviceId,
       approvedByName: identity.username,
-      signerPublicKey: identity.publicKeyBase64,
+      signerPublicKey: base64Encode(publicKey.bytes),
+      expiresAt: DateTime.now().toUtc().add(approvalCertificateValidity),
     );
-    final signature = _signApprovalCertificate(certificate, secret);
+    final signature = await signApprovalPayload(
+      certificate.canonicalPayload,
+      privateKeyBytes,
+    );
     return certificate.copyWith(approvalSignature: signature);
   }
 
-  static String _signApprovalCertificate(
-      AssociatedDevice cert, String secret) {
-    return signApprovalPayload(cert.canonicalPayload, secret);
-  }
-
-  /// Firma HMAC-SHA256 (base64) di un payload canonico con [secret].
-  /// Esposto staticamente per essere testabile senza secure storage.
-  static String signApprovalPayload(String canonicalPayload, String secret) {
-    final mac = crypto.Hmac(crypto.sha256, utf8.encode(secret));
-    return base64Encode(mac.convert(utf8.encode(canonicalPayload)).bytes);
-  }
-
-  /// Verifica (tempo-costante) una firma HMAC-SHA256 di un payload canonico.
-  static bool verifyApprovalSignature({
-    required String canonicalPayload,
-    required String signature,
-    required String secret,
-  }) {
-    if (signature.isEmpty || secret.isEmpty) return false;
-    return _constantTimeEquals(
-      signApprovalPayload(canonicalPayload, secret),
-      signature,
-    );
-  }
-
-  static bool _constantTimeEquals(String a, String b) {
-    if (a.length != b.length) return false;
-    var diff = 0;
-    for (var i = 0; i < a.length; i++) {
-      diff |= a.codeUnitAt(i) ^ b.codeUnitAt(i);
-    }
-    return diff == 0;
-  }
-
-  /// Verifica il certificato di approvazione usando il segreto del
-  /// Responsabile. Richiede che il dispositivo possieda il segreto (es.
-  /// il dispositivo primario che ha scansionato il QR di fiducia).
-  Future<bool> verifyApprovalWithParishSecret(
-      AssociatedDevice cert) async {
+  /// Verifica un certificato di approvazione in modo ASIMMETRICO:
+  ///   1. certificato emesso e firmato;
+  ///   2. non scaduto;
+  ///   3. firmatario coincidente con la trust root locale;
+  ///   4. firma Ed25519 valida;
+  ///   5. dispositivo NON nella blacklist delle revoche.
+  Future<bool> verifyApprovalCertificate(
+    AssociatedDevice cert, {
+    DateTime? now,
+  }) async {
+    final current = now ?? DateTime.now();
     if (!cert.authorizedByResponsabile ||
         cert.approvalSignature == null ||
         cert.approvalSignature!.isEmpty) {
       return false;
     }
-    final secret = await getParishApprovalSecret();
-    if (secret == null || secret.isEmpty) return false;
-    final expected = _signApprovalCertificate(cert, secret);
-    return _constantTimeEquals(expected, cert.approvalSignature!);
+    final expiresAt = cert.expiresAt;
+    if (expiresAt != null && current.isAfter(expiresAt)) return false;
+
+    // M1 — Freschezza: il certificato deve essere stato EMESSO in una
+    // finestra plausibile. Un certificato con timestampApproval nel futuro
+    // (oltre lo skew di orologio) o emesso troppo tempo fa (oltre la durata
+    // massima) viene rifiutato, anche se la scadenza fosse manipolata.
+    final issuedAt = cert.timestampApproval;
+    if (issuedAt != null) {
+      if (current.isBefore(issuedAt.subtract(_clockSkew))) return false;
+      if (current.difference(issuedAt) > approvalCertificateValidity) {
+        return false;
+      }
+    } else {
+      // Certificato senza data di emissione: non freschezza verificabile.
+      return false;
+    }
+
+    final rootKey = await _getTrustRootSignerKey();
+    if (rootKey == null || rootKey.isEmpty) return false;
+    if (cert.signerPublicKey != rootKey) return false;
+
+    final valid = await verifyApprovalSignature(
+      canonicalPayload: cert.canonicalPayload,
+      signature: cert.approvalSignature!,
+      publicKeyBase64: rootKey,
+    );
+    if (!valid) return false;
+
+    return !await isDeviceRevoked(cert.deviceId);
+  }
+
+  /// Trust root locale: la chiave pubblica di firma importata dal "QR di
+  /// fiducia" del Responsabile; se assente, la propria (dispositivo del
+  /// Responsabile).
+  Future<String?> _getTrustRootSignerKey() async {
+    final info = await getResponsabileTrustInfo();
+    final fromInfo = info?['signerPublicKey'];
+    if (fromInfo is String && fromInfo.isNotEmpty) return fromInfo;
+    return getParishSignerPublicKeyBase64();
+  }
+
+  /// True se il dispositivo può verificare i certificati di approvazione
+  /// (possiede la trust root del Responsabile o è il Responsabile stesso).
+  Future<bool> hasTrustRoot() async {
+    final key = await _getTrustRootSignerKey();
+    return key != null && key.isNotEmpty;
+  }
+
+  // ─── Blacklist delle revoche ──────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> _readRevokedDevices() async {
+    final raw = await _secureStorage.read(key: _parishRevokedDevicesKey);
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      return (jsonDecode(raw) as List)
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Lista dei deviceId revocati dal Responsabile.
+  Future<List<Map<String, dynamic>>> getRevokedDevices() =>
+      _readRevokedDevices();
+
+  /// True se [deviceId] è stato revocato dal Responsabile.
+  Future<bool> isDeviceRevoked(String deviceId) async {
+    if (deviceId.isEmpty) return false;
+    final revoked = await _readRevokedDevices();
+    return revoked.any((e) => e['deviceId'] == deviceId);
+  }
+
+  /// Aggiunge [deviceId] alla blacklist delle revoche (kill-switch locale).
+  /// La blacklist viene propagata agli altri dispositivi attraverso la trust
+  /// root rigenerata (QR di fiducia) o il canale parrocchiale.
+  Future<void> revokeDeviceApproval(String deviceId) async {
+    if (deviceId.isEmpty) return;
+    final revoked = await _readRevokedDevices();
+    if (revoked.any((e) => e['deviceId'] == deviceId)) return;
+    revoked.add({
+      'deviceId': deviceId,
+      'revokedAt': DateTime.now().toUtc().toIso8601String(),
+    });
+    await _secureStorage.write(
+      key: _parishRevokedDevicesKey,
+      value: jsonEncode(revoked),
+    );
+  }
+
+  /// Unisce le revoche ricevute (QR di fiducia / canale parrocchiale) alla
+  /// blacklist locale, mantenendo la più recente per deviceId.
+  Future<void> importRevokedDevices(
+    List<Map<String, dynamic>>? revocations,
+  ) async {
+    if (revocations == null || revocations.isEmpty) return;
+    final current = await _readRevokedDevices();
+    final merged = <String, Map<String, dynamic>>{
+      for (final e in current)
+        if (e['deviceId'] != null) e['deviceId'].toString(): e,
+    };
+    for (final e in revocations) {
+      final id = e['deviceId']?.toString() ?? '';
+      if (id.isEmpty) continue;
+      final existing = merged[id];
+      if (existing == null || _revokedAt(existing).isBefore(_revokedAt(e))) {
+        merged[id] = e;
+      }
+    }
+    await _secureStorage.write(
+      key: _parishRevokedDevicesKey,
+      value: jsonEncode(merged.values.toList()),
+    );
+  }
+
+  static DateTime _revokedAt(Map<String, dynamic> e) =>
+      DateTime.tryParse(e['revokedAt']?.toString() ?? '') ??
+      DateTime.fromMillisecondsSinceEpoch(0);
+
+  // ─── M1: propagazione firmata delle revoche via P2P ───────────────────
+
+  /// Firma la lista delle revoche con la chiave privata Ed25519 del
+  /// Responsabile. Solo il dispositivo Responsabile (titolare della chiave di
+  /// firma della parrocchia) può generare una revoca valida: i verificatori
+  /// accettano la revoca solo se la firma combacia con la trust root.
+  /// Restituisce null se il dispositivo non è il Responsabile firmatario.
+  Future<Map<String, dynamic>?> signRevocationList() async {
+    final keyPair = await getOrCreateParishSignerKeyPair();
+    final privateKeyBytes = await keyPair.extractPrivateKeyBytes();
+    final identity = await getLocalIdentity();
+    final revocations = await getRevokedDevices();
+    final canonical = _revocationCanonicalPayload(revocations);
+    final signature = await signApprovalPayload(canonical, privateKeyBytes);
+    return {
+      'revocations': revocations,
+      'deviceId': identity.deviceId,
+      'signedAt': DateTime.now().toUtc().toIso8601String(),
+      'signature': signature,
+    };
+  }
+
+  /// Verifica una lista di revoche firmata dal Responsabile contro la trust
+  /// root locale. La verifica è ASIMMETRICA (Ed25519): un dispositivo rogue
+  /// non può iniettare revoche fasulle nella rete, perché non possiede la
+  /// chiave privata di firma del Responsabile.
+  Future<bool> verifyRevocationList(Map<String, dynamic>? payload) async {
+    if (payload == null) return false;
+    final revocations = (payload['revocations'] as List<dynamic>? ?? [])
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    final signature = payload['signature'] as String? ?? '';
+    if (signature.isEmpty) return false;
+    final rootKey = await _getTrustRootSignerKey();
+    if (rootKey == null || rootKey.isEmpty) return false;
+    return verifyApprovalSignature(
+      canonicalPayload: _revocationCanonicalPayload(revocations),
+      signature: signature,
+      publicKeyBase64: rootKey,
+    );
+  }
+
+  static String _revocationCanonicalPayload(List<Map<String, dynamic>> revocations) {
+    final canonical = <String>[];
+    for (final r in revocations) {
+      canonical.add(
+        '${r['deviceId']}|${_revokedAt(r).toUtc().toIso8601String()}',
+      );
+    }
+    canonical.sort();
+    return jsonEncode(canonical);
   }
 
   /// Salva le informazioni di fiducia del Responsabile su un dispositivo
-  /// verificatore (es. il PRIMARY che scansiona il QR di fiducia).
+  /// verificatore (es. il PRIMARY che scansiona il QR di fiducia). Il QR di
+  /// fiducia trasporta SOLO la chiave pubblica di firma (trust root) e la
+  /// scadenza: nessun segreto simmetrico.
   Future<void> storeResponsabileTrustInfo({
     required String responsabileDeviceId,
-    required String approvalSecret,
+    required String signerPublicKey,
     String? responsabileName,
+    DateTime? expiresAt,
   }) async {
-    final meta = await getParishApprovalSecretMeta();
     await _secureStorage.write(
       key: _responsabileTrustInfoKey,
       value: jsonEncode({
         'responsabileDeviceId': responsabileDeviceId,
-        'approvalSecret': approvalSecret,
+        'signerPublicKey': signerPublicKey,
         'responsabileName': responsabileName ?? '',
-        'secretGeneration': meta?['generation'] ?? 1,
+        'expiresAt': expiresAt?.toUtc().toIso8601String(),
         'storedAt': DateTime.now().toUtc().toIso8601String(),
+        'v': 2,
       }),
     );
   }
@@ -1410,6 +1707,17 @@ class P2PSecurityService {
     } catch (_) {
       return null;
     }
+  }
+
+  /// True se la trust root importata è scaduta (richiede un nuovo QR di
+  /// fiducia dal Responsabile).
+  Future<bool> isTrustRootExpired({DateTime? now}) async {
+    final info = await getResponsabileTrustInfo();
+    final raw = info?['expiresAt'];
+    if (raw is! String || raw.isEmpty) return false;
+    final expiresAt = DateTime.tryParse(raw)?.toUtc();
+    if (expiresAt == null) return false;
+    return (now ?? DateTime.now().toUtc()).isAfter(expiresAt);
   }
 
   /// Salva il certificato di approvazione ricevuto dal Responsabile
@@ -1450,7 +1758,7 @@ class P2PSecurityService {
   /// Applica la catena di fiducia alla sincronizzazione:
   /// - Modalità Responsabile ATTIVA: il dispositivo remoto deve avere
   ///   un'associazione valida E un certificato di approvazione firmato dal
-  ///   Responsabile (verificato con il segreto locale, se presente).
+  ///   Responsabile (verifica asimmetrica Ed25519 + scadenza + blacklist).
   /// - Modalità Responsabile DISATTIVA: basta un'associazione valida.
   Future<bool> isSyncAllowedFromDevice(String deviceId) async {
     final assoc = await getAssociation(deviceId);
@@ -1473,8 +1781,9 @@ class P2PSecurityService {
       approvedByDeviceId: assoc.approvedByDeviceId,
       signerPublicKey: assoc.approvalSignerPublicKey,
       approvalSignature: assoc.approvalSignature,
+      expiresAt: assoc.approvalExpiresAt,
     );
-    return verifyApprovalWithParishSecret(cert);
+    return verifyApprovalCertificate(cert);
   }
 }
 

@@ -23,6 +23,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../../core/services/field_encryption_service.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/catechesi_model.dart';
 import '../../shared/models/class_model.dart';
@@ -246,9 +247,16 @@ class PdfExportService {
   // ─── Caricamento dati ─────────────────────────────────────────────────────
 
   static List<Student> _loadStudents(SchoolClass schoolClass) {
+    // L6 / Fase 4-12: i campi sensibili (birthDate, telefoni, email, allergie,
+    // note) sono cifrati a livello di campo nel box. Devono essere decifrati
+    // PRIMA di costruire il modello: in passato il PDF poteva stampare
+    // ciphertext al posto di data di nascita/telefoni.
     final students = LocalDatabase.values(
       LocalDatabase.students(),
-      (id, data) => Student.fromMap(id, data),
+      (id, data) => Student.fromMap(
+        id,
+        FieldEncryptionService.decryptStudentMapForTransport(data),
+      ),
     );
     final ids = schoolClass.studentIds.toSet();
     return Student.sortedBySurname(students.where((s) => ids.contains(s.id)));

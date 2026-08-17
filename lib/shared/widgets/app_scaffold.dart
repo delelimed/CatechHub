@@ -63,13 +63,13 @@ class AppScaffold extends StatelessWidget {
   ///   - Catechista: 0 → '/', 1 → '/my-group', 2 → '/planning',
   ///     3 → '/documents', 4 → '/settings'
   ///   - Responsabile: 0 → '/parrocchia', 1 → '/parrocchia/classi',
-  ///     2 → '/parrocchia/iscrizioni', 3 → '/parrocchia/consensi',
+  ///     2 → '/parrocchia/logistica', 3 → '/parrocchia/rete',
   ///     4 → '/settings'
   int _indexFromLocation(String location) {
     if (UserRole.isResponsabile) {
       if (location.startsWith('/parrocchia/classi')) return 1;
-      if (location.startsWith('/parrocchia/iscrizioni')) return 2;
-      if (location.startsWith('/parrocchia/consensi')) return 3;
+      if (location.startsWith('/parrocchia/logistica')) return 2;
+      if (location.startsWith('/parrocchia/rete')) return 3;
       if (location.startsWith('/settings')) return 4;
       return 0;
     }
@@ -93,10 +93,10 @@ class AppScaffold extends StatelessWidget {
           return '/parrocchia/classi';
 
         case 2:
-          return '/parrocchia/iscrizioni';
+          return '/parrocchia/logistica';
 
         case 3:
-          return '/parrocchia/consensi';
+          return '/parrocchia/rete';
 
         case 4:
           return '/settings';
@@ -131,8 +131,8 @@ class AppScaffold extends StatelessWidget {
       ? const [
           '/parrocchia',
           '/parrocchia/classi',
-          '/parrocchia/iscrizioni',
-          '/parrocchia/consensi',
+          '/parrocchia/logistica',
+          '/parrocchia/rete',
           '/settings',
         ]
       : const ['/', '/my-group', '/planning', '/documents', '/settings'];
@@ -151,14 +151,14 @@ class AppScaffold extends StatelessWidget {
             label: 'Classi',
           ),
           NavigationDestination(
-            icon: Icon(Icons.how_to_reg_rounded),
-            selectedIcon: Icon(Icons.how_to_reg_rounded),
-            label: 'Iscrizioni',
+            icon: Icon(Icons.meeting_room_rounded),
+            selectedIcon: Icon(Icons.meeting_room_rounded),
+            label: 'Logistica',
           ),
           NavigationDestination(
-            icon: Icon(Icons.task_alt_rounded),
-            selectedIcon: Icon(Icons.task_alt_rounded),
-            label: 'Consensi',
+            icon: Icon(Icons.network_check_rounded),
+            selectedIcon: Icon(Icons.network_check_rounded),
+            label: 'Rete',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),

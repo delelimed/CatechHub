@@ -72,7 +72,6 @@ SOFTWARE.
     {'name': 'image_picker', 'version': '^1.2.2', 'license': 'Apache-2.0'},
     {'name': 'path_provider', 'version': '^2.1.0', 'license': 'BSD-3-Clause'},
     {'name': 'image', 'version': '^4.9.0', 'license': 'MIT'},
-    {'name': 'open_filex', 'version': '^4.5.0', 'license': 'BSD-3-Clause'},
     {'name': 'share_plus', 'version': '^13.2.0', 'license': 'BSD-3-Clause'},
     {'name': 'license_checker', 'version': '1.6.2', 'license': 'BSD-3-Clause'},
     {'name': 'state_notifier', 'version': '^1.0.0', 'license': 'MIT'},

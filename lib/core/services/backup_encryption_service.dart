@@ -25,16 +25,24 @@ import 'package:pointycastle/export.dart' as pc;
 
 class BackupEncryptionService {
   static const int _version = 2;
-  static const int _iterations = 210000;
+  // M9: iterazioni PBKDF2 aumentate (210k → 350k) per rendere il brute-force
+  // offline ancora più costoso. I pacchetti creati con 210k restano decifrabili
+  // (vedi _legacyIterations in decryptBackup).
+  static const int _iterations = 350000;
+
+  /// Iterazioni KDF usate dalle versioni precedenti: accettate in lettura per
+  /// non rendere inutilizzabili i backup già creati.
+  static const int _legacyIterations = 210000;
   static const int _saltLength = 16;
   static const int _nonceLength = 12;
   static const int _tagLengthBits = 128;
   static const int _keyLength = 32; // AES-256
 
-  /// Lunghezza minima del PIN backup: 10 cifre. Con un PIN a 4 cifre e KDF a
-  /// 210k iterazioni, un attaccante locale potrebbe brute-forzare offline il
-  /// file di backup; a 10 cifre (10^10 combinazioni) la ricerca esaustiva è
-  /// impraticabile anche su GPU.
+  /// Lunghezza minima del PIN backup: 12 caratteri ALFANUMERICI.
+  /// M9: un PIN solo numerico (10^10 o 10^12) ha un keyspace troppo ridotto per
+  /// il brute-force offline su GPU. Mescolando lettere e cifre (almeno una di
+  /// ogni classe) il keyspace cresce a ~62^12 ≈ 2^71, impraticabile anche con
+  /// PBKDF2 a iterazioni ridotte.
   static const int minPinLength = 12;
 
   /// Numero massimo di tentativi di decifratura prima di bloccare l'import
@@ -125,8 +133,8 @@ class BackupEncryptionService {
       }
 
       final iterations = package['iter'] as int;
-      if (iterations != _iterations) {
-        throw Exception('Iterazioni KDF non corrispondenti: $iterations (attese $_iterations)');
+      if (iterations != _iterations && iterations != _legacyIterations) {
+        throw Exception('Iterazioni KDF non corrispondenti: $iterations (attese $_iterations o legacy $_legacyIterations)');
       }
 
       final salt = base64Decode(package['salt'] as String);
@@ -209,7 +217,9 @@ class BackupEncryptionService {
 
   /// Mostra dialog per inserimento e conferma PIN backup.
   /// Restituisce il PIN scelto dall'utente, o null se annullato.
-  /// Il PIN deve essere almeno [minPinLength] cifre, solo numeri.
+  /// M9: il PIN deve essere di almeno [minPinLength] caratteri ALFANUMERICI e
+  /// contenere almeno una lettera e una cifra (keyspace espanso, anti
+  /// brute-force offline). In lettura accetta anche i PIN numerici legacy.
   static Future<String?> showBackupPinDialog({
     required BuildContext context,
     required bool isExport, // true = esportazione (crea PIN), false = importazione (inserisci PIN)
@@ -239,7 +249,8 @@ class BackupEncryptionService {
             children: [
               Text(
                 isExport
-                    ? 'Scegli un PIN numerico (min $minPinLength cifre) per proteggere il file di backup. '
+                    ? 'Scegli una passphrase di almeno $minPinLength caratteri alfanumerici '
+                      '(lettere e cifre, almeno una di ogni tipo) per proteggere il file di backup. '
                       'Questo PIN serve SOLO per questo backup e non è il PIN del telefono.'
                     : 'Inserisci il PIN usato per cifrare questo backup.',
                 style: const TextStyle(fontSize: 13, color: Colors.grey),
@@ -247,9 +258,9 @@ class BackupEncryptionService {
               const SizedBox(height: 16),
               TextField(
                 controller: controller,
-                keyboardType: TextInputType.number,
+                keyboardType: TextInputType.text,
                 obscureText: true,
-                maxLength: 12,
+                maxLength: 16,
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 24, letterSpacing: 8, fontWeight: FontWeight.bold),
                 decoration: InputDecoration(
@@ -266,16 +277,16 @@ class BackupEncryptionService {
                   ),
                   counterText: '',
                 ),
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]'))],
                 onChanged: (_) => setState(() => showError = false),
               ),
               if (isExport) ...[
                 const SizedBox(height: 12),
                 TextField(
                   controller: confirmController,
-                  keyboardType: TextInputType.number,
+                  keyboardType: TextInputType.text,
                   obscureText: true,
-                  maxLength: 12,
+                  maxLength: 16,
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 24, letterSpacing: 8, fontWeight: FontWeight.bold),
                   decoration: InputDecoration(
@@ -292,7 +303,7 @@ class BackupEncryptionService {
                     ),
                     counterText: '',
                   ),
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]'))],
                   onChanged: (_) => setState(() => showError = false),
                 ),
               ],
@@ -313,16 +324,27 @@ class BackupEncryptionService {
                 if (pin.length < minPinLength) {
                   setState(() {
                     showError = true;
-                    errorText = 'Il PIN deve essere di almeno $minPinLength cifre';
+                    errorText = 'Il PIN deve essere di almeno $minPinLength caratteri';
                   });
                   return;
                 }
-                if (isExport && pin != confirmController.text.trim()) {
-                  setState(() {
-                    showError = true;
-                    errorText = 'I PIN non coincidono';
-                  });
-                  return;
+                if (isExport) {
+                  final hasLetter = RegExp(r'[a-zA-Z]').hasMatch(pin);
+                  final hasDigit = RegExp(r'[0-9]').hasMatch(pin);
+                  if (!hasLetter || !hasDigit) {
+                    setState(() {
+                      showError = true;
+                      errorText = 'Il PIN deve contenere almeno una lettera e una cifra';
+                    });
+                    return;
+                  }
+                  if (pin != confirmController.text.trim()) {
+                    setState(() {
+                      showError = true;
+                      errorText = 'I PIN non coincidono';
+                    });
+                    return;
+                  }
                 }
                 Navigator.pop(ctx, pin);
               },

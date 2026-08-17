@@ -181,67 +181,78 @@ class _CatechistManagerDialogState extends State<_CatechistManagerDialog> {
                   ),
                 )
               else ...[
+                // 1. Scelta del catechista (a larghezza piena).
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedProfileId,
+                  decoration: InputDecoration(
+                    labelText: 'Catechista',
+                    hintText: 'Seleziona il catechista',
+                    border: border,
+                    isDense: true,
+                  ),
+                  items: [
+                    for (final p in _available)
+                      DropdownMenuItem(
+                        value: p.id,
+                        child: Text(
+                          p.fullName,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: (v) => setState(() => _selectedProfileId = v),
+                ),
+                const SizedBox(height: 12),
+                // 2. Scelta del ruolo con flag Titolare/Aiuto.
+                Text(
+                  'Ruolo nella classe',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
+                  ),
+                ),
+                const SizedBox(height: 8),
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _selectedProfileId,
-                        decoration: InputDecoration(
-                          labelText: 'Catechista',
-                          border: border,
-                          isDense: true,
+                      child: _RoleFlag(
+                        selected: _newRole == ClassesRepository.roleTitolare,
+                        icon: Icons.star_rounded,
+                        label: 'Titolare',
+                        onTap: () => setState(
+                          () => _newRole = ClassesRepository.roleTitolare,
                         ),
-                        hint: const Text('Seleziona'),
-                        items: [
-                          for (final p in _available)
-                            DropdownMenuItem(
-                              value: p.id,
-                              child: Text(
-                                p.fullName,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                        ],
-                        onChanged: (v) =>
-                            setState(() => _selectedProfileId = v),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    SegmentedButton<String>(
-                      style: const ButtonStyle(
-                        visualDensity: VisualDensity.compact,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _RoleFlag(
+                        selected: _newRole == ClassesRepository.roleAiuto,
+                        icon: Icons.group_rounded,
+                        label: 'Aiuto',
+                        onTap: () => setState(
+                          () => _newRole = ClassesRepository.roleAiuto,
+                        ),
                       ),
-                      segments: const [
-                        ButtonSegment(
-                          value: ClassesRepository.roleTitolare,
-                          label: Text('Tit.'),
-                          icon: Icon(Icons.star_rounded, size: 14),
-                        ),
-                        ButtonSegment(
-                          value: ClassesRepository.roleAiuto,
-                          label: Text('Aiuto'),
-                          icon: Icon(Icons.group_rounded, size: 14),
-                        ),
-                      ],
-                      selected: {_newRole},
-                      onSelectionChanged: (sel) =>
-                          setState(() => _newRole = sel.first),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton.filledTonal(
-                      tooltip: 'Aggiungi',
-                      icon: const Icon(Icons.add_rounded),
-                      onPressed: _selectedProfileId == null
-                          ? null
-                          : () {
-                              setState(() {
-                                _roles[_selectedProfileId!] = _newRole;
-                                _selectedProfileId = null;
-                              });
-                            },
                     ),
                   ],
+                ),
+                const SizedBox(height: 14),
+                // 3. Pulsante di conferma.
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _selectedProfileId == null
+                        ? null
+                        : () {
+                            setState(() {
+                              _roles[_selectedProfileId!] = _newRole;
+                              _selectedProfileId = null;
+                            });
+                          },
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Aggiungi'),
+                  ),
                 ),
               ],
             ],
@@ -258,6 +269,65 @@ class _CatechistManagerDialogState extends State<_CatechistManagerDialog> {
           child: const Text('Salva'),
         ),
       ],
+    );
+  }
+}
+
+/// Flag selezionabile per la scelta del ruolo (Titolare/Aiuto) del
+/// catechista da aggiungere a una classe.
+class _RoleFlag extends StatelessWidget {
+  final bool selected;
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _RoleFlag({
+    required this.selected,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isTitolo = label == 'Titolare';
+    final accent = isTitolo ? Colors.orange : Colors.purple;
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: selected
+              ? accent.withValues(alpha: isDark ? 0.25 : 0.15)
+              : (isDark
+                  ? Colors.white.withValues(alpha: 0.04)
+                  : Colors.grey.shade50),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected
+                ? accent
+                : (isDark ? Colors.grey.shade700 : Colors.grey.shade300),
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: selected ? accent : Colors.grey),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                color: selected ? accent : Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

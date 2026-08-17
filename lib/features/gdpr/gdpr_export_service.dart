@@ -15,6 +15,7 @@
 import 'dart:convert';
 
 import '../../core/services/backup_encryption_service.dart';
+import '../../core/storage/local_database.dart';
 import '../responsabile/audit_log_repository.dart';
 import '../responsabile/parish_config_repository.dart';
 import '../students/students_repository.dart';
@@ -52,8 +53,19 @@ class GdprExportService {
   /// Include: config parrocchiale, studenti (con campi GDPR), registro,
   /// tombstone (diritto all'oblio) e metadata di esportazione.
   static Map<String, dynamic> buildParishConservationPackage() {
-    final students = StudentsRepository().getAllStudentsSync().map((s) =>
-        s.toMap()..['id'] = s.id);
+    // M8 / Fase 3 — item 9: esclude sempre i record demo della guida (PII di
+    // esempio taggate `_demo`) anche dall'archivio di conservazione.
+    final demoIds = LocalDatabase.students()
+        .keys
+        .map((k) => k.toString())
+        .where((id) {
+          final raw = LocalDatabase.students().get(id);
+          return LocalDatabase.toStringDynamicMap(raw)['_demo'] == true;
+        })
+        .toSet();
+    final students = StudentsRepository().getAllStudentsSync()
+        .where((s) => !demoIds.contains(s.id))
+        .map((s) => s.toMap()..['id'] = s.id);
     final logs = AuditLogRepository().getAllLogsSync().map((l) =>
         l.toMap()..['logId'] = l.logId);
     final tombstones = TombstoneRepository().getAll().map((t) =>

@@ -256,9 +256,16 @@ class QRDataService {
     };
   }
 
-  /// Indica un singolo box Hive: per ogni record estrae id, updatedAt e checksum.
+  /// Indica un singolo box Hive: per ogni record estrae id e updatedAt.
   /// Supporta sia box Map che box con valori di altro tipo (es. List).
   /// Se [classUniqueCode] è valorizzato, filtra i record della sola classe.
+  ///
+  /// L4: l'indice NON include più il checksum del contenuto. In passato ogni
+  /// voce era [id, updatedAt, checksum]: l'hash rendeva l'indice QR (mostrato
+  /// in chiaro durante la condivisione) uno strumento per confrontare/finger
+  /// stampare il contenuto dei record di un altro catechista. Ora l'indice
+  /// espone solo la metadata minima indispensabile al diff (id + timestamp);
+  /// i dati veri viaggiano SEMPRE cifrati col PIN nel pacchetto AES-GCM.
   static Map<String, dynamic> _indexBox(Box box, String boxName, {String? classUniqueCode}) {
     final records = <List<dynamic>>[];
     String? globalLatestTs;
@@ -268,24 +275,22 @@ class QRDataService {
       final raw = box.get(key);
       if (raw == null) continue;
 
+      // M8 / Fase 3-9: i record demo non devono nemmeno essere annunciati.
+      if (raw is Map) {
+        final data = LocalDatabase.toStringDynamicMap(raw);
+        if (data['_demo'] == true) continue;
+      }
+
       if (classUniqueCode != null &&
           !_recordInClass(boxName, id, raw, classUniqueCode)) {
         continue;
       }
 
-      String updatedAt;
-      String checksum;
+      final updatedAt = raw is Map
+          ? _extractUpdatedAt(LocalDatabase.toStringDynamicMap(raw))
+          : DateTime.now().toUtc().toIso8601String();
 
-      if (raw is Map) {
-        final data = LocalDatabase.toStringDynamicMap(raw);
-        updatedAt = _extractUpdatedAt(data);
-        checksum = _recordChecksum(data);
-      } else {
-        updatedAt = DateTime.now().toUtc().toIso8601String();
-        checksum = sha256.convert(utf8.encode(jsonEncode(raw))).toString().substring(0, 8);
-      }
-
-      records.add([id, updatedAt, checksum]);
+      records.add([id, updatedAt]);
 
       if (globalLatestTs == null || updatedAt.compareTo(globalLatestTs) > 0) {
         globalLatestTs = updatedAt;
@@ -363,27 +368,6 @@ class QRDataService {
       }
     } catch (_) {}
     return false;
-  }
-
-  /// Checksum del contenuto del record (esclude campi temporali).
-  /// Per gli studenti i campi sensibili sono cifrati per-dispositivo: il
-  /// checksum è calcolato sulla forma decifrata (canonica) così che la
-  /// differenza tra dispositivi confronti contenuti, non ciphertext.
-  static String _recordChecksum(Map<String, dynamic> data) {
-    final normalized = Map<String, dynamic>.from(data);
-    normalized.remove('updatedAt');
-    normalized.remove('createdAt');
-    if (normalized.containsKey('noteAllergieSalute') ||
-        normalized.containsKey('allergies') ||
-        normalized.containsKey('autonomousExits') ||
-        normalized.containsKey('notes')) {
-      return sha256
-          .convert(utf8.encode(jsonEncode(
-              FieldEncryptionService.decryptStudentMapForTransport(normalized))))
-          .toString()
-          .substring(0, 8);
-    }
-    return sha256.convert(utf8.encode(jsonEncode(normalized))).toString().substring(0, 8);
   }
 
   /// Dato l'indice remoto [remoteIndex] e le opzioni di condivisione,
@@ -482,6 +466,8 @@ class QRDataService {
       final raw = localBox.get(key);
       if (raw == null) continue;
       final data = LocalDatabase.toStringDynamicMap(raw);
+      // M8 / Fase 3 — item 9: esclude sempre i record demo (PII di esempio).
+      if (data['_demo'] == true) continue;
 
       if (classUniqueCode != null &&
           !_recordInClass(boxName, id, data, classUniqueCode)) {
@@ -489,7 +475,6 @@ class QRDataService {
       }
 
       final localUpdatedAt = _extractUpdatedAt(data);
-      final localChecksum = _recordChecksum(data);
 
       final remote = remoteRecords[id];
       if (remote == null) {
@@ -499,19 +484,15 @@ class QRDataService {
         needed.add(_egressRecord(boxName, record));
       } else {
         final remoteTs = remote['ts'] as String;
-        final remoteChecksum = remote['cs'] as String;
         if (localUpdatedAt.compareTo(remoteTs) > 0) {
           // Locale più recente → invia
           final record = Map<String, dynamic>.from(data);
           record['id'] = id;
           needed.add(_egressRecord(boxName, record));
-        } else if (localUpdatedAt == remoteTs && localChecksum != remoteChecksum) {
-          // Stesso timestamp ma checksum diverso → invia (conflitto, vince locale)
-          final record = Map<String, dynamic>.from(data);
-          record['id'] = id;
-          needed.add(_egressRecord(boxName, record));
         }
         // else: record identico o remoto più recente → salta
+        // (L4: senza checksum nell'indice non si confrontano più i contenuti
+        //  a parità di timestamp — l'hash non viene mai esposto in chiaro.)
       }
     }
 
@@ -552,14 +533,13 @@ class QRDataService {
         continue;
       }
 
-      final localChecksum = sha256.convert(utf8.encode(jsonEncode(raw))).toString().substring(0, 8);
       final remote = remoteRecords[id];
 
       if (remote == null) {
         needed.add({'meetingId': id, 'catechesiIds': raw is List ? raw : []});
-      } else if (remote['cs'] != localChecksum) {
-        needed.add({'meetingId': id, 'catechesiIds': raw is List ? raw : []});
       }
+      // L4: senza checksum nell'indice, a parità di presenza remota non si
+      // invia nulla (niente confronto dei contenuti in chiaro).
     }
 
     return needed;
@@ -573,6 +553,8 @@ class QRDataService {
       final raw = box.get(key);
       if (raw == null) continue;
       final data = LocalDatabase.toStringDynamicMap(raw);
+      // M8 / Fase 3 — item 9: esclude sempre i record demo (PII di esempio).
+      if (data['_demo'] == true) continue;
       if (classUniqueCode != null &&
           !_recordInClass(boxName, id, data, classUniqueCode)) {
         continue;
@@ -594,16 +576,18 @@ class QRDataService {
     return record;
   }
 
-  /// Converte l'indice remoto in una mappa id → {ts, cs} per confronto veloce.
+  /// Converte l'indice remoto in una mappa id → {ts} per confronto veloce.
+  /// L4: l'indice trasporta solo id + timestamp; i checksum (cs) non vengono
+  /// più trasmessi. Per retrocompatibilità un eventuale terzo elemento legacy
+  /// viene ignorato.
   static Map<String, Map<String, String>> _parseRemoteRecords(dynamic moduleData) {
     final result = <String, Map<String, String>>{};
     if (moduleData is! Map) return result;
     final recordsList = (moduleData['r'] as List<dynamic>?) ?? [];
     for (final entry in recordsList) {
-      if (entry is List && entry.length >= 3) {
+      if (entry is List && entry.length >= 2) {
         result[entry[0].toString()] = {
           'ts': entry[1].toString(),
-          'cs': entry[2].toString(),
         };
       }
     }

@@ -171,6 +171,7 @@ class SubstituteDelegationService {
         'substituteCatechistId': d.substituteCatechistId,
         'substituteName': d.substituteName,
         'substituteDeviceId': d.substituteDeviceId,
+        'substitutePublicKey': d.substitutePublicKey,
         'validFrom': d.validFrom.toUtc().toIso8601String(),
         'validUntil': d.validUntil.toUtc().toIso8601String(),
       };
@@ -209,6 +210,7 @@ class SubstituteDelegationService {
       substituteCatechistId: substituteCatechistId,
       substituteName: substituteName,
       substituteDeviceId: substituteDeviceId,
+      substitutePublicKey: substitutePublicKeyBase64,
       validFrom: validFrom.toUtc(),
       validUntil: validUntil.toUtc(),
       temporaryClassKey: tempKey,
@@ -336,6 +338,7 @@ class SubstituteDelegationService {
       substituteCatechistId: token['substituteCatechistId']?.toString() ?? '',
       substituteName: token['substituteName']?.toString() ?? '',
       substituteDeviceId: token['substituteDeviceId']?.toString() ?? '',
+      substitutePublicKey: token['substitutePublicKey']?.toString() ?? '',
       validFrom: SubstituteDelegation.parseUtc(
         token['validFrom']?.toString(),
         DateTime.now(),
@@ -438,6 +441,13 @@ class SubstituteDelegationService {
   // ─────────────────────────────────────────────────────────────────────────
 
   /// Genera i chunk QR di revoca (non cifrato ma firmato dal Titolare).
+  ///
+  /// Il QR di revoca viene firmato con HMAC-SHA256 keyed dal SEGRETO CONDIVISO
+  /// ECDH tra il Titolare e il Supplente: DH(owner_priv, sub_pub). Il Supplente
+  /// verifica calcolando DH(sub_priv, owner_pub) (stesso valore). In passato
+  /// veniva usata la chiave pubblica del TITOLARE (DH(owner_priv, owner_pub),
+  /// self-secret): il Supplente non poteva mai ricalcolarla, quindi la verifica
+  /// falliva sempre e una delega revocata restava attiva sul Supplente.
   Future<List<Map<String, dynamic>>> buildRevokeQrChunks(
     SubstituteDelegation delegation,
   ) async {
@@ -447,7 +457,14 @@ class SubstituteDelegationService {
         'action': 'revoke',
       }),
     );
-    final shared = await _p2p.computeStaticSharedSecret(delegation.ownerPublicKey);
+    final substitutePublicKey = delegation.substitutePublicKey;
+    if (substitutePublicKey.isEmpty) {
+      throw Exception(
+        'Chiave pubblica del Supplente mancante: impossibile firmare la revoca.',
+      );
+    }
+    final shared =
+        await _p2p.computeStaticSharedSecret(substitutePublicKey);
     final signature = hmacBase64(canonical, shared);
     final wrapper = {
       'v': 1,

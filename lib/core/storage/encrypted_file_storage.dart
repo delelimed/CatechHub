@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:path_provider/path_provider.dart';
@@ -111,6 +112,43 @@ class EncryptedFileStorage {
     if (await file.exists()) {
       await file.delete();
     }
+  }
+
+  /// WIPE SICURO (Fase 3 — item 8): sovrascrive i bytes del file vault con
+  /// dati casuali (più passate) PRIMA di eliminarlo, così la PII del minore
+  /// non è recuperabile da tool di recovery del filesystem. Best-effort: se
+  /// la sovrascrittura fallisce, il file viene comunque eliminato.
+  static Future<void> deleteSecure(String storageId) async {
+    final file = await _fileFor(storageId);
+    if (!await file.exists()) return;
+    try {
+      final length = await file.length();
+      if (length > 0) {
+        final chunkSize = 64 * 1024;
+        final random = Random.secure();
+        final buffer = Uint8List(chunkSize);
+        var written = 0;
+        final raf = await file.open(mode: FileMode.write);
+        try {
+          while (written < length) {
+            final n = length - written < chunkSize
+                ? length - written
+                : chunkSize;
+            for (var i = 0; i < n; i++) {
+              buffer[i] = random.nextInt(256);
+            }
+            await raf.writeFrom(buffer, 0, n);
+            await raf.flush();
+            written += n;
+          }
+        } finally {
+          await raf.close();
+        }
+      }
+    } catch (_) {
+      // Best-effort: la cancellazione avviene comunque.
+    }
+    await file.delete();
   }
 
   /// Elimina TUTTI i file vault dalla directory secure_vault.

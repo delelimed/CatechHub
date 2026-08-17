@@ -125,7 +125,6 @@ class SettingsPage extends ConsumerWidget {
         TextEditingController(text: config.sogliaAssenzeConsecutive.toString());
     final durataCtrl =
         TextEditingController(text: config.durataValiditaConsensoMesi.toString());
-    var ruolo = UserRole.current();
 
     showDialog(
       context: context,
@@ -143,26 +142,6 @@ class SettingsPage extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Ruolo profilo locale',
-                    style: TextStyle(fontSize: 12, color: Colors.grey)),
-                const SizedBox(height: 4),
-                SegmentedButton<UserRole>(
-                  segments: const [
-                    ButtonSegment(
-                      value: UserRole.catechista,
-                      label: Text('Catechista'),
-                      icon: Icon(Icons.person_rounded),
-                    ),
-                    ButtonSegment(
-                      value: UserRole.responsabile,
-                      label: Text('Responsabile'),
-                      icon: Icon(Icons.admin_panel_settings_rounded),
-                    ),
-                  ],
-                  selected: {ruolo},
-                  onSelectionChanged: (sel) => setState(() => ruolo = sel.first),
-                ),
-                const Divider(height: 24),
                 const _ConfigSectionLabel('Parrocchia'),
                 TextField(
                   controller: nomeCtrl,
@@ -225,7 +204,6 @@ class SettingsPage extends ConsumerWidget {
             ),
             FilledButton(
               onPressed: () async {
-                await UserRole.setCurrent(ruolo);
                 final soglia = int.tryParse(sogliaCtrl.text.trim());
                 final durata = int.tryParse(durataCtrl.text.trim());
                 await repo.save(config.copyWith(
@@ -412,15 +390,6 @@ class SettingsPage extends ConsumerWidget {
                 const SizedBox(height: 12),
               ],
 
-              _SettingsItem(
-                icon: Icons.delete_forever_rounded,
-                title: 'Cancella dati salvati',
-                subtitle: 'Elimina selettivamente anagrafiche, presenze, documenti, calendario, catechesi o allegati',
-                color: Colors.red,
-                isDestructive: true,
-                onTap: () => context.push('/delete-data'),
-              ),
-
               if (!isResponsabile) ...[
                 const SizedBox(height: 12),
 
@@ -549,6 +518,17 @@ class SettingsPage extends ConsumerWidget {
                     );
                   }
                 },
+              ),
+
+              const SizedBox(height: 12),
+
+              _SettingsItem(
+                icon: Icons.delete_forever_rounded,
+                title: 'Cancella dati salvati',
+                subtitle: 'Elimina selettivamente anagrafiche, presenze, documenti, calendario, catechesi o allegati. La cancellazione totale avviene con conferma dopo 24 ore',
+                color: Colors.red,
+                isDestructive: true,
+                onTap: () => context.push('/delete-data'),
               ),
 
               const SizedBox(height: 24),

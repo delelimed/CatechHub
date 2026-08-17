@@ -6,6 +6,7 @@ import 'package:hive/hive.dart';
 import 'package:CatechHub/core/storage/local_database.dart';
 import 'package:CatechHub/features/classes/classes_repository.dart';
 import 'package:CatechHub/shared/models/class_model.dart';
+import 'package:CatechHub/shared/models/user_role.dart';
 
 void main() {
   late Directory tempDir;
@@ -15,6 +16,7 @@ void main() {
       tempDir = Directory.systemTemp.createTempSync('hive_test_');
       Hive.init(tempDir.path);
       await Hive.openBox(LocalDatabase.authBox);
+      await UserRole.setCurrent(UserRole.responsabile);
     });
 
     tearDown(() async {

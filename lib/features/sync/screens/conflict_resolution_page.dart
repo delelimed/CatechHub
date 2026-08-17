@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
 
+import '../../../core/services/field_encryption_service.dart';
 import '../../../core/storage/local_database.dart';
 
 final syncConflictsProvider = StreamProvider<List<Map<String, dynamic>>>((ref) async* {
@@ -76,8 +77,17 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
             ?.map((e) => e.toString())
             .toList() ??
         [];
-    final localData = Map<String, dynamic>.from(c['localData'] ?? {});
-    final remoteData = Map<String, dynamic>.from(c['remoteData'] ?? {});
+    final isStudents = c['boxName'] == LocalDatabase.studentsBox;
+    // M3: i dati degli studenti nel box conflitti sono cifrati con la chiave
+    // di campo del dispositivo; li decifriamo SOLO per la visualizzazione.
+    final localData = isStudents
+        ? FieldEncryptionService.decryptStudentMapForTransport(
+            Map<String, dynamic>.from(c['localData'] ?? {}))
+        : Map<String, dynamic>.from(c['localData'] ?? {});
+    final remoteData = isStudents
+        ? FieldEncryptionService.decryptStudentMapForTransport(
+            Map<String, dynamic>.from(c['remoteData'] ?? {}))
+        : Map<String, dynamic>.from(c['remoteData'] ?? {});
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -178,7 +188,13 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
       existing['lastModifiedBy'] = choice == 'local'
           ? 'Risolto (scelto locale)'
           : 'Risolto (scelto remoto)';
-      await box.put(recordId, existing);
+      // M3: i valori scelti sono stati decifrati per la visualizzazione;
+      // prima della persistenza sul box studenti i campi sensibili vanno
+      // ricifrati (idempotente per i campi già cifrati non modificati).
+      final toStore = boxName == LocalDatabase.studentsBox
+          ? FieldEncryptionService.encryptStudentMapForStorage(existing)
+          : existing;
+      await box.put(recordId, toStore);
 
       final conflictsBox = LocalDatabase.syncConflicts();
       final key = '$boxName:$recordId';

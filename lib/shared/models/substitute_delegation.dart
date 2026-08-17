@@ -55,6 +55,12 @@ class SubstituteDelegation {
   /// Titolare. Serve al Supplente per derivare il segreto condiviso ECDH.
   final String ownerPublicKey;
 
+  /// Chiave pubblica X25519 (base64) dell'identità P2P del dispositivo del
+  /// Supplente. Serve al Titolare per derivare il segreto condiviso ECDH in
+  /// fase di revoca (il QR di revoca viene firmato con HMAC keyed dal segreto
+  /// condiviso DH(owner_priv, sub_pub)).
+  final String substitutePublicKey;
+
   /// catechistId del catechista Supplente (destinatario della delega).
   final String substituteCatechistId;
 
@@ -105,6 +111,7 @@ class SubstituteDelegation {
     required this.validFrom,
     required this.validUntil,
     required this.temporaryClassKey,
+    this.substitutePublicKey = '',
     this.status = SubstituteDelegationStatus.active,
     this.dataCollected = false,
     this.qrChunks = const [],
@@ -130,6 +137,7 @@ class SubstituteDelegation {
     DateTime? updatedAt,
     DateTime? validFrom,
     DateTime? validUntil,
+    String? substitutePublicKey,
   }) {
     return SubstituteDelegation(
       delegationId: delegationId,
@@ -142,6 +150,7 @@ class SubstituteDelegation {
       substituteCatechistId: substituteCatechistId,
       substituteName: substituteName,
       substituteDeviceId: substituteDeviceId,
+      substitutePublicKey: substitutePublicKey ?? this.substitutePublicKey,
       validFrom: validFrom ?? this.validFrom,
       validUntil: validUntil ?? this.validUntil,
       temporaryClassKey: temporaryClassKey,
@@ -165,6 +174,7 @@ class SubstituteDelegation {
       'substituteCatechistId': substituteCatechistId,
       'substituteName': substituteName,
       'substituteDeviceId': substituteDeviceId,
+      'substitutePublicKey': substitutePublicKey,
       'validFrom': validFrom.toUtc().toIso8601String(),
       'validUntil': validUntil.toUtc().toIso8601String(),
       'temporaryClassKey': temporaryClassKey,
@@ -191,6 +201,7 @@ class SubstituteDelegation {
       substituteCatechistId: data['substituteCatechistId']?.toString() ?? '',
       substituteName: data['substituteName']?.toString() ?? '',
       substituteDeviceId: data['substituteDeviceId']?.toString() ?? '',
+      substitutePublicKey: data['substitutePublicKey']?.toString() ?? '',
       validFrom:
           DateTime.tryParse(data['validFrom']?.toString() ?? '') ?? DateTime.now(),
       validUntil:

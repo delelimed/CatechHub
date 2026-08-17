@@ -188,11 +188,13 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
     String? savedPath;
     var saved = false;
     try {
-      savedPath = await FilePicker.saveFile(
+      // file_picker 12: saveFile restituisce Uri?.
+      final uri = await FilePicker.saveFile(
         dialogTitle: 'Salva esportazione',
         fileName: fullName,
         bytes: bytes,
       );
+      savedPath = uri?.path;
       if (savedPath != null) saved = true;
     } catch (_) {
       savedPath = null;

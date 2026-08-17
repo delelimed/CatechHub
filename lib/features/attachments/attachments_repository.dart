@@ -180,7 +180,8 @@ class AttachmentsRepository {
   }
 
   Future<void> deleteAttachment(String attachmentId) async {
-    await EncryptedFileStorage.delete(attachmentId);
+    // Fase 3 — item 8: wipe sicuro del file vault (sovrascrittura + delete).
+    await EncryptedFileStorage.deleteSecure(attachmentId);
     await _box.delete(attachmentId);
   }
 

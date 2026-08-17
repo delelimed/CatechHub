@@ -347,17 +347,28 @@ class _CatechistDetailSheetState extends ConsumerState<_CatechistDetailSheet> {
         .toList();
 
     if (myClasses.isEmpty) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.grey.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Text(
-          'Nessuna classe assegnata. Tocca sotto per assegnarne una.',
-          style: TextStyle(fontSize: 13),
-        ),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.grey.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Text(
+              'Nessuna classe assegnata. Tocca sotto per assegnarne una.',
+              style: TextStyle(fontSize: 13),
+            ),
+          ),
+          const SizedBox(height: 8),
+          FilledButton.tonalIcon(
+            onPressed: () => _assignToClass(active, myClasses),
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text('Assegna a una classe'),
+          ),
+        ],
       );
     }
 

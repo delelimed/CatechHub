@@ -303,6 +303,18 @@ class MeetingNotificationService {
 
     const details = NotificationDetails(android: androidDetails);
 
+    // L2 / Fase 4-11: SCHEDULE_EXACT_ALARM viene RICHIESTO a runtime al momento
+    // della programmazione del promemoria (best-effort). Prima il permesso era
+    // solo dichiarato nel manifest senza richiesta: su Android 12+ la
+    // pianificazione esatta falliva o era impossibile da concedere. Se la
+    // richiesta non è disponibile/concessa, si continua con la modalità
+    // inesatta (fallback già previsto sotto).
+    try {
+      await Permission.scheduleExactAlarm.request();
+    } catch (_) {
+      // Best-effort: su API < 31 il permesso non esiste ed è già "granted".
+    }
+
     try {
       await _notificationsPlugin.zonedSchedule(
         id: id,

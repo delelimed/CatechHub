@@ -19,13 +19,8 @@ import '../../shared/utils/auth_utils.dart';
 import '../../shared/utils/anno_catechistico.dart';
 import '../classes/classes_provider.dart';
 import '../classes/classes_repository.dart';
-
-/// Percorsi catechistici ammessi per la creazione di una classe.
-const List<String> kPercorsiClassi = [
-  'Battesimo',
-  'Comunione',
-  'Confermazione',
-];
+import 'catechists_repository.dart';
+import 'percorsi_repository.dart';
 
 /// Gestione classi e assegnazione catechisti.
 class ClassiManagementPage extends ConsumerStatefulWidget {
@@ -42,6 +37,7 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
   Future<void> _openCreateClassDialog() async {
     final nomeCtrl = TextEditingController();
     String? percorso;
+    final percorsi = PercorsiRepository().getPercorsi();
 
     final ok = await showDialog<bool>(
       context: context,
@@ -74,14 +70,14 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
                   ),
                   hint: const Text('Seleziona il percorso'),
                   items: [
-                    for (final p in kPercorsiClassi)
+                    for (final p in percorsi)
                       DropdownMenuItem(value: p, child: Text(p)),
                   ],
                   onChanged: (v) => setState(() => percorso = v),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Percorsi disponibili: ${kPercorsiClassi.join(', ')}.',
+                  'Percorsi disponibili: ${percorsi.join(', ')}.',
                   style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                 ),
               ],
@@ -128,77 +124,205 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
     _snack('Classe "$nome" creata.');
   }
 
-  Future<void> _archive(SchoolClass c) async {
-    final confirm = await _confirm(
-      'Archivia classe',
-      'Archiviare "${c.name}"? I dati restano conservati nello storico.',
+  /// Apre la finestra di gestione dei percorsi catechistici: il Responsabile
+  /// può modificarli, eliminarli o crearne di nuovi.
+  Future<void> _openManagePercorsiDialog() async {
+    final repo = PercorsiRepository();
+    var percorsi = repo.getPercorsi();
+    final nuovoCtrl = TextEditingController();
+
+    await showDialog<void>(
+      context: context,
+      builder: (d) => StatefulBuilder(
+        builder: (d, setState) => AlertDialog(
+          title: const Text('Gestisci percorsi'),
+          content: SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'I percorsi vengono usati per organizzare le classi '
+                    '(es. Battesimo, Comunione, Confermazione, Post Cresima).',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade700,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  if (percorsi.isEmpty)
+                    Text(
+                      'Nessun percorso definito.',
+                      style: TextStyle(
+                        fontStyle: FontStyle.italic,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.grey.shade400
+                            : Colors.black54,
+                        fontSize: 13,
+                      ),
+                    )
+                  else
+                    for (final p in percorsi)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                p,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              visualDensity: VisualDensity.compact,
+                              tooltip: 'Rinomina',
+                              icon: const Icon(Icons.edit_outlined, size: 20),
+                              onPressed: () async {
+                                final nuovoNome =
+                                    await _renamePercorso(d, p);
+                                if (nuovoNome != null) {
+                                  setState(() {
+                                    percorsi = percorsi.map((x) => x == p ? nuovoNome : x).toList();
+                                  });
+                                }
+                              },
+                            ),
+                            IconButton(
+                              visualDensity: VisualDensity.compact,
+                              tooltip: 'Elimina',
+                              icon: Icon(
+                                Icons.delete_outline,
+                                size: 20,
+                                color: Colors.red.shade400,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  percorsi = percorsi
+                                      .where((x) => x != p)
+                                      .toList();
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                  const Divider(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: nuovoCtrl,
+                          textCapitalization: TextCapitalization.words,
+                          decoration: const InputDecoration(
+                            labelText: 'Nuovo percorso',
+                            hintText: 'Es. Iniziazione cristiana',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          onSubmitted: (_) {
+                            final value = nuovoCtrl.text.trim();
+                            if (value.isEmpty) return;
+                            setState(() {
+                              percorsi = [
+                                ...percorsi.where((x) => x != value),
+                                value,
+                              ];
+                            });
+                            nuovoCtrl.clear();
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton.filledTonal(
+                        tooltip: 'Aggiungi percorso',
+                        icon: const Icon(Icons.add_rounded),
+                        onPressed: () {
+                          final value = nuovoCtrl.text.trim();
+                          if (value.isEmpty) return;
+                          setState(() {
+                            percorsi = [
+                              ...percorsi.where((x) => x != value),
+                              value,
+                            ];
+                          });
+                          nuovoCtrl.clear();
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        percorsi = List.of(kDefaultPercorsiClassi);
+                      });
+                    },
+                    icon: const Icon(Icons.restore_rounded, size: 18),
+                    label: const Text('Ripristina percorsi di default'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(d),
+              child: const Text('Annulla'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                await repo.savePercorsi(percorsi);
+                if (d.mounted) Navigator.pop(d);
+                _snack('Percorsi aggiornati.');
+              },
+              child: const Text('Salva'),
+            ),
+          ],
+        ),
+      ),
     );
-    if (confirm == true) {
-      await ClassesRepository().archiveClass(c.id);
-      _snack('Classe archiviata.');
-    }
+    nuovoCtrl.dispose();
   }
 
-  Future<void> _rename(SchoolClass c) async {
-    final nomeCtrl = TextEditingController(text: c.name);
+  Future<String?> _renamePercorso(BuildContext d, String current) async {
+    final ctrl = TextEditingController(text: current);
     final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Rinomina classe'),
+      context: d,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rinomina percorso'),
         content: TextField(
-          controller: nomeCtrl,
+          controller: ctrl,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
           decoration: const InputDecoration(
-            labelText: 'Nuovo nome',
-            hintText: 'Es. Comunione A',
+            labelText: 'Nome percorso',
+            border: OutlineInputBorder(),
+            isDense: true,
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Annulla'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Rinomina'),
           ),
         ],
       ),
     );
-    if (ok == true && nomeCtrl.text.trim().isNotEmpty) {
-      await ClassesRepository().renameClass(c.id, nomeCtrl.text.trim());
-      _snack('Classe rinominata in "${nomeCtrl.text.trim()}".');
-    }
-  }
-
-  Future<void> _delete(SchoolClass c) async {
-    final confirm = await _confirm(
-      'Elimina classe',
-      'Eliminare definitivamente "${c.name}" e tutti i suoi dati?',
-    );
-    if (confirm == true) {
-      await ClassesRepository().deleteClass(c.id);
-      _snack('Classe eliminata.');
-    }
-  }
-
-  Future<bool?> _confirm(String title, String content) {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(content),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annulla'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Conferma'),
-          ),
-        ],
-      ),
-    );
+    final value = ctrl.text.trim();
+    ctrl.dispose();
+    if (ok != true || value.isEmpty) return null;
+    return value;
   }
 
   @override
@@ -216,10 +340,22 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
           children: [
             Align(
               alignment: Alignment.centerRight,
-              child: FilledButton.icon(
-                onPressed: _openCreateClassDialog,
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Nuova classe'),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _openManagePercorsiDialog,
+                    icon: const Icon(Icons.route_outlined, size: 18),
+                    label: const Text('Gestisci percorsi'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: _openCreateClassDialog,
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Nuova classe'),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 16),
@@ -231,6 +367,10 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
                 final archived = classes.where((c) => c.archived).toList();
                 final percorsi = active.map((c) => c.percorso).toSet().toList()
                   ..sort((a, b) => a.compareTo(b));
+                final namesById = {
+                  for (final p in CatechistsRepository().getAllSync())
+                    p.id: p.fullName,
+                };
 
                 if (active.isEmpty && archived.isEmpty) {
                   return Padding(
@@ -280,7 +420,7 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
                         ),
                       for (final c
                           in active.where((c) => c.percorso == percorso))
-                        _manageClassCard(c),
+                        _manageClassCard(c, namesById: namesById),
                     ],
                     if (archived.isNotEmpty) ...[
                       const SizedBox(height: 16),
@@ -294,7 +434,12 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
                         ),
                       ),
                       const SizedBox(height: 10),
-                      for (final c in archived) _manageClassCard(c, archived: true),
+                      for (final c in archived)
+                        _manageClassCard(
+                          c,
+                          archived: true,
+                          namesById: namesById,
+                        ),
                     ],
                   ],
                 );
@@ -306,7 +451,11 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
     );
   }
 
-  Widget _manageClassCard(SchoolClass c, {bool archived = false}) {
+  Widget _manageClassCard(
+    SchoolClass c, {
+    bool archived = false,
+    required Map<String, String> namesById,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = isDark
         ? Theme.of(context).colorScheme.surfaceContainer
@@ -352,26 +501,11 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
                       ),
                     ),
                     if (!archived) ...[
-                      IconButton(
-                        tooltip: 'Rinomina',
-                        icon: const Icon(Icons.edit_outlined),
-                        onPressed: () => _rename(c),
-                      ),
-                      IconButton(
-                        tooltip: 'Archivia',
-                        icon: const Icon(Icons.archive_outlined),
-                        onPressed: () => _archive(c),
-                      ),
-                      IconButton(
-                        tooltip: 'Elimina',
-                        icon: const Icon(Icons.delete_outline),
-                        onPressed: () => _delete(c),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
                       ),
                     ],
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
-                    ),
                   ],
                 ),
                 if (c.catechistRoles.isNotEmpty)
@@ -382,7 +516,7 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
                       final isTitolo = e.value == ClassesRepository.roleTitolare;
                       return Chip(
                         label: Text(
-                          '${_catechistLabel(e.key)} · ${isTitolo ? "Titolare" : "Aiuto"}',
+                          '${_catechistLabel(e.key, namesById)} · ${isTitolo ? "Titolare" : "Aiuto"}',
                           style: const TextStyle(fontSize: 11),
                         ),
                         visualDensity: VisualDensity.compact,
@@ -400,7 +534,9 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
     );
   }
 
-  String _catechistLabel(String id) {
+  String _catechistLabel(String id, Map<String, String> namesById) {
+    final name = namesById[id];
+    if (name != null && name.isNotEmpty) return name;
     if (id == 'local_catechist_id') return 'Catechista locale';
     return id.length > 8
         ? 'Catechista ${id.substring(id.length - 8)}'

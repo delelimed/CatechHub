@@ -205,21 +205,23 @@ class GdprRetentionService {
   //  ma rimuove i dati operativi dello studente dal database locale.
   static Future<void> _performSingleStudentCleanup(String studentId) async {
     try {
-      // Usa StudentsRepository.deleteStudent che esegue cascade delete:
-      // - Rimuove allegati
-      // - Rimuove note giornaliere
-      // - Rimuove record storici
-      // - Rimuove dalla classe
-      // - Rimuove da presenze e consegne
-      // - Logga nell'audit
-      final box = LocalDatabase.students();
-      if (box.containsKey(studentId)) {
-        await box.delete(studentId);
-        await box.flush();
-      }
+      // M7 / Fase 3 — item 8: CASCATA DI CANCELLAZIONE REALE. In passato qui
+      // veniva eseguito un semplice `box.delete(studentId)`, lasciando sul
+      // dispositivo gli allegati cifrati, le note giornaliere, i record
+      // storici e le presenze del minore. Ora si usa la stessa cascata della
+      // cancellazione manuale, che rimuove:
+      //   - allegati (file vault + metadati), con wipe sicuro dei file;
+      //   - note giornaliere e note di contatto;
+      //   - record storici (archivio);
+      //   - lo studente dalle classi (studentIds);
+      //   - presenze/consegne documenti;
+      //   - il record studente stesso.
+      // Il tombstone e il registro trattamenti restano per la compliance
+      // storage limitation.
+      await StudentsRepository().deleteStudent(studentId);
       debugPrint(
           '[GdprRetention] Cleanup automatico dati completato per studente: $studentId '
-          '(grace period scaduto)',
+          '(grace period scaduto, cascata allegati/note/storici/presenze)',
         );
     } catch (e) {
       if (kDebugMode) {

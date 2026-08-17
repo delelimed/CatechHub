@@ -70,6 +70,27 @@ class DataDeletionCounts {
   int get total => students + attendance + planning + catechesi + contactNotes + attachments + documents + deliveries + associations;
 }
 
+/// Stato della richiesta di cancellazione totale dei dati.
+///
+/// Il flusso a conferma differita protegge da cancellazioni accidentali:
+/// la richiesta diventa "eseguibile" solo dopo 24 ore e scade dopo 30 ore
+/// dalla richiesta, senza mai cancellare nulla in automatico.
+enum DeletionRequestStatus {
+  /// Nessuna richiesta in corso.
+  none,
+
+  /// Richiesta registrata: la cancellazione è disponibile dopo 24 ore.
+  waiting,
+
+  /// Finestra di conferma (24h-30h dalla richiesta): l'eliminazione
+  /// può essere eseguita dal Responsabile.
+  available,
+
+  /// Richiesta scaduta (oltre 30 ore): nessuna cancellazione eseguita,
+  /// il Responsabile deve inoltrare una nuova richiesta.
+  expired,
+}
+
 /// Servizio per la cancellazione selettiva dei dati.
 ///
 /// COLLABORAZIONI:
@@ -87,6 +108,58 @@ class DataDeletionCounts {
 /// rimossi PRIMA dei genitori (studenti/giornate) per evitare dati orfani
 /// nel vault cifrato.
 class DataDeletionService {
+  /// Attesa minima prima che la cancellazione totale possa essere eseguita.
+  static const kDeletionRequestWait = Duration(hours: 24);
+
+  /// Finestra di conferma successiva all'attesa (24 ore) entro cui la
+  /// cancellazione può essere eseguita: 6 ore.
+  static const kDeletionRequestWindow = Duration(hours: 6);
+
+  /// Durata massima dell'intero ciclo richiesta (24 ore di attesa + 6 ore
+  /// di finestra di conferma = 30 ore). Oltre questo termine la richiesta
+  /// scade senza cancellare nulla.
+  static const kDeletionRequestExpiry = Duration(hours: 30);
+
+  /// Chiave Hive (box auth) del timestamp della richiesta di cancellazione.
+  static const _deletionRequestKey = 'deletion_requested_at';
+
+  /// Timestamp della richiesta di cancellazione totale, o null se assente.
+  DateTime? getDeletionRequestTime() {
+    try {
+      final raw = LocalDatabase.auth().get(_deletionRequestKey);
+      if (raw is! String) return null;
+      return DateTime.tryParse(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Stato corrente della richiesta di cancellazione totale (ciclo 24/30 ore).
+  DeletionRequestStatus getDeletionRequestStatus() {
+    final requestedAt = getDeletionRequestTime();
+    if (requestedAt == null) return DeletionRequestStatus.none;
+    final elapsed = DateTime.now().difference(requestedAt);
+    if (elapsed.isNegative) return DeletionRequestStatus.none;
+    if (elapsed < kDeletionRequestWait) return DeletionRequestStatus.waiting;
+    if (elapsed <= kDeletionRequestExpiry) {
+      return DeletionRequestStatus.available;
+    }
+    return DeletionRequestStatus.expired;
+  }
+
+  /// Registra la richiesta di cancellazione totale (avvia il timer 24/30 ore).
+  Future<void> requestDeletion() async {
+    await LocalDatabase.auth().put(
+      _deletionRequestKey,
+      DateTime.now().toIso8601String(),
+    );
+  }
+
+  /// Annulla/scade la richiesta di cancellazione totale.
+  Future<void> clearDeletionRequest() async {
+    await LocalDatabase.auth().delete(_deletionRequestKey);
+  }
+
   /// Conta i record per una specifica classe (o totali se [classId] è null).
   DataDeletionCounts getCounts({String? classId}) {
     if (classId == null) {

@@ -176,12 +176,13 @@ class _ImportRagazziPageState extends ConsumerState<ImportRagazziPage> {
   }
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.pickFiles(
+    // file_picker 12: pickFiles restituisce List<PlatformFile> (vuota su annulla).
+    final files = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['csv', 'xls', 'xlsx'],
     );
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.single;
+    if (files.isEmpty) return;
+    final file = files.single;
     final bytes = await file.readAsBytes();
     if (bytes.isEmpty) {
       _setWarning('Impossibile leggere il file selezionato.');

@@ -12,6 +12,7 @@ import '../../../core/storage/encrypted_file_storage.dart';
 import '../../../core/storage/local_database.dart';
 import '../../gdpr/hard_delete_service.dart';
 import '../../gdpr/tombstone_model.dart';
+import '../../gdpr/tombstone_repository.dart';
 import '../../gdpr/tombstone_service.dart';
 import '../class_channel_service.dart';
 import '../data/association_models.dart';
@@ -302,7 +303,11 @@ class P2PSyncService {
 
   void addLog(String level, String message) {
     _syncLogs.add(
-      SyncLogEntry(timestamp: DateTime.now(), level: level, message: message),
+      SyncLogEntry(
+        timestamp: DateTime.now(),
+        level: level,
+        message: _redactLog(message),
+      ),
     );
     if (_syncLogs.length > _maxLogEntries) {
       _syncLogs.removeAt(0);
@@ -311,6 +316,31 @@ class P2PSyncService {
       _logController.add(null);
     }
   }
+
+  /// M4 — Privacy nei log: il viewer in-app mostra i log di sync, quindi le
+  /// PII (email, telefoni, identificativi di persona) vengono mascherate
+  /// PRIMA della registrazione. I nomi/deviceName sono già esclusi dai
+  /// messaggi di log (si usano solo gli ID di sessione).
+  static String _redactLog(String message) {
+    var m = message;
+    // Email e telefoni (prefisso internazionale opzionale + >=9 cifre).
+    m = m.replaceAllMapped(_emailRe, (match) => '[email]');
+    m = m.replaceAllMapped(_phoneRe, (match) => '[telefono]');
+    // catechistId e campi anagrafici espliciti nei log.
+    m = m
+        .replaceAllMapped(
+          RegExp(r'(catechistId\s*=\s*)([^\s,\)]+)'),
+          (match) => 'catechistId=[nascosto]',
+        )
+        .replaceAllMapped(
+          RegExp(r'(sender(?:FirstName|LastName)\s*=\s*)([^\s,\)]+)'),
+          (match) => '${match.group(1)}[nascosto]',
+        );
+    return m;
+  }
+
+  static final _emailRe = RegExp(r'[\w.+-]+@[\w-]+\.[\w.-]+');
+  static final _phoneRe = RegExp(r'(?<![\w])\+?\d[\d\s./-]{7,}\d(?!\w)');
 
   void clearLogs() {
     _syncLogs.clear();
@@ -402,6 +432,11 @@ class P2PSyncService {
   /// Chiave pubblica efimera del peer remoto, ricevuta nell'handshake.
   final Map<String, String> _endpointRemoteEphemeralPub = {};
 
+  /// Chiave pubblica per-associazione del peer remoto (M5), ricevuta nel
+  /// payload cifrato `p2p_identity`. Usata per mescolare il DH dedicato
+  /// dell'associazione nella chiave di sessione.
+  final Map<String, String> _endpointRemoteAssocPub = {};
+
   bool _continuousModeActive = false;
   final Set<String> _connectedEndpoints = {};
   final Set<String> _nearbyDiscoveredDevices = {};
@@ -480,7 +515,8 @@ class P2PSyncService {
             expiringDevicesCount: nearExpiryCount,
           ),
         );
-        addLog('WARN', warning);
+        // M4: il nome del dispositivo (PII) NON viene registrato nei log.
+        addLog('WARN', '$nearExpiryCount dispositivo/i in scadenza');
       }
     } catch (_) {}
   }
@@ -547,6 +583,7 @@ class P2PSyncService {
     _endpointLocalEphemeral.clear();
     _endpointLocalEphemeralPub.clear();
     _endpointRemoteEphemeralPub.clear();
+    _endpointRemoteAssocPub.clear();
     _isSyncing = false;
     _sessionPairingNonce = null;
     _remoteSessionPairingNonce = null;
@@ -690,7 +727,7 @@ class P2PSyncService {
         _syncPrefix,
         Strategy.P2P_CLUSTER,
         onEndpointFound: (endpointId, name, serviceId) {
-          addLog('DEBUG', 'Endpoint trovato: $name ($endpointId)');
+          addLog('DEBUG', 'Endpoint trovato: $endpointId');
           if (!name.startsWith(_syncPrefix)) return;
           final deviceId = _extractDeviceId(name);
           if (deviceId == null) return;
@@ -712,13 +749,21 @@ class P2PSyncService {
 
               final assoc = await _security.getAssociation(deviceId);
               if (assoc != null && assoc.isValid) {
-                if (!_sessionSyncAllowed && _needsSessionPermission(assoc)) {
-                  _updateState(
-                    _state.copyWith(
-                      awaitingSessionPermission: true,
-                      pendingSessionDeviceName: assoc.deviceName,
-                    ),
-                  );
+                if (_needsSessionPermission(assoc)) {
+                  if (!_sessionSyncAllowed) {
+                    _updateState(
+                      _state.copyWith(
+                        awaitingSessionPermission: true,
+                        pendingSessionDeviceName: assoc.deviceName,
+                      ),
+                    );
+                    addLog(
+                      'DEBUG',
+                      '  consenso sessione richiesto per $deviceId, '
+                          'connessione differita',
+                    );
+                    return;
+                  }
                 }
                 addLog(
                   'DEBUG',
@@ -798,13 +843,20 @@ class P2PSyncService {
 
       final assoc = await _security.getAssociation(deviceId);
       if (assoc != null && assoc.isValid) {
-        if (!_sessionSyncAllowed && _needsSessionPermission(assoc)) {
-          _updateState(
-            _state.copyWith(
-              awaitingSessionPermission: true,
-              pendingSessionDeviceName: assoc.deviceName,
-            ),
-          );
+        if (_needsSessionPermission(assoc)) {
+          if (!_sessionSyncAllowed) {
+            _updateState(
+              _state.copyWith(
+                awaitingSessionPermission: true,
+                pendingSessionDeviceName: assoc.deviceName,
+              ),
+            );
+            addLog(
+              'DEBUG',
+              'Consenso sessione richiesto per $deviceId, connessione differita',
+            );
+            continue;
+          }
         }
         final localIdentity = await _security.getLocalIdentity();
         await _nearby.requestConnection(
@@ -919,11 +971,16 @@ class P2PSyncService {
         'INFO',
         'Invio incrementale: ${records.length} nuovi/modificati record',
       );
-      final engine = HiveSyncEngine();
       final attachmentBytes = await _collectAttachmentBytes(records);
+      // H4/H5: passa dal canale classe (niente record studenti in chiaro) e
+      // esclude i record tombstoned dal lato invio.
+      final channelPayload = await _buildSyncDataPayload(
+        records: records,
+        endpointId: endpointId,
+      );
       final recordsPayload = jsonEncode({
         'type': 'p2p_sync_data',
-        'records': engine.serializeRecords(records),
+        ...channelPayload,
         if (attachmentBytes.isNotEmpty) 'attachments': attachmentBytes,
       });
       await _sendEncryptedPayload(endpointId, recordsPayload);
@@ -1262,6 +1319,7 @@ class P2PSyncService {
     _endpointLocalEphemeral.clear();
     _endpointLocalEphemeralPub.clear();
     _endpointRemoteEphemeralPub.clear();
+    _endpointRemoteAssocPub.clear();
     _endpointSyncPhase.clear();
     _pendingEndpointId = null;
     _pendingHandshakeIdentity = null;
@@ -1363,9 +1421,11 @@ class P2PSyncService {
         }
         if (_needsSessionPermission(association) && !_sessionSyncAllowed) {
           addLog(
-            'DEBUG',
-            'Connessione in arrivo da $deviceId, attesa autorizzazione',
+            'WARN',
+            'Rifiuto connessione da $deviceId: consenso sessione non concesso',
           );
+          await _nearby.rejectConnection(endpointId);
+          return;
         }
         addLog(
           'DEBUG',
@@ -1435,6 +1495,7 @@ class P2PSyncService {
     _endpointLocalEphemeral.remove(endpointId);
     _endpointLocalEphemeralPub.remove(endpointId);
     _endpointRemoteEphemeralPub.remove(endpointId);
+    _endpointRemoteAssocPub.remove(endpointId);
     _endpointSyncPhase.remove(endpointId);
     _authRequestSent.remove(endpointId);
     _endpointRemoteCatechistId.remove(endpointId);
@@ -1483,6 +1544,7 @@ class P2PSyncService {
     _endpointLocalEphemeral.remove(endpointId);
     _endpointLocalEphemeralPub.remove(endpointId);
     _endpointRemoteEphemeralPub.remove(endpointId);
+    _endpointRemoteAssocPub.remove(endpointId);
     _endpointSyncPhase.remove(endpointId);
     _endpointRemoteCatechistId.remove(endpointId);
     _endpointRemoteHasClasses.remove(endpointId);
@@ -1513,12 +1575,34 @@ class P2PSyncService {
     return true;
   }
 
-  /// Determina se è necessario chiedere il permesso all'utente prima di sincronizzarsi.
-  /// Viene mostrato un banner quando almeno un dispositivo è "Altro Catechista"
-  /// e i catechisti sono diversi. Se entrambi sono "Mio Dispositivo" o condividono
-  /// lo stesso catechistId, la sincronizzazione è automatica.
+  /// Determina se è necessario il CONSENSO ESPLICITO dell'utente prima di
+  /// sincronizzarsi in questa sessione. Il consenso è richiesto quando almeno
+  /// uno dei due dispositivi è un "Altro Catechista" con identità diversa
+  /// (dati di minori tra persone diverse). Se entrambi sono "Mio Dispositivo"
+  /// o condividono lo stesso catechistId, la sincronizzazione è automatica.
+  ///
+  /// La sync NON parte finché entrambe le parti non hanno concesso il consenso
+  /// (vedi [grantSessionPermission]); l'auto-accettazione dell'auth è stata
+  /// rimossa in favore di questa verifica.
   bool _needsSessionPermission(P2PDeviceAssociation assoc) {
-    return false;
+    final localRole = _state.role;
+    final isLocalOther = localRole == P2PSyncRole.altroCatechista;
+    final isRemoteOther =
+        assoc.remoteRole == P2PSyncRole.altroCatechista.name;
+    if (!isLocalOther && !isRemoteOther) {
+      // Entrambi "Mio Dispositivo": stessa persona, sync automatica.
+      return false;
+    }
+    // Almeno un "Altro Catechista": consent automatico solo se stessa identità.
+    final localCat = AuthService.getCatechistId();
+    final remoteCat = assoc.catechistId;
+    if (localCat.isNotEmpty &&
+        remoteCat != null &&
+        remoteCat.isNotEmpty &&
+        localCat == remoteCat) {
+      return false;
+    }
+    return true;
   }
 
   String _getCurrentClassId() {
@@ -1756,7 +1840,6 @@ class P2PSyncService {
         16,
       ).map((b) => b.toRadixString(16).padLeft(2, '0')).join();
       final localIdentity = await _security.getLocalIdentity();
-      final localApproval = await _security.getLocalApproval();
       // Forward secrecy: chiave efimera generata per QUESTA connessione.
       // Non viene mai persistita; la chiave privata resta solo in memoria e
       // viene scartata alla chiusura della sessione.
@@ -1764,31 +1847,22 @@ class P2PSyncService {
       final ephemeralPub = await ephemeral.extractPublicKey();
       _endpointLocalEphemeral[endpointId] = ephemeral;
       _endpointLocalEphemeralPub[endpointId] = base64Encode(ephemeralPub.bytes);
+      // H2: l'handshake in chiaro trasporta SOLO i dati di bootstrap necessari
+      // a stabilire la sessione (nonce, chiave efimera, ruoli). Le PII
+      // (nome, cognome, telefono, catechistId, classi condivise, certificato
+      // di approvazione) viaggiano ESCLUSIVAMENTE nel payload cifrato
+      // `p2p_identity`, mai sul canale BLE in broadcast.
       final handshakeMsg = jsonEncode({
         'type': 'p2p_handshake',
+        'v': 2,
         'senderId': localIdentity.deviceId,
         'senderName': localIdentity.deviceName,
-        'senderFirstName': localIdentity.firstName,
-        'senderLastName': localIdentity.lastName,
         'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
         'role': _state.role.name,
         'sessionNonce': _sessionPairingNonce,
         'ephemeralPub': base64Encode(ephemeralPub.bytes),
-        'classId': _handshakeClassId(),
-        'sharedClassIds': _handshakeSharedClassIds(),
-        'catechistId': AuthService.getCatechistId(),
-        'hasClasses': _hasCatechistIdentity(AuthService.getCatechistId()),
         'supportsClassChannel': true,
         'supportsParishChannel': true,
-        // Profilo anagrafico dell'altro catechista (ruolo "Altro Catechista"):
-        // il ricevente lo usa per configurare il proprio account.
-        if (_associationRemoteProfile.isNotEmpty)
-          'remoteProfile': _associationRemoteProfile,
-        // Certificato di approvazione del Responsabile (se il dispositivo è
-        // già stato approvato): il peer lo verifica con il segreto della
-        // parrocchia quando la modalità Responsabile è attiva.
-        if (localApproval != null && localApproval.isApproved)
-          'approvalCert': localApproval.toJson(),
       });
       addLog(
         'DEBUG',
@@ -1807,14 +1881,134 @@ class P2PSyncService {
   String _localEphemeralPubForEndpoint(String endpointId) =>
       _endpointLocalEphemeralPub[endpointId] ?? '';
 
-  /// Deriva il pairing code dal shared secret e dai nonces concordati.
-  /// Entrambi i dispositivi devono usare lo stesso nonce concordato per
-  /// garantire che i codice di verifica corrispondano. Se un nonce è
-  /// mancante, si aspetta fino a 3 secondi per riceverlo prima di procedere.
+  /// Invia il payload cifrato `p2p_identity` con i dati di IDENTITÀ del
+  /// dispositivo locale (nome, cognome, catechistId, classi condivise,
+  /// profilo anagrafico dell'altro catechista e certificato di approvazione).
+  ///
+  /// H2: queste informazioni NON devono mai transitare sul canale BLE in
+  /// chiaro (broadcast). Viaggiano esclusivamente dentro il payload cifrato
+  /// AES-GCM della sessione stabilita ([_sendEncryptedPayload]).
+  Future<void> _sendIdentityPayload(String endpointId) async {
+    try {
+      final localIdentity = await _security.getLocalIdentity();
+      final localApproval = await _security.getLocalApproval();
+      // M5: la chiave pubblica per-associazione del dispositivo locale viene
+      // scambiata in modo autenticato (payload cifrato della sessione): il
+      // peer la usa per mescolare il DH dedicato dell'associazione nella
+      // chiave di sessione. Senza di essa non c'è alcun downgrade: la
+      // sessione resta TripleDH, semplicemente senza il fattore extra.
+      final remoteDeviceId = _endpointConnIdMap[endpointId];
+      final localAssoc = remoteDeviceId != null
+          ? await _security.getAssociation(remoteDeviceId)
+          : null;
+      final assocPub = localAssoc?.devicePublicKeyBase64 ?? '';
+      final msg = jsonEncode({
+        'type': 'p2p_identity',
+        'senderId': localIdentity.deviceId,
+        'senderFirstName': localIdentity.firstName,
+        'senderLastName': localIdentity.lastName,
+        'classId': _handshakeClassId(),
+        'sharedClassIds': _handshakeSharedClassIds(),
+        'catechistId': AuthService.getCatechistId(),
+        'hasClasses': _hasCatechistIdentity(AuthService.getCatechistId()),
+        if (assocPub.isNotEmpty) 'assocPub': assocPub,
+        // Profilo anagrafico dell'altro catechista (ruolo "Altro Catechista"):
+        // il ricevente lo usa per configurare il proprio account.
+        if (_associationRemoteProfile.isNotEmpty)
+          'remoteProfile': _associationRemoteProfile,
+        // Certificato di approvazione del Responsabile (se il dispositivo è
+        // già stato approvato): il peer lo verifica con la trust root della
+        // parrocchia quando la modalità Responsabile è attiva.
+        if (localApproval != null && localApproval.isApproved)
+          'approvalCert': localApproval.toJson(),
+      });
+      await _sendEncryptedPayload(endpointId, msg);
+      addLog('DEBUG', 'Identità inviata a $endpointId');
+    } catch (e) {
+      addLog('ERROR', 'Errore invio identità a $endpointId: $e');
+    }
+  }
+
+  /// Riceve il payload cifrato `p2p_identity` dal peer e aggiorna lo stato
+  /// dell'identità remota dichiarata (catechistId, classi condivise, profilo
+  /// anagrafico) e allega il certificato di approvazione se verificabile.
+  Future<void> _handleIdentity(
+    String endpointId,
+    Map<String, dynamic> message,
+  ) async {
+    final senderId = message['senderId'] as String?;
+    if (senderId == null) return;
+    addLog(
+      'DEBUG',
+      'Identità ricevuta da $senderId',
+    );
+
+    final remoteCatechistId = message['catechistId'] as String?;
+    if (remoteCatechistId != null && remoteCatechistId.isNotEmpty) {
+      _endpointRemoteCatechistId[endpointId] = remoteCatechistId;
+      _pendingHandshakeRemoteCatechistId = remoteCatechistId;
+    }
+    _endpointRemoteHasClasses[endpointId] = message['hasClasses'] == true;
+    _endpointSupportsClassChannel[endpointId] =
+        message['supportsClassChannel'] == true;
+    _endpointSupportsParishChannel[endpointId] =
+        message['supportsParishChannel'] == true;
+    _endpointSharedClassIds[endpointId] = _resolveSharedClassIdsForEndpoint(
+      endpointId,
+      (message['sharedClassIds'] as List<dynamic>? ?? [])
+          .map((e) => e.toString())
+          .toList(),
+      message['classId'] as String?,
+    );
+    _pendingHandshakeRemoteProfile = _parseRemoteProfile(message);
+
+    // M5: registra la chiave pubblica per-associazione del peer e applica il
+    // fattore di associazione alla chiave di sessione (crypto per-associazione
+    // ora realmente usata). La vecchia chiave resta nel set di decifratura
+    // per i messaggi in transito, così il passaggio è indolore.
+    final assocPub = message['assocPub'] as String? ?? '';
+    if (assocPub.isNotEmpty) {
+      _endpointRemoteAssocPub[endpointId] = assocPub;
+      await _applyAssociationUpgrade(endpointId);
+    }
+
+    // Anagrafica (nome/cognome) per il controllo anti-associazione errata.
+    final firstName = message['senderFirstName'] as String? ?? '';
+    final lastName = message['senderLastName'] as String? ?? '';
+    if (firstName.isNotEmpty || lastName.isNotEmpty) {
+      final current = _pendingHandshakeIdentity;
+      if (current != null) {
+        _pendingHandshakeIdentity = P2PIdentity(
+          deviceId: current.deviceId,
+          deviceName: current.deviceName,
+          username: current.username,
+          publicKeyBase64: current.publicKeyBase64,
+          fingerprint: current.fingerprint,
+          connectionEndpoint: current.connectionEndpoint,
+          firstName: firstName,
+          lastName: lastName,
+        );
+      }
+    }
+
+    // Catena di fiducia (H3): verifica e allega il certificato di approvazione
+    // e lo vincola all'identità dichiarata.
+    await _attachApprovalFromHandshake(senderId, message);
+  }
+
+  /// Deriva il pairing code dal shared secret, dai nonces concordati e dalle
+  /// chiavi efimere (Fase 2 — item 6). Entrambi i dispositivi devono usare lo
+  /// stesso nonce concordato per garantire che i codice di verifica
+  /// corrispondano. Se un nonce è mancante, si aspetta fino a 3 secondi per
+  /// riceverlo prima di procedere.
+  ///
+  /// Le chiavi efimere vengono ordinate in modo canonico prima di essere
+  /// incluse, così entrambi i peer producono lo stesso input al SAS.
   Future<String?> _computePairingCode({
     required String remoteId,
     required String? localNonce,
     required String? remoteNonce,
+    String? endpointId,
   }) async {
     addLog(
       'INFO',
@@ -1879,6 +2073,14 @@ class P2PSyncService {
     final code = P2PSecurityService.computePairingCode(
       sharedSecret,
       sessionNonce: agreedNonce,
+      // Fase 2 — item 6: vincola il SAS alle chiavi efimere della sessione
+      // (detezione MitM sullo scambio delle chiavi efimere).
+      localEphemeralPub: endpointId != null
+          ? _endpointLocalEphemeralPub[endpointId]
+          : null,
+      remoteEphemeralPub: endpointId != null
+          ? _endpointRemoteEphemeralPub[endpointId]
+          : null,
     );
     // Privacy: il codice pairing NON viene loggato. È il segreto di
     // autenticazione a breve termine per l'associazione; un log (anche
@@ -1972,6 +2174,9 @@ class P2PSyncService {
         case 'p2p_handshake_ack':
           await _handleHandshakeAck(endpointId, decoded);
           break;
+        case 'p2p_identity':
+          await _handleIdentity(endpointId, decoded);
+          break;
         case 'p2p_auth_request':
           await _handleAuthRequest(endpointId, decoded);
           break;
@@ -2008,6 +2213,9 @@ class P2PSyncService {
           break;
         case 'p2p_tombstone':
           await _handleTombstone(endpointId, decoded);
+          break;
+        case 'p2p_revoked_devices':
+          await _handleRevokedDevices(endpointId, decoded);
           break;
         case 'p2p_parish_channel':
           await _handleParishChannel(endpointId, decoded);
@@ -2142,7 +2350,7 @@ class P2PSyncService {
       );
       return;
     }
-    addLog('DEBUG', 'Handshake da: $remoteName ($remoteId)');
+    addLog('DEBUG', 'Handshake da: $remoteId');
 
     // ─── Catena di fiducia (modalità Responsabile) ─────────────────────────
     // Se il peer trasporta un certificato di approvazione del Responsabile,
@@ -2264,23 +2472,23 @@ class P2PSyncService {
 
     if (!_state.isPairingMode) {
       addLog('DEBUG', 'Handshake: associazione esistente, invio ack cifrato');
+      // H2: l'ack trasporta solo dati di bootstrap (nessuna PII in chiaro
+      // sul canale BLE). L'identità viaggia nel payload cifrato
+      // `p2p_identity`, inviato subito dopo l'ack.
       final ack = jsonEncode({
         'type': 'p2p_handshake_ack',
         'senderId': localIdentity.deviceId,
         'senderName': localIdentity.deviceName,
+        'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
         'role': _state.role.name,
         'sessionNonce': _sessionPairingNonce ?? '',
         'ephemeralPub': _localEphemeralPubForEndpoint(endpointId),
-        'classId': _handshakeClassId(),
-        'sharedClassIds': _handshakeSharedClassIds(),
-        'catechistId': AuthService.getCatechistId(),
-        'hasClasses': _hasCatechistIdentity(AuthService.getCatechistId()),
         'supportsClassChannel': true,
         'supportsParishChannel': true,
-        if (_associationRemoteProfile.isNotEmpty)
-          'remoteProfile': _associationRemoteProfile,
       });
       await _sendEncryptedPayload(endpointId, ack);
+      // H2: invia l'identità (PII) SOLO nel payload cifrato di sessione.
+      await _sendIdentityPayload(endpointId);
       _updateState(
         _state.copyWith(
           status: P2PSyncStatus.sessionEstablished,
@@ -2307,21 +2515,19 @@ class P2PSyncService {
     } else {
       addLog('DEBUG', 'Handshake: associazione trovata, calcolo pairing code');
 
+      // H2: l'ack trasporta solo dati di bootstrap (nessuna PII in chiaro
+      // sul canale BLE). L'identità viaggia nel payload cifrato
+      // `p2p_identity`, inviato subito dopo l'ack.
       final ack = jsonEncode({
         'type': 'p2p_handshake_ack',
         'senderId': localIdentity.deviceId,
         'senderName': localIdentity.deviceName,
+        'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
         'role': _state.role.name,
         'sessionNonce': _sessionPairingNonce ?? '',
         'ephemeralPub': _localEphemeralPubForEndpoint(endpointId),
-        'classId': _handshakeClassId(),
-        'sharedClassIds': _handshakeSharedClassIds(),
-        'catechistId': AuthService.getCatechistId(),
-        'hasClasses': _hasCatechistIdentity(AuthService.getCatechistId()),
         'supportsClassChannel': true,
         'supportsParishChannel': true,
-        if (_associationRemoteProfile.isNotEmpty)
-          'remoteProfile': _associationRemoteProfile,
       });
       await _sendPayload(endpointId, ack);
 
@@ -2330,6 +2536,7 @@ class P2PSyncService {
           remoteId: remoteId,
           localNonce: _sessionPairingNonce,
           remoteNonce: _remoteSessionPairingNonce,
+          endpointId: endpointId,
         );
 
         _pendingHandshakeRemoteProfile = _parseRemoteProfile(message);
@@ -2386,12 +2593,36 @@ class P2PSyncService {
       return;
     }
 
+    // M6 — freshness: un ACK riprodotto (replay) deve essere rifiutato.
+    // L'ACK, come l'handshake, trasporta un timestamp: se è più vecchio di
+    // 120s (o nel futuro oltre lo skew di orologio) il pairing viene
+    // interrotto, così una registrazione BLE intercettata non può essere
+    // riusata per ricavare il pairing code.
+    final ackTimestamp = message['timestamp'] as int? ?? 0;
+    if (ackTimestamp > 0) {
+      final ackAge =
+          (DateTime.now().millisecondsSinceEpoch ~/ 1000) - ackTimestamp;
+      if (ackAge.abs() > 120) {
+        addLog(
+          'WARN',
+          'M6: handshake ACK scaduto per $endpointId (età: ${ackAge.abs()}s), '
+          'disconnessione',
+        );
+        try {
+          await _nearby.disconnectFromEndpoint(endpointId);
+        } catch (_) {}
+        _connectedEndpoints.remove(endpointId);
+        _pendingEndpointId = null;
+        return;
+      }
+    }
+
     final association = await _security.getAssociation(remoteId);
 
     if (association == null && _state.isPairingMode) {
       addLog(
         'DEBUG',
-        'Handshake ACK da $remoteName ($remoteId) in pairing mode, '
+        'Handshake ACK da $remoteId in pairing mode, '
             'nessuna associazione ancora. Attendo scansione QR.',
       );
 
@@ -2470,7 +2701,7 @@ class P2PSyncService {
       );
       return;
     }
-    addLog('DEBUG', 'Handshake ACK da: $remoteName ($remoteId)');
+    addLog('DEBUG', 'Handshake ACK da: $remoteId');
 
     final remoteRoleStr = message['role'] as String?;
     final remoteRole = remoteRoleStr != null
@@ -2555,6 +2786,11 @@ class P2PSyncService {
       final iAmInitiator = localIdentity.deviceId.compareTo(remoteId) <= 0;
       _isInitiator = iAmInitiator;
 
+      // H2: invia l'identità (PII) SOLO nel payload cifrato di sessione,
+      // prima dell'auth request così il ricevente ha l'identità quando
+      // calcola lo scope di sincronizzazione.
+      await _sendIdentityPayload(endpointId);
+
       if (iAmInitiator && !_authRequestSent.contains(endpointId)) {
         _authRequestSent.add(endpointId);
         final authRequest = jsonEncode({
@@ -2572,6 +2808,7 @@ class P2PSyncService {
         remoteId: remoteId,
         localNonce: _sessionPairingNonce,
         remoteNonce: _remoteSessionPairingNonce,
+        endpointId: endpointId,
       );
 
       _pendingHandshakeRemoteProfile = _parseRemoteProfile(message);
@@ -2625,23 +2862,50 @@ class P2PSyncService {
       if (assoc.authorizedByResponsabile) return;
 
       final responsabileMode = await _security.isResponsabileModeActive();
-      final hasSecret = await _security.hasParishApprovalSecret();
+      final hasTrustRoot = await _security.hasTrustRoot();
       var valid = false;
-      if (responsabileMode && hasSecret) {
-        valid = await _security.verifyApprovalWithParishSecret(cert);
+      if (responsabileMode && hasTrustRoot) {
+        valid = await _security.verifyApprovalCertificate(cert);
+      }
+
+      // H3: l'identità dichiarata deve essere AUTENTICATA dal certificato
+      // firmato. Il certificato è valido solo se:
+      //   1. la chiave pubblica del dispositivo nel certificato coincide con
+      //      quella dell'associazione (il certificato non può essere usato da
+      //      un dispositivo diverso dal firmato);
+      //   2. il catechistId dichiarato coincide con quello del certificato
+      //      (un dispositivo rogue non può impersonare un catechista membro).
+      if (valid) {
+        final certMatchesDevice =
+            cert.publicKey.isNotEmpty && cert.publicKey == assoc.publicKeyBase64;
+        final claimedCat = message['catechistId'] as String?;
+        final certCat = cert.catechistId;
+        final identityMatches = claimedCat == null ||
+            claimedCat.isEmpty ||
+            certCat == claimedCat;
+        if (!certMatchesDevice || !identityMatches) {
+          addLog(
+            'WARN',
+            'H3: certificato non vincolato all\'identità dichiarata per '
+            '$remoteId (device key match=$certMatchesDevice, '
+            'catechistId match=$identityMatches). Approvazione non elevata.',
+          );
+          valid = false;
+        }
       }
 
       final updated = assoc.copyWith(
         // Il flag viene alzato SOLO se il certificato è stato verificato
-        // contro il segreto della parrocchia. In caso contrario il certificato
-        // viene comunque conservato come metadato (verifica differita), ma
-        // senza elevare l'autorizzazione: un certificato non verificato non
-        // deve mai valere come approvazione.
+        // contro la trust root della parrocchia. In caso contrario il
+        // certificato viene comunque conservato come metadato (verifica
+        // differita), ma senza elevare l'autorizzazione: un certificato non
+        // verificato non deve mai valere come approvazione.
         authorizedByResponsabile: valid,
         timestampApproval: cert.timestampApproval,
         approvedByDeviceId: cert.approvedByDeviceId,
         approvalSignature: cert.approvalSignature,
         approvalSignerPublicKey: cert.signerPublicKey,
+        approvalExpiresAt: cert.expiresAt,
       );
       await _security.saveAssociation(updated);
 
@@ -2651,7 +2915,7 @@ class P2PSyncService {
             : 'WARN',
         valid
             ? 'Certificato di approvazione verificato e allegato per $remoteId'
-            : 'Certificato di approvazione ricevuto per $remoteId (segreto parrocchia non disponibile, verifica differita)',
+            : 'Certificato di approvazione ricevuto per $remoteId (trust root parrocchia non disponibile, verifica differita)',
       );
     } catch (e) {
       addLog('WARN', 'Errore attach approval da handshake: $e');
@@ -2713,7 +2977,7 @@ class P2PSyncService {
         catechistId: catechistId,
       );
 
-      addLog('INFO', 'Associazione salvata per ${remoteIdentity.deviceName}');
+      addLog('INFO', 'Associazione salvata per ${remoteIdentity.deviceId}');
     } catch (e) {
       addLog('ERROR', 'Errore salvataggio associazione: $e');
     }
@@ -2767,6 +3031,7 @@ class P2PSyncService {
           remoteId: remoteId,
           localNonce: _sessionPairingNonce,
           remoteNonce: _remoteSessionPairingNonce,
+          endpointId: endpointId,
         );
         if (code != null) break;
         await Future.delayed(const Duration(milliseconds: 500));
@@ -2782,6 +3047,10 @@ class P2PSyncService {
     }
 
     await _ensureSessionKey(endpointId);
+
+    // H2: scambio dell'identità (PII) nel payload cifrato di sessione,
+    // mai sul canale BLE in chiaro.
+    await _sendIdentityPayload(endpointId);
 
     _updateState(
       _state.copyWith(
@@ -2816,6 +3085,7 @@ class P2PSyncService {
     _endpointLocalEphemeral.remove(endpointId);
     _endpointLocalEphemeralPub.remove(endpointId);
     _endpointRemoteEphemeralPub.remove(endpointId);
+    _endpointRemoteAssocPub.remove(endpointId);
     _pendingEndpointId = null;
     _pendingHandshakeIdentity = null;
     _pendingHandshakeRemoteRole = null;
@@ -2845,7 +3115,7 @@ class P2PSyncService {
     required String fingerprint,
     required String sharedSecretBase64,
   }) async {
-    addLog('INFO', 'storePendingAssociation per $deviceName ($deviceId)');
+    addLog('INFO', 'storePendingAssociation per $deviceId');
     _pendingAssociations[deviceId] = _PendingAssociationData(
       deviceId: deviceId,
       deviceName: deviceName,
@@ -2934,6 +3204,7 @@ class P2PSyncService {
       remoteId: remoteDeviceId,
       localNonce: _sessionPairingNonce,
       remoteNonce: remoteNonce,
+      endpointId: endpointId,
     );
 
     _pendingHandshakeIdentity = P2PIdentity(
@@ -2969,7 +3240,30 @@ class P2PSyncService {
   ) async {
     final deviceId = message['deviceId'] as String?;
     final deviceName = message['deviceName'] as String? ?? 'Sconosciuto';
-    addLog('INFO', 'Auto-accettazione auth per $deviceName');
+
+    // Consenso per-sessione: la sincronizzazione richiede il consenso esplicito
+    // di ENTRAMBE le parti. Se il peer è un "Altro Catechista" con identità
+    // diversa e il consenso locale non è stato concesso, l'auth viene rifiutata.
+    var needsConsent = false;
+    if (deviceId != null) {
+      final assoc = await _security.getAssociation(deviceId);
+      needsConsent = assoc != null && _needsSessionPermission(assoc);
+    }
+    if (needsConsent && !_sessionSyncAllowed) {
+      addLog(
+        'WARN',
+        'Sync rifiutata per $deviceName: consenso sessione non concesso',
+      );
+      final reject = jsonEncode({
+        'type': 'p2p_auth_response',
+        'accepted': false,
+        'deviceId': deviceId,
+      });
+      await _sendEncryptedPayload(endpointId, reject);
+      return;
+    }
+
+    addLog('INFO', 'Auto-accettazione auth (deviceId sessione)');
 
     final ack = jsonEncode({
       'type': 'p2p_auth_response',
@@ -3094,6 +3388,23 @@ class P2PSyncService {
   }
 
   Future<void> _performBidirectionalSync(String endpointId) async {
+    // Consenso per-sessione (kill-switch): nessun sync verso un "Altro
+    // Catechista" senza il consenso esplicito dell'utente in questa sessione.
+    final deviceId = _endpointConnIdMap[endpointId] ??
+        _nearbyEndpointToDevice[endpointId];
+    if (deviceId != null) {
+      final assoc = await _security.getAssociation(deviceId);
+      if (assoc != null &&
+          _needsSessionPermission(assoc) &&
+          !_sessionSyncAllowed) {
+        addLog(
+          'WARN',
+          'Sync bloccato: consenso sessione non concesso per $deviceId',
+        );
+        return;
+      }
+    }
+
     final phase = _endpointSyncPhase[endpointId] ??= _SyncPhase2();
     if (!phase.isIdle && !phase.complete) {
       addLog('DEBUG', 'Sync già in corso per $endpointId');
@@ -3120,11 +3431,27 @@ class P2PSyncService {
       final engine = HiveSyncEngine();
       final lastSync = await engine.getLastSyncTimestamp();
       final sendScope = await _currentSyncScope(endpointId);
-      final localIndex = engine.buildLocalIndex(sendScope);
+      var localIndex = engine.buildLocalIndex(sendScope);
+      // H5 — non pubblicare nell'indice gli studenti tombstoned, così il peer
+      // non li richiede nemmeno.
+      final tombstoned = _tombstonedEntityIds();
+      if (tombstoned.isNotEmpty) {
+        localIndex = localIndex
+            .where((e) =>
+                !(e.boxName == LocalDatabase.studentsBox &&
+                    tombstoned.contains(e.id)))
+            .toList();
+      }
       addLog(
         'DEBUG',
         'Indice locale costruito: ${localIndex.length} record, lastSync: $lastSync',
       );
+
+      // H5 — propaga i tombstone GDPR ad ogni sync, così un dispositivo che
+      // era offline alla cancellazione non conserva/ripropaga la PII.
+      await _sendTombstonesToEndpoint(endpointId);
+      // M1 — propaga la blacklist delle revoche firmata ad ogni sync.
+      await _sendRevocationsToEndpoint(endpointId);
 
       final indexPayload = jsonEncode({
         'type': 'p2p_sync_index',
@@ -3379,7 +3706,24 @@ class P2PSyncService {
       remoteEphemeralPublicKeyBase64:
           endpointId != null ? _endpointRemoteEphemeralPub[endpointId] : null,
     );
-    return session.sessionKey;
+    var sessionKey = session.sessionKey;
+    // M5: quando entrambi i peer hanno scambiato la chiave per-associazione
+    // (via p2p_identity cifrato), la chiave di sessione incorpora il DH
+    // dedicato dell'associazione. La chiave per-associazione è ora "viva".
+    if (endpointId != null) {
+      final remoteAssocPub = _endpointRemoteAssocPub[endpointId];
+      final localKeyPair = assoc.keyPair;
+      if (remoteAssocPub != null &&
+          remoteAssocPub.isNotEmpty &&
+          localKeyPair != null) {
+        sessionKey = await _security.applyAssociationFactor(
+          sessionKey: sessionKey,
+          localAssociationKeyPair: localKeyPair,
+          remoteAssociationPublicBase64: remoteAssocPub,
+        );
+      }
+    }
+    return sessionKey;
   }
 
   /// Garantisce che per [endpointId] siano disponibili le chiavi di sessione
@@ -3448,6 +3792,40 @@ class P2PSyncService {
       }
     }
     _endpointSessionKeys[endpointId] = keys;
+  }
+
+  /// M5 — Applica il fattore di associazione alla chiave di sessione corrente
+  /// dopo lo scambio della chiave per-associazione (payload `p2p_identity`).
+  /// La chiave aggiornata diventa quella attiva per l'INVIO; la chiave
+  /// precedente resta nel set di decifratura per i messaggi in transito, così
+  /// il passaggio non interrompe la comunicazione.
+  Future<void> _applyAssociationUpgrade(String endpointId) async {
+    final deviceId = _endpointConnIdMap[endpointId];
+    if (deviceId == null) return;
+    final keys = _endpointSessionKeys[endpointId];
+    if (keys == null || keys.isEmpty) return;
+    final currentWindow = P2PSecurityService.sessionWindowIndex();
+    if (!keys.any((k) => k.windowIndex == currentWindow)) return;
+    try {
+      final upgraded = await _deriveSessionKey(
+        deviceId,
+        at: P2PSecurityService.sessionWindowStart(currentWindow),
+        endpointId: endpointId,
+      );
+      final oldCurrent = keys
+          .where((k) => k.windowIndex == currentWindow)
+          .toList();
+      final others =
+          keys.where((k) => k.windowIndex != currentWindow).toList();
+      _endpointSessionKeys[endpointId] = [
+        _EndpointSessionKey(windowIndex: currentWindow, key: upgraded),
+        ...others,
+        ...oldCurrent,
+      ];
+      addLog('INFO', 'M5: fattore di associazione attivo per $endpointId');
+    } catch (e) {
+      addLog('WARN', 'M5: upgrade associazione fallito per $endpointId: $e');
+    }
   }
 
   /// Restituisce la chiave di sessione attiva (finestra corrente) per
@@ -3547,11 +3925,25 @@ class P2PSyncService {
       phase.indexSent = true;
       final engine = HiveSyncEngine();
       final sendScope = await _currentSyncScope(endpointId);
-      final localIndex = engine.buildLocalIndex(sendScope);
+      var localIndex = engine.buildLocalIndex(sendScope);
+      // H5 — non pubblicare nell'indice gli studenti tombstoned.
+      final tombstoned = _tombstonedEntityIds();
+      if (tombstoned.isNotEmpty) {
+        localIndex = localIndex
+            .where((e) =>
+                !(e.boxName == LocalDatabase.studentsBox &&
+                    tombstoned.contains(e.id)))
+            .toList();
+      }
 
       // Canale parrocchiale globale: scambia riunioni e avvisi parrocchiali
       // (in chiaro per la rete) insieme all'indice delle classi.
       await sendParishChannel(endpointId);
+
+      // H5 — propaga i tombstone GDPR ad ogni sync (dispositivi offline).
+      await _sendTombstonesToEndpoint(endpointId);
+      // M1 — propaga la blacklist delle revoche firmata ad ogni sync.
+      await _sendRevocationsToEndpoint(endpointId);
 
       final remoteIndexData = message['index'] as List<dynamic>? ?? [];
       final remoteIndex = remoteIndexData
@@ -4107,6 +4499,8 @@ class P2PSyncService {
 
     try {
       await _ensureSessionKey(endpointId);
+      // H2: invia l'identità (PII) SOLO nel payload cifrato di sessione.
+      await _sendIdentityPayload(endpointId);
       await _sendEncryptedPayload(endpointId, confirmed);
       addLog('DEBUG', 'Conferma associazione inviata (cifrata)');
     } catch (e) {
@@ -4260,7 +4654,7 @@ class P2PSyncService {
   ) async {
     final chosenId = message['catechistId'] as String?;
     if (chosenId == null || chosenId.isEmpty) return;
-    addLog('INFO', 'Scelta catechistId remota ricevuta: $chosenId');
+    addLog('INFO', 'Scelta catechistId remota ricevuta');
 
     _endpointRemoteCatechistId[endpointId] = chosenId;
 
@@ -4316,6 +4710,7 @@ class P2PSyncService {
     _endpointLocalEphemeral.remove(endpointId);
     _endpointLocalEphemeralPub.remove(endpointId);
     _endpointRemoteEphemeralPub.remove(endpointId);
+    _endpointRemoteAssocPub.remove(endpointId);
     _endpointSyncPhase.remove(endpointId);
     _pendingEndpointId = null;
     _pendingHandshakeIdentity = null;
@@ -4552,13 +4947,49 @@ class P2PSyncService {
     final classChannelEnabled = targetEndpoint != null &&
         _endpointSupportsClassChannel[targetEndpoint] == true;
 
+    // Diritto all'Oblio (H5): mai inviare dati di studenti eliminati tramite
+    // tombstone, anche se il record live è ancora presente sul box locale.
+    final tombstoned = _tombstonedEntityIds();
+    if (tombstoned.isNotEmpty) {
+      final before = records.length;
+      records = records
+          .where((r) =>
+              !(r.boxName == LocalDatabase.studentsBox &&
+                  tombstoned.contains(r.id)))
+          .toList();
+      if (records.length != before) {
+        addLog(
+          'WARN',
+          'H5: esclusi ${before - records.length} record tombstoned dalla sync',
+        );
+      }
+    }
+
     // Firma i timestamp prima dell'invio: il ricevente accetta il LWW solo
     // con firma valida (vedi SignedLww.remoteWins).
     final signed = await _signRecordsForEndpoint(endpointId, records);
 
     if (!classChannelEnabled || records.isEmpty) {
+      // H4: nessun fallback in chiaro per i dati delle classi. Se il peer non
+      // supporta il canale classe (versione legacy), i record SCOPERITI
+      // (senza classe, es. configurazione globale) vengono comunque inviati;
+      // i record delle classi (studenti e relativi) NON vengono trasmessi in
+      // chiaro: un peer che farebbe da relay non deve poter leggere i dati di
+      // una classe di cui non è membro.
       final engine = HiveSyncEngine();
-      return {'records': engine.serializeRecords(signed)};
+      final scopedOut =
+          signed.where((r) => _recordClassUniqueCode(r) != null).length;
+      if (scopedOut > 0) {
+        addLog(
+          'WARN',
+          'H4: $scopedOut record di classe omessi (peer senza canale classe, '
+          'niente fallback in chiaro)',
+        );
+      }
+      final plain = signed
+          .where((r) => _recordClassUniqueCode(r) == null)
+          .toList();
+      return {'records': engine.serializeRecords(plain)};
     }
 
     final plain = <Map<String, dynamic>>[];
@@ -4586,7 +5017,14 @@ class P2PSyncService {
       }
       final blob = ClassChannelService.encryptRecords(code, entry.value);
       if (blob == null) {
-        plain.addAll(entry.value);
+        // H4: mai inviare record di classe in chiaro. Se la cifratura per
+        // classe non è disponibile, i record vengono OMESSI (il ricevente li
+        // riceverà via grant/relay) invece di esporli in chiaro.
+        addLog(
+          'WARN',
+          'H4: cifratura classe $code non disponibile, ${entry.value.length} '
+          'record omessi (no plaintext fallback)',
+        );
         continue;
       }
       if (_remoteHasClassTitle(targetEndpoint, code)) {
@@ -4790,6 +5228,100 @@ class P2PSyncService {
     }
   }
 
+  /// Invia i tombstone locali (Diritto all'Oblio) all'endpoint, firmati con il
+  /// segreto ECDH statico dell'associazione. Usato durante OGNI sync: così un
+  /// dispositivo rimasto OFFLINE alla propagazione iniziale apprende comunque
+  /// le cancellazioni appena si riconnette, evitando che conservi e ripropaghi
+  /// la PII del minore.
+  Future<void> _sendTombstonesToEndpoint(String endpointId) async {
+    final remoteId = _endpointConnIdMap[endpointId];
+    if (remoteId == null) return;
+    try {
+      final assoc = await _security.getAssociation(remoteId);
+      if (assoc == null || assoc.publicKeyBase64.isEmpty) return;
+      final secret =
+          await _security.computeStaticSharedSecret(assoc.publicKeyBase64);
+      final identity = await _security.getLocalIdentity();
+      final repo = TombstoneRepository();
+      final tombstones = repo.getAll();
+      if (tombstones.isEmpty) return;
+      int sent = 0;
+      for (final ts in tombstones) {
+        final base = ts.toMap()..['signerDeviceId'] = identity.deviceId;
+        final msg = jsonEncode({
+          'type': 'p2p_tombstone',
+          'tombstone': TombstoneService.withSignature(base, secret),
+        });
+        await _sendEncryptedPayload(endpointId, msg);
+        sent++;
+      }
+      addLog(
+        'INFO',
+        'Tombstones inviati a $endpointId: $sent cancellazioni GDPR',
+      );
+    } catch (e) {
+      addLog('WARN', 'Invio tombstones a $endpointId fallito: $e');
+    }
+  }
+
+  /// Invia la blacklist delle revoche firmata (M1) all'endpoint durante ogni
+  /// sync. Solo il Responsabile possiede la chiave di firma, quindi la revoca
+  /// è autenticata: un dispositivo rogue non può propagare revoche fasulle.
+  Future<void> _sendRevocationsToEndpoint(String endpointId) async {
+    try {
+      final signed = await _security.signRevocationList();
+      if (signed == null || (signed['revocations'] as List? ?? []).isEmpty) {
+        return;
+      }
+      final msg = jsonEncode({
+        'type': 'p2p_revoked_devices',
+        'payload': signed,
+      });
+      await _sendEncryptedPayload(endpointId, msg);
+      addLog(
+        'INFO',
+        'M1: revoche firmate inviate a $endpointId '
+            '(${(signed['revocations'] as List).length} dispositivi)',
+      );
+    } catch (e) {
+      addLog('WARN', 'M1: invio revoche a $endpointId fallito: $e');
+    }
+  }
+
+  /// Riceve la blacklist delle revoche firmata dal Responsabile (M1). La
+  /// verifica Ed25519 contro la trust root impedisce l'iniezione di revoche
+  /// fasulle; le revoche valide vengono unite alla blacklist locale.
+  Future<void> _handleRevokedDevices(
+    String endpointId,
+    Map<String, dynamic> message,
+  ) async {
+    try {
+      final payload = message['payload'];
+      if (payload is! Map) return;
+      final valid =
+          await _security.verifyRevocationList(Map<String, dynamic>.from(payload));
+      if (!valid) {
+        addLog(
+          'WARN',
+          'M1: revoche rifiutate da $endpointId (firma Ed25519 non valida)',
+        );
+        return;
+      }
+      final revocations = (payload['revocations'] as List<dynamic>? ?? [])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      if (revocations.isEmpty) return;
+      await _security.importRevokedDevices(revocations);
+      addLog(
+        'INFO',
+        'M1: importate ${revocations.length} revoche firmate da $endpointId',
+      );
+    } catch (e) {
+      addLog('WARN', 'M1: gestione revoche da $endpointId fallita: $e');
+    }
+  }
+
   /// ID delle entità eliminati tramite tombstone (per esclusione durante sync).
   Set<String> _tombstonedEntityIds() {
     try {
@@ -4954,6 +5486,7 @@ class P2PSyncService {
     _endpointLocalEphemeral.clear();
     _endpointLocalEphemeralPub.clear();
     _endpointRemoteEphemeralPub.clear();
+    _endpointRemoteAssocPub.clear();
     _initialized = false;
     _stateController.close();
     _syncDataController.close();

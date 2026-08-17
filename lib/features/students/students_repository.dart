@@ -37,12 +37,20 @@ class StudentsRepository {
     final catechistName = getCurrentCatechistName();
     final now = DateTime.now();
     final code = student.classUniqueCode ?? _lookupClassUniqueCode(student.classId);
-    await _box.put(id, _normalize(student).copyWith(
-      classUniqueCode: code,
-      lastModifiedBy: catechistName,
-      createdAt: now,
-      updatedAt: now,
-    ).toMap());
+    // L5 / Fase 4-12: cifratura di campo PRIMA della persistenza. In passato
+    // i dati uscivano in chiaro dal repository (birthDate, telefoni, email,
+    // allergie...), mentre il path P2P/import cifrava già i campi: incoerenza.
+    // encryptStudentMapForStorage è idempotente (lascia invariato ciò che è
+    // già cifrato) e i valori cifrati vengono decifrati in lettura da
+    // [_studentFromBox].
+    await _box.put(id, FieldEncryptionService.encryptStudentMapForStorage(
+      _normalize(student).copyWith(
+        classUniqueCode: code,
+        lastModifiedBy: catechistName,
+        createdAt: now,
+        updatedAt: now,
+      ).toMap(),
+    ));
     await _log(AuditActionType.createStudent, id, AuditLog.entityRagazzo);
   }
 
@@ -103,12 +111,16 @@ class StudentsRepository {
       existingUniqueCode = map['classUniqueCode'];
     }
     final code = student.classUniqueCode ?? existingUniqueCode ?? _lookupClassUniqueCode(student.classId);
-    await _box.put(id, _normalize(student).copyWith(
-      classUniqueCode: code,
-      lastModifiedBy: catechistName,
-      createdAt: existingCreatedAt ?? DateTime.now(),
-      updatedAt: DateTime.now(),
-    ).toMap());
+    // L5 / Fase 4-12: cifratura di campo prima della persistenza (vedi
+    // addStudent). I valori già cifrati restano invariati (idempotente).
+    await _box.put(id, FieldEncryptionService.encryptStudentMapForStorage(
+      _normalize(student).copyWith(
+        classUniqueCode: code,
+        lastModifiedBy: catechistName,
+        createdAt: existingCreatedAt ?? DateTime.now(),
+        updatedAt: DateTime.now(),
+      ).toMap(),
+    ));
     await _log(AuditActionType.updateStudent, id, AuditLog.entityRagazzo);
   }
 
@@ -136,10 +148,10 @@ Student _normalize(Student student) {
       motherSurname: NameFormatting.capitalizeWords(student.motherSurname),
       fatherName: NameFormatting.capitalizeWords(student.fatherName),
       fatherSurname: NameFormatting.capitalizeWords(student.fatherSurname),
-      motherPhone: motherPhone!,
-      fatherPhone: fatherPhone!,
-      studentPhone: studentPhone!,
-      parentEmail: parentEmail!,
+      motherPhone: motherPhone ?? '',
+      fatherPhone: fatherPhone ?? '',
+      studentPhone: studentPhone ?? '',
+      parentEmail: parentEmail ?? '',
       consensoPrivacyFirmato: student.consensoPrivacyFirmato,
       dataFirmaConsenso: student.dataFirmaConsenso,
       dataScadenzaTrattamento: student.dataScadenzaTrattamento,

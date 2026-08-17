@@ -263,6 +263,13 @@ class HiveSyncEngine {
 
   static const _lastSyncKey = 'p2p_last_sync_timestamp';
 
+  /// M8 / Fase 3 — item 9: i record demo della guida (tag `_demo`) contengono
+  /// PII di esempio con aspetto reale e NON devono MAI lasciare il dispositivo
+  /// tramite sync P2P (né essere applicati da un peer). Il purge demo all'avvio
+  /// li rimuove dal DB locale, ma questo filtro è la seconda barriera.
+  static bool _isDemoRecord(Map<String, dynamic> data) =>
+      data['_demo'] == true;
+
   Future<DateTime> getLastSyncTimestamp() async {
     final auth = LocalDatabase.auth();
     final stored = auth.get(_lastSyncKey);
@@ -303,6 +310,9 @@ class HiveSyncEngine {
           final raw = box.get(key);
           if (raw == null) continue;
           final data = LocalDatabase.toStringDynamicMap(raw);
+          if (_isDemoRecord(data)) {
+            continue;
+          }
           if (!_recordMatchesScope(
             boxName: boxName,
             id: id,
@@ -344,6 +354,9 @@ class HiveSyncEngine {
           final raw = box.get(key);
           if (raw == null) continue;
           final data = LocalDatabase.toStringDynamicMap(raw);
+          if (_isDemoRecord(data)) {
+            continue;
+          }
           if (!_recordMatchesScope(
             boxName: boxName,
             id: id,
@@ -444,6 +457,9 @@ class HiveSyncEngine {
         final raw = box.get(recordId);
         if (raw == null) continue;
         final data = LocalDatabase.toStringDynamicMap(raw);
+        if (_isDemoRecord(data)) {
+          continue;
+        }
         if (!_recordMatchesScope(
           boxName: boxName,
           id: recordId,
@@ -476,11 +492,21 @@ class HiveSyncEngine {
     try {
       final box = Hive.box<Map>(LocalDatabase.syncConflictsBox);
       final conflictKey = '$boxName:$recordId';
+      // M3 — Diritto all'Oblio: i dati dei minori NON vengono mai persistiti
+      // in chiaro nel box dei conflitti. Per gli studenti i campi sensibili
+      // (allergie, note, telefoni, ecc.) vengono cifrati con la chiave di
+      // campo del dispositivo prima dello storage. L'operazione è idempotente:
+      // i valori già cifrati (es. localData letto dal box) restano invariati.
+      final isStudents = boxName == LocalDatabase.studentsBox;
       await box.put(conflictKey, {
         'boxName': boxName,
         'recordId': recordId,
-        'localData': localData,
-        'remoteData': remoteData,
+        'localData': isStudents
+            ? FieldEncryptionService.encryptStudentMapForStorage(localData)
+            : localData,
+        'remoteData': isStudents
+            ? FieldEncryptionService.encryptStudentMapForStorage(remoteData)
+            : remoteData,
         'conflictingFields': conflictingFields,
         'detectedAt': DateTime.now().toUtc().toIso8601String(),
         'resolved': false,
@@ -594,6 +620,10 @@ class HiveSyncEngine {
       if (!syncableBoxes.containsKey(remote.boxName)) continue;
 
       try {
+        // M8 / Fase 3 — item 9: rifiuta sempre record demo in ingresso.
+        if (_isDemoRecord(remote.data)) {
+          continue;
+        }
         final box = Hive.box<Map>(remote.boxName);
         final localRaw = box.get(remote.id);
         final isClassBox = remote.boxName == 'classes';
@@ -643,15 +673,17 @@ class HiveSyncEngine {
         }
 
         if (localIsDeleted && !remote.isDeleted) {
-          var data = Map<String, dynamic>.from(remote.data);
-          data.remove('_conflicts');
-          if (isClassBox && data['nameLocked'] != true) {
-            data['nameLocked'] = true;
-          }
-          if (remote.boxName == LocalDatabase.studentsBox) {
-            data = FieldEncryptionService.encryptStudentMapForStorage(data);
-          }
-          await box.put(remote.id, data);
+          // H5 — Diritto all'Oblio: un record cancellato localmente NON viene
+          // resuscitato da una copia live remota. La cancellazione è "appiccicosa":
+          // se il peer ha ancora il dato (dispositivo offline alla propagazione
+          // del tombstone), il dato cancellato vince e la cancellazione viene
+          // ripropagata (updatedAt aggiornato) così gli altri dispositivi la
+          // applicano a loro volta. In passato qui si sovrascriveva il record
+          // cancellato con la copia live, facendo riapparire la PII del minore.
+          final merged = Map<String, dynamic>.from(localData);
+          merged['isDeleted'] = true;
+          merged['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+          await box.put(remote.id, merged);
           appliedCount++;
           continue;
         }

@@ -159,11 +159,13 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       String? savedPath;
       bool saved = false;
       try {
-        savedPath = await FilePicker.saveFile(
+        // file_picker 12: saveFile restituisce Uri?.
+        final uri = await FilePicker.saveFile(
           dialogTitle: 'Salva backup',
           fileName: fileName,
           bytes: bytes,
         );
+        savedPath = uri?.path;
         if (savedPath != null) saved = true;
       } catch (e) {
         savedPath = null;
@@ -230,15 +232,16 @@ class _BackupPageState extends ConsumerState<BackupPage> {
 
     try {
       // Seleziona file
-      final result = await FilePicker.pickFiles(
+      // file_picker 12: pickFiles restituisce List<PlatformFile> (vuota su annulla).
+      final files = await FilePicker.pickFiles(
         type: FileType.any,
       );
-      if (result == null || result.files.isEmpty) {
+      if (files.isEmpty) {
         if (mounted) setState(() => _isImporting = false);
         return;
       }
 
-      final filePath = result.files.single.path;
+      final filePath = files.single.path;
       if (filePath == null) {
         throw Exception(
           'Impossibile leggere il file selezionato: percorso non disponibile',

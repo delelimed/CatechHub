@@ -70,15 +70,18 @@ jobs:
         with:
           name: release-signed-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+          # M11: retention breve (7 giorni) per non esporre all'infinito un APK
+          # firmato scaricabile pubblicamente da chiunque veda il workflow.
+          retention-days: 7
 
-      # 10. Salva anche i file di debug generati dall'offuscamento (Sempre attivo)
-      - name: Upload Debug Info (Obfuscation Symbols)
-        uses: actions/upload-artifact@v4
-        with:
-          name: CatechHub-Debug-Info
-          path: ./debug_info
+      # M11: il passo "Upload Debug Info (Obfuscation Symbols)" è stato RIMOSSO.
+      # `--split-debug-info` genera la mappa dei simboli che annulla l'offuscamento
+      # (`--obfuscate`): pubblicarla come artifact pubblico permette a chiunque di
+      # de-offuscare il codice e ricostruire nomi/funzioni. I simboli servono solo
+      # per il deobfuscation delle crash-log da parte dello sviluppatore e vanno
+      # conservati PRIVATAMENTE (mai in un artifact pubblico del workflow).
 
-      # 11. Crea una bozza (Draft) di Release solo se eseguito manualmente su 'main'
+      # 10. Crea una bozza (Draft) di Release solo se eseguito manualmente su 'main'
       - name: Create GitHub Draft Release
         id: create_release
         if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'

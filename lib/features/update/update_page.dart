@@ -205,7 +205,19 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
     } catch (_) {
       directory = null;
     }
-    directory ??= await getApplicationDocumentsDirectory();
+    // L1 / Fase 4-11: l'APK viene salvato in una sottodirectory DEDICATA
+    // `apk_updates/` della directory esterna dell'app. Il FileProvider nativo
+    // espone SOLO questa sottocartella (file_provider_paths.xml), così nessun
+    // altro file dell'app (Hive, secure_vault) è condivisibile con altre app.
+    final Directory apkDir;
+    if (directory != null) {
+      apkDir = Directory('${directory.path}/apk_updates');
+    } else {
+      apkDir = Directory('${(await getApplicationDocumentsDirectory()).path}/apk_updates');
+    }
+    if (!await apkDir.exists()) {
+      await apkDir.create(recursive: true);
+    }
 
     setState(() {
       _isDownloading = true;
@@ -213,7 +225,7 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
     });
 
     try {
-      final path = '${directory.path}/catechhub_update.apk';
+      final path = '${apkDir.path}/catechhub_update.apk';
       final file = File(path);
       if (await file.exists()) {
         await file.delete();

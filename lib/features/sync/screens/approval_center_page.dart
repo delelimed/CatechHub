@@ -13,12 +13,13 @@ import '../p2p/p2p_security_service.dart';
 /// Centro di controllo della Catena di Fiducia del Responsabile.
 ///
 /// Due modalità d'uso:
-///  1. Sul dispositivo del RESPONSABILE: genera il "QR di fiducia" (segreto
-///     della parrocchia) da far scansionare UNA volta al dispositivo che
-///     farà da PRIMARY, e approva/firma i dispositivi autorizzati a
-///     sincronizzare le classi (generando per ognuno un QR di approvazione).
+///  1. Sul dispositivo del RESPONSABILE: genera il "QR di fiducia" (chiave
+///     pubblica di firma della parrocchia) da far scansionare UNA volta al
+///     dispositivo che farà da PRIMARY, e approva/firma i dispositivi
+///     autorizzati a sincronizzare le classi (generando per ognuno un QR di
+///     approvazione). L'approvazione è un certificato firmato con Ed25519.
 ///  2. Su un dispositivo APPROVATO/VERIFICATORE: scansiona il QR di fiducia
-///     (per importare il segreto) o il QR di approvazione del Responsabile
+///     (per importare la trust root) o il QR di approvazione del Responsabile
 ///     (per ricevere il certificato e poter sincronizzare).
 class ApprovalCenterPage extends ConsumerStatefulWidget {
   const ApprovalCenterPage({super.key});
@@ -29,7 +30,7 @@ class ApprovalCenterPage extends ConsumerStatefulWidget {
 }
 
 class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
-  static const _trustQrPrefix = 'CatechHub_TRUST_v1|';
+  static const _trustQrPrefix = 'CatechHub_TRUST_v2|';
   static const _approvalQrPrefix = 'CatechHub_APPROVAL_v1|';
 
   final P2PSecurityService _security = P2PSecurityService();
@@ -88,13 +89,23 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
   }
 
   Future<void> _generateTrustQr() async {
-    final secret = await _security.getOrCreateParishApprovalSecret();
+    final signerPublicKey = await _security.getParishSignerPublicKeyBase64();
     final identity = await _security.getLocalIdentity();
+    final revoked = await _security.getRevokedDevices();
+    // Il QR di fiducia trasporta SOLO la chiave pubblica di firma (trust
+    // root), la scadenza e la blacklist delle revoche: nessun segreto
+    // simmetrico. Fotografarlo non consente di falsificare approvazioni.
     final payload = _trustQrPrefix +
         jsonEncode({
+          'v': 2,
           'responsabileDeviceId': identity.deviceId,
           'responsabileName': identity.username,
-          'approvalSecret': secret,
+          'signerPublicKey': signerPublicKey,
+          'expiresAt': DateTime.now()
+              .toUtc()
+              .add(P2PSecurityService.trustRootValidity)
+              .toIso8601String(),
+          'revocations': revoked,
         });
     if (!mounted) return;
     setState(() {
@@ -148,6 +159,7 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
         approvedByDeviceId: cert.approvedByDeviceId,
         approvalSignature: cert.approvalSignature,
         approvalSignerPublicKey: cert.signerPublicKey,
+        approvalExpiresAt: cert.expiresAt,
       );
       await _security.saveAssociation(updated);
 
@@ -181,6 +193,11 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
   }
 
   Future<void> _revokeApproval(P2PDeviceAssociation assoc) async {
+    // Kill-switch: il deviceId viene aggiunto alla blacklist delle revoche.
+    // La blacklist viene propagata agli altri dispositivi attraverso il QR di
+    // fiducia rigenerato, quindi il dispositivo revocato viene rifiutato da
+    // ogni verificatore che possiede la trust root.
+    await _security.revokeDeviceApproval(assoc.deviceId);
     final updated = assoc.copyWith(clearApproval: true);
     await _security.saveAssociation(updated);
     await _initData();
@@ -201,24 +218,41 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
     try {
       final json = raw.substring(_trustQrPrefix.length);
       final data = jsonDecode(json) as Map<String, dynamic>;
-      final secret = data['approvalSecret'] as String? ?? '';
+      final signerPublicKey = data['signerPublicKey'] as String? ?? '';
       final respDeviceId = data['responsabileDeviceId'] as String? ?? '';
       final respName = data['responsabileName'] as String? ?? '';
-      if (secret.isEmpty || respDeviceId.isEmpty) {
+      final expiresAt =
+          DateTime.tryParse(data['expiresAt']?.toString() ?? '')?.toUtc();
+      final revocations = (data['revocations'] as List<dynamic>? ?? [])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      if (signerPublicKey.isEmpty || respDeviceId.isEmpty) {
         setState(() => _scanMessage = 'QR di fiducia non valido.');
         _scanPaused = false;
         return;
       }
+      if (expiresAt != null && expiresAt.isBefore(DateTime.now().toUtc())) {
+        setState(() => _scanMessage = 'QR di fiducia scaduto.');
+        _scanPaused = false;
+        return;
+      }
+      // Il QR di fiducia trasporta SOLO la chiave pubblica di firma (trust
+      // root): la verifica delle approvazioni è asimmetrica e non dipende da
+      // segreti condivisi.
       await _security.storeResponsabileTrustInfo(
         responsabileDeviceId: respDeviceId,
-        approvalSecret: secret,
+        signerPublicKey: signerPublicKey,
         responsabileName: respName,
+        expiresAt: expiresAt,
       );
+      // Unisce la blacklist delle revoche propagata dal Responsabile.
+      await _security.importRevokedDevices(revocations);
       if (!mounted) return;
       setState(() {
         _trustInfo = {
           'responsabileDeviceId': respDeviceId,
-          'approvalSecret': secret,
+          'signerPublicKey': signerPublicKey,
           'responsabileName': respName,
         };
         _scanTrust = false;
@@ -270,6 +304,7 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
           approvedByDeviceId: cert.approvedByDeviceId,
           approvalSignature: cert.approvalSignature,
           approvalSignerPublicKey: cert.signerPublicKey,
+          approvalExpiresAt: cert.expiresAt,
         );
         await _security.saveAssociation(updated);
       }
@@ -451,9 +486,10 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Il QR di fiducia contiene il segreto che permette di verificare '
-          'le approvazioni. Consegnane una copia (UNA volta) al dispositivo '
-          'primario.',
+          'Il QR di fiducia contiene la chiave pubblica di firma del '
+          'Responsabile (trust root) e la blacklist delle revoche. '
+          'Non contiene segreti. Consegnane una copia (UNA volta) al '
+          'dispositivo primario.',
           style: TextStyle(fontSize: 12, color: Colors.grey[600]),
         ),
       ],

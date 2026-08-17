@@ -28,6 +28,7 @@ import 'core/services/meeting_notification_service.dart';
 import 'core/storage/local_database.dart';
 import 'core/config/env_config.dart';
 import 'features/guide/demo_guide_service.dart';
+import 'shared/utils/app_mode.dart';
 import 'features/gdpr/gdpr_retention_service.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -434,6 +435,11 @@ Future<void> main() async {
       // dati di esempio (guida in corso o non completata), vengono rimossi al
       // riavvio per lasciare spazio ai dati reali.
       await DemoGuideService.handleAppStart();
+
+      // Coerenza della modalità Responsabile: assicura che app_mode,
+      // user_role e configurazione parrocchiale siano allineati, così la
+      // dashboard parrocchiale non mostra "Accesso riservato" all'avvio.
+      await AppModeUtils.ensureConsistency();
 
       // ═══════════════════════════════════════════════════════════════════════
       // FASE 4 - IMPOSTAZIONI PRIVACY

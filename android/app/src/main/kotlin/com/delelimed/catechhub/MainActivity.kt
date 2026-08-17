@@ -576,6 +576,12 @@ class MainActivity : FlutterFragmentActivity() {
             cacheDir
         )
 
+        // L1 / Fase 4-11: l'APK viene salvato nella sottodirectory dedicata
+        // `apk_updates/` della directory esterna dell'app (l'unica esposta dal
+        // FileProvider). La pulizia deve quindi scansionare anche quella.
+        val apkUpdates = getExternalFilesDir(null)?.let { File(it, "apk_updates") }
+        if (apkUpdates != null) dirs.add(apkUpdates)
+
         // Aggiungi directory Download e Documents se accessibili
         try {
             val downloads = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)

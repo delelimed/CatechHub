@@ -70,13 +70,18 @@ class AssociatedDevice {
   /// Nome del Responsabile che ha firmato l'approvazione (per le UI).
   final String? approvedByName;
 
-  /// Firma HMAC-SHA256 della catena di fiducia (su [canonicalPayload]).
+  /// Firma (Ed25519) della catena di fiducia (su [canonicalPayload]).
   final String? approvalSignature;
 
-  /// Chiave pubblica di firma del dispositivo del Responsabile che ha emesso
-  /// il certificato (base64). Permette al dispositivo primario di verificare
-  /// la firma senza dipendere dalla distribuzione della chiave segreta.
+  /// Chiave pubblica di firma Ed25519 del dispositivo del Responsabile che ha
+  /// emesso il certificato (base64). Coincide con la trust root della parrocchia
+  /// distribuita via QR di fiducia. La verifica è asimmetrica: conoscere la
+  /// chiave pubblica non consente di falsificare certificati.
   final String? signerPublicKey;
+
+  /// Scadenza del certificato di approvazione. I certificati scaduti vengono
+  /// rifiutati dai dispositivi verificatori (forza una ri-approvazione).
+  final DateTime? expiresAt;
 
   const AssociatedDevice({
     required this.deviceId,
@@ -89,6 +94,7 @@ class AssociatedDevice {
     this.approvedByName,
     this.approvalSignature,
     this.signerPublicKey,
+    this.expiresAt,
   });
 
   bool get isApproved => authorizedByResponsabile;
@@ -96,12 +102,14 @@ class AssociatedDevice {
   /// Payload canonico firmabile del certificato di approvazione.
   String get canonicalPayload {
     final ts = timestampApproval?.toUtc().millisecondsSinceEpoch ?? 0;
+    final exp = expiresAt?.toUtc().millisecondsSinceEpoch ?? 0;
     return [
       deviceId,
       catechistId,
       publicKey,
       approvedByDeviceId ?? '',
       ts.toString(),
+      exp.toString(),
     ].join('|');
   }
 
@@ -113,6 +121,7 @@ class AssociatedDevice {
     String? approvedByName,
     String? approvalSignature,
     String? signerPublicKey,
+    DateTime? expiresAt,
     bool clearApproval = false,
   }) {
     return AssociatedDevice(
@@ -132,6 +141,8 @@ class AssociatedDevice {
           clearApproval ? null : (approvalSignature ?? this.approvalSignature),
       signerPublicKey:
           clearApproval ? null : (signerPublicKey ?? this.signerPublicKey),
+      expiresAt:
+          clearApproval ? null : (expiresAt ?? this.expiresAt),
     );
   }
 
@@ -146,6 +157,7 @@ class AssociatedDevice {
         'approvedByName': approvedByName,
         'approvalSignature': approvalSignature,
         'signerPublicKey': signerPublicKey,
+        'expiresAt': expiresAt?.toUtc().toIso8601String(),
       };
 
   factory AssociatedDevice.fromJson(Map<String, dynamic> json) =>
@@ -162,6 +174,9 @@ class AssociatedDevice {
         approvedByName: json['approvedByName'] as String?,
         approvalSignature: json['approvalSignature'] as String?,
         signerPublicKey: json['signerPublicKey'] as String?,
+        expiresAt: json['expiresAt'] != null
+            ? DateTime.parse(json['expiresAt'] as String).toLocal()
+            : null,
       );
 }
 

@@ -50,32 +50,16 @@
     <uses-permission android:name="android.permission.CAMERA" />
 
     <!--
-        Scrittura storage (WRITE_EXTERNAL_STORAGE):
-        - Obsoleta da Android 9+ (API 28+): il sistema ignora questo permesso
-        - Mantenuta con maxSdkVersion="28" per il download dell'APK di aggiornamento
-          su dispositivi Android 8.x e precedenti
-        - Non utilizzata per salvare dati personali degli studenti
-    -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
-
-    <!--
-        Lettura storage (READ_EXTERNAL_STORAGE):
-        Opzionale — richiesto solo per payload FILE.
-    -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-
-    <!--
-        Permessi media granulari (Android 13+ / API 33+):
-        Introdotti da Google per dare all'utente un controllo più fine su quali
-        media l'app può accedere. Sostituiscono READ_EXTERNAL_STORAGE con
-        accesso mirato a singole categorie di file.
-        - READ_MEDIA_IMAGES: foto scattate per allegati studenti/incontri
-        - READ_MEDIA_VIDEO: video eventualmente allegati
-        - READ_MEDIA_AUDIO: file audio eventualmente allegati
+        Permessi storage/media (L2 / Fase 4-11):
+        - L'app scrive SOLO in directory app-specifiche (getExternalFilesDir,
+          filesDir, secure_vault): NON serve alcun permesso di storage legacy.
+          Rimossi WRITE_EXTERNAL_STORAGE e READ_EXTERNAL_STORAGE (mai richiesti
+          a runtime e non necessari).
+        - READ_MEDIA_IMAGES (Android 13+): richiesto a runtime durante
+          l'onboarding (Permission.photos) per allegare foto dai dispositivi.
+        - READ_MEDIA_VIDEO / READ_MEDIA_AUDIO: MAI richiesti a runtime — rimossi.
     -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
 
     <!--
         Installazione pacchetti (REQUEST_INSTALL_PACKAGES):
@@ -94,6 +78,14 @@
           sincronizzazione Bluetooth, promemoria incontri
     -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!--
+        SCHEDULE_EXACT_ALARM:
+        Usato per i promemoria degli incontri (meeting_notification_service,
+        zonedSchedule con AndroidScheduleMode.exactAllowWhileIdle). La richiesta
+        runtime avviene al momento della programmazione del promemoria
+        (Permission.scheduleExactAlarm); se non concessa si ripiega sulla
+        modalità inesatta. NON è un permesso sovradichiarato.
+    -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <!--
@@ -130,7 +122,11 @@
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
-    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
+    <!-- L3 / Fase 4-11: Nearby Connections usa solo Wi-Fi P2P per il trasferimento
+         dati, MAI per localizzazione. neverForLocation dichiara esplicitamente
+         che i risultati non derivano dalla posizione dell'utente. -->
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
+        android:usesPermissionFlags="neverForLocation" />
 
     <!-- ════════════════════════════════════════════════════════════════════════ -->
     <!-- DICHIARAZIONE DELL'APPLICAZIONE E ATTIVITÀ PRINCIPALE                  -->

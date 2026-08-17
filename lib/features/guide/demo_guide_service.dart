@@ -1,5 +1,6 @@
 import '../../core/auth/auth_service.dart';
 import '../../core/storage/local_database.dart';
+import '../../features/responsabile/parish_config_repository.dart';
 import '../../shared/models/audit_action.dart';
 import '../../shared/models/audit_log.dart';
 import '../../shared/models/aula.dart';
@@ -367,15 +368,31 @@ class DemoGuideService {
     final now = DateTime.now();
     final anno = '${now.year}-${now.year + 1}';
 
-    final config = ParishConfig(
-      isResponsabileModeActive: true,
-      nomeParrocchia: 'Parrocchia San Francesco d\'Assisi',
-      diocesi: 'Diocesi di Roma',
-      annoCatechisticoCorrente: anno,
-      durataValiditaConsensoMesi: 12,
-      sogliaAssenzeConsecutive: 3,
-    );
-    await configBox.put(ParishConfig.storageKey, _tagged(config.toMap()));
+    // La configurazione parrocchiale reale (nome parrocchia/diocesi inseriti
+    // durante l'onboarding) NON viene sovrascritta dai dati demo della guida:
+    // il Responsabile deve ritrovare intatti i propri valori. La configurazione
+    // NON viene taggata come demo, così il purge all'avvio non la elimina e la
+    // modalità Responsabile resta attiva (niente "Accesso riservato").
+    final existingRaw = configBox.get(ParishConfig.storageKey);
+    final existing = existingRaw != null
+        ? LocalDatabase.toStringDynamicMap(existingRaw)
+        : null;
+    final hasRealConfig =
+        existing != null &&
+        (existing['nomeParrocchia']?.toString().trim().isNotEmpty ?? false);
+    if (!hasRealConfig) {
+      final config = ParishConfig(
+        isResponsabileModeActive: true,
+        nomeParrocchia: 'Parrocchia San Francesco d\'Assisi',
+        diocesi: 'Diocesi di Roma',
+        annoCatechisticoCorrente: anno,
+        durataValiditaConsensoMesi: 12,
+        sogliaAssenzeConsecutive: 3,
+      );
+      await configBox.put(ParishConfig.storageKey, config.toMap());
+    } else {
+      await ParishConfigRepository().forceResponsabileMode(true);
+    }
 
     final catechists = <CatechistProfile>[];
     final catechistNames = [

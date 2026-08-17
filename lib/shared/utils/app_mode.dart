@@ -96,4 +96,23 @@ class AppModeUtils {
     }
     return true;
   }
+
+  /// Rende coerenti tra loro tutte le variabili della modalità Responsabile
+  /// (app_mode, user_role e configurazione parrocchiale). Da chiamare
+  /// all'avvio: se l'account è in modalità Responsabile assicura che il
+  /// ruolo e la configurazione parrocchiale risultino attivi, così la
+  /// dashboard non mostra mai "Accesso riservato" dopo un avvio.
+  static Future<void> ensureConsistency() async {
+    try {
+      final isResponsabile = current() == AppMode.responsabile;
+      final repo = ParishConfigRepository();
+      final config = repo.getConfig();
+      if (config.isResponsabileModeActive != isResponsabile) {
+        await repo.forceResponsabileMode(isResponsabile);
+      }
+      if (isResponsabile && !UserRole.isResponsabile) {
+        await UserRole.setCurrent(UserRole.responsabile);
+      }
+    } catch (_) {}
+  }
 }

@@ -45,6 +45,74 @@ void main() {
       expect(code1, code2);
     });
 
+    // Fase 2 — item 6: le chiavi efimere vincolano il SAS alla sessione.
+    test('chiavi efimere ordinate in modo canonico producono lo stesso codice',
+        () {
+      const sharedSecret = 'dGhpcyBpcyBhIHRlc3Qgc2VjcmV0';
+      const sessionNonce = 'nonce_fisso';
+
+      // I due peer scambiano le chiavi efimere; l'ordine locale/remoto è
+      // invertito ma l'input canonico deve essere identico.
+      final codeA = P2PSecurityService.computePairingCode(
+        sharedSecret,
+        sessionNonce: sessionNonce,
+        localEphemeralPub: 'eph_local',
+        remoteEphemeralPub: 'eph_remote',
+      );
+      final codeB = P2PSecurityService.computePairingCode(
+        sharedSecret,
+        sessionNonce: sessionNonce,
+        localEphemeralPub: 'eph_remote',
+        remoteEphemeralPub: 'eph_local',
+      );
+
+      expect(codeA, codeB);
+    });
+
+    test('una chiave efimera sostituita da un MitM cambia il codice', () {
+      const sharedSecret = 'dGhpcyBpcyBhIHRlc3Qgc2VjcmV0';
+      const sessionNonce = 'nonce_fisso';
+
+      final codeLegit = P2PSecurityService.computePairingCode(
+        sharedSecret,
+        sessionNonce: sessionNonce,
+        localEphemeralPub: 'eph_legit',
+        remoteEphemeralPub: 'eph_legit',
+      );
+      final codeMitM = P2PSecurityService.computePairingCode(
+        sharedSecret,
+        sessionNonce: sessionNonce,
+        localEphemeralPub: 'eph_legit',
+        remoteEphemeralPub: 'eph_attacker',
+      );
+
+      expect(codeLegit, isNot(codeMitM));
+    });
+
+    test('senza sessionNonce le chiavi efimere bastano a vincolare il codice',
+        () {
+      const sharedSecret = 'dGhpcyBpcyBhIHRlc3Qgc2VjcmV0';
+
+      final code1 = P2PSecurityService.computePairingCode(
+        sharedSecret,
+        localEphemeralPub: 'eph_1',
+        remoteEphemeralPub: 'eph_2',
+      );
+      final code2 = P2PSecurityService.computePairingCode(
+        sharedSecret,
+        localEphemeralPub: 'eph_1',
+        remoteEphemeralPub: 'eph_2',
+      );
+      final codeMitM = P2PSecurityService.computePairingCode(
+        sharedSecret,
+        localEphemeralPub: 'eph_1',
+        remoteEphemeralPub: 'eph_rogue',
+      );
+
+      expect(code1, code2);
+      expect(code1, isNot(codeMitM));
+    });
+
     test('codice con nonce singolo (fallback) funziona', () {
       const sharedSecret = 'c2VjcmV0';
 

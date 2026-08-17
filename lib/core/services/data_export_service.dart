@@ -117,8 +117,37 @@ class DataExportService {
 
   // ─── EXPORT SINGOLI MODULI ─────────────────────────────────────────
 
+  /// M8 / Fase 3 — item 9: iterazione dei box che ESCLUDE i record demo della
+  /// guida (tag `_demo`). I dati demo contengono PII di esempio ma devono
+  /// restare solo sul dispositivo di onboarding: NON devono mai finire in
+  /// export, backup o condivisione QR. Il filtro è applicato sui dati grezzi
+  /// (prima della conversione in modello), perché `toMap()` non preserva il tag.
+  static List<T> _liveValues<T>(
+    Box<Map> box,
+    T Function(String id, Map<String, dynamic> data) mapper,
+  ) {
+    final result = <T>[];
+    for (final key in box.keys) {
+      final id = key.toString();
+      final raw = box.get(key);
+      if (raw == null) continue;
+      final data = LocalDatabase.toStringDynamicMap(raw);
+      if (data['_demo'] == true) continue;
+      result.add(mapper(id, data));
+    }
+    return result;
+  }
+
   static Map<String, dynamic> _exportAnagrafica(_ExportScope scope) {
-    final students = LocalDatabase.values(LocalDatabase.students(), (id, data) => Student.fromMap(id, data))
+    // L5: i campi sensibili sono cifrati a livello di campo nel box. Vanno
+    // DECIFRATI prima di costruire il modello Student, altrimenti birthDate
+    // non sarebbe parsabile (e finirebbe col default) e i campi free-text
+    // sarebbero esportati come ciphertext.
+    final students = _liveValues(LocalDatabase.students(), (id, data) =>
+        Student.fromMap(
+          id,
+          FieldEncryptionService.decryptStudentMapForTransport(data),
+        ))
         .where((s) => scope.contains(s.toMap()))
         .toList();
     return {
@@ -135,25 +164,25 @@ class DataExportService {
   }
 
   static Map<String, dynamic> _exportAgenda(_ExportScope scope) {
-    final attendance = LocalDatabase.values(LocalDatabase.attendance(), (id, data) => {'id': id, ...data})
+    final attendance = _liveValues(LocalDatabase.attendance(), (id, data) => {'id': id, ...data})
         .where((r) => scope.contains(r))
         .toList();
     return {'attendance': attendance};
   }
 
   static Map<String, dynamic> _exportProgrammazione(_ExportScope scope) {
-    final planning = LocalDatabase.values(LocalDatabase.planning(), (id, data) => PlanningMeeting.fromMap(id, data))
+    final planning = _liveValues(LocalDatabase.planning(), (id, data) => PlanningMeeting.fromMap(id, data))
         .where((p) => scope.contains(p.toMap()))
         .toList();
     return {'planning': planning.map((p) => p.toMap()..['id'] = p.id).toList()};
   }
 
   static Map<String, dynamic> _exportDocumenti(_ExportScope scope) {
-    final documents = LocalDatabase.values(LocalDatabase.documents(), (id, data) => {'id': id, ...data})
+    final documents = _liveValues(LocalDatabase.documents(), (id, data) => {'id': id, ...data})
         .where((d) => scope.contains(d))
         .toList();
     final docIds = documents.map((d) => d['id'].toString()).toSet();
-    final deliveries = LocalDatabase.values(LocalDatabase.documentDeliveries(), (id, data) => {'id': id, ...data})
+    final deliveries = _liveValues(LocalDatabase.documentDeliveries(), (id, data) => {'id': id, ...data})
         .where((d) => docIds.contains(d['id'].toString()))
         .toList();
     return {'documents': documents, 'deliveries': deliveries};
@@ -163,7 +192,7 @@ class DataExportService {
     String parentType, {
     _ExportScope? scope,
   }) async {
-    final all = LocalDatabase.values(LocalDatabase.attachments(), (id, data) => Attachment.fromMap(id, data));
+    final all = _liveValues(LocalDatabase.attachments(), (id, data) => Attachment.fromMap(id, data));
     var filtered = all.where((a) => a.parentType == parentType).toList();
 
     if (scope != null && scope.classes.isNotEmpty) {
@@ -186,7 +215,7 @@ class DataExportService {
   }
 
   static Map<String, dynamic> _exportCatechesi() {
-    final catechesi = LocalDatabase.values(LocalDatabase.catechesi(), (id, data) => Catechesi.fromMap(id, data));
+    final catechesi = _liveValues(LocalDatabase.catechesi(), (id, data) => Catechesi.fromMap(id, data));
     return {'catechesi': catechesi.map((c) => c.toMap()..['id'] = c.id).toList()};
   }
 
@@ -203,14 +232,14 @@ class DataExportService {
   }
 
   static Map<String, dynamic> _exportNoteContatto(_ExportScope scope) {
-    final notes = LocalDatabase.values(LocalDatabase.contactNotes(), (id, data) => ContactNote.fromMap(id, data))
+    final notes = _liveValues(LocalDatabase.contactNotes(), (id, data) => ContactNote.fromMap(id, data))
         .where((n) => scope.contains(n.toMap()))
         .toList();
     return {'notes': notes.map((n) => n.toMap()..['id'] = n.id).toList()};
   }
 
   static Map<String, dynamic> _exportStudentDailyNotes(_ExportScope scope) {
-    final notes = LocalDatabase.values(LocalDatabase.studentDailyNotes(), (id, data) => StudentDailyNote.fromMap(id, data))
+    final notes = _liveValues(LocalDatabase.studentDailyNotes(), (id, data) => StudentDailyNote.fromMap(id, data))
         .where((n) => scope.contains(n.toMap()))
         .toList();
     return {'notes': notes.map((n) => n.toMap()..['id'] = n.id).toList()};
@@ -673,9 +702,13 @@ class _ExportScope {
 
   /// IDs degli studenti appartenenti allo scope.
   Set<String> get studentIds {
+    // L5: decifra prima di parsare (evita birthDate null nei toMap()).
     final students = LocalDatabase.values(
       LocalDatabase.students(),
-      (id, data) => Student.fromMap(id, data),
+      (id, data) => Student.fromMap(
+        id,
+        FieldEncryptionService.decryptStudentMapForTransport(data),
+      ),
     );
     return students.where((s) => contains(s.toMap())).map((s) => s.id).toSet();
   }

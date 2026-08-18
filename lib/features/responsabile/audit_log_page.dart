@@ -187,14 +187,14 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
     final fullName = '${fileName}_$timestamp.$extension';
     String? savedPath;
     var saved = false;
-    try {
-      // file_picker 12: saveFile restituisce Uri?.
+try {
+      // file_picker 12: saveFile restituisce String?.
       final uri = await FilePicker.saveFile(
         dialogTitle: 'Salva esportazione',
         fileName: fullName,
         bytes: bytes,
       );
-      savedPath = uri?.path;
+      savedPath = uri;
       if (savedPath != null) saved = true;
     } catch (_) {
       savedPath = null;

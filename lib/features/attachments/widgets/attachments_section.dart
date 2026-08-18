@@ -252,14 +252,14 @@ class AttachmentsSection extends ConsumerWidget {
   }
 
   Future<void> _pickPdf(BuildContext context, WidgetRef ref) async {
-    // file_picker 12: pickFiles restituisce List<PlatformFile> (vuota su annulla).
-    final files = await FilePicker.pickFiles(
+    // file_picker 12: pickFiles restituisce FilePickerResult.
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf'],
     );
-    if (files.isEmpty) return;
+    if (result == null || result.files.isEmpty) return;
 
-    final file = files.single;
+    final file = result.files.single;
     final path = file.path;
 
     // Chiedi all'utente di confermare o modificare il nome

@@ -165,7 +165,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
           fileName: fileName,
           bytes: bytes,
         );
-        savedPath = uri?.path;
+        savedPath = uri;
         if (savedPath != null) saved = true;
       } catch (e) {
         savedPath = null;
@@ -232,16 +232,16 @@ class _BackupPageState extends ConsumerState<BackupPage> {
 
     try {
       // Seleziona file
-      // file_picker 12: pickFiles restituisce List<PlatformFile> (vuota su annulla).
-      final files = await FilePicker.pickFiles(
+      // file_picker 12: pickFiles restituisce FilePickerResult.
+      final result = await FilePicker.pickFiles(
         type: FileType.any,
       );
-      if (files.isEmpty) {
+      if (result == null || result.files.isEmpty) {
         if (mounted) setState(() => _isImporting = false);
         return;
       }
 
-      final filePath = files.single.path;
+      final filePath = result.files.single.path;
       if (filePath == null) {
         throw Exception(
           'Impossibile leggere il file selezionato: percorso non disponibile',

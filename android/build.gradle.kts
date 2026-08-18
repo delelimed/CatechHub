@@ -100,7 +100,7 @@ subprojects {
     // ─────────────────────────────────────────────────────────────────────────
     plugins.withId("com.android.application") {
         configure<ApplicationExtension> {
-            compileSdk = 36
+            compileSdk = 37
         }
     }
 
@@ -114,7 +114,7 @@ subprojects {
     plugins.withId("com.android.library") {
         configure<LibraryExtension> {
             // Forza compileSdk 36 per tutte le librerie
-            compileSdk = 36
+            compileSdk = 37
 
             // ─────────────────────────────────────────────────────────────────
             // PATCH PER FLUTTER_BLUETOOTH_SERIAL

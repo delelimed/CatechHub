@@ -11,6 +11,7 @@ on:
   push:
     branches:
       - feature/**
+      - main
 
 permissions:
   contents: write
@@ -20,11 +21,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Scarica il codice sorgente
+      # 1. Scarica il codice sorgente (v4 è la versione stabile attuale)
       - name: Checkout code
         uses: actions/checkout@v5
 
-      # 2. Configura Java
+      # 2. Configura Java JDK 17 (v4)
       - name: Set up JDK
         uses: actions/setup-java@v5
         with:
@@ -56,8 +57,7 @@ jobs:
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > /tmp/keystore.jks
 
-      # 8. Compila l'APK firmato
-      # Passa --build-name solo se l'utente ha inserito una versione, altrimenti usa quella di pubspec.yaml
+      # 8. Compila l'APK firmato e ottimizzato
       - name: Build Signed Android APK
         env:
           SIGNING_KEYSTORE_PATH: /tmp/keystore.jks
@@ -65,13 +65,25 @@ jobs:
           SIGNING_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          BUILD_CMD="flutter build apk --release --dart-define-from-file=.env --target-platform=android-arm64 --obfuscate --split-debug-info=./debug_info --strip"
+          EXTRA_ARGS=""
           if [ -n "${{ inputs.version_name }}" ]; then
-            BUILD_CMD="$BUILD_CMD --build-name=${{ inputs.version_name }}"
+            EXTRA_ARGS="--build-name=${{ inputs.version_name }}"
           fi
-          $BUILD_CMD
 
-      # 9. Salva l'APK negli Artifacts
+          flutter build apk --release \
+            --dart-define-from-file=.env \
+            --target-platform=android-arm64 \
+            --obfuscate \
+            --split-debug-info=./debug_info \
+            --strip \
+            $EXTRA_ARGS
+
+      # 9. Pulizia del Keystore temporaneo
+      - name: Clean up Keystore
+        if: always()
+        run: rm -f /tmp/keystore.jks
+
+      # 10. Salva l'APK negli Artifacts
       - name: Upload Signed APK Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -79,7 +91,15 @@ jobs:
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
 
-      # 10. Crea la Draft Release SOLO se avviato manualmente E su ramo 'main' E con versione inserita
+      # 11. Salva anche i simboli di debug per eventuale de-obfuscation degli stack trace
+      - name: Upload Debug Symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-symbols
+          path: debug_info/
+          retention-days: 7
+
+      # 12. Crea la Draft Release SOLO se avviato manualmente E su ramo 'main' E con versione inserita
       - name: Create GitHub Draft Release
         id: create_release
         if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.version_name != ''

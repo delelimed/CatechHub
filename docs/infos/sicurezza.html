@@ -46,16 +46,20 @@
       <thead><tr><th>Ambito</th><th>Algoritmo</th><th>Parametri</th><th>Standard di riferimento</th></tr></thead>
       <tbody>
         <tr><td>Dati a riposo (Hive)</td><td>AES-256-GCM</td><td>Nonce 12B, tag 128bit, chiave 256bit master in AndroidKeyStore (TEE/StrongBox)</td><td>NIST SP 800-38D</td></tr>
-        <tr><td>Derivazione chiave (backup)</td><td>PBKDF2-HMAC-SHA256</td><td>210.000 iterazioni, salt 16B, key 32B</td><td>NIST SP 800-132</td></tr>
-        <tr><td>Derivazione chiave (share rapido)</td><td>PBKDF2-HMAC-SHA256</td><td>12.000 iterazioni</td><td>NIST SP 800-132</td></tr>
-        <tr><td>Scambio chiavi (sync)</td><td>X25519 ECDH (Curve25519)</td><td>Shared secret 32B + chiave per dispositivo associato</td><td>RFC 7748</td></tr>
-        <tr><td>Session key derivation</td><td>HKDF-SHA256</td><td>Info: "CatechHub_P2P_Session_v2" + device IDs + ruolo</td><td>RFC 5869</td></tr>
-        <tr><td>Cifratura sync P2P</td><td>AES-256-GCM</td><td>Chiave di sessione derivata da ECDHE + HKDF, nonce 12B, tag 128bit</td><td>NIST SP 800-38D</td></tr>
-        <tr><td>Anti-MitM pairing</td><td>SHA-256 pairing code</td><td>6 cifre decimali derivate da SHA-256(shared secret ECDH)</td><td>FIPS 180-4</td></tr>
-        <tr><td>Key pinning</td><td>Confronto chiave pubblica</td><td>Chiave P-256/X255RY ricevuta vs salvata in associazione</td><td>Key continuity management</td></tr>
-        <tr><td>Chiave di associazione</td><td>X25519 per dispositivo</td><td>Ogni associazione ha chiave privata/pubblica dedicata</td><td>RFC 7748</td></tr>
+        <tr><td>Campi sensibili (field encryption)</td><td>AES-256-GCM</td><td>Formato <code>cieI1:</code>, chiave per-dispositivo (32B) nel box cifrato</td><td>NIST SP 800-38D</td></tr>
+        <tr><td>Derivazione chiave (backup generale)</td><td>PBKDF2-HMAC-SHA256</td><td>210.000 iterazioni, salt 16B, key 32B</td><td>NIST SP 800-132</td></tr>
+        <tr><td>Derivazione chiave (backup conformità GDPR)</td><td>PBKDF2-HMAC-SHA256</td><td>350.000 iterazioni, PIN min. 12 alfanumerici, anti-brute-force (5 tentativi / 30 min)</td><td>NIST SP 800-132</td></tr>
+        <tr><td>Derivazione chiave (share rapido QR)</td><td>PBKDF2-HMAC-SHA256</td><td>60.000 iterazioni, PIN 12 cifre (3 min)</td><td>NIST SP 800-132</td></tr>
+        <tr><td>Scambio chiavi (sync)</td><td>X25519 TripleDH</td><td>Static↔static + static↔effimero + effimero↔effimero, chiave per dispositivo associato</td><td>RFC 7748</td></tr>
+        <tr><td>Session key derivation</td><td>HKDF-SHA256</td><td>Info: "CatechHub_P2P_Session_v3", rotazione chiavi ogni 30 minuti</td><td>RFC 5869</td></tr>
+        <tr><td>Cifratura sync P2P</td><td>AES-256-GCM</td><td>Chiave di sessione derivata da TripleDH + HKDF, nonce 12B, tag 128bit</td><td>NIST SP 800-38D</td></tr>
+        <tr><td>Anti-MitM pairing</td><td>SHA-256 pairing code</td><td>6 cifre decimali derivate da SHA-256(aux input ‖ shared secret)</td><td>FIPS 180-4</td></tr>
+        <tr><td>Key pinning</td><td>Confronto chiave pubblica</td><td>Chiave X25519 ricevuta vs salvata in associazione</td><td>Key continuity management</td></tr>
+        <tr><td>Catena di fiducia</td><td>Ed25519</td><td>Certificati di approvazione asimmetrici, validità 30 giorni, revoche firmate, trust root via QR (solo chiave pubblica)</td><td>RFC 8032</td></tr>
+        <tr><td>Registro Trattamenti</td><td>HMAC-SHA256</td><td>Audit log append-only firmato, verifica constant-time</td><td>FIPS 198-1</td></tr>
         <tr><td>Hashing ID messaggio</td><td>SHA-256</td><td>Digest 32B</td><td>FIPS 180-4</td></tr>
-        <tr><td>Fallback legacy (v1)</td><td>AES-256-CBC + PKCS7</td><td>Solo per compatibilità pacchetti v1</td><td>NIST SP 800-38A</td></tr>
+        <tr><td>Aggiornamenti (TLS)</td><td>Certificate pinning</td><td>Fingerprint SHA-256 dei certificati GitHub, fail-closed</td><td>RFC 7469</td></tr>
+        <tr><td>Formato legacy (v1)</td><td>Rimosso</td><td>AES-256-CBC senza MAC non è più accettato (anti-downgrade / padding oracle)</td><td>—</td></tr>
       </tbody>
     </table>
 
@@ -82,10 +86,13 @@
         <tr><td>Device binding (Play Integrity)</td><td>Verifica attestazione</td></tr>
         <tr><td>ADB / USB debugging</td><td>Avviso all'utente</td></tr>
         <tr><td>Debugger connesso</td><td>Blocco con SecurityBlockScreen</td></tr>
-        <tr><td>Opzioni sviluppatore</td><td>Avviso all'utente</td></tr>
+        <tr><td>Opzioni sviluppatore</td><td>Avviso all'utente (schermata arancione informativa)</td></tr>
       </tbody>
     </table>
-    <p><code>killOnBypass = false</code>: l'utente non viene forzato alla chiusura ma visualizza una schermata informativa di blocco (<code>SecurityBlockScreen</code>).</p>
+    <p><code>killOnBypass = false</code>: l'utente non viene forzato alla chiusura ma visualizza una schermata di blocco (<code>SecurityBlockScreen</code>, non bypassabile) per root, emulatori, hooking, tampering e debugger; per le sole opzioni sviluppatore viene mostrata una schermata arancione informativa.</p>
+
+    <h3>3.1b Anti-brute-force sul backup</h3>
+    <p>L'importazione dei backup (percorso conformità GDPR) è protetta da un <strong>lockout anti-brute-force</strong>: massimo 5 tentativi di PIN errati, poi blocco di 30 minuti legato al singolo file. I PIN richiesti sono di minimo 12 caratteri alfanumerici (keyspace ≈ 62^12 ≈ 2^71), rendendo impraticabile anche il brute-force offline.</p>
 
     <h3>3.2 FLAG_SECURE</h3>
     <p>L'Activity principale imposta <code>WindowManager.LayoutParams.FLAG_SECURE</code>, che impedisce:</p>
@@ -102,6 +109,7 @@
       <li><strong>Nessuna telemetria</strong>: l'app non raccoglie analytics, crash report, statistiche d'uso o dati diagnostici automatici.</li>
       <li><strong>Nessuna pubblicità</strong>: assenza totale di SDK pubblicitari o di profilazione.</li>
       <li><strong>Minimizzazione nativa</strong>: l'app raccoglie solo i dati strettamente necessari alla gestione del catechismo.</li>
+      <li><strong>Traffico di rete opzionale e minimale</strong>: il controllo aggiornamenti (attivo di default ma disattivabile) si connette solo a GitHub con certificate pinning e non trasmette dati personali; il feedback all'autore (Wiredash) è opt-in (disattivato di default).</li>
     </ul>
 
     <h2>5. Piano di risposta agli incidenti</h2>
@@ -137,9 +145,9 @@
       <tbody>
         <tr><td>Pseudonimizzazione</td><td>Parziale</td><td>I dati non sono pseudonimizzati per default, ma l'utente può esportare dati senza identificativi diretti</td></tr>
         <tr><td>Crittografia a riposo</td><td>Sì</td><td>AES-256-GCM su tutti i box Hive. Chiave master in AndroidKeyStore (TEE/StrongBox obbligatorio — nessun fallback software). SecurityManager verifica hardware all'avvio.</td></tr>
-        <tr><td>Crittografia in transito</td><td>Sì</td><td>Sync P2P: X25519 ECDH + HKDF + AES-256-GCM con pairing code anti-MitM e key pinning. Backup: PBKDF2 + AES-256-GCM</td></tr>
+        <tr><td>Crittografia in transito</td><td>Sì</td><td>Sync P2P: X25519 TripleDH + HKDF + AES-256-GCM (rotazione chiavi 30 min) con pairing code anti-MitM e key pinning. Backup: PBKDF2 + AES-256-GCM</td></tr>
         <tr><td>Controllo accesso</td><td>Sì</td><td>Biometria + PIN/Pattern, sessione in RAM, timeout 120s</td></tr>
-        <tr><td>Registrazione accessi</td><td>No</td><td>Non implementata. L'app non tiene log degli accessi (coerente con principio di minimizzazione)</td></tr>
+        <tr><td>Registrazione accessi</td><td>No</td><td>L'app non tiene log degli accessi (coerente con minimizzazione). In modalità Responsabile esiste invece il <strong>Registro Trattamenti</strong>: audit log firmato HMAC-SHA256 delle operazioni rilevanti (Art. 30 GDPR), non degli accessi.</td></tr>
       </tbody>
     </table>
 

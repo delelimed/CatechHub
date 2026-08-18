@@ -61,7 +61,7 @@
     <p>Ogni iscritto ha un <strong>consenso privacy</strong> con data di sottoscrizione e <strong>durata di validità</strong> (configurabile nelle impostazioni della parrocchia). L'app segnala i consensi in scadenza o scaduti, così sai sempre quali famiglie devi ricontattare per il rinnovo.</p>
 
     <h3>Registro Trattamenti (GDPR)</h3>
-    <p>Ogni operazione rilevante viene registrata in un <strong>audit log firmato</strong> (HMAC-SHA256, chiave per dispositivo): chi ha inserito, modificato o eliminato cosa e quando. Il Registro Trattamenti è il punto di riferimento per la conformità GDPR della parrocchia.</p>
+    <p>Ogni operazione rilevante viene registrata in un <strong>audit log append-only firmato</strong> (HMAC-SHA256, chiave per dispositivo): chi ha inserito, modificato o eliminato cosa e quando. Il Registro Trattamenti è il punto di riferimento per la conformità GDPR della parrocchia. Include la gestione dei <strong>consensi con scadenza</strong>: alla scadenza l'app marca RITIRATO, applica un periodo di grazia di 30 giorni e procede alla <strong>cancellazione a cascata</strong> automatica dei dati.</p>
 
     <h3>Gestione catechisti</h3>
     <p>Anagrafica dei catechisti della parrocchia, con ruoli e permessi associati (chi può gestire presenze, documenti, aule, ecc.).</p>
@@ -77,7 +77,16 @@
     <p>La <strong>rete parrocchiale</strong> mostra i dispositivi collegati alla parrocchia e i loro stati. Con la <a href="sync.html">catena di fiducia</a>, ogni dispositivo deve essere <strong>approvato dal Responsabile</strong> prima di poter sincronizzare le classi.</p>
 
     <h2>Catena di fiducia</h2>
-    <p>Dal <strong>Centro approvazioni</strong> il Responsabile approva o revoca i dispositivi dei catechisti. L'approvazione è un certificato firmato (HMAC-SHA256) legato al segreto della parrocchia e viene verificata durante ogni handshake P2P. Un dispositivo non approvato <strong>non può sincronizzarsi</strong> finché la modalità Responsabile è attiva.</p>
+    <p>Dal <strong>Centro approvazioni</strong> il Responsabile approva o revoca i dispositivi dei catechisti. L'approvazione è un <strong>certificato asimmetrico firmato Ed25519</strong> (validità 30 giorni, revoche firmate propagate peer-to-peer) e viene verificata durante ogni handshake P2P. La <strong>trust root</strong> si distribuisce tramite QR di fiducia che trasporta solo la chiave pubblica. Un dispositivo non approvato <strong>non può sincronizzarsi</strong> finché la modalità Responsabile è attiva.</p>
+
+    <h2>Archivio storico</h2>
+    <p>Con <strong>"Concludi anno"</strong> le classi a fine percorso vengono archiviate: gli incontri dell'anno concluso sono congelati in <strong>snapshot immutabili</strong> (consultazione read-only dello storico presenze), a prova di modifiche accidentali o retroattive.</p>
+
+    <h2>Supplenze</h2>
+    <p>Il Responsabile può delegare temporaneamente una classe a un catechista tramite un <strong>QR crittografico a scadenza</strong> (validità massima 24 ore, revoca immediata): il supplente legge le informazioni essenziali e segna le presenze per la sola durata della delega. Ogni delega è registrata nel Registro Trattamenti.</p>
+
+    <h2>Export conformità GDPR</h2>
+    <p>Genera un pacchetto di conservazione (CSV del registro + dati cifrati AES-256-GCM) protetto da <strong>PIN alfanumerico di 12 caratteri</strong> con derivazione chiave a <strong>350.000 iterazioni</strong> e <strong>anti-brute-force</strong> (5 tentativi / 30 minuti). Vedere anche <a href="backup.html">Backup</a>.</p>
 
     <h2>Allarme assenze</h2>
     <p>Il Responsabile può monitorare le assenze ripetute dei ragazzi a livello parrocchiale, per intervenire tempestivamente con le famiglie.</p>

@@ -13,7 +13,7 @@
 //   4. Ogni chunk ha checksum SHA-256 per rilevare corruzione
 //   5. Il destinatario scansiona i QR, riassembla, verifica checksum, decifra
 //
-//   Il PIN è un numero casuale di 8 cifre, valido 3 minuti.
+//   Il PIN è un numero casuale di 12 cifre, valido 3 minuti.
 //   La segmentazione in chunk permette di trasferire payload grandi
 //   via QR code (es. intero database di un gruppo).
 //
@@ -95,12 +95,12 @@ class QRChunk {
 
 class QRDataService {
   static const int maxQRSize = 1200;
-  // PIN minimo di 10 cifre: con 10^10 combinazioni e KDF PBKDF2-SHA256
+  // PIN di 12 cifre: con 10^12 combinazioni e KDF PBKDF2-SHA256
   // (fastShareIterations = 60000) il brute-force offline del PIN QR diventa
   // impraticabile, anche per un pacchetto QR valido 3 minuti.
   static const int pinLength = 12;
 
-  /// Genera un PIN numerico casuale di [pinLength] cifre (es. "38572014").
+  /// Genera un PIN numerico casuale di [pinLength] cifre (es. "385720147901").
   static String generatePin() {
     final random = Random.secure();
     return List.generate(pinLength, (_) => random.nextInt(10)).join();

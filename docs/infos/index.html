@@ -67,12 +67,12 @@
         <tr>
           <td>Art. 6</td>
           <td>Lawfulness of processing</td>
-          <td>Base giuridica: consenso dell'interessato (Art. 6.1.a) e compito di interesse pubblico (Art. 6.1.e) — l'attività educativa catechistica. L'app non impone alcun trattamento senza base giuridica. La sincronizzazione P2P tra dispositivi "Altro Catechista" richiede il consenso esplicito di entrambi gli utenti (doppio consenso) prima del trasferimento dati.</td>
+          <td>Base giuridica: consenso dell'interessato (Art. 6.1.a) e compito di interesse pubblico (Art. 6.1.e) — l'attività educativa catechistica. L'app non impone alcun trattamento senza base giuridica. La sincronizzazione P2P tra dispositivi "Altro Catechista" richiede il consenso esplicito di entrambi gli utenti (doppio consenso) prima del trasferimento dati; in modalità Responsabile solo i dispositivi approvati (catena di fiducia) possono sincronizzare le classi.</td>
         </tr>
         <tr>
           <td>Art. 9</td>
           <td>Special categories of data</td>
-          <td>Allergie, informazioni sanitarie e autorizzazioni uscite autonome sono trattati solo se esplicitamente inseriti dall'utente con consenso esplicito (Art. 9.2.a). Cifratura aggiuntiva sui dati sensibili.</td>
+          <td>Allergie, informazioni sanitarie e autorizzazioni uscite autonome sono trattati solo se esplicitamente inseriti dall'utente con consenso esplicito (Art. 9.2.a). Cifratura di campo aggiuntiva (AES-256-GCM, chiave per-dispositivo) sui dati sensibili; consensi con durata di validità gestita automaticamente in modalità Responsabile.</td>
         </tr>
         <tr>
           <td>Art. 12-14</td>
@@ -87,22 +87,27 @@
         <tr>
           <td>Art. 17</td>
           <td>Right to erasure</td>
-          <td>Funzione "Elimina dati" integrata nell'app. Cancellazione a cascata (studente, presenze, documenti, note). Disinstallando l'app tutti i dati vengono rimossi dal dispositivo.</td>
+          <td>Funzione "Elimina dati" integrata nell'app (cancellazione completa o selettiva, a cascata: studente, presenze, documenti, note, allegati). La cancellazione genera un <strong>tombstone firmato</strong> propagato peer-to-peer che impedisce la "resurrezione" dei dati da backup o altri dispositivi. L'hard delete irreversibile è riservato al Responsabile. Disinstallando l'app tutti i dati vengono rimossi dal dispositivo.</td>
         </tr>
         <tr>
           <td>Art. 20</td>
           <td>Right to data portability</td>
-          <td>Esportazione in formato .catechhub (JSON cifrato). Esportazione selettiva per box. I dati possono essere trasferiti a qualsiasi altro sistema.</td>
+          <td>Esportazione in formato .catechhub (JSON cifrato). Esportazione selettiva per box. <strong>Export conformità GDPR</strong> (CSV del registro + pacchetto conservazione AES-256-GCM con PIN alfanumerico). I dati possono essere trasferiti a qualsiasi altro sistema.</td>
         </tr>
         <tr>
           <td>Art. 25</td>
           <td>Data protection by design and by default</td>
-          <td>Privacy by design: crittografia end-to-end, zero cloud, offline-first, biometrica, FLAG_SECURE, freeRASP. By default: nessuna condivisione, nessuna telemetria, minimizzazione dei dati.</td>
+          <td>Privacy by design: crittografia end-to-end, zero cloud, offline-first, biometrica, FLAG_SECURE, freeRASP. By default: nessuna condivisione, nessuna telemetria, minimizzazione dei dati. La retention automatica dei consensi scaduti applica la minimizzazione nel tempo.</td>
+        </tr>
+        <tr>
+          <td>Art. 30</td>
+          <td>Records of processing activities</td>
+          <td>In modalità Responsabile l'app integra un <strong>Registro Trattamenti digitale</strong>: audit log append-only firmato HMAC-SHA256 di ogni operazione rilevante (data, ora, autore), con verifica d'integrità in tempo reale. Vedere anche il <a href="registro-trattamento.html">Registro delle attività di trattamento</a>.</td>
         </tr>
         <tr>
           <td>Art. 32</td>
           <td>Security of processing</td>
-          <td>AES-256-GCM a riposo con chiave in AndroidKeyStore (TEE/StrongBox), verifica hardware obbligatoria all'avvio, PBKDF2 210k iterazioni per backup, X25519 ECDH + HKDF + AES-256-GCM per sync P2P, pairing code a 6 cifre anti-MitM, key pinning per dispositivo, doppio consenso esplicito tra catechisti, sessione in RAM, timeout 120s, freeRASP anti-tamper.</td>
+          <td>AES-256-GCM a riposo con chiave in AndroidKeyStore (TEE/StrongBox), verifica hardware obbligatoria all'avvio, cifratura di campo per i dati sensibili, PBKDF2-HMAC-SHA256 (210k/350k/60k iterazioni) per backup e QR, X25519 <strong>TripleDH</strong> + HKDF + AES-256-GCM per sync P2P con rotazione chiavi di sessione ogni 30 minuti, pairing code a 6 cifre anti-MitM, key pinning per dispositivo, certificati di approvazione Ed25519, doppio consenso esplicito tra catechisti, sessione in RAM, timeout 120s, freeRASP anti-tamper, certificate pinning per gli aggiornamenti.</td>
         </tr>
         <tr>
           <td>Art. 35</td>
@@ -117,13 +122,14 @@
     <table class="sec-table">
       <thead><tr><th>Rischio</th><th>Probabilità</th><th>Impatto</th><th>Mitigazione</th></tr></thead>
       <tbody>
-        <tr><td>Furto dispositivo</td><td>Bassa</td><td>Alto</td><td>Crittografia AES-256-GCM, chiave in AndroidKeyStore, auth biometrica</td></tr>
-        <tr><td>Accesso non autorizzato</td><td>Media</td><td>Alto</td><td>Autenticazione obbligatoria, timeout sessione 120s</td></tr>
-        <tr><td>Intercettazione sync</td><td>Bassa</td><td>Medio</td><td>E2EE con X25519 ECDH + HKDF + AES-256-GCM, pairing code anti-MitM, forward secrecy, key pinning</td></tr>
-        <tr><td>Perdita dati</td><td>Media</td><td>Alto</td><td>Backup crittografato, export selettivo, merge import</td></tr>
-        <tr><td>Malware/root</td><td>Bassa</td><td>Alto</td><td>freeRASP rilevamento root, hooking, emulatori</td></tr>
-        <tr><td>Errore umano</td><td>Alta</td><td>Medio</td><td>Conferma eliminazione, cronologia modifiche, recovery corruzione Hive</td></tr>
-        <tr><td>Violazione dati minori</td><td>Bassa</td><td>Molto alto</td><td>Minimizzazione dati, nessun cloud, FLAG_SECURE, dati sensibili cifrati</td></tr>
+        <tr><td>Furto dispositivo</td><td>Bassa</td><td>Alto</td><td>Crittografia AES-256-GCM, chiave in AndroidKeyStore, auth biometrica, sessione in RAM</td></tr>
+        <tr><td>Accesso non autorizzato</td><td>Media</td><td>Alto</td><td>Autenticazione obbligatoria, timeout sessione 120s, blocco schermo, freeRASP</td></tr>
+        <tr><td>Intercettazione sync</td><td>Bassa</td><td>Medio</td><td>E2EE con TripleDH X25519 + HKDF + AES-256-GCM, pairing code anti-MitM, forward secrecy, key pinning, rotazione chiavi ogni 30 min</td></tr>
+        <tr><td>Condivisione non autorizzata delle classi</td><td>Bassa</td><td>Alto</td><td>Canale classe cifrato per-classe, dispositivi "Senza Titolo" come relay, catena di fiducia con certificati Ed25519 in modalità Responsabile</td></tr>
+        <tr><td>Perdita dati</td><td>Media</td><td>Alto</td><td>Backup crittografato, export selettivo, merge import, export conformità</td></tr>
+        <tr><td>Malware/root</td><td>Bassa</td><td>Alto</td><td>freeRASP rilevamento root, hooking, emulatori; chiavi mai in memoria volatile</td></tr>
+        <tr><td>Errore umano</td><td>Alta</td><td>Medio</td><td>Conferma eliminazione, cronologia modifiche, recovery corruzione Hive, tombstone</td></tr>
+        <tr><td>Violazione dati minori</td><td>Bassa</td><td>Molto alto</td><td>Minimizzazione dati, nessun cloud, FLAG_SECURE, cifratura di campo per dati sensibili, retention automatica</td></tr>
       </tbody>
     </table>
 
@@ -135,6 +141,8 @@
       <li><strong>Campi di audit:</strong> Ogni record nell'app (studenti, programmazione, catechesi, note di contatto, ecc.) traccia automaticamente <code>createdAt</code>, <code>updatedAt</code> e <code>lastModifiedBy</code>.</li>
       <li><strong>Visualizzazione:</strong> Questi campi sono visualizzati in tutte le schermate di dettaglio, consentendo all'utente di conoscere sempre chi ha creato o modificato un dato e quando.</li>
       <li><strong>Presenze:</strong> Per le presenze, viene mostrata la data cumulativa dell'ultima modifica per giornata, non per singolo studente, bilanciando trasparenza e minimizzazione.</li>
+      <li><strong>Registro Trattamenti (modalità Responsabile):</strong> audit log append-only di ogni operazione rilevante (iscrizione, modifica, consenso, passaggio anno, retention, oblio) <strong>firmato HMAC-SHA256</strong> con chiave per dispositivo e verifica d'integrità in tempo reale. È il supporto digitale dell'obbligo dell'Art. 30 GDPR.</li>
+      <li><strong>Retention automatica:</strong> i consensi scaduti vengono marcati RITIRATO, seguiti da un periodo di grazia di 30 giorni e dalla cancellazione a cascata automatica dei dati (storage limitation, Art. 5.1.e).</li>
       <li><strong>Sync P2P &mdash; doppio consenso:</strong> Quando entrambi i dispositivi sono configurati come "Altro Catechista", entrambi gli utenti devono autorizzare esplicitamente la sincronizzazione, fornendo un consenso reciproco prima del trasferimento dei dati.</li>
     </ul>
 

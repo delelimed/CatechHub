@@ -617,7 +617,7 @@ class _DataShareSendPageState extends ConsumerState<DataShareSendPage> {
                     InkWell(
                       onTap: () => setState(() => _pinVisible = !_pinVisible),
                       child: Text(
-                        _pinVisible ? (_pin ?? '---') : '••••••••••',
+                        _pinVisible ? (_pin ?? '---') : '••••••••••••',
                         style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.amber, letterSpacing: 4),
                       ),
                     ),

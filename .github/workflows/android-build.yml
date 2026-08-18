@@ -1,18 +1,19 @@
 name: Flutter Android Signed Build
 
 on:
-  # Permette di far partire l'azione manualmente dalla scheda "Actions" di GitHub
   workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'Versione Release (es. 1.2.0) - Richiesta solo se su main'
+        required: false
+        type: string
 
-  # Fa partire l'azione automaticamente ad ogni push sui rami feature
   push:
     branches:
       - feature/**
-      
-  # Fa partire l'azione ad ogni Pull Request verso il ramo develop
-  #pull_request:
-  #  branches:
-  #    - develop
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -21,75 +22,73 @@ jobs:
     steps:
       # 1. Scarica il codice sorgente
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      # 2. Configura Java (JDK 17 richiesto per le versioni recenti di Flutter/Gradle)
+      # 2. Configura Java
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      # 3. Configura Flutter con la cache per velocizzare le build successive
+      # 3. Configura Flutter
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
 
-      # 4. Scarica i pacchetti di Flutter
+      # 4. Scarica le dipendenze
       - name: Install dependencies
         run: flutter pub get
 
-      # 5. Ricrea il file .env partendo dal Secret di GitHub
+      # 5. Ricrea il file .env
       - name: Create .env file
         run: |
           echo "${{ secrets.ENV_FILE }}" > .env
 
-      # 6. Verifica che non ci siano errori di sintassi o analisi nel codice
+      # 6. Analisi del codice
       - name: Run Flutter Analyzer
         run: flutter analyze
 
-      # 7. Decodifica il Keystore in un file fisico temporaneo
+      # 7. Decodifica il Keystore
       - name: Decode Keystore File
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > /tmp/keystore.jks
 
-      # 8. Compila l'APK firmato passando le credenziali come variabili d'ambiente
+      # 8. Compila l'APK firmato
+      # Passa --build-name solo se l'utente ha inserito una versione, altrimenti usa quella di pubspec.yaml
       - name: Build Signed Android APK
         env:
           SIGNING_KEYSTORE_PATH: /tmp/keystore.jks
           SIGNING_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: flutter build apk --release --dart-define-from-file=.env --target-platform=android-arm64 --obfuscate --split-debug-info=./debug_info
+        run: |
+          BUILD_CMD="flutter build apk --release --dart-define-from-file=.env --target-platform=android-arm64 --obfuscate --split-debug-info=./debug_info"
+          if [ -n "${{ inputs.version_name }}" ]; then
+            BUILD_CMD="$BUILD_CMD --build-name=${{ inputs.version_name }}"
+          fi
+          $BUILD_CMD
 
-      # 9. Salva l'APK firmato finale negli Artifacts di GitHub scaricabili (Sempre attivo)
+      # 9. Salva l'APK negli Artifacts
       - name: Upload Signed APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: release-signed-apk
           path: build/app/outputs/flutter-apk/app-release.apk
-          # M11: retention breve (7 giorni) per non esporre all'infinito un APK
-          # firmato scaricabile pubblicamente da chiunque veda il workflow.
           retention-days: 7
 
-      # M11: il passo "Upload Debug Info (Obfuscation Symbols)" è stato RIMOSSO.
-      # `--split-debug-info` genera la mappa dei simboli che annulla l'offuscamento
-      # (`--obfuscate`): pubblicarla come artifact pubblico permette a chiunque di
-      # de-offuscare il codice e ricostruire nomi/funzioni. I simboli servono solo
-      # per il deobfuscation delle crash-log da parte dello sviluppatore e vanno
-      # conservati PRIVATAMENTE (mai in un artifact pubblico del workflow).
-
-      # 10. Crea una bozza (Draft) di Release solo se eseguito manualmente su 'main'
+      # 10. Crea la Draft Release SOLO se avviato manualmente E su ramo 'main' E con versione inserita
       - name: Create GitHub Draft Release
         id: create_release
-        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.version_name != ''
         uses: softprops/action-gh-release@v2
         with:
           draft: true
-          tag_name: v1.0.0-${{ github.run_number }}
-          name: Release v1.0.0-${{ github.run_number }} (Draft)
-          files: build/app/outputs/flutter-apk/app-release.apk
+          tag_name: ${{ inputs.version_name }}
+          name: Release ${{ inputs.version_name }} (Draft)
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

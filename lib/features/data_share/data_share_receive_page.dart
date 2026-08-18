@@ -160,8 +160,8 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
       return;
     }
     final inputPin = _pinController.text.trim();
-    if (inputPin.length != 8) {
-      setState(() => _errorMessage = 'Il PIN deve essere di 8 cifre');
+    if (inputPin.length != QRDataService.pinLength) {
+      setState(() => _errorMessage = 'Il PIN deve essere di ${QRDataService.pinLength} cifre');
       return;
     }
     setState(() {
@@ -511,7 +511,7 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
               ),
               SizedBox(height: 8),
               Text(
-                'Inserisci il PIN di 8 cifre fornito dal mittente',
+                'Inserisci il PIN di ${QRDataService.pinLength} cifre fornito dal mittente',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 14, color: Colors.grey),
               ),
@@ -525,7 +525,7 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
           maxLength: 8,
           decoration: const InputDecoration(
             labelText: 'PIN di sicurezza',
-            hintText: 'Inserisci 8 cifre',
+            hintText: 'Inserisci ${QRDataService.pinLength} cifre',
             prefixIcon: Icon(Icons.security_rounded),
             border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
             counterText: '',

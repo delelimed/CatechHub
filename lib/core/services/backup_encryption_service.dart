@@ -4,10 +4,11 @@
 // NUOVO FLUSSO (post-migrazione): non esiste più un PIN dell'app.
 // Quando l'utente esporta un backup, DEVE inserire e confermare un PIN
 // scelto al momento (diverso dal PIN del telefono). Questo PIN deriva
-// la chiave AES-256-GCM via PBKDF2 (210k iterazioni).
+// la chiave AES-256-GCM via PBKDF2 (350k iterazioni; 210k accettate in
+// lettura per i backup creati dalle versioni precedenti).
 //
 // SICUREZZA:
-// - PBKDF2-HMAC-SHA256, 210.000 iterazioni, salt 16 byte casuali
+// - PBKDF2-HMAC-SHA256, 350.000 iterazioni, salt 16 byte casuali
 // - AES-256-GCM (confidenzialità + integrità), nonce 12 byte
 // - Formato: base64({v, kdf, iter, alg, salt, nonce, ciphertext})
 // - Constant-time password verification

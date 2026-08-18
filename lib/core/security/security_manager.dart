@@ -21,7 +21,7 @@
 //
 // PLUGIN UTILIZZATI (SOLO UFFICIALI, ZERO CODICE NATIVO CUSTOM):
 // ──────────────────────────────────────────────────────────────────────────────
-// • flutter_secure_storage ^10.3.1 — Storage cifrato con Android Keystore
+// • flutter_secure_storage ^11.0.0 — Storage cifrato con Android Keystore
 // • local_auth ^3.0.2 — Verifica hardware biometrico (TEE proxy)
 // • hive_flutter ^1.1.0 — Database locale con cifratura AES-256
 //

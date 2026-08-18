@@ -810,7 +810,7 @@ class _GrantQrDialogState extends State<_GrantQrDialog> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  _pinVisible ? widget.pin : '••••••••••',
+                  _pinVisible ? widget.pin : '••••••••••••',
                   style: TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.bold,

@@ -82,6 +82,7 @@ dependencies:
   state_notifier: ^1.0.0
   xml: ^7.0.1
 
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

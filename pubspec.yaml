@@ -50,7 +50,7 @@ dependencies:
   freerasp: ^8.0.0
 
   # ── Scambio Dati (backup futuro) ──────────────────────────────────────────
-  file_picker: ^12.0.0
+  file_picker: 12.0.0-beta.7
   archive: ^4.0.9
 
   # ── QR Code e Scansione ──────────────────────────────────────────────────

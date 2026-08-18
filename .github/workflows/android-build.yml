@@ -65,7 +65,7 @@ jobs:
           SIGNING_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          BUILD_CMD="flutter build apk --release --dart-define-from-file=.env --target-platform=android-arm64 --obfuscate --split-debug-info=./debug_info"
+          BUILD_CMD="flutter build apk --release --dart-define-from-file=.env --target-platform=android-arm64 --obfuscate --split-debug-info=./debug_info --strip"
           if [ -n "${{ inputs.version_name }}" ]; then
             BUILD_CMD="$BUILD_CMD --build-name=${{ inputs.version_name }}"
           fi

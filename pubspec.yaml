@@ -13,9 +13,10 @@ environment:
 #
 # NOTA SULLA COERENZA DEI PLUGIN NATIVI:
 # Le versioni qui dichiarate devono essere coerenti con:
-#   - Kotlin 2.2.20 (android/settings.gradle.kts)
-#   - Android Gradle Plugin 8.11.1 (android/settings.gradle.kts)
-#   - compileSdk 36 (android/app/build.gradle.kts)
+#   - Kotlin 2.4.0 (android/settings.gradle.kts)
+#   - Android Gradle Plugin 9.1.1 (android/settings.gradle.kts)
+#   - Gradle 9.3.1 (android/gradle/wrapper/gradle-wrapper.properties)
+#   - compileSdk 37 (android/app/build.gradle.kts)
 #   - minSdk 30 (Android 10+)
 #   - JVM target 17
 #

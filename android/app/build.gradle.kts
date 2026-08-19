@@ -18,7 +18,7 @@ plugins {
 
 android {
     namespace = "com.delelimed.catechhub"
-    compileSdk = 36
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

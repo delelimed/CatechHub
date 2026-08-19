@@ -80,7 +80,9 @@ class EncryptedFileStorage {
   /// Scrive bytes già cifrati direttamente nel vault.
   /// Usato per ricevere allegati durante la sincronizzazione P2P.
   static Future<void> writeRawEncrypted(
-      String storageId, Uint8List encryptedBytes) async {
+    String storageId,
+    Uint8List encryptedBytes,
+  ) async {
     final file = await _fileFor(storageId);
     await file.writeAsBytes(encryptedBytes, flush: true);
   }

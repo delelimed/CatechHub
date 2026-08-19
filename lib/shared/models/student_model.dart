@@ -67,7 +67,7 @@ class Student {
   /// Email del genitore/tutore (facoltativa, importata da Excel/CSV).
   final String parentEmail;
 
-// ─── Dati sanitari e note ───────────────────────────────────────────
+  // ─── Dati sanitari e note ───────────────────────────────────────────
   /// Allergie alimentari o farmacologiche (testo libero). Dato critico
   /// per la sicurezza durante incontri con pasti/merende.
   final String? allergies;
@@ -164,8 +164,8 @@ class Student {
     this.lastModifiedBy = '',
     DateTime? createdAt,
     DateTime? updatedAt,
-  })  : createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now();
+  }) : createdAt = createdAt ?? DateTime.now(),
+       updatedAt = updatedAt ?? DateTime.now();
 
   /// Deserializza da Map (proveniente da Hive o da sync CRDT).
   /// I campi mancanti defaultano a stringa vuota o DateTime.now().
@@ -174,7 +174,8 @@ class Student {
       id: id,
       name: data['name'] ?? '',
       surname: data['surname'] ?? '',
-      birthDate: DateTime.tryParse(data['birthDate']?.toString() ?? '') ??
+      birthDate:
+          DateTime.tryParse(data['birthDate']?.toString() ?? '') ??
           DateTime.now(),
       classId: data['classId'],
       classUniqueCode: data['classUniqueCode'],
@@ -191,21 +192,26 @@ class Student {
       notes: data['notes'],
       consensoPrivacyFirmato: data['consensoPrivacyFirmato'] ?? false,
       dataFirmaConsenso: DateTime.tryParse(
-          data['dataFirmaConsenso']?.toString() ?? ''),
+        data['dataFirmaConsenso']?.toString() ?? '',
+      ),
       dataScadenzaTrattamento: DateTime.tryParse(
-          data['dataScadenzaTrattamento']?.toString() ?? ''),
+        data['dataScadenzaTrattamento']?.toString() ?? '',
+      ),
       consensoUsciteAutonome: data['consensoUsciteAutonome'] ?? false,
       contributoVersato: data['contributoVersato'] ?? false,
-      contributoEuros:
-          (data['contributoEuros'] as num?)?.toDouble() ?? 0,
+      contributoEuros: (data['contributoEuros'] as num?)?.toDouble() ?? 0,
       annoContributo: data['annoContributo'] ?? '',
       noteAllergieSalute: data['noteAllergieSalute'],
       statoPercorso: data['statoPercorso'] ?? 'ATTIVO',
       annoIscrizione: data['annoIscrizione'] ?? '',
       sacraments: Sacrament.listFromStorage(data['sacraments']),
       lastModifiedBy: data['lastModifiedBy'] ?? '',
-      createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(data['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(data['updatedAt']?.toString() ?? '') ??
+          DateTime.now(),
     );
   }
 
@@ -213,7 +219,9 @@ class Student {
   /// Usato per ordinare la lista studenti in tutta l'app (dashboard,
   /// anagrafica, presenze, ecc.).
   static int compareBySurname(Student a, Student b) {
-    final bySurname = a.surname.toLowerCase().compareTo(b.surname.toLowerCase());
+    final bySurname = a.surname.toLowerCase().compareTo(
+      b.surname.toLowerCase(),
+    );
     if (bySurname != 0) return bySurname;
     return a.name.toLowerCase().compareTo(b.name.toLowerCase());
   }

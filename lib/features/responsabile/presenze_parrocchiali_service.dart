@@ -42,9 +42,7 @@ class PresenzeParrocchialiService {
 
   /// Dati reattivi: presenze per classe (utile per la gerarchia).
   Stream<Map<String, List<Map<String, dynamic>>>> presenzePerClasse() {
-    return AttendanceRepository()
-        .getAttendance()
-        .map(_groupByClass);
+    return AttendanceRepository().getAttendance().map(_groupByClass);
   }
 
   Map<String, List<Map<String, dynamic>>> _groupByClass(
@@ -63,16 +61,16 @@ class PresenzeParrocchialiService {
   /// [threshold] = soglia di assenze consecutive per essere segnalato.
   /// Usa solo record conseguesce con data nota. Se un ragazzo non ha presenze,
   /// non viene segnalato (dati insufficienti).
-  List<AllertaAssenza> rilevaIstanza({
+  Future<List<AllertaAssenza>> rilevaIstanza({
     required int threshold,
     List<SchoolClass>? classes,
     bool includiArchiviati = false,
-  }) {
+  }) async {
     if (threshold <= 1) return const [];
 
     final classesRepo = ClassesRepository();
     final allClasses = classes ?? classesRepo.getClassesSync();
-    final allStudents = StudentsRepository().getAllStudentsSync();
+    final allStudents = await StudentsRepository().getAllStudentsSync();
     final studentsById = {for (final s in allStudents) s.id: s};
 
     final attendance = AttendanceRepository().getAttendanceSync()
@@ -94,7 +92,9 @@ class PresenzeParrocchialiService {
       for (final r in classRecords) {
         final presence = (r['presence'] as Map? ?? {});
         presence.forEach((sid, status) {
-          sequences.putIfAbsent(sid.toString(), () => []).add(status.toString());
+          sequences
+              .putIfAbsent(sid.toString(), () => [])
+              .add(status.toString());
         });
       }
 
@@ -115,14 +115,16 @@ class PresenzeParrocchialiService {
         }
         if (consecutive >= threshold) {
           final totale = seq.where((s) => s == 'Assente').length;
-          alerts.add(AllertaAssenza(
-            studentId: student.id,
-            fullName: '${student.name} ${student.surname}'.trim(),
-            className: cls.name,
-            classId: cls.id,
-            assenzeConsecutive: consecutive,
-            totaleAssenze: totale,
-          ));
+          alerts.add(
+            AllertaAssenza(
+              studentId: student.id,
+              fullName: '${student.name} ${student.surname}'.trim(),
+              className: cls.name,
+              classId: cls.id,
+              assenzeConsecutive: consecutive,
+              totaleAssenze: totale,
+            ),
+          );
         }
       }
     }

@@ -32,10 +32,12 @@ class HistoricalRecordRepository {
 
   /// Lettura sincrona di tutti i record storici.
   List<HistoricalRecord> getAllRecordsSync() {
-    return _sortNewestFirst(LocalDatabase.values(
-      _box,
-      (id, data) => HistoricalRecord.fromMap(id, data),
-    ));
+    return _sortNewestFirst(
+      LocalDatabase.values(
+        _box,
+        (id, data) => HistoricalRecord.fromMap(id, data),
+      ),
+    );
   }
 
   /// Stream dei record storici di uno specifico studente.
@@ -79,14 +81,11 @@ class HistoricalRecordRepository {
 
   /// Elimina i record di un singolo studente (Diritto all'Oblio / cascade).
   Future<void> deleteRecordsForStudent(String studentId) async {
-    final keys = _box.keys
-        .where((key) {
-          final data = _box.get(key);
-          if (data == null) return false;
-          return LocalDatabase.toStringDynamicMap(data)['studentId'] ==
-              studentId;
-        })
-        .toList();
+    final keys = _box.keys.where((key) {
+      final data = _box.get(key);
+      if (data == null) return false;
+      return LocalDatabase.toStringDynamicMap(data)['studentId'] == studentId;
+    }).toList();
     for (final key in keys) {
       await _box.delete(key);
     }
@@ -96,13 +95,11 @@ class HistoricalRecordRepository {
   Future<void> deleteRecordsForStudents(Iterable<String> studentIds) async {
     final set = studentIds.toSet();
     if (set.isEmpty) return;
-    final keys = _box.keys
-        .where((key) {
-          final data = _box.get(key);
-          if (data == null) return false;
-          return set.contains(LocalDatabase.toStringDynamicMap(data)['studentId']);
-        })
-        .toList();
+    final keys = _box.keys.where((key) {
+      final data = _box.get(key);
+      if (data == null) return false;
+      return set.contains(LocalDatabase.toStringDynamicMap(data)['studentId']);
+    }).toList();
     for (final key in keys) {
       await _box.delete(key);
     }

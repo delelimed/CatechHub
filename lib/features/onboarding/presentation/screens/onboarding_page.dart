@@ -145,7 +145,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       await _showSettingsDialog(
         'Posizione non autorizzata',
         'Per la sincronizzazione Bluetooth tra catechisti, autorizza la posizione dalle impostazioni del dispositivo. '
-        'CatechHub non usa la tua posizione per geolocalizzazione.',
+            'CatechHub non usa la tua posizione per geolocalizzazione.',
       );
     }
   }
@@ -187,7 +187,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       await _showSettingsDialog(
         'Galleria non autorizzata',
         'Per allegare foto di ragazzi, documenti e verbali dagli allegati, '
-        'autorizza l\'accesso alla galleria dalle impostazioni del dispositivo.',
+            'autorizza l\'accesso alla galleria dalle impostazioni del dispositivo.',
       );
     }
   }
@@ -271,14 +271,11 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
         await configRepo.forceResponsabileMode(false);
     }
 
-    await box.put(
-      'app_mode',
-      switch (mode) {
-        _OnboardingMode.responsabile => 'RESPONSABILE',
-        _OnboardingMode.normal => 'NORMAL',
-        _OnboardingMode.join => 'REPLICATED_PEER',
-      },
-    );
+    await box.put('app_mode', switch (mode) {
+      _OnboardingMode.responsabile => 'RESPONSABILE',
+      _OnboardingMode.normal => 'NORMAL',
+      _OnboardingMode.join => 'REPLICATED_PEER',
+    });
     await box.put('onboarding_completed', true);
 
     if (!mounted) return;
@@ -305,11 +302,13 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     await UserRole.setCurrent(UserRole.responsabile);
     final configRepo = ParishConfigRepository();
     await configRepo.forceResponsabileMode(true);
-    await configRepo.save(configRepo.getConfig().copyWith(
-          nomeParrocchia: nome,
-          diocesi: _diocesiCtrl.text.trim(),
-          annoCatechisticoCorrente: _annoCatechisticoCtrl.text.trim(),
-        ));
+    await configRepo.save(
+      configRepo.getConfig().copyWith(
+        nomeParrocchia: nome,
+        diocesi: _diocesiCtrl.text.trim(),
+        annoCatechisticoCorrente: _annoCatechisticoCtrl.text.trim(),
+      ),
+    );
 
     await _applyMode(_OnboardingMode.responsabile);
   }
@@ -329,8 +328,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
               child: _step == 0
                   ? _buildPermissionsStep()
                   : _step == 1
-                      ? _buildModeStep()
-                      : _buildParishStep(),
+                  ? _buildModeStep()
+                  : _buildParishStep(),
             ),
           ],
         ),
@@ -406,20 +405,29 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             const SizedBox(height: 20),
             const Text(
               'Prima di iniziare',
-              style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF174A7E),
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               'Per il corretto funzionamento CatechHub usa alcuni permessi '
               'del dispositivo. Puoi attivarli ora oppure quando ti verranno '
               'richiesti durante l\'uso.',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.5),
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade700,
+                height: 1.5,
+              ),
             ),
             const SizedBox(height: 20),
             _buildPermissionCard(
               icon: Icons.notifications_rounded,
               title: 'Notifiche',
-              description: 'Avvisi di aggiornamento e promemoria degli incontri.',
+              description:
+                  'Avvisi di aggiornamento e promemoria degli incontri.',
               granted: _notificationGranted,
               requested: _notificationRequested,
               buttonLabel: 'Attiva le notifiche',
@@ -428,7 +436,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             _buildPermissionCard(
               icon: Icons.bluetooth_rounded,
               title: 'Connessione locale (P2P)',
-              description: 'Sincronizzazione diretta tra catechisti via Bluetooth '
+              description:
+                  'Sincronizzazione diretta tra catechisti via Bluetooth '
                   'e Nearby. Su Android richiede anche il permesso di posizione.',
               granted: _locationGranted && _bluetoothGranted,
               requested: _locationRequested && _bluetoothRequested,
@@ -443,7 +452,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             _buildPermissionCard(
               icon: Icons.qr_code_scanner_rounded,
               title: 'Fotocamera',
-              description: 'Per scansionare i codici QR di associazione o '
+              description:
+                  'Per scansionare i codici QR di associazione o '
                   'condivisione dei dati tra catechisti.',
               granted: _cameraGranted,
               requested: _cameraRequested,
@@ -453,7 +463,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             _buildPermissionCard(
               icon: Icons.photo_library_rounded,
               title: 'Foto e media',
-              description: 'Per allegare foto di ragazzi, documenti e verbali '
+              description:
+                  'Per allegare foto di ragazzi, documenti e verbali '
                   'dalla galleria del dispositivo.',
               granted: _photosGranted,
               requested: _photosRequested,
@@ -469,10 +480,15 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF174A7E),
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                   elevation: 2,
                 ),
-                child: const Text('Continua', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                child: const Text(
+                  'Continua',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -521,7 +537,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                 ),
                 child: Icon(
                   icon,
-                  color: granted ? Colors.green.shade700 : const Color(0xFF174A7E),
+                  color: granted
+                      ? Colors.green.shade700
+                      : const Color(0xFF174A7E),
                   size: 24,
                 ),
               ),
@@ -532,12 +550,20 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF174A7E)),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: Color(0xFF174A7E),
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       description,
-                      style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700, height: 1.4),
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: Colors.grey.shade700,
+                        height: 1.4,
+                      ),
                     ),
                   ],
                 ),
@@ -565,11 +591,16 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF174A7E),
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
           elevation: 0,
         ),
         icon: const Icon(Icons.toggle_on_rounded, size: 24),
-        label: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        label: Text(
+          label,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }
@@ -582,10 +613,15 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
         onPressed: openAppSettings,
         style: OutlinedButton.styleFrom(
           foregroundColor: const Color(0xFF174A7E),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
         icon: const Icon(Icons.settings_rounded, size: 20),
-        label: const Text('Attiva dalle impostazioni', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        label: const Text(
+          'Attiva dalle impostazioni',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }
@@ -594,11 +630,19 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.check_circle_rounded, color: Colors.green.shade700, size: 20),
+        Icon(
+          Icons.check_circle_rounded,
+          color: Colors.green.shade700,
+          size: 20,
+        ),
         const SizedBox(width: 6),
         Text(
           'Permesso concesso',
-          style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w600, fontSize: 13),
+          style: TextStyle(
+            color: Colors.green.shade700,
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
         ),
       ],
     );
@@ -617,19 +661,28 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             const SizedBox(height: 16),
             Text(
               'Come vuoi usare CatechHub?',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: const Color(0xFF174A7E)),
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF174A7E),
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               'Puoi cambiare modalità in qualsiasi momento dalle impostazioni.',
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade700, height: 1.4),
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade700,
+                height: 1.4,
+              ),
             ),
             const SizedBox(height: 20),
             _buildModeCard(
               mode: _OnboardingMode.responsabile,
               icon: Icons.account_balance_rounded,
               title: 'Modalità Responsabile Catechistico',
-              description: 'Per chi gestisce la programmazione e la struttura '
+              description:
+                  'Per chi gestisce la programmazione e la struttura '
                   'dell\'intera parrocchia: classi, catechisti, luoghi, presenze '
                   'aggregate e registro GDPR.',
             ),
@@ -637,14 +690,16 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
               mode: _OnboardingMode.normal,
               icon: Icons.menu_book_rounded,
               title: 'Modalità Normale (Senza Responsabile)',
-              description: 'Uso autonomo del singolo catechista: crea la tua '
+              description:
+                  'Uso autonomo del singolo catechista: crea la tua '
                   'classe e gestisci il registro in modo indipendente.',
             ),
             _buildModeCard(
               mode: _OnboardingMode.join,
               icon: Icons.group_add_rounded,
               title: 'Associa a Classe Esistente',
-              description: 'Configura rapidamente un nuovo dispositivo ricevendo '
+              description:
+                  'Configura rapidamente un nuovo dispositivo ricevendo '
                   'account e classe direttamente da un altro catechista o dal '
                   'Responsabile via P2P.',
             ),
@@ -674,13 +729,18 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF174A7E),
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                   elevation: 2,
                 ),
                 icon: const Icon(Icons.arrow_forward_rounded, size: 20),
                 label: Text(
                   _selectedMode == null ? 'Continua' : 'Conferma modalità',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
@@ -713,7 +773,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                 : Colors.white,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: isSelected ? const Color(0xFF174A7E) : Colors.grey.shade200,
+              color: isSelected
+                  ? const Color(0xFF174A7E)
+                  : Colors.grey.shade200,
               width: isSelected ? 2 : 1,
             ),
             boxShadow: [
@@ -757,15 +819,23 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                     const SizedBox(height: 4),
                     Text(
                       description,
-                      style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700, height: 1.45),
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: Colors.grey.shade700,
+                        height: 1.45,
+                      ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 8),
               Icon(
-                isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
-                color: isSelected ? const Color(0xFF174A7E) : Colors.grey.shade400,
+                isSelected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_off_rounded,
+                color: isSelected
+                    ? const Color(0xFF174A7E)
+                    : Colors.grey.shade400,
               ),
             ],
           ),

@@ -70,158 +70,223 @@ void main() {
   });
 
   Map<String, dynamic> studentEntry(String id, {bool demo = false}) => {
-        'id': id,
-        'classId': 'class_1',
-        'classUniqueCode': 'CU_1',
-        'name': demo ? 'Mario Demo' : 'Gino Reale',
-        'surname': demo ? 'Esempio' : 'Protetto',
-        'birthDate': '2014-01-01T00:00:00.000Z',
-        'motherName': 'Anna',
-        'motherSurname': 'Mamma',
-        'fatherName': 'Luigi',
-        'fatherSurname': 'Papa',
-        'motherPhone': '3330000001',
-        'fatherPhone': '3330000002',
-        'studentPhone': '3330000003',
-        'parentEmail': 'genitore@example.com',
-        'allergies': 'nessuna',
-        'autonomousExits': 'false',
-        'notes': '',
-        'consensoPrivacyFirmato': true,
-        'dataFirmaConsenso': '2026-01-01T00:00:00.000Z',
-        'dataScadenzaTrattamento': '2027-01-01T00:00:00.000Z',
-        'statoPercorso': 'ATTIVO',
-        'createdAt': '2026-01-01T00:00:00.000Z',
-        'updatedAt': '2026-01-01T00:00:00.000Z',
-        if (demo) '_demo': true,
-      };
+    'id': id,
+    'classId': 'class_1',
+    'classUniqueCode': 'CU_1',
+    'name': demo ? 'Mario Demo' : 'Gino Reale',
+    'surname': demo ? 'Esempio' : 'Protetto',
+    'birthDate': '2014-01-01T00:00:00.000Z',
+    'motherName': 'Anna',
+    'motherSurname': 'Mamma',
+    'fatherName': 'Luigi',
+    'fatherSurname': 'Papa',
+    'motherPhone': '3330000001',
+    'fatherPhone': '3330000002',
+    'studentPhone': '3330000003',
+    'parentEmail': 'genitore@example.com',
+    'allergies': 'nessuna',
+    'autonomousExits': 'false',
+    'notes': '',
+    'consensoPrivacyFirmato': true,
+    'dataFirmaConsenso': '2026-01-01T00:00:00.000Z',
+    'dataScadenzaTrattamento': '2027-01-01T00:00:00.000Z',
+    'statoPercorso': 'ATTIVO',
+    'createdAt': '2026-01-01T00:00:00.000Z',
+    'updatedAt': '2026-01-01T00:00:00.000Z',
+    if (demo) '_demo': true,
+  };
 
   Map<String, dynamic> classEntry(List<String> studentIds) => {
-        'name': 'Prima Comunione',
-        'uniqueCode': 'CU_1',
-        'catechistIds': ['local_catechist_id'],
-        'studentIds': studentIds,
-        'createdAt': '2026-01-01T00:00:00.000Z',
-        'updatedAt': '2026-01-01T00:00:00.000Z',
-      };
+    'name': 'Prima Comunione',
+    'uniqueCode': 'CU_1',
+    'catechistIds': ['local_catechist_id'],
+    'studentIds': studentIds,
+    'createdAt': '2026-01-01T00:00:00.000Z',
+    'updatedAt': '2026-01-01T00:00:00.000Z',
+  };
 
   group('M7 / Fase 3-8: cascata di cancellazione reale', () {
-    test('deleteStudent rimuove note, storici, presenze e riferimenti classe',
-        () async {
-      const id = 'STU_CASCADE';
-      await LocalDatabase.students().put(id, studentEntry(id));
-      await LocalDatabase.classes().put('class_1', classEntry([id]));
-      await LocalDatabase.attendance().put(
-            'meet_1',
-            {'presence': {id: true}, 'updatedAt': '2026-01-01T00:00:00.000Z'},
-          );
-      await LocalDatabase.studentDailyNotes().put(
-            'note_1',
-            {'studentId': id, 'text': 'nota', 'updatedAt': '2026-01-01T00:00:00.000Z'},
-          );
-      await LocalDatabase.historicalRecords().put(
-            'hist_1',
-            {'studentId': id, 'note': 'storico', 'updatedAt': '2026-01-01T00:00:00.000Z'},
-          );
-      await LocalDatabase.documentDeliveries().put(
-            'doc_1',
-            {id: '2026-01-15', 'updatedAt': '2026-01-01T00:00:00.000Z'},
-          );
+    test(
+      'deleteStudent rimuove note, storici, presenze e riferimenti classe',
+      () async {
+        const id = 'STU_CASCADE';
+        await LocalDatabase.students().put(id, studentEntry(id));
+        await LocalDatabase.classes().put('class_1', classEntry([id]));
+        await LocalDatabase.attendance().put('meet_1', {
+          'presence': {id: true},
+          'updatedAt': '2026-01-01T00:00:00.000Z',
+        });
+        await LocalDatabase.studentDailyNotes().put('note_1', {
+          'studentId': id,
+          'text': 'nota',
+          'updatedAt': '2026-01-01T00:00:00.000Z',
+        });
+        await LocalDatabase.historicalRecords().put('hist_1', {
+          'studentId': id,
+          'note': 'storico',
+          'updatedAt': '2026-01-01T00:00:00.000Z',
+        });
+        await LocalDatabase.documentDeliveries().put('doc_1', {
+          id: '2026-01-15',
+          'updatedAt': '2026-01-01T00:00:00.000Z',
+        });
 
-      await StudentsRepository().deleteStudent(id);
+        await StudentsRepository().deleteStudent(id);
 
-      expect(LocalDatabase.students().containsKey(id), isFalse,
-          reason: 'il record studente deve essere eliminato');
-      final classMap =
-          LocalDatabase.toStringDynamicMap(LocalDatabase.classes().get('class_1'));
-      expect(classMap['studentIds'], isNot(contains(id)),
-          reason: 'lo studente deve essere rimosso dalla classe');
-      final presence = LocalDatabase.toStringDynamicMap(
-          LocalDatabase.attendance().get('meet_1'))['presence'] as Map;
-      expect(presence.containsKey(id), isFalse,
-          reason: 'lo studente deve essere rimosso dalle presenze');
-      expect(LocalDatabase.studentDailyNotes().containsKey('note_1'), isFalse,
-          reason: 'le note giornaliere devono essere eliminate');
-      expect(LocalDatabase.historicalRecords().containsKey('hist_1'), isFalse,
-          reason: 'i record storici devono essere eliminati');
-      final delivery =
-          LocalDatabase.toStringDynamicMap(LocalDatabase.documentDeliveries().get('doc_1'));
-      expect(delivery.containsKey(id), isFalse,
-          reason: 'lo studente deve essere rimosso dalle consegne documenti');
-    });
+        expect(
+          LocalDatabase.students().containsKey(id),
+          isFalse,
+          reason: 'il record studente deve essere eliminato',
+        );
+        final classMap = LocalDatabase.toStringDynamicMap(
+          LocalDatabase.classes().get('class_1'),
+        );
+        expect(
+          classMap['studentIds'],
+          isNot(contains(id)),
+          reason: 'lo studente deve essere rimosso dalla classe',
+        );
+        final presence =
+            LocalDatabase.toStringDynamicMap(
+                  LocalDatabase.attendance().get('meet_1'),
+                )['presence']
+                as Map;
+        expect(
+          presence.containsKey(id),
+          isFalse,
+          reason: 'lo studente deve essere rimosso dalle presenze',
+        );
+        expect(
+          LocalDatabase.studentDailyNotes().containsKey('note_1'),
+          isFalse,
+          reason: 'le note giornaliere devono essere eliminate',
+        );
+        expect(
+          LocalDatabase.historicalRecords().containsKey('hist_1'),
+          isFalse,
+          reason: 'i record storici devono essere eliminati',
+        );
+        final delivery = LocalDatabase.toStringDynamicMap(
+          LocalDatabase.documentDeliveries().get('doc_1'),
+        );
+        expect(
+          delivery.containsKey(id),
+          isFalse,
+          reason: 'lo studente deve essere rimosso dalle consegne documenti',
+        );
+      },
+    );
 
-    test('deleteStudent non cancella un altro studente dello stesso box', () async {
-      const id = 'STU_CASCADE';
-      const other = 'STU_ALTRO';
-      await LocalDatabase.students().put(id, studentEntry(id));
-      await LocalDatabase.students().put(other, studentEntry(other));
+    test(
+      'deleteStudent non cancella un altro studente dello stesso box',
+      () async {
+        const id = 'STU_CASCADE';
+        const other = 'STU_ALTRO';
+        await LocalDatabase.students().put(id, studentEntry(id));
+        await LocalDatabase.students().put(other, studentEntry(other));
 
-      await StudentsRepository().deleteStudent(id);
+        await StudentsRepository().deleteStudent(id);
 
-      expect(LocalDatabase.students().containsKey(id), isFalse);
-      expect(LocalDatabase.students().containsKey(other), isTrue,
-          reason: 'la cascata non deve toccare gli altri studenti');
-    });
+        expect(LocalDatabase.students().containsKey(id), isFalse);
+        expect(
+          LocalDatabase.students().containsKey(other),
+          isTrue,
+          reason: 'la cascata non deve toccare gli altri studenti',
+        );
+      },
+    );
   });
 
   group('M8 / Fase 3-9: dati demo esclusi da export e sync', () {
     test('exportAllData non include lo studente demo', () async {
       const demoId = 'STU_DEMO';
       const realId = 'STU_REAL';
-      await LocalDatabase.students().put(demoId, studentEntry(demoId, demo: true));
+      await LocalDatabase.students().put(
+        demoId,
+        studentEntry(demoId, demo: true),
+      );
       await LocalDatabase.students().put(realId, studentEntry(realId));
-      await LocalDatabase.classes().put('class_1', classEntry([demoId, realId]));
+      await LocalDatabase.classes().put(
+        'class_1',
+        classEntry([demoId, realId]),
+      );
 
       final data = await DataExportService.exportAllData();
 
       final exportedIds = (data['anagrafica']['students'] as List)
           .map((s) => (s as Map)['id'].toString())
           .toSet();
-      expect(exportedIds, contains(realId),
-          reason: 'lo studente reale deve essere esportato');
-      expect(exportedIds, isNot(contains(demoId)),
-          reason: 'lo studente demo non deve essere esportato');
+      expect(
+        exportedIds,
+        contains(realId),
+        reason: 'lo studente reale deve essere esportato',
+      );
+      expect(
+        exportedIds,
+        isNot(contains(demoId)),
+        reason: 'lo studente demo non deve essere esportato',
+      );
     });
 
     test('pacchetto conservazione GDPR non include lo studente demo', () async {
       const demoId = 'STU_DEMO';
       const realId = 'STU_REAL';
-      await LocalDatabase.students().put(demoId, studentEntry(demoId, demo: true));
+      await LocalDatabase.students().put(
+        demoId,
+        studentEntry(demoId, demo: true),
+      );
       await LocalDatabase.students().put(realId, studentEntry(realId));
 
-      final pkg = GdprExportService.buildParishConservationPackage();
+      final pkg = await GdprExportService.buildParishConservationPackage();
       final exportedIds = (pkg['schedaSchedaConsensi'] as List)
           .map((s) => (s as Map)['id'].toString())
           .toSet();
       expect(exportedIds, contains(realId));
-      expect(exportedIds, isNot(contains(demoId)),
-          reason: 'il dato demo non deve comparire nell\'archivio di conservazione');
+      expect(
+        exportedIds,
+        isNot(contains(demoId)),
+        reason:
+            'il dato demo non deve comparire nell\'archivio di conservazione',
+      );
     });
 
-    test('indice sync P2P e record modificati escludono lo studente demo',
-        () async {
-      const demoId = 'STU_DEMO';
-      const realId = 'STU_REAL';
-      await LocalDatabase.students().put(demoId, studentEntry(demoId, demo: true));
-      await LocalDatabase.students().put(realId, studentEntry(realId));
+    test(
+      'indice sync P2P e record modificati escludono lo studente demo',
+      () async {
+        const demoId = 'STU_DEMO';
+        const realId = 'STU_REAL';
+        await LocalDatabase.students().put(
+          demoId,
+          studentEntry(demoId, demo: true),
+        );
+        await LocalDatabase.students().put(realId, studentEntry(realId));
 
-      final index = HiveSyncEngine().buildLocalIndex();
-      final indexedIds = index.where((e) => e.boxName == LocalDatabase.studentsBox)
-          .map((e) => e.id)
-          .toSet();
-      expect(indexedIds, contains(realId));
-      expect(indexedIds, isNot(contains(demoId)),
-          reason: 'il dato demo non deve essere pubblicizzato via sync');
+        final index = await HiveSyncEngine().buildLocalIndex();
+        final indexedIds = index
+            .where((e) => e.boxName == LocalDatabase.studentsBox)
+            .map((e) => e.id)
+            .toSet();
+        expect(indexedIds, contains(realId));
+        expect(
+          indexedIds,
+          isNot(contains(demoId)),
+          reason: 'il dato demo non deve essere pubblicizzato via sync',
+        );
 
-      final records = HiveSyncEngine()
-          .extractModifiedRecords(DateTime.fromMillisecondsSinceEpoch(0).toUtc());
-      final recordIds = records
-          .where((r) => r.boxName == LocalDatabase.studentsBox)
-          .map((r) => r.id)
-          .toSet();
-      expect(recordIds, contains(realId));
-      expect(recordIds, isNot(contains(demoId)),
-          reason: 'il dato demo non deve essere trasmesso via sync');
-    });
+        final records = await HiveSyncEngine().extractModifiedRecords(
+          DateTime.fromMillisecondsSinceEpoch(0).toUtc(),
+        );
+        final recordIds = records
+            .where((r) => r.boxName == LocalDatabase.studentsBox)
+            .map((r) => r.id)
+            .toSet();
+        expect(recordIds, contains(realId));
+        expect(
+          recordIds,
+          isNot(contains(demoId)),
+          reason: 'il dato demo non deve essere trasmesso via sync',
+        );
+      },
+    );
   });
 }

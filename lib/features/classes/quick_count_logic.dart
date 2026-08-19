@@ -42,10 +42,10 @@ class QuickCountLogic {
 
   /// Numero di ragazzi marcati "Presente" in un singolo record di appello.
   static int presentCount(Map<String, dynamic> record) {
-    final presence = Map<String, dynamic>.from(record['presence'] as Map? ?? {});
-    return presence.values
-        .where((v) => v?.toString() == 'Presente')
-        .length;
+    final presence = Map<String, dynamic>.from(
+      record['presence'] as Map? ?? {},
+    );
+    return presence.values.where((v) => v?.toString() == 'Presente').length;
   }
 
   /// Totale dei presenti sull'insieme di record (somma di [presentCount]).

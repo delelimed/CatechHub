@@ -23,9 +23,7 @@ void main() {
 
     test('factory failure() crea un risultato con allGranted=false', () {
       // Act: crea un risultato di fallimento
-      final result = PermissionCheckResult.failure(
-        message: 'Permessi negati',
-      );
+      final result = PermissionCheckResult.failure(message: 'Permessi negati');
       // Assert: i permessi non sono concessi
       expect(result.allGranted, isFalse);
       expect(result.errorMessage, 'Permessi negati');

@@ -14,6 +14,7 @@
 /// IMPORTANTE: questa funzione NON salva nulla e NON modifica l'appello
 /// svolto: è solo un supporto di verifica in presenza.
 library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -96,7 +97,9 @@ class _QuickCountPageState extends ConsumerState<QuickCountPage> {
       return;
     }
 
-    final attendance = ref.read(attendanceRepositoryProvider).getAttendanceSync();
+    final attendance = ref
+        .read(attendanceRepositoryProvider)
+        .getAttendanceSync();
     final todayRecords = QuickCountLogic.recordsOfClasses(
       QuickCountLogic.recordsOnDate(attendance, DateTime.now()),
       _selectedClassIds,
@@ -129,7 +132,7 @@ class _QuickCountPageState extends ConsumerState<QuickCountPage> {
     }
 
     final presentIds = QuickCountLogic.presentStudentIds(todayRecords);
-    final students = ref.read(studentsRepoProvider).getAllStudentsSync();
+    final students = await ref.read(studentsRepoProvider).getAllStudentsSync();
     final presentStudents = Student.sortedBySurname(
       students.where((s) => presentIds.contains(s.id)),
     );
@@ -336,7 +339,9 @@ class _QuickCountPageState extends ConsumerState<QuickCountPage> {
                           'Presenti all\'appello: ${data.present}',
                           style: TextStyle(
                             fontSize: 14,
-                            color: isDark ? Colors.grey.shade300 : Colors.black87,
+                            color: isDark
+                                ? Colors.grey.shade300
+                                : Colors.black87,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -345,7 +350,9 @@ class _QuickCountPageState extends ConsumerState<QuickCountPage> {
                           'individuare i mancanti. Nessun dato viene salvato.',
                           style: TextStyle(
                             fontSize: 12,
-                            color: isDark ? Colors.grey.shade400 : Colors.black54,
+                            color: isDark
+                                ? Colors.grey.shade400
+                                : Colors.black54,
                           ),
                         ),
                       ],

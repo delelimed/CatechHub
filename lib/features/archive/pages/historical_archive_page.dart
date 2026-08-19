@@ -130,18 +130,21 @@ class _HistoricalArchivePageState extends ConsumerState<HistoricalArchivePage> {
       final result = await ConcludiAnnoService().concludiAnno();
       setState(() => _busy = false);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-          'Anno concluso: ${result.records.length} record archiviati, '
-          '${result.promozioni.length} classi promosse. '
-          'Nuovo anno: ${result.nuovoAnno}.',
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Anno concluso: ${result.records.length} record archiviati, '
+            '${result.promozioni.length} classi promosse. '
+            'Nuovo anno: ${result.nuovoAnno}.',
+          ),
         ),
-      ));
+      );
     } catch (e) {
       setState(() => _busy = false);
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Errore: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Errore: $e')));
     }
   }
 }
@@ -197,8 +200,11 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.history_rounded,
-                size: 56, color: Theme.of(context).colorScheme.primary),
+            Icon(
+              Icons.history_rounded,
+              size: 56,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             const SizedBox(height: 12),
             const Text(
               'Nessun record storico archiviato.',
@@ -229,8 +235,11 @@ class _YearHeader extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       children: [
-        Icon(Icons.calendar_month_rounded,
-            size: 18, color: Theme.of(context).colorScheme.primary),
+        Icon(
+          Icons.calendar_month_rounded,
+          size: 18,
+          color: Theme.of(context).colorScheme.primary,
+        ),
         const SizedBox(width: 6),
         Text(
           'Anno $year',
@@ -262,106 +271,124 @@ class _ArchiveRecordCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final student = _studentById(record.studentId);
-    final name = student == null
-        ? 'Ragazzo eliminato'
-        : '${student.name} ${student.surname}'.trim();
+    return FutureBuilder<Student?>(
+      future: _studentById(record.studentId),
+      builder: (context, snapshot) {
+        final student = snapshot.data;
+        final name = student == null
+            ? 'Ragazzo eliminato'
+            : '${student.name} ${student.surname}'.trim();
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isDark ? theme.colorScheme.surfaceContainer : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-            color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDark ? theme.colorScheme.surfaceContainer : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundColor:
-                    theme.colorScheme.primary.withValues(alpha: 0.12),
-                child: Text(
-                  name.isNotEmpty ? name[0].toUpperCase() : '?',
-                  style: TextStyle(
-                      fontSize: 14, color: theme.colorScheme.primary),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name,
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
-                    Text(
-                      record.className.isEmpty
-                          ? 'Classe non specificata'
-                          : record.className,
-                      style:
-                          TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: theme.colorScheme.primary.withValues(
+                      alpha: 0.12,
                     ),
+                    child: Text(
+                      name.isNotEmpty ? name[0].toUpperCase() : '?',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          record.className.isEmpty
+                              ? 'Classe non specificata'
+                              : record.className,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      'Presenze ${record.attendancePercentage.toStringAsFixed(0)}%',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (record.sacramentsReceived.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final s in record.sacramentsReceived)
+                      Chip(
+                        label: Text(
+                          s.label,
+                          style: const TextStyle(fontSize: 10),
+                        ),
+                        visualDensity: VisualDensity.compact,
+                        backgroundColor: Colors.green.shade50,
+                        side: BorderSide(color: Colors.green.shade200),
+                      ),
                   ],
                 ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  'Presenze ${record.attendancePercentage.toStringAsFixed(0)}%',
+              ],
+              if (record.evaluationsSummary.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  record.evaluationsSummary,
                   style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.primary,
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.grey.shade700,
                   ),
                 ),
-              ),
+              ],
+              const Divider(height: 16),
+              _StudentEndOfYearActions(record: record),
             ],
           ),
-          if (record.sacramentsReceived.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final s in record.sacramentsReceived)
-                  Chip(
-                    label: Text(s.label, style: const TextStyle(fontSize: 10)),
-                    visualDensity: VisualDensity.compact,
-                    backgroundColor: Colors.green.shade50,
-                    side: BorderSide(color: Colors.green.shade200),
-                  ),
-              ],
-            ),
-          ],
-          if (record.evaluationsSummary.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              record.evaluationsSummary,
-              style: TextStyle(
-                fontSize: 12,
-                fontStyle: FontStyle.italic,
-                color: Colors.grey.shade700,
-              ),
-            ),
-          ],
-          const Divider(height: 16),
-          _StudentEndOfYearActions(record: record),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Student? _studentById(String id) {
-    for (final s in StudentsRepository().getAllStudentsSync()) {
+  Future<Student?> _studentById(String id) async {
+    for (final s in await StudentsRepository().getAllStudentsSync()) {
       if (s.id == id) return s;
     }
     return null;
@@ -387,43 +414,48 @@ class _StudentEndOfYearActionsState
 
   @override
   Widget build(BuildContext context) {
-    final student = _studentById(record.studentId);
     final cls = _classById(record.classId);
+    return FutureBuilder<Student?>(
+      future: _studentById(record.studentId),
+      builder: (context, snapshot) {
+        final student = snapshot.data;
 
-    if (student == null || cls == null) {
-      return Text(
-        'Ragazzo non più presente nelle classi attive.',
-        style: TextStyle(
-          fontSize: 11,
-          fontStyle: FontStyle.italic,
-          color: Colors.grey.shade600,
-        ),
-      );
-    }
+        if (student == null || cls == null) {
+          return Text(
+            'Ragazzo non più presente nelle classi attive.',
+            style: TextStyle(
+              fontSize: 11,
+              fontStyle: FontStyle.italic,
+              color: Colors.grey.shade600,
+            ),
+          );
+        }
 
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: _busy ? null : () => _promuovi(student, cls),
-            icon: const Icon(Icons.trending_up_rounded, size: 16),
-            label: const Text('Promuovi'),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: _busy ? null : () => _archivia(student, cls),
-            icon: const Icon(Icons.archive_outlined, size: 16),
-            label: const Text('Archivia'),
-          ),
-        ),
-      ],
+        return Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _busy ? null : () => _promuovi(student, cls),
+                icon: const Icon(Icons.trending_up_rounded, size: 16),
+                label: const Text('Promuovi'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _busy ? null : () => _archivia(student, cls),
+                icon: const Icon(Icons.archive_outlined, size: 16),
+                label: const Text('Archivia'),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
-  Student? _studentById(String id) {
-    for (final s in StudentsRepository().getAllStudentsSync()) {
+  Future<Student?> _studentById(String id) async {
+    for (final s in await StudentsRepository().getAllStudentsSync()) {
       if (s.id == id) return s;
     }
     return null;
@@ -440,9 +472,14 @@ class _StudentEndOfYearActionsState
   Future<void> _promuovi(Student student, SchoolClass cls) async {
     setState(() => _busy = true);
     try {
-      await ConcludiAnnoService()
-          .promuoviStudente(student, cls, testNow: DateTime.now());
-      _snack('${student.name} ${student.surname} promosso all\'anno successivo.');
+      await ConcludiAnnoService().promuoviStudente(
+        student,
+        cls,
+        testNow: DateTime.now(),
+      );
+      _snack(
+        '${student.name} ${student.surname} promosso all\'anno successivo.',
+      );
     } catch (e) {
       _snack('Errore: $e');
     } finally {
@@ -453,8 +490,11 @@ class _StudentEndOfYearActionsState
   Future<void> _archivia(Student student, SchoolClass cls) async {
     setState(() => _busy = true);
     try {
-      await ConcludiAnnoService()
-          .archiviaStudente(student, cls, testNow: DateTime.now());
+      await ConcludiAnnoService().archiviaStudente(
+        student,
+        cls,
+        testNow: DateTime.now(),
+      );
       _snack('${student.name} ${student.surname} archiviato ad anno concluso.');
     } catch (e) {
       _snack('Errore: $e');
@@ -465,6 +505,8 @@ class _StudentEndOfYearActionsState
 
   void _snack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }

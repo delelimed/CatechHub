@@ -66,21 +66,26 @@ class ContactNote {
     this.lastModifiedBy = '',
     DateTime? createdAt,
     DateTime? updatedAt,
-  })  : createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now();
+  }) : createdAt = createdAt ?? DateTime.now(),
+       updatedAt = updatedAt ?? DateTime.now();
 
   factory ContactNote.fromMap(String id, Map<String, dynamic> data) {
     return ContactNote(
       id: id,
       studentId: data['studentId'] ?? '',
       classUniqueCode: data['classUniqueCode'],
-      dateTime: DateTime.tryParse(data['dateTime']?.toString() ?? '') ??
+      dateTime:
+          DateTime.tryParse(data['dateTime']?.toString() ?? '') ??
           DateTime.now(),
       medium: data['medium'] ?? 'de_visu',
       notes: data['notes'] ?? '',
       lastModifiedBy: data['lastModifiedBy'] ?? '',
-      createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(data['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(data['updatedAt']?.toString() ?? '') ??
+          DateTime.now(),
     );
   }
 

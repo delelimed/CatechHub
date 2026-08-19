@@ -38,11 +38,13 @@ void main() {
   group('AulaRepository', () {
     test('saveAula persiste l\'aula e la ritrova in sync', () async {
       final repo = AulaRepository();
-      await repo.saveAula(Aula(
-        stanzaId: 'stanza_1',
-        nomeStanza: 'Aula Magna',
-        capienzaMassima: 24,
-      ));
+      await repo.saveAula(
+        Aula(
+          stanzaId: 'stanza_1',
+          nomeStanza: 'Aula Magna',
+          capienzaMassima: 24,
+        ),
+      );
 
       final saved = repo.getAula('stanza_1');
       expect(saved, isNotNull);
@@ -50,35 +52,40 @@ void main() {
       expect(saved.capienzaMassima, 24);
     });
 
-    test('deleteAula rimuove l\'aula e pulisce gli slot dalle classi', () async {
-      final repo = AulaRepository();
-      await repo.saveAula(Aula(stanzaId: 'stanza_a', nomeStanza: 'Aula A'));
+    test(
+      'deleteAula rimuove l\'aula e pulisce gli slot dalle classi',
+      () async {
+        final repo = AulaRepository();
+        await repo.saveAula(Aula(stanzaId: 'stanza_a', nomeStanza: 'Aula A'));
 
-      await ClassesRepository().addClass(SchoolClass(
-        id: 'class_slot_1',
-        name: 'Sala',
-        studentIds: [],
-        catechistIds: [],
-        roomSlots: [
-          RoomSlot(
-            slotId: 'slot_a',
-            stanzaId: 'stanza_a',
-            nomeStanza: 'Aula A',
-            giornoSettimana: 6,
-            oraInizio: '15:00',
-            oraFine: '16:30',
+        await ClassesRepository().addClass(
+          SchoolClass(
+            id: 'class_slot_1',
+            name: 'Sala',
+            studentIds: [],
+            catechistIds: [],
+            roomSlots: [
+              RoomSlot(
+                slotId: 'slot_a',
+                stanzaId: 'stanza_a',
+                nomeStanza: 'Aula A',
+                giornoSettimana: 6,
+                oraInizio: '15:00',
+                oraFine: '16:30',
+              ),
+            ],
           ),
-        ],
-      ));
+        );
 
-      await repo.deleteAula('stanza_a');
+        await repo.deleteAula('stanza_a');
 
-      expect(repo.getAula('stanza_a'), isNull);
+        expect(repo.getAula('stanza_a'), isNull);
 
-      final updated = ClassesRepository()
-          .getClassesSync()
-          .firstWhere((c) => c.id == 'class_slot_1');
-      expect(updated.roomSlots, isEmpty);
-    });
+        final updated = ClassesRepository().getClassesSync().firstWhere(
+          (c) => c.id == 'class_slot_1',
+        );
+        expect(updated.roomSlots, isEmpty);
+      },
+    );
   });
 }

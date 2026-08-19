@@ -25,13 +25,12 @@ class ApprovalCenterPage extends ConsumerStatefulWidget {
   const ApprovalCenterPage({super.key});
 
   @override
-  ConsumerState<ApprovalCenterPage> createState() =>
-      _ApprovalCenterPageState();
+  ConsumerState<ApprovalCenterPage> createState() => _ApprovalCenterPageState();
 }
 
 class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
-  static const _trustQrPrefix = 'CatechHub_TRUST_v2|';
-  static const _approvalQrPrefix = 'CatechHub_APPROVAL_v1|';
+  static const _trustQrPrefix = P2PSecurityService.trustQrPrefix;
+  static const _approvalQrPrefix = P2PSecurityService.approvalQrPrefix;
 
   final P2PSecurityService _security = P2PSecurityService();
 
@@ -82,9 +81,9 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
   Future<void> _refresh() async {
     await _initData();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Stato aggiornato.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Stato aggiornato.')));
     }
   }
 
@@ -95,7 +94,8 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
     // Il QR di fiducia trasporta SOLO la chiave pubblica di firma (trust
     // root), la scadenza e la blacklist delle revoche: nessun segreto
     // simmetrico. Fotografarlo non consente di falsificare approvazioni.
-    final payload = _trustQrPrefix +
+    final payload =
+        _trustQrPrefix +
         jsonEncode({
           'v': 2,
           'responsabileDeviceId': identity.deviceId,
@@ -165,8 +165,7 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
 
       if (!mounted) return;
       setState(() {
-        _selectedApprovalQrData =
-            _approvalQrPrefix + jsonEncode(cert.toJson());
+        _selectedApprovalQrData = _approvalQrPrefix + jsonEncode(cert.toJson());
         _scanApproval = false;
         _scanTrust = false;
         _trustQrData = null;
@@ -183,9 +182,9 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Errore approvazione: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Errore approvazione: $e')));
       }
     } finally {
       if (mounted) setState(() => _approvalInProgress = false);
@@ -203,15 +202,38 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
     await _initData();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Approvazione revocata per ${assoc.deviceName}.')),
+        SnackBar(
+          content: Text('Approvazione revocata per ${assoc.deviceName}.'),
+        ),
       );
     }
   }
 
   Future<void> _onTrustQrScanned(String raw) async {
     if (_scanPaused) return;
+    // QR del dispositivo scansionato per errore nello scanner "fiducia":
+    // guida l'utente verso la schermata di associazione corretta.
+    final qrType = P2PSecurityService.classifyQrPayload(raw);
+    if (qrType == P2PQrType.deviceIdentity) {
+      setState(
+        () => _scanMessage =
+            'Questo è il QR del dispositivo: si usa con "Associa un nuovo '
+            'dispositivo" per la sincronizzazione, non qui.',
+      );
+      return;
+    }
+    if (qrType == P2PQrType.approval) {
+      setState(
+        () => _scanMessage =
+            'QR non riconosciuto: è un QR di approvazione. Usa il pulsante '
+            '"Ricevi approvazione".',
+      );
+      return;
+    }
     if (!raw.startsWith(_trustQrPrefix)) {
-      setState(() => _scanMessage = 'QR non riconosciuto: non è un QR di fiducia.');
+      setState(
+        () => _scanMessage = 'QR non riconosciuto: non è un QR di fiducia.',
+      );
       return;
     }
     _scanPaused = true;
@@ -221,8 +243,9 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
       final signerPublicKey = data['signerPublicKey'] as String? ?? '';
       final respDeviceId = data['responsabileDeviceId'] as String? ?? '';
       final respName = data['responsabileName'] as String? ?? '';
-      final expiresAt =
-          DateTime.tryParse(data['expiresAt']?.toString() ?? '')?.toUtc();
+      final expiresAt = DateTime.tryParse(
+        data['expiresAt']?.toString() ?? '',
+      )?.toUtc();
       final revocations = (data['revocations'] as List<dynamic>? ?? [])
           .whereType<Map>()
           .map((e) => Map<String, dynamic>.from(e))
@@ -276,17 +299,42 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
 
   Future<void> _onApprovalQrScanned(String raw) async {
     if (_scanPaused) return;
+    // QR del dispositivo scansionato per errore nello scanner "approvazione":
+    // guida l'utente verso la schermata di associazione corretta.
+    final qrType = P2PSecurityService.classifyQrPayload(raw);
+    if (qrType == P2PQrType.deviceIdentity) {
+      setState(
+        () => _scanMessage =
+            'Questo è il QR del dispositivo: si usa con "Associa un nuovo '
+            'dispositivo" per la sincronizzazione, non qui.',
+      );
+      return;
+    }
+    if (qrType == P2PQrType.trust) {
+      setState(
+        () => _scanMessage =
+            'QR non riconosciuto: è un QR di fiducia. Usa il pulsante '
+            '"Scansiona QR di fiducia".',
+      );
+      return;
+    }
     if (!raw.startsWith(_approvalQrPrefix)) {
-      setState(() => _scanMessage = 'QR non riconosciuto: non è un QR di approvazione.');
+      setState(
+        () =>
+            _scanMessage = 'QR non riconosciuto: non è un QR di approvazione.',
+      );
       return;
     }
     _scanPaused = true;
     try {
       final json = raw.substring(_approvalQrPrefix.length);
-      final cert =
-          AssociatedDevice.fromJson(jsonDecode(json) as Map<String, dynamic>);
+      final cert = AssociatedDevice.fromJson(
+        jsonDecode(json) as Map<String, dynamic>,
+      );
       if (!cert.isApproved) {
-        setState(() => _scanMessage = 'Certificato di approvazione non valido.');
+        setState(
+          () => _scanMessage = 'Certificato di approvazione non valido.',
+        );
         _scanPaused = false;
         return;
       }
@@ -419,10 +467,14 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
                 Text(
                   active
                       ? 'Ogni dispositivo deve essere approvato prima di '
-                          'sincronizzare le classi.'
+                            'sincronizzare le classi.'
                       : 'Attiva la modalità Responsabile per gestire la '
-                          'catena di fiducia.',
-                  style: TextStyle(fontSize: 12.5, color: Colors.grey[700], height: 1.4),
+                            'catena di fiducia.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: Colors.grey[700],
+                    height: 1.4,
+                  ),
                 ),
               ],
             ),
@@ -602,12 +654,12 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
     );
   }
 
-  Widget _buildAssociationCard(
-      P2PDeviceAssociation assoc, ThemeData theme) {
+  Widget _buildAssociationCard(P2PDeviceAssociation assoc, ThemeData theme) {
     final approved = assoc.authorizedByResponsabile;
     final isDark = theme.brightness == Brightness.dark;
-    final cardColor =
-        isDark ? theme.colorScheme.surfaceContainer : Colors.white;
+    final cardColor = isDark
+        ? theme.colorScheme.surfaceContainer
+        : Colors.white;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
@@ -620,8 +672,8 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
           color: approved
               ? Colors.green.withValues(alpha: 0.35)
               : (isDark
-                  ? theme.colorScheme.outline.withValues(alpha: 0.2)
-                  : Colors.grey.shade200),
+                    ? theme.colorScheme.outline.withValues(alpha: 0.2)
+                    : Colors.grey.shade200),
         ),
       ),
       child: Column(
@@ -643,8 +695,10 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
               ),
               if (approved)
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.green.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(20),
@@ -652,7 +706,10 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
                   child: const Text(
                     'Approvato',
                     style: TextStyle(
-                        color: Colors.green, fontSize: 11, fontWeight: FontWeight.w600),
+                      color: Colors.green,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
             ],
@@ -661,7 +718,7 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
           Text(
             approved
                 ? 'Approvato il ${_formatDate(assoc.timestampApproval)} '
-                    'da ${assoc.approvedByDeviceId ?? '-'}'
+                      'da ${assoc.approvedByDeviceId ?? '-'}'
                 : 'Non ancora approvato dal Responsabile',
             style: TextStyle(
               fontSize: 12,
@@ -695,7 +752,8 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
                 OutlinedButton.icon(
                   onPressed: () {
                     setState(() {
-                      _selectedApprovalQrData = _approvalQrPrefix +
+                      _selectedApprovalQrData =
+                          _approvalQrPrefix +
                           jsonEncode(
                             AssociatedDevice(
                               deviceId: assoc.deviceId,
@@ -775,15 +833,16 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
       ),
       child: Column(
         children: [
-          Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
+          Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: Colors.grey[600], height: 1.4),
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+              height: 1.4,
+            ),
           ),
           const SizedBox(height: 12),
           QrImageView(
@@ -832,7 +891,10 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
                   isTrust
                       ? 'Scansiona il QR di fiducia del Responsabile'
                       : 'Scansiona il QR di approvazione mostrato dal Responsabile',
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
                 ),
               ),
               IconButton(
@@ -862,7 +924,8 @@ class _ApprovalCenterPageState extends ConsumerState<ApprovalCenterPage> {
             Text(
               _scanMessage!,
               style: TextStyle(
-                color: _scanMessage!.contains('Errore') ||
+                color:
+                    _scanMessage!.contains('Errore') ||
                         _scanMessage!.contains('non')
                     ? Colors.red[700]
                     : Colors.grey[700],

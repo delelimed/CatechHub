@@ -16,8 +16,7 @@ import '../attachments/attachments_repository.dart';
 import '../responsabile/audit_log_repository.dart';
 import 'student_daily_notes_repository.dart';
 
-final studentsRepositoryProvider =
-    Provider<StudentsRepository>((ref) {
+final studentsRepositoryProvider = Provider<StudentsRepository>((ref) {
   return StudentsRepository();
 });
 
@@ -36,66 +35,82 @@ class StudentsRepository {
     final id = student.id.isEmpty ? LocalDatabase.newId('student') : student.id;
     final catechistName = getCurrentCatechistName();
     final now = DateTime.now();
-    final code = student.classUniqueCode ?? _lookupClassUniqueCode(student.classId);
+    final code =
+        student.classUniqueCode ?? _lookupClassUniqueCode(student.classId);
     // L5 / Fase 4-12: cifratura di campo PRIMA della persistenza. In passato
     // i dati uscivano in chiaro dal repository (birthDate, telefoni, email,
     // allergie...), mentre il path P2P/import cifrava già i campi: incoerenza.
     // encryptStudentMapForStorage è idempotente (lascia invariato ciò che è
     // già cifrato) e i valori cifrati vengono decifrati in lettura da
     // [_studentFromBox].
-    await _box.put(id, FieldEncryptionService.encryptStudentMapForStorage(
-      _normalize(student).copyWith(
-        classUniqueCode: code,
-        lastModifiedBy: catechistName,
-        createdAt: now,
-        updatedAt: now,
-      ).toMap(),
-    ));
+    await _box.put(
+      id,
+      await FieldEncryptionService.encryptStudentMapForStorage(
+        (await _normalize(student))
+            .copyWith(
+              classUniqueCode: code,
+              lastModifiedBy: catechistName,
+              createdAt: now,
+              updatedAt: now,
+            )
+            .toMap(),
+      ),
+    );
     await _log(AuditActionType.createStudent, id, AuditLog.entityRagazzo);
   }
 
-  Stream<List<Student>> getAllStudents() {
-    return LocalDatabase.watchList(
-      _box,
-      (id, data) => _studentFromBox(id, data),
-    ).map(Student.sortedBySurname);
+  Stream<List<Student>> getAllStudents() async* {
+    yield await _snapshotStudents();
+    var lastUpdate = DateTime.now();
+    await for (final _ in _box.watch()) {
+      if (DateTime.now().difference(lastUpdate) >
+          const Duration(milliseconds: 500)) {
+        yield await _snapshotStudents();
+        lastUpdate = DateTime.now();
+      }
+    }
   }
 
   Stream<List<Student>> getStudents() => getAllStudents();
 
   /// Stream degli studenti filtrati per classe.
-  Stream<List<Student>> getStudentsByClass(String classId) {
-    return LocalDatabase.watchList(
-      _box,
-      (id, data) => _studentFromBox(id, data),
-    ).map((students) => Student.sortedBySurname(
-      students.where((s) => s.classId == classId),
-    ));
+  Stream<List<Student>> getStudentsByClass(String classId) async* {
+    await for (final students in getAllStudents()) {
+      yield Student.sortedBySurname(
+        students.where((s) => s.classId == classId),
+      );
+    }
   }
 
-  /// Lista sincrona degli studenti filtrati per classe.
-  List<Student> getStudentsByClassSync(String classId) {
+  /// Lista degli studenti filtrati per classe.
+  Future<List<Student>> getStudentsByClassSync(String classId) async {
     return Student.sortedBySurname(
-      LocalDatabase.values(
-        _box,
-        (id, data) => _studentFromBox(id, data),
-      ).where((s) => s.classId == classId),
+      (await _snapshotStudents()).where((s) => s.classId == classId),
     );
   }
 
-  List<Student> getAllStudentsSync() {
-    return Student.sortedBySurname(
-      LocalDatabase.values(
-        _box,
-        (id, data) => _studentFromBox(id, data),
-      ),
-    );
+  Future<List<Student>> getAllStudentsSync() async {
+    return Student.sortedBySurname(await _snapshotStudents());
+  }
+
+  Future<List<Student>> _snapshotStudents() async {
+    final result = <Student>[];
+    for (final key in _box.keys) {
+      result.add(
+        await _studentFromBox(
+          key.toString(),
+          LocalDatabase.toStringDynamicMap(_box.get(key)),
+        ),
+      );
+    }
+    return result;
   }
 
   /// Deserializza dal Box decifrando i campi sensibili cifrati a livello
   /// di campo (es. [Student.noteAllergieSalute]).
-  Student _studentFromBox(String id, Map<String, dynamic> data) {
-    final decrypted = FieldEncryptionService.decryptStudentMapForTransport(data);
+  Future<Student> _studentFromBox(String id, Map<String, dynamic> data) async {
+    final decrypted =
+        await FieldEncryptionService.decryptStudentMapForTransport(data);
     final student = Student.fromMap(id, decrypted);
     return student;
   }
@@ -110,32 +125,39 @@ class StudentsRepository {
       existingCreatedAt = DateTime.tryParse(map['createdAt']?.toString() ?? '');
       existingUniqueCode = map['classUniqueCode'];
     }
-    final code = student.classUniqueCode ?? existingUniqueCode ?? _lookupClassUniqueCode(student.classId);
+    final code =
+        student.classUniqueCode ??
+        existingUniqueCode ??
+        _lookupClassUniqueCode(student.classId);
     // L5 / Fase 4-12: cifratura di campo prima della persistenza (vedi
     // addStudent). I valori già cifrati restano invariati (idempotente).
-    await _box.put(id, FieldEncryptionService.encryptStudentMapForStorage(
-      _normalize(student).copyWith(
-        classUniqueCode: code,
-        lastModifiedBy: catechistName,
-        createdAt: existingCreatedAt ?? DateTime.now(),
-        updatedAt: DateTime.now(),
-      ).toMap(),
-    ));
+    await _box.put(
+      id,
+      await FieldEncryptionService.encryptStudentMapForStorage(
+        (await _normalize(student))
+            .copyWith(
+              classUniqueCode: code,
+              lastModifiedBy: catechistName,
+              createdAt: existingCreatedAt ?? DateTime.now(),
+              updatedAt: DateTime.now(),
+            )
+            .toMap(),
+      ),
+    );
     await _log(AuditActionType.updateStudent, id, AuditLog.entityRagazzo);
   }
 
-Student _normalize(Student student) {
-    final noteAllergieSalute =
-        student.noteAllergieSalute != null
-            ? FieldEncryptionService.encrypt(student.noteAllergieSalute)!
-            : '';
-    final allergies = _encryptField(student.allergies);
-    final autonomousExits = _encryptField(student.autonomousExits);
-    final notes = _encryptField(student.notes);
-    final studentPhone = _encryptField(student.studentPhone);
-    final motherPhone = _encryptField(student.motherPhone);
-    final fatherPhone = _encryptField(student.fatherPhone);
-    final parentEmail = _encryptField(student.parentEmail);
+  Future<Student> _normalize(Student student) async {
+    final noteAllergieSalute = student.noteAllergieSalute != null
+        ? (await FieldEncryptionService.encrypt(student.noteAllergieSalute))!
+        : '';
+    final allergies = await _encryptField(student.allergies);
+    final autonomousExits = await _encryptField(student.autonomousExits);
+    final notes = await _encryptField(student.notes);
+    final studentPhone = await _encryptField(student.studentPhone);
+    final motherPhone = await _encryptField(student.motherPhone);
+    final fatherPhone = await _encryptField(student.fatherPhone);
+    final parentEmail = await _encryptField(student.parentEmail);
 
     return Student(
       id: student.id,
@@ -169,7 +191,7 @@ Student _normalize(Student student) {
     );
   }
 
-  String? _encryptField(String? value) {
+  Future<String?> _encryptField(String? value) async {
     if (value != null && value.isNotEmpty) {
       return FieldEncryptionService.encrypt(value);
     }
@@ -187,21 +209,27 @@ Student _normalize(Student student) {
 
   /// Aggiorna lo stato del percorso (ATTIVO/FERMO/RITIRATO) di uno studente.
   Future<void> setStatoPercorso(String id, String stato) async {
-    final existing = getAllStudentsSync().where((s) => s.id == id).firstOrNull;
+    final existing = (await getAllStudentsSync())
+        .where((s) => s.id == id)
+        .firstOrNull;
     if (existing == null) return;
     await updateStudent(id, existing.copyWith(statoPercorso: stato));
   }
 
   /// Aggiorna l'anno di iscrizione di uno studente.
   Future<void> setAnnoIscrizione(String id, String anno) async {
-    final existing = getAllStudentsSync().where((s) => s.id == id).firstOrNull;
+    final existing = (await getAllStudentsSync())
+        .where((s) => s.id == id)
+        .firstOrNull;
     if (existing == null) return;
     await updateStudent(id, existing.copyWith(annoIscrizione: anno));
   }
 
   /// Aggiorna l'elenco dei sacramenti ricevuti da uno studente.
   Future<void> setSacraments(String id, List<Sacrament> sacraments) async {
-    final existing = getAllStudentsSync().where((s) => s.id == id).firstOrNull;
+    final existing = (await getAllStudentsSync())
+        .where((s) => s.id == id)
+        .firstOrNull;
     if (existing == null) return;
     await updateStudent(id, existing.copyWith(sacraments: sacraments));
   }
@@ -209,39 +237,44 @@ Student _normalize(Student student) {
   /// Rimuove uno studente dalla classe, liberando classId e aggiornando
   /// la classe (mantiene lo studente in anagrafica, non lo cancella).
   Future<void> removeFromClass(String studentId, String classId) async {
-    final existing = getAllStudentsSync().where((s) => s.id == studentId).firstOrNull;
+    final existing = (await getAllStudentsSync())
+        .where((s) => s.id == studentId)
+        .firstOrNull;
     if (existing == null) return;
     final isCurrent = existing.classId == classId;
-    await updateStudent(studentId, Student(
-      id: existing.id,
-      name: existing.name,
-      surname: existing.surname,
-      birthDate: existing.birthDate,
-      classId: isCurrent ? null : existing.classId,
-      classUniqueCode: isCurrent ? null : existing.classUniqueCode,
-      motherName: existing.motherName,
-      motherSurname: existing.motherSurname,
-      fatherName: existing.fatherName,
-      fatherSurname: existing.fatherSurname,
-      motherPhone: existing.motherPhone,
-      fatherPhone: existing.fatherPhone,
-      studentPhone: existing.studentPhone,
-      parentEmail: existing.parentEmail,
-      allergies: existing.allergies,
-      autonomousExits: existing.autonomousExits,
-      notes: existing.notes,
-      consensoPrivacyFirmato: existing.consensoPrivacyFirmato,
-      dataFirmaConsenso: existing.dataFirmaConsenso,
-      dataScadenzaTrattamento: existing.dataScadenzaTrattamento,
-      consensoUsciteAutonome: existing.consensoUsciteAutonome,
-      contributoVersato: existing.contributoVersato,
-      contributoEuros: existing.contributoEuros,
-      annoContributo: existing.annoContributo,
-      noteAllergieSalute: existing.noteAllergieSalute,
-      statoPercorso: existing.statoPercorso,
-      annoIscrizione: existing.annoIscrizione,
-      sacraments: existing.sacraments,
-    ));
+    await updateStudent(
+      studentId,
+      Student(
+        id: existing.id,
+        name: existing.name,
+        surname: existing.surname,
+        birthDate: existing.birthDate,
+        classId: isCurrent ? null : existing.classId,
+        classUniqueCode: isCurrent ? null : existing.classUniqueCode,
+        motherName: existing.motherName,
+        motherSurname: existing.motherSurname,
+        fatherName: existing.fatherName,
+        fatherSurname: existing.fatherSurname,
+        motherPhone: existing.motherPhone,
+        fatherPhone: existing.fatherPhone,
+        studentPhone: existing.studentPhone,
+        parentEmail: existing.parentEmail,
+        allergies: existing.allergies,
+        autonomousExits: existing.autonomousExits,
+        notes: existing.notes,
+        consensoPrivacyFirmato: existing.consensoPrivacyFirmato,
+        dataFirmaConsenso: existing.dataFirmaConsenso,
+        dataScadenzaTrattamento: existing.dataScadenzaTrattamento,
+        consensoUsciteAutonome: existing.consensoUsciteAutonome,
+        contributoVersato: existing.contributoVersato,
+        contributoEuros: existing.contributoEuros,
+        annoContributo: existing.annoContributo,
+        noteAllergieSalute: existing.noteAllergieSalute,
+        statoPercorso: existing.statoPercorso,
+        annoIscrizione: existing.annoIscrizione,
+        sacraments: existing.sacraments,
+      ),
+    );
     final classesBox = LocalDatabase.classes();
     for (final classKey in classesBox.keys) {
       final data = LocalDatabase.toStringDynamicMap(classesBox.get(classKey));
@@ -276,8 +309,12 @@ Student _normalize(Student student) {
 
     final attendanceBox = LocalDatabase.attendance();
     for (final attendanceKey in attendanceBox.keys) {
-      final data = LocalDatabase.toStringDynamicMap(attendanceBox.get(attendanceKey));
-      final presence = Map<String, dynamic>.from(data['presence'] as Map? ?? {});
+      final data = LocalDatabase.toStringDynamicMap(
+        attendanceBox.get(attendanceKey),
+      );
+      final presence = Map<String, dynamic>.from(
+        data['presence'] as Map? ?? {},
+      );
       if (presence.remove(id) != null) {
         data['presence'] = presence;
         await attendanceBox.put(attendanceKey, data);
@@ -286,7 +323,9 @@ Student _normalize(Student student) {
 
     final deliveriesBox = LocalDatabase.documentDeliveries();
     for (final deliveryKey in deliveriesBox.keys) {
-      final data = LocalDatabase.toStringDynamicMap(deliveriesBox.get(deliveryKey));
+      final data = LocalDatabase.toStringDynamicMap(
+        deliveriesBox.get(deliveryKey),
+      );
       if (data.remove(id) != null) {
         await deliveriesBox.put(deliveryKey, data);
       }
@@ -311,10 +350,10 @@ Student _normalize(Student student) {
     } catch (e) {
       // Non bloccante: il log GDPR non deve interrompere le operazioni CRUD.
       if (kDebugMode) {
-        debugPrint('[StudentsRepository] AuditLog non registrato ($action): $e');
+        debugPrint(
+          '[StudentsRepository] AuditLog non registrato ($action): $e',
+        );
       }
     }
   }
 }
-
-

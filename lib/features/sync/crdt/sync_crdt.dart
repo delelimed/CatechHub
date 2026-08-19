@@ -20,7 +20,7 @@
 
 import 'dart:convert';
 
-import 'package:crypto/crypto.dart' show Hmac, sha256;
+import '../../../core/services/crypto_utils.dart';
 
 /// Orologio vettoriale per il merge locale-first delle presenze.
 ///
@@ -117,10 +117,7 @@ class AttendanceCrdt {
   ///  - `>0` → [a] vince
   ///  - `<0` → [b] vince
   ///  - `0`  → identiche
-  static int compareEntry(
-    Map<String, dynamic> a,
-    Map<String, dynamic> b,
-  ) {
+  static int compareEntry(Map<String, dynamic> a, Map<String, dynamic> b) {
     final ta = (a['t'] as num?)?.toInt() ?? 0;
     final tb = (b['t'] as num?)?.toInt() ?? 0;
     if (ta != tb) return ta.compareTo(tb);
@@ -129,7 +126,10 @@ class AttendanceCrdt {
     return ba.compareTo(bb);
   }
 
-  static Map<String, dynamic> _entryMeta(int t, String by) => {'t': t, 'by': by};
+  static Map<String, dynamic> _entryMeta(int t, String by) => {
+    't': t,
+    'by': by,
+  };
 
   /// Costruisce `presenceMeta` a partire dalla `presence` quando il record
   /// ricevuto è legacy (senza meta): attribuisce ogni presenza all'autore con
@@ -163,21 +163,20 @@ class AttendanceCrdt {
     final remoteMeta = metaOf(remoteData);
 
     final localTs =
-        (DateTime.tryParse(localData['updatedAt']?.toString() ?? '')
-                    ?.toUtc()
-                    .millisecondsSinceEpoch ??
-                0);
+        (DateTime.tryParse(
+          localData['updatedAt']?.toString() ?? '',
+        )?.toUtc().millisecondsSinceEpoch ??
+        0);
     final remoteTs =
-        (DateTime.tryParse(remoteData['updatedAt']?.toString() ?? '')
-                    ?.toUtc()
-                    .millisecondsSinceEpoch ??
-                0);
+        (DateTime.tryParse(
+          remoteData['updatedAt']?.toString() ?? '',
+        )?.toUtc().millisecondsSinceEpoch ??
+        0);
 
     final localAuthor = (localData['lastModifiedBy'] ?? localData['updatedAt'])
         .toString();
-    final remoteAuthor = (remoteData['lastModifiedBy'] ??
-            remoteData['updatedAt'])
-        .toString();
+    final remoteAuthor =
+        (remoteData['lastModifiedBy'] ?? remoteData['updatedAt']).toString();
 
     final resolvedMeta = <String, dynamic>{};
     final mergedPresence = <String, dynamic>{};
@@ -213,15 +212,11 @@ class AttendanceCrdt {
       }
     }
 
-    return {
-      _presenceKey: mergedPresence,
-      _metaKey: resolvedMeta,
-    };
+    return {_presenceKey: mergedPresence, _metaKey: resolvedMeta};
   }
 
   /// true se il record è un record di presenza (attendance).
-  static bool isAttendanceRecord(String boxName) =>
-      boxName == 'attendance_box';
+  static bool isAttendanceRecord(String boxName) => boxName == 'attendance_box';
 }
 
 /// Timestamp firmato HMAC-SHA256 per il Last-Write-Wins sicuro.
@@ -251,13 +246,17 @@ class SignedLww {
     required String updatedAtIso,
     required String secretKey,
   }) {
-    final mac = Hmac(sha256, utf8.encode(secretKey));
-    final payload = canonical(
-      boxName: boxName,
-      recordId: recordId,
-      updatedAtIso: updatedAtIso,
+    final mac = hmacSha256BytesSync(
+      utf8.encode(secretKey),
+      utf8.encode(
+        canonical(
+          boxName: boxName,
+          recordId: recordId,
+          updatedAtIso: updatedAtIso,
+        ),
+      ),
     );
-    return base64Encode(mac.convert(utf8.encode(payload)).bytes);
+    return base64Encode(mac);
   }
 
   /// Verifica la firma di un record (confronto tempo-costante).

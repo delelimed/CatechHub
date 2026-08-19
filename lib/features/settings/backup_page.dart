@@ -15,6 +15,7 @@
 /// L'importazione sostituisce completamente i dati esistenti in modo
 /// irreversibile.
 library;
+
 import 'dart:convert';
 import 'dart:io';
 
@@ -81,7 +82,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       // Chiedi il PIN per cifrare il backup (PIN dedicato al file di backup)
       final pin = await _askPin(
         title: 'Cifra Backup',
-        message: 'Crea un PIN per proteggere il file di backup.\nQuesto PIN sarà necessario per ripristinare il backup.',
+        message:
+            'Crea un PIN per proteggere il file di backup.\nQuesto PIN sarà necessario per ripristinare il backup.',
       );
       if (pin == null) {
         if (mounted) setState(() => _isExporting = false);
@@ -151,7 +153,9 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       // Permetti all'utente di scegliere dove salvare
       final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
       final catechistName = getCurrentCatechistName();
-      final className = exportClass != null ? exportClass.name : 'ClassiCompleto';
+      final className = exportClass != null
+          ? exportClass.name
+          : 'ClassiCompleto';
       final fileName =
           'catechhub_backup_${_sanitizeFilename(catechistName)}_'
           '${_sanitizeFilename(className)}_$timestamp.catechhub';
@@ -233,9 +237,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
     try {
       // Seleziona file
       // file_picker 12: pickFiles restituisce FilePickerResult.
-      final result = await FilePicker.pickFiles(
-        type: FileType.any,
-      );
+      final result = await FilePicker.pickFiles(type: FileType.any);
       if (result == null || result.files.isEmpty) {
         if (mounted) setState(() => _isImporting = false);
         return;
@@ -268,7 +270,10 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       // Verifica PIN provando a decifrare
       setState(() => _statusMessage = 'Verifica password…');
       await Future.delayed(Duration.zero);
-      if (!DataExportService.verifyEncryptedPassword(encryptedData, pin)) {
+      if (!await DataExportService.verifyEncryptedPassword(
+        encryptedData,
+        pin,
+      )) {
         if (mounted) {
           setState(() {
             _isImporting = false;
@@ -305,7 +310,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       setState(() => _statusMessage = 'Importazione dati in corso…');
       await Future.delayed(Duration.zero);
       await DataExportService.importEncryptedData(
-        encryptedData, pin,
+        encryptedData,
+        pin,
         onPhase: (phase) {
           if (mounted) setState(() => _phaseMessage = phase);
         },
@@ -343,7 +349,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
   //  DIALOGS
   // ────────────────────────────────────────────
 
-Future<String?> _askPin({
+  Future<String?> _askPin({
     required String title,
     required String message,
   }) async {
@@ -431,10 +437,7 @@ Future<String?> _askPin({
           ),
           title: Row(
             children: [
-              Icon(
-                Icons.class_outlined,
-                color: const Color(0xFF174A7E),
-              ),
+              Icon(Icons.class_outlined, color: const Color(0xFF174A7E)),
               const SizedBox(width: 8),
               const Expanded(child: Text('Classi da esportare')),
             ],
@@ -641,7 +644,10 @@ Future<String?> _askPin({
                 padding: const EdgeInsets.only(bottom: 16),
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF174A7E).withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
@@ -652,7 +658,8 @@ Future<String?> _askPin({
                   child: Row(
                     children: [
                       SizedBox(
-                        width: 16, height: 16,
+                        width: 16,
+                        height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           color: const Color(0xFF174A7E),
@@ -749,7 +756,9 @@ class _ActionCard extends StatelessWidget {
         : color.withValues(alpha: 0.10);
     final titleColor = isDark ? colorScheme.onSurface : const Color(0xFF1A1A1A);
     final subtitleColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
-    final borderColor = isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.transparent;
+    final borderColor = isDark
+        ? colorScheme.outline.withValues(alpha: 0.2)
+        : Colors.transparent;
     final shadowColor = isDark
         ? Colors.black.withValues(alpha: 0.4)
         : Colors.black.withValues(alpha: 0.04);
@@ -816,7 +825,10 @@ class _ActionCard extends StatelessWidget {
               ),
             ),
             if (!isLoading)
-              Icon(Icons.chevron_right_rounded, color: isDark ? Colors.grey.shade500 : Colors.grey.shade400),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+              ),
           ],
         ),
       ),

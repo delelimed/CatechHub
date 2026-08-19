@@ -85,9 +85,9 @@ class NearbySyncDaemonController extends StateNotifier<bool> {
 
 final nearbySyncDaemonProvider =
     StateNotifierProvider<NearbySyncDaemonController, bool>((ref) {
-  final service = ref.watch(nearbySyncServiceProvider);
-  return NearbySyncDaemonController(service);
-});
+      final service = ref.watch(nearbySyncServiceProvider);
+      return NearbySyncDaemonController(service);
+    });
 
 class NearbySyncLifecycleManager extends ConsumerStatefulWidget {
   final Widget child;
@@ -183,7 +183,6 @@ class _NearbySyncLifecycleManagerState
   }
 
   @override
-  Widget build(BuildContext context) => SyncProgressOverlay(
-        child: widget.child,
-      );
+  Widget build(BuildContext context) =>
+      SyncProgressOverlay(child: widget.child);
 }

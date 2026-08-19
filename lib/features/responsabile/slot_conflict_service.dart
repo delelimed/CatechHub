@@ -24,8 +24,7 @@ class SlotConflictException implements Exception {
   const SlotConflictException(this.conflicts);
 
   @override
-  String toString() =>
-      conflicts.map((c) => c.message).join('\n');
+  String toString() => conflicts.map((c) => c.message).join('\n');
 }
 
 /// Esito di una verifica di conflitto.
@@ -73,14 +72,17 @@ class SlotConflictService {
     for (final slot in target.roomSlots) {
       if (slot.slotId == newSlot.slotId) continue;
       if (slot.overlaps(newSlot)) {
-        conflicts.add(SlotConflict(
-          classA: target,
-          classB: null,
-          slotA: slot,
-          slotB: newSlot,
-          message: 'Conflitto interno: "${target.name}" ha già un impegno '
-              'programmato nello stesso orario.',
-        ));
+        conflicts.add(
+          SlotConflict(
+            classA: target,
+            classB: null,
+            slotA: slot,
+            slotB: newSlot,
+            message:
+                'Conflitto interno: "${target.name}" ha già un impegno '
+                'programmato nello stesso orario.',
+          ),
+        );
       }
     }
 
@@ -91,31 +93,38 @@ class SlotConflictService {
         if (slot.stanzaId != newSlot.stanzaId) continue;
         if (slot.overlaps(newSlot)) {
           final aulaLabel = aula?.nomeStanza ?? newSlot.nomeStanza;
-          conflicts.add(SlotConflict(
-            classA: other,
-            classB: target,
-            slotA: slot,
-            slotB: newSlot,
-            message: "L'aula $aulaLabel è già occupata dalla classe "
-                '"${other.name}" di ${_giorno(newSlot.giornoSettimana)} alle '
-                '${newSlot.oraInizio}.',
-          ));
+          conflicts.add(
+            SlotConflict(
+              classA: other,
+              classB: target,
+              slotA: slot,
+              slotB: newSlot,
+              message:
+                  "L'aula $aulaLabel è già occupata dalla classe "
+                  '"${other.name}" di ${_giorno(newSlot.giornoSettimana)} alle '
+                  '${newSlot.oraInizio}.',
+            ),
+          );
         }
       }
     }
 
     // Warning di capienza: classe più numerosa della capienza dell'aula.
-    if (aula != null && aula.capienzaMassima > 0 &&
+    if (aula != null &&
+        aula.capienzaMassima > 0 &&
         target.studentIds.length > aula.capienzaMassima) {
-      conflicts.add(SlotConflict(
-        classA: target,
-        classB: null,
-        slotA: newSlot,
-        slotB: null,
-        message: 'Attenzione: "${target.name}" ha ${target.studentIds.length} '
-            'ragazzi, ma l\'aula "${aula.nomeStanza}" ha capienza massima di '
-            '${aula.capienzaMassima}.',
-      ));
+      conflicts.add(
+        SlotConflict(
+          classA: target,
+          classB: null,
+          slotA: newSlot,
+          slotB: null,
+          message:
+              'Attenzione: "${target.name}" ha ${target.studentIds.length} '
+              'ragazzi, ma l\'aula "${aula.nomeStanza}" ha capienza massima di '
+              '${aula.capienzaMassima}.',
+        ),
+      );
     }
 
     return conflicts;
@@ -138,10 +147,12 @@ class SlotConflictService {
           aulas: aulas,
         )) {
           // Dedup: la verifica incrociata produrrebbe coppie duplicate.
-          final already = conflicts.any((x) =>
-              x.message == conflict.message &&
-              x.slotA.slotId == conflict.slotA.slotId &&
-              x.slotB?.slotId == conflict.slotB?.slotId);
+          final already = conflicts.any(
+            (x) =>
+                x.message == conflict.message &&
+                x.slotA.slotId == conflict.slotA.slotId &&
+                x.slotB?.slotId == conflict.slotB?.slotId,
+          );
           if (!already) conflicts.add(conflict);
         }
       }
@@ -150,7 +161,16 @@ class SlotConflictService {
   }
 
   static String _giorno(int g) {
-    const giorni = ['', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
+    const giorni = [
+      '',
+      'Lunedì',
+      'Martedì',
+      'Mercoledì',
+      'Giovedì',
+      'Venerdì',
+      'Sabato',
+      'Domenica',
+    ];
     return g >= 1 && g <= 7 ? giorni[g] : 'giorno';
   }
 }

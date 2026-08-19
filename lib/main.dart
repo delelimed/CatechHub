@@ -163,7 +163,7 @@ Future<void> main() async {
       // PRIMA di questa riga provoca un crash fatale:
       //   "Binding has not yet been initialized"
       //
-// NOTA: FlutterError.onError viene impostato DOPO ensureInitialized()
+      // NOTA: FlutterError.onError viene impostato DOPO ensureInitialized()
       // perché il binding deve essere attivo prima di poter registrare
       // handler custom per gli errori del framework.
       // ══════════════════════════════════════════════════════════════════════
@@ -189,12 +189,15 @@ Future<void> main() async {
       } catch (e, stack) {
         debugPrint('[MAIN] ERRORE FATALE inizializzazione freeRASP: $e');
         debugPrint('$stack');
-        runApp(_FatalErrorApp(
-          message: 'Errore di inizializzazione sicurezza (freeRASP).\n'
-              'L\'app non può avviarsi senza le protezioni runtime.\n\n'
-              'Dettaglio: $e\n\n'
-              'Contattare l\'amministratore o reinstallare l\'app.',
-        ));
+        runApp(
+          _FatalErrorApp(
+            message:
+                'Errore di inizializzazione sicurezza (freeRASP).\n'
+                'L\'app non può avviarsi senza le protezioni runtime.\n\n'
+                'Dettaglio: $e\n\n'
+                'Contattare l\'amministratore o reinstallare l\'app.',
+          ),
+        );
         return;
       }
 
@@ -262,7 +265,9 @@ Future<void> main() async {
         await Hive.initFlutter();
       } catch (hiveInitError) {
         debugPrint('[MAIN] Hive.initFlutter() fallito: $hiveInitError');
-        debugPrint('[MAIN] Tentativo di recovery: eliminazione file .lock residui...');
+        debugPrint(
+          '[MAIN] Tentativo di recovery: eliminazione file .lock residui...',
+        );
 
         // Tentativo di recovery: elimina i file .lock residui da crash precedenti.
         // I file .lock vengono creati da Hive quando un Box non viene chiuso
@@ -276,7 +281,9 @@ Future<void> main() async {
             int deletedCount = 0;
             await for (final entity in hiveDir.list()) {
               if (entity is File && entity.path.endsWith('.lock')) {
-                debugPrint('[MAIN] Eliminazione lock file residuo: ${entity.path}');
+                debugPrint(
+                  '[MAIN] Eliminazione lock file residuo: ${entity.path}',
+                );
                 await entity.delete();
                 deletedCount++;
               }
@@ -286,7 +293,9 @@ Future<void> main() async {
 
           // Riprova l'inizializzazione dopo la pulizia dei lock
           await Hive.initFlutter();
-          debugPrint('[MAIN] Hive.initFlutter() recovery completato con successo');
+          debugPrint(
+            '[MAIN] Hive.initFlutter() recovery completato con successo',
+          );
         } catch (retryError) {
           // ─────────────────────────────────────────────────────────────────
           // ERRORE FATALE: Hive NON si inizializza neanche dopo la pulizia.
@@ -300,15 +309,18 @@ Future<void> main() async {
           // Mostra schermata di errore fatale con istruzioni per l'utente.
           // ─────────────────────────────────────────────────────────────────
           debugPrint('[MAIN] Hive.initFlutter() retry fallito: $retryError');
-          runApp(_FatalErrorApp(
-            message: 'Impossibile inizializzare il database locale.\n'
-                'Errore di inizializzazione Hive: $retryError\n\n'
-                'Possibili cause:\n'
-                '- Spazio di archiviazione esaurito\n'
-                '- Permessi di archiviazione negati\n'
-                '- Filesystem corrotto\n\n'
-                'Prova a disinstallare e reinstallare l\'applicazione.',
-          ));
+          runApp(
+            _FatalErrorApp(
+              message:
+                  'Impossibile inizializzare il database locale.\n'
+                  'Errore di inizializzazione Hive: $retryError\n\n'
+                  'Possibili cause:\n'
+                  '- Spazio di archiviazione esaurito\n'
+                  '- Permessi di archiviazione negati\n'
+                  '- Filesystem corrotto\n\n'
+                  'Prova a disinstallare e reinstallare l\'applicazione.',
+            ),
+          );
           return;
         }
       }
@@ -378,23 +390,29 @@ Future<void> main() async {
         // REQUISITO: NESSUN FALLBACK SOFTWARE. L'app DEVE bloccarsi.
         // ─────────────────────────────────────────────────────────────────────
         debugPrint('[MAIN] BLOCCO SICUREZZA HARDWARE: $e');
-        runApp(MaterialApp(
-          debugShowCheckedModeBanner: false,
-          home: SecurityBlockScreen(
-            message: 'Impossibile avviare l\'applicazione.\n\n'
-                '${e.userMessage}\n\n'
-                'Dopo aver configurato un metodo di sblocco, riavvia l\'app.',
+        runApp(
+          MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: SecurityBlockScreen(
+              message:
+                  'Impossibile avviare l\'applicazione.\n\n'
+                  '${e.userMessage}\n\n'
+                  'Dopo aver configurato un metodo di sblocco, riavvia l\'app.',
+            ),
           ),
-        ));
+        );
         return;
       } catch (e) {
         // Qualsiasi altro errore imprevisto durante l'inizializzazione sicurezza
         debugPrint('[MAIN] Errore imprevisto inizializzazione sicurezza: $e');
-        runApp(_FatalErrorApp(
-          message: 'Errore di inizializzazione sicurezza imprevisto.\n'
-              'Dettaglio: $e\n\n'
-              'Contattare l\'amministratore o reinstallare l\'app.',
-        ));
+        runApp(
+          _FatalErrorApp(
+            message:
+                'Errore di inizializzazione sicurezza imprevisto.\n'
+                'Dettaglio: $e\n\n'
+                'Contattare l\'amministratore o reinstallare l\'app.',
+          ),
+        );
         return;
       }
 
@@ -422,12 +440,15 @@ Future<void> main() async {
         // L'app NON può funzionare senza il database.
         // ─────────────────────────────────────────────────────────────────────
         debugPrint('[MAIN] Errore fatale database: $e');
-        runApp(_FatalErrorApp(
-          message: 'Impossibile inizializzare il database locale.\n'
-              'L\'app ha provato a riparare i dati corrotti ma non è riuscita.\n'
-              'Prova a disinstallare e reinstallare l\'applicazione.\n\n'
-              'Dettaglio: $e',
-        ));
+        runApp(
+          _FatalErrorApp(
+            message:
+                'Impossibile inizializzare il database locale.\n'
+                'L\'app ha provato a riparare i dati corrotti ma non è riuscita.\n'
+                'Prova a disinstallare e reinstallare l\'applicazione.\n\n'
+                'Dettaglio: $e',
+          ),
+        );
         return;
       }
 
@@ -595,7 +616,8 @@ class MyApp extends ConsumerWidget {
 
     // Verifica se l'utente è attualmente sulla route di login
     // (utilizzato per mostrare il caricamento senza splash screen)
-    final isLoginRoute = router.routeInformationProvider.value.uri.path.startsWith('/login');
+    final isLoginRoute = router.routeInformationProvider.value.uri.path
+        .startsWith('/login');
 
     // ═══════════════════════════════════════════════════════════════════════════
     // GESTIONE SICUREZZA freeRASP: ValueListenableBuilder per schermate di blocco
@@ -666,7 +688,8 @@ class MyApp extends ConsumerWidget {
                         child: Router(
                           routerDelegate: router.routerDelegate,
                           routeInformationParser: router.routeInformationParser,
-                          routeInformationProvider: router.routeInformationProvider,
+                          routeInformationProvider:
+                              router.routeInformationProvider,
                         ),
                       )
                     : const _LoadingScreen(),
@@ -749,24 +772,30 @@ class MyApp extends ConsumerWidget {
   /// - denied: richiedi il permesso dopo conferma dell'utente
   ///
   /// Il permesso è necessario per le notifiche di aggiornamento dell'app.
-  Future<void> _requestNotificationPermissionIfNeeded(BuildContext context) async {
+  Future<void> _requestNotificationPermissionIfNeeded(
+    BuildContext context,
+  ) async {
     final authBox = LocalDatabase.auth();
     final notificationRequested =
-        authBox.get('notification_permission_requested', defaultValue: false) as bool;
+        authBox.get('notification_permission_requested', defaultValue: false)
+            as bool;
 
     final status = await UpdateService.notificationPermissionStatus();
-    if (status == PermissionStatus.granted || status == PermissionStatus.limited) {
+    if (status == PermissionStatus.granted ||
+        status == PermissionStatus.limited) {
       return;
     }
 
     if (!context.mounted) return;
 
-    if (status == PermissionStatus.permanentlyDenied || status == PermissionStatus.restricted) {
+    if (status == PermissionStatus.permanentlyDenied ||
+        status == PermissionStatus.restricted) {
       await _showNotificationSettingsDialog(context);
       return;
     }
 
-    final shouldRequest = !notificationRequested || status == PermissionStatus.denied;
+    final shouldRequest =
+        !notificationRequested || status == PermissionStatus.denied;
     if (!shouldRequest) return;
 
     final confirmation = await showDialog<bool>(
@@ -795,11 +824,14 @@ class MyApp extends ConsumerWidget {
     if (confirmation != true || !context.mounted) return;
 
     final newStatus = await UpdateService.requestNotificationPermission();
-    if (newStatus == PermissionStatus.granted || newStatus == PermissionStatus.limited) {
+    if (newStatus == PermissionStatus.granted ||
+        newStatus == PermissionStatus.limited) {
       return;
     }
 
-    if ((newStatus == PermissionStatus.permanentlyDenied || newStatus == PermissionStatus.restricted) && context.mounted) {
+    if ((newStatus == PermissionStatus.permanentlyDenied ||
+            newStatus == PermissionStatus.restricted) &&
+        context.mounted) {
       await _showNotificationSettingsDialog(context);
     }
   }
@@ -864,7 +896,8 @@ class MyApp extends ConsumerWidget {
       return;
     }
 
-    if ((newStatus.isPermanentlyDenied || newStatus.isRestricted) && context.mounted) {
+    if ((newStatus.isPermanentlyDenied || newStatus.isRestricted) &&
+        context.mounted) {
       await _showCameraSettingsDialog(context);
     }
   }
@@ -945,8 +978,13 @@ class MyApp extends ConsumerWidget {
   /// - L'utente non ha acconsentito al feedback remoto
   /// - Wiredash non è configurato
   /// - Il contesto non è più montato
-  void _showMonthlyRandomPromoterSurvey(BuildContext context, PrivacySettings privacy) {
-    if (!privacy.allowRemoteFeedback || !_wiredashConfigured || !context.mounted) {
+  void _showMonthlyRandomPromoterSurvey(
+    BuildContext context,
+    PrivacySettings privacy,
+  ) {
+    if (!privacy.allowRemoteFeedback ||
+        !_wiredashConfigured ||
+        !context.mounted) {
       return;
     }
 
@@ -975,11 +1013,12 @@ class MyApp extends ConsumerWidget {
     try {
       Wiredash.of(context).showPromoterSurvey(inheritMaterialTheme: true);
       // Programma la prossima visualizzazione tra 30 e 45 giorni
-      final nextScheduledDate = now.add(Duration(days: 30 + Random().nextInt(15)));
+      final nextScheduledDate = now.add(
+        Duration(days: 30 + Random().nextInt(15)),
+      );
       box.put(nextSurveyKey, nextScheduledDate.toIso8601String());
     } catch (_) {}
   }
-
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1051,18 +1090,11 @@ class _FatalErrorApp extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.error_outline,
-                  color: Colors.red,
-                  size: 64,
-                ),
+                const Icon(Icons.error_outline, color: Colors.red, size: 64),
                 const SizedBox(height: 24),
                 const Text(
                   'Errore di Inizializzazione',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
                 Text(

@@ -2,18 +2,16 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:crypto/crypto.dart';
 import 'package:cryptography/cryptography.dart';
 import 'package:hive/hive.dart';
 
+import '../../../core/services/crypto_utils.dart';
 import '../../../core/services/field_encryption_service.dart';
 import '../../../core/storage/local_database.dart';
 import '../crdt/sync_crdt.dart';
 import 'p2p_security_service.dart';
 
-final _syncAad = Uint8List.fromList(
-  utf8.encode('CatechHub_Context_Sync_v1'),
-);
+final _syncAad = Uint8List.fromList(utf8.encode('CatechHub_Context_Sync_v1'));
 
 class SyncRecord {
   final String id;
@@ -37,22 +35,22 @@ class SyncRecord {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'box': boxName,
-        'data': data,
-        'createdAt': createdAt.toUtc().toIso8601String(),
-        'updatedAt': updatedAt.toUtc().toIso8601String(),
-        'isDeleted': isDeleted,
-      };
+    'id': id,
+    'box': boxName,
+    'data': data,
+    'createdAt': createdAt.toUtc().toIso8601String(),
+    'updatedAt': updatedAt.toUtc().toIso8601String(),
+    'isDeleted': isDeleted,
+  };
 
   factory SyncRecord.fromJson(Map<String, dynamic> json) => SyncRecord(
-        id: json['id'] as String,
-        boxName: json['box'] as String,
-        data: Map<String, dynamic>.from(json['data'] ?? {}),
-        createdAt: DateTime.parse(json['createdAt'] as String).toUtc(),
-        updatedAt: DateTime.parse(json['updatedAt'] as String).toUtc(),
-        isDeleted: json['isDeleted'] == true,
-      );
+    id: json['id'] as String,
+    boxName: json['box'] as String,
+    data: Map<String, dynamic>.from(json['data'] ?? {}),
+    createdAt: DateTime.parse(json['createdAt'] as String).toUtc(),
+    updatedAt: DateTime.parse(json['updatedAt'] as String).toUtc(),
+    isDeleted: json['isDeleted'] == true,
+  );
 
   factory SyncRecord.fromHiveEntry({
     required String id,
@@ -61,10 +59,10 @@ class SyncRecord {
   }) {
     final createdAt =
         DateTime.tryParse(entry['createdAt']?.toString() ?? '')?.toUtc() ??
-            DateTime.now().toUtc();
+        DateTime.now().toUtc();
     final updatedAt =
         DateTime.tryParse(entry['updatedAt']?.toString() ?? '')?.toUtc() ??
-            createdAt;
+        createdAt;
     return SyncRecord(
       id: id,
       boxName: boxName,
@@ -92,21 +90,20 @@ class SyncIndexEntry {
   });
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'box': boxName,
-        'updatedAt': updatedAt.toUtc().toIso8601String(),
-        'checksum': checksum,
-        'isDeleted': isDeleted,
-      };
+    'id': id,
+    'box': boxName,
+    'updatedAt': updatedAt.toUtc().toIso8601String(),
+    'checksum': checksum,
+    'isDeleted': isDeleted,
+  };
 
-  factory SyncIndexEntry.fromJson(Map<String, dynamic> json) =>
-      SyncIndexEntry(
-        id: json['id'] as String,
-        boxName: json['box'] as String,
-        updatedAt: DateTime.parse(json['updatedAt'] as String).toUtc(),
-        checksum: json['checksum'] as String? ?? '',
-        isDeleted: json['isDeleted'] == true,
-      );
+  factory SyncIndexEntry.fromJson(Map<String, dynamic> json) => SyncIndexEntry(
+    id: json['id'] as String,
+    boxName: json['box'] as String,
+    updatedAt: DateTime.parse(json['updatedAt'] as String).toUtc(),
+    checksum: json['checksum'] as String? ?? '',
+    isDeleted: json['isDeleted'] == true,
+  );
 }
 
 class SyncResult {
@@ -141,10 +138,7 @@ class SyncClassScope {
   final String classId;
   final String classUniqueCode;
 
-  const SyncClassScope({
-    required this.classId,
-    required this.classUniqueCode,
-  });
+  const SyncClassScope({required this.classId, required this.classUniqueCode});
 
   bool get isAll => false;
 }
@@ -267,8 +261,7 @@ class HiveSyncEngine {
   /// PII di esempio con aspetto reale e NON devono MAI lasciare il dispositivo
   /// tramite sync P2P (né essere applicati da un peer). Il purge demo all'avvio
   /// li rimuove dal DB locale, ma questo filtro è la seconda barriera.
-  static bool _isDemoRecord(Map<String, dynamic> data) =>
-      data['_demo'] == true;
+  static bool _isDemoRecord(Map<String, dynamic> data) => data['_demo'] == true;
 
   Future<DateTime> getLastSyncTimestamp() async {
     final auth = LocalDatabase.auth();
@@ -284,7 +277,9 @@ class HiveSyncEngine {
     await auth.put(_lastSyncKey, timestamp.toUtc().toIso8601String());
   }
 
-  static String _computeRecordChecksum(Map<String, dynamic> data) {
+  static Future<String> _computeRecordChecksum(
+    Map<String, dynamic> data,
+  ) async {
     final normalized = Map<String, dynamic>.from(data);
     normalized.remove('updatedAt');
     normalized.remove('createdAt');
@@ -293,12 +288,15 @@ class HiveSyncEngine {
     // dispositivi con lo stesso dato hanno ciphertext diversi (nonce casuale).
     // Il checksum deve essere calcolato sulla forma canonica (decifrata) così
     // che l'indice di sync sia confrontabile tra dispositivi.
-    final canonical = FieldEncryptionService.decryptStudentMapForTransport(normalized);
+    final canonical =
+        await FieldEncryptionService.decryptStudentMapForTransport(normalized);
     final json = jsonEncode(canonical);
-    return sha256.convert(utf8.encode(json)).toString().substring(0, 12);
+    return (await sha256Hex(json)).substring(0, 12);
   }
 
-  List<SyncIndexEntry> buildLocalIndex([List<SyncClassScope>? scopes]) {
+  Future<List<SyncIndexEntry>> buildLocalIndex([
+    List<SyncClassScope>? scopes,
+  ]) async {
     final index = <SyncIndexEntry>[];
 
     for (final entry in syncableBoxes.entries) {
@@ -322,18 +320,19 @@ class HiveSyncEngine {
             continue;
           }
           final updatedAt =
-              DateTime.tryParse(data['updatedAt']?.toString() ?? '')
-                      ?.toUtc() ??
-                  DateTime.fromMillisecondsSinceEpoch(0).toUtc();
+              DateTime.tryParse(data['updatedAt']?.toString() ?? '')?.toUtc() ??
+              DateTime.fromMillisecondsSinceEpoch(0).toUtc();
           final isDeleted = data['isDeleted'] == true;
-          final checksum = _computeRecordChecksum(data);
-          index.add(SyncIndexEntry(
-            id: id,
-            boxName: boxName,
-            updatedAt: updatedAt,
-            checksum: checksum,
-            isDeleted: isDeleted,
-          ));
+          final checksum = await _computeRecordChecksum(data);
+          index.add(
+            SyncIndexEntry(
+              id: id,
+              boxName: boxName,
+              updatedAt: updatedAt,
+              checksum: checksum,
+              isDeleted: isDeleted,
+            ),
+          );
         }
       } catch (_) {}
     }
@@ -341,8 +340,10 @@ class HiveSyncEngine {
     return index;
   }
 
-  List<SyncRecord> extractModifiedRecords(DateTime since,
-      [List<SyncClassScope>? scopes]) {
+  Future<List<SyncRecord>> extractModifiedRecords(
+    DateTime since, [
+    List<SyncClassScope>? scopes,
+  ]) async {
     final records = <SyncRecord>[];
 
     for (final entry in syncableBoxes.entries) {
@@ -366,9 +367,8 @@ class HiveSyncEngine {
             continue;
           }
           final updatedAt =
-              DateTime.tryParse(data['updatedAt']?.toString() ?? '')
-                      ?.toUtc() ??
-                  DateTime.fromMillisecondsSinceEpoch(0).toUtc();
+              DateTime.tryParse(data['updatedAt']?.toString() ?? '')?.toUtc() ??
+              DateTime.fromMillisecondsSinceEpoch(0).toUtc();
 
           if (updatedAt.isAfter(since.toUtc())) {
             // Egresso P2P: i campi sensibili cifrati per-dispositivo vengono
@@ -376,13 +376,17 @@ class HiveSyncEngine {
             // AES-GCM con shared secret). Il ricevente li cifrerà di nuovo
             // con la propria chiave locale.
             final transportData = boxName == LocalDatabase.studentsBox
-                ? FieldEncryptionService.decryptStudentMapForTransport(data)
+                ? await FieldEncryptionService.decryptStudentMapForTransport(
+                    data,
+                  )
                 : data;
-            records.add(SyncRecord.fromHiveEntry(
-              id: id,
-              boxName: boxName,
-              entry: transportData,
-            ));
+            records.add(
+              SyncRecord.fromHiveEntry(
+                id: id,
+                boxName: boxName,
+                entry: transportData,
+              ),
+            );
           }
         }
       } catch (_) {}
@@ -391,9 +395,9 @@ class HiveSyncEngine {
     return records;
   }
 
-  List<String> computeNeededRecords(
+  Future<List<String>> computeNeededRecords(
     List<SyncIndexEntry> remoteIndex,
-  ) {
+  ) async {
     final needed = <String>[];
 
     for (final remote in remoteIndex) {
@@ -406,44 +410,42 @@ class HiveSyncEngine {
 
         if (localRaw == null) {
           if (!remote.isDeleted) {
-            needed.add(
-                '${remote.boxName}:${remote.id}');
+            needed.add('${remote.boxName}:${remote.id}');
           }
           continue;
         }
         final localData = LocalDatabase.toStringDynamicMap(localRaw);
         final localUpdatedAt =
-            DateTime.tryParse(localData['updatedAt']?.toString() ?? '')
-                    ?.toUtc() ??
-                DateTime.fromMillisecondsSinceEpoch(0).toUtc();
+            DateTime.tryParse(
+              localData['updatedAt']?.toString() ?? '',
+            )?.toUtc() ??
+            DateTime.fromMillisecondsSinceEpoch(0).toUtc();
 
         if (remote.isDeleted && !localIsDeleted) {
-          needed.add(
-              '${remote.boxName}:${remote.id}');
+          needed.add('${remote.boxName}:${remote.id}');
           continue;
         }
 
         if (remote.updatedAt.isAfter(localUpdatedAt)) {
-          needed.add(
-              '${remote.boxName}:${remote.id}');
+          needed.add('${remote.boxName}:${remote.id}');
         } else if (remote.updatedAt == localUpdatedAt) {
-          final localChecksum = _computeRecordChecksum(localData);
+          final localChecksum = await _computeRecordChecksum(localData);
           if (remote.checksum != localChecksum) {
-            needed.add(
-                '${remote.boxName}:${remote.id}');
+            needed.add('${remote.boxName}:${remote.id}');
           }
         }
       } catch (_) {
-        needed.add(
-            '${remote.boxName}:${remote.id}');
+        needed.add('${remote.boxName}:${remote.id}');
       }
     }
 
     return needed;
   }
 
-  List<SyncRecord> fetchRecords(List<String> recordKeys,
-      [List<SyncClassScope>? scopes]) {
+  Future<List<SyncRecord>> fetchRecords(
+    List<String> recordKeys, [
+    List<SyncClassScope>? scopes,
+  ]) async {
     final records = <SyncRecord>[];
 
     for (final key in recordKeys) {
@@ -468,13 +470,17 @@ class HiveSyncEngine {
         )) {
           continue;
         }
-        records.add(SyncRecord.fromHiveEntry(
-          id: recordId,
-          boxName: boxName,
-          entry: boxName == LocalDatabase.studentsBox
-              ? FieldEncryptionService.decryptStudentMapForTransport(data)
-              : data,
-        ));
+        records.add(
+          SyncRecord.fromHiveEntry(
+            id: recordId,
+            boxName: boxName,
+            entry: boxName == LocalDatabase.studentsBox
+                ? await FieldEncryptionService.decryptStudentMapForTransport(
+                    data,
+                  )
+                : data,
+          ),
+        );
       } catch (_) {}
     }
 
@@ -502,10 +508,14 @@ class HiveSyncEngine {
         'boxName': boxName,
         'recordId': recordId,
         'localData': isStudents
-            ? FieldEncryptionService.encryptStudentMapForStorage(localData)
+            ? await FieldEncryptionService.encryptStudentMapForStorage(
+                localData,
+              )
             : localData,
         'remoteData': isStudents
-            ? FieldEncryptionService.encryptStudentMapForStorage(remoteData)
+            ? await FieldEncryptionService.encryptStudentMapForStorage(
+                remoteData,
+              )
             : remoteData,
         'conflictingFields': conflictingFields,
         'detectedAt': DateTime.now().toUtc().toIso8601String(),
@@ -522,7 +532,7 @@ class HiveSyncEngine {
   /// il timestamp più recente vince solo se la sua firma HMAC è valida, così
   /// un dispositivo non può "inventare" un aggiornamento più recente di
   /// quello reale. Senza chiave si usa il confronto timestamp legacy.
-  Map<String, dynamic> _mergeFields({
+  Future<Map<String, dynamic>> _mergeFields({
     required String boxName,
     required String recordId,
     required Map<String, dynamic> localData,
@@ -531,7 +541,7 @@ class HiveSyncEngine {
     required DateTime remoteUpdatedAt,
     String? secretKey,
     Set<String> excludeFields = const {},
-  }) {
+  }) async {
     final merged = Map<String, dynamic>.from(localData);
     final conflictFields = <String>[];
 
@@ -562,10 +572,10 @@ class HiveSyncEngine {
     // falsi conflitti. Il confronto avviene sulla forma decifrata.
     final isStudentsBox = boxName == LocalDatabase.studentsBox;
     final localForCompare = isStudentsBox
-        ? FieldEncryptionService.decryptStudentMapForTransport(localData)
+        ? await FieldEncryptionService.decryptStudentMapForTransport(localData)
         : localData;
     final remoteForCompare = isStudentsBox
-        ? FieldEncryptionService.decryptStudentMapForTransport(remoteData)
+        ? await FieldEncryptionService.decryptStudentMapForTransport(remoteData)
         : remoteData;
 
     for (final entry in remoteForCompare.entries) {
@@ -648,7 +658,9 @@ class HiveSyncEngine {
             // Ingresso P2P: i campi sensibili arrivano in chiaro e vengono
             // cifrati con la chiave locale prima della persistenza.
             if (remote.boxName == LocalDatabase.studentsBox) {
-              data = FieldEncryptionService.encryptStudentMapForStorage(data);
+              data = await FieldEncryptionService.encryptStudentMapForStorage(
+                data,
+              );
             }
             await box.put(remote.id, data);
             appliedCount++;
@@ -658,9 +670,10 @@ class HiveSyncEngine {
 
         final localData = LocalDatabase.toStringDynamicMap(localRaw);
         final localUpdatedAt =
-            DateTime.tryParse(localData['updatedAt']?.toString() ?? '')
-                    ?.toUtc() ??
-                DateTime.fromMillisecondsSinceEpoch(0).toUtc();
+            DateTime.tryParse(
+              localData['updatedAt']?.toString() ?? '',
+            )?.toUtc() ??
+            DateTime.fromMillisecondsSinceEpoch(0).toUtc();
         final localIsDeleted = localData['isDeleted'] == true;
 
         if (remote.isDeleted && !localIsDeleted) {
@@ -688,7 +701,7 @@ class HiveSyncEngine {
           continue;
         }
 
-        var merged = _mergeFields(
+        var merged = await _mergeFields(
           boxName: remote.boxName,
           recordId: remote.id,
           localData: localData,
@@ -696,8 +709,9 @@ class HiveSyncEngine {
           localUpdatedAt: localUpdatedAt,
           remoteUpdatedAt: remote.updatedAt,
           secretKey: secretKey,
-          excludeFields:
-              isAttendanceBox ? const {'presence', 'presenceMeta'} : const {},
+          excludeFields: isAttendanceBox
+              ? const {'presence', 'presenceMeta'}
+              : const {},
         );
 
         if (isAttendanceBox) {
@@ -712,14 +726,14 @@ class HiveSyncEngine {
           merged['presenceMeta'] = crdt['presenceMeta'];
         }
 
-        final conflictFields =
-            (merged['_conflicts'] as List<String>?) ?? [];
+        final conflictFields = (merged['_conflicts'] as List<String>?) ?? [];
         merged.remove('_conflicts');
         // La firma del timestamp è un dato di trasporto: non va persistita.
         merged.remove('updatedAtSignature');
 
         if (isClassBox) {
-          merged['nameLocked'] = (localData['nameLocked'] ?? true) ||
+          merged['nameLocked'] =
+              (localData['nameLocked'] ?? true) ||
               (remote.data['nameLocked'] == true);
         }
 
@@ -729,7 +743,9 @@ class HiveSyncEngine {
         // merge con dati remoti in chiaro) vengono cifrati con la chiave
         // locale. L'operazione è idempotente: i campi già cifrati restano.
         if (remote.boxName == LocalDatabase.studentsBox) {
-          merged = FieldEncryptionService.encryptStudentMapForStorage(merged);
+          merged = await FieldEncryptionService.encryptStudentMapForStorage(
+            merged,
+          );
         }
         await box.put(remote.id, merged);
 
@@ -804,19 +820,19 @@ class HiveSyncEngine {
     required List<SyncIndexEntry> localIndex,
     required List<SyncIndexEntry> remoteIndex,
     required Future<List<SyncRecord>> Function(List<String> neededKeys)
-        fetchRemoteRecords,
+    fetchRemoteRecords,
     List<SyncClassScope>? scopes,
     String? secretKey,
   }) async {
     try {
-      final neededFromRemote = computeNeededRecords(remoteIndex);
+      final neededFromRemote = await computeNeededRecords(remoteIndex);
 
       var sentCount = 0;
       var receivedCount = 0;
 
-      final neededFromLocal = computeNeededRecords(localIndex);
+      final neededFromLocal = await computeNeededRecords(localIndex);
       if (neededFromLocal.isNotEmpty) {
-        final localRecords = fetchRecords(neededFromLocal, scopes);
+        final localRecords = await fetchRecords(neededFromLocal, scopes);
         sentCount = localRecords.length;
       }
 
@@ -849,8 +865,10 @@ class HiveSyncEngine {
     required String Function(Map<String, dynamic>) encryptRecord,
     List<SyncClassScope>? scopes,
   }) async {
-    final records = extractModifiedRecords(
-        DateTime.fromMillisecondsSinceEpoch(0), scopes);
+    final records = await extractModifiedRecords(
+      DateTime.fromMillisecondsSinceEpoch(0),
+      scopes,
+    );
 
     for (final record in records) {
       encryptRecord(record.data);
@@ -902,7 +920,7 @@ class HiveSyncEngine {
 
   /// Performs a full bidirectional sync with a remote device
   /// Uses LWW (Last-Write-Wins) conflict resolution based on updatedAt
-  /// 
+  ///
   /// [sessionKey] - The shared session key from P2PSecurityService (ECDH + HKDF derived)
   /// [fetchRemoteIndex] - Function to fetch remote index
   /// [fetchRemoteRecords] - Function to fetch remote records by keys
@@ -912,7 +930,8 @@ class HiveSyncEngine {
   Future<SyncResult> performFullSync({
     required SecretKey sessionKey,
     required Future<List<SyncIndexEntry>> Function() fetchRemoteIndex,
-    required Future<List<SyncRecord>> Function(List<String> keys) fetchRemoteRecords,
+    required Future<List<SyncRecord>> Function(List<String> keys)
+    fetchRemoteRecords,
     required Future<void> Function(List<SyncIndexEntry> index) sendLocalIndex,
     required Future<void> Function(List<SyncRecord> records) sendLocalRecords,
     void Function(int sent, int received, int total)? onProgress,
@@ -920,46 +939,46 @@ class HiveSyncEngine {
   }) async {
     try {
       // Step 1: Build local index
-      final localIndex = buildLocalIndex(scopes);
-      
+      final localIndex = await buildLocalIndex(scopes);
+
       // Step 2: Send local index to remote
       await sendLocalIndex(localIndex);
-      
+
       // Step 3: Fetch remote index
       final remoteIndex = await fetchRemoteIndex();
-      
+
       // Step 4: Compute what we need from remote
-      final neededFromRemote = computeNeededRecords(remoteIndex);
-      
+      final neededFromRemote = await computeNeededRecords(remoteIndex);
+
       // Step 5: Compute what remote needs from us
-      final neededFromLocal = computeNeededRecordsFromLocal(localIndex, remoteIndex);
-      
+      final neededFromLocal = computeNeededRecordsFromLocal(
+        localIndex,
+        remoteIndex,
+      );
+
       // Step 6: Send our records that remote needs
       var sentCount = 0;
       if (neededFromLocal.isNotEmpty) {
-        final localRecords = fetchRecords(neededFromLocal, scopes);
+        final localRecords = await fetchRecords(neededFromLocal, scopes);
         await sendLocalRecords(localRecords);
         sentCount = localRecords.length;
       }
-      
+
       // Step 7: Fetch and apply remote records we need
       var receivedCount = 0;
       var conflictsResolved = 0;
-      
+
       if (neededFromRemote.isNotEmpty) {
         final remoteRecords = await fetchRemoteRecords(neededFromRemote);
-        
+
         // Apply with conflict resolution
-        final result = await applyRemoteRecords(
-          remoteRecords,
-          scopes: scopes,
-        );
+        final result = await applyRemoteRecords(remoteRecords, scopes: scopes);
         receivedCount = result.receivedRecords;
         conflictsResolved = result.conflictsResolved;
       }
-      
+
       onProgress?.call(sentCount, receivedCount, sentCount + receivedCount);
-      
+
       return SyncResult(
         success: true,
         sentRecords: sentCount,
@@ -982,12 +1001,14 @@ class HiveSyncEngine {
     List<SyncIndexEntry> remoteIndex,
   ) {
     final needed = <String>[];
-    final remoteIndexMap = {for (final e in remoteIndex) '${e.boxName}:${e.id}': e};
-    
+    final remoteIndexMap = {
+      for (final e in remoteIndex) '${e.boxName}:${e.id}': e,
+    };
+
     for (final local in localIndex) {
       final key = '${local.boxName}:${local.id}';
       final remote = remoteIndexMap[key];
-      
+
       if (remote == null) {
         if (!local.isDeleted) {
           needed.add(key);
@@ -998,11 +1019,12 @@ class HiveSyncEngine {
         if (!local.isDeleted) {
           needed.add(key);
         }
-      } else if (local.updatedAt == remote.updatedAt && local.checksum != remote.checksum) {
+      } else if (local.updatedAt == remote.updatedAt &&
+          local.checksum != remote.checksum) {
         needed.add(key);
       }
     }
-    
+
     return needed;
   }
 

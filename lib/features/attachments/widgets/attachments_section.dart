@@ -20,6 +20,7 @@
 /// Il parametro [readOnly] disabilita tutte le azioni modificative (aggiungi,
 /// rinomina, elimina), utile in contesti di sola consultazione.
 library;
+
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -81,7 +82,9 @@ class AttachmentsSection extends ConsumerWidget {
                 children: [
                   Icon(
                     Icons.lock_rounded,
-                    color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                    color: isDark
+                        ? colorScheme.primary
+                        : const Color(0xFF174A7E),
                     size: 20,
                   ),
                   const SizedBox(width: 8),
@@ -91,7 +94,9 @@ class AttachmentsSection extends ConsumerWidget {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                        color: isDark
+                            ? colorScheme.primary
+                            : const Color(0xFF174A7E),
                       ),
                     ),
                   ),
@@ -100,14 +105,19 @@ class AttachmentsSection extends ConsumerWidget {
                       tooltip: 'Aggiungi',
                       onPressed: () => _showAddMenu(context, ref),
                       icon: const Icon(Icons.add_circle_outline_rounded),
-                      color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                      color: isDark
+                          ? colorScheme.primary
+                          : const Color(0xFF174A7E),
                     ),
                 ],
               ),
               const SizedBox(height: 4),
               Text(
                 'Salvati cifrati e compressi (foto max 1600px, JPEG).',
-                style: TextStyle(fontSize: 12, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                ),
               ),
               const SizedBox(height: 12),
               if (snapshot.connectionState == ConnectionState.waiting &&
@@ -116,7 +126,9 @@ class AttachmentsSection extends ConsumerWidget {
               else if (attachments.isEmpty)
                 Text(
                   'Nessun allegato',
-                  style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade500),
+                  style: TextStyle(
+                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
+                  ),
                 )
               else
                 ...attachments.map(
@@ -502,9 +514,14 @@ class _AttachmentTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 0,
-      color: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.grey.shade50,
+      color: isDark
+          ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
+          : Colors.grey.shade50,
       child: ListTile(
-        leading: Icon(icon, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+        leading: Icon(
+          icon,
+          color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+        ),
         title: Text(
           attachment.name,
           maxLines: 1,

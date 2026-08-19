@@ -69,7 +69,11 @@ void main() {
 
     test('ignora record con data non valida', () {
       final records = [
-        {'date': 'non-una-data', 'classId': 'c1', 'presence': <String, String>{}},
+        {
+          'date': 'non-una-data',
+          'classId': 'c1',
+          'presence': <String, String>{},
+        },
       ];
       final result = QuickCountLogic.recordsOnDate(
         records,
@@ -95,9 +99,7 @@ void main() {
     });
 
     test('lista vuota se nessun record appartiene alle classi', () {
-      final records = [
-        record(date: '2026-08-04', classId: 'c1', presence: {}),
-      ];
+      final records = [record(date: '2026-08-04', classId: 'c1', presence: {})];
       final result = QuickCountLogic.recordsOfClasses(records, {'c9'});
       expect(result, isEmpty);
     });
@@ -108,20 +110,25 @@ void main() {
   // ══════════════════════════════════════════════════
   group('presentCount', () {
     test('conta solo i Presente', () {
-      final r = record(date: '2026-08-04', classId: 'c1', presence: {
-        's1': 'Presente',
-        's2': 'Assente',
-        's3': 'Assente',
-        's4': 'Presente',
-      });
+      final r = record(
+        date: '2026-08-04',
+        classId: 'c1',
+        presence: {
+          's1': 'Presente',
+          's2': 'Assente',
+          's3': 'Assente',
+          's4': 'Presente',
+        },
+      );
       expect(QuickCountLogic.presentCount(r), 2);
     });
 
     test('restituisce 0 se non ci sono Presente', () {
-      final r = record(date: '2026-08-04', classId: 'c1', presence: {
-        's1': 'Assente',
-        's2': 'Assente',
-      });
+      final r = record(
+        date: '2026-08-04',
+        classId: 'c1',
+        presence: {'s1': 'Assente', 's2': 'Assente'},
+      );
       expect(QuickCountLogic.presentCount(r), 0);
     });
 
@@ -139,14 +146,16 @@ void main() {
   group('totalPresentCount', () {
     test('somma i presenti di più record (multi-classe)', () {
       final records = [
-        record(date: '2026-08-04', classId: 'c1', presence: {
-          's1': 'Presente',
-          's2': 'Presente',
-        }),
-        record(date: '2026-08-04', classId: 'c2', presence: {
-          's3': 'Presente',
-          's4': 'Assente',
-        }),
+        record(
+          date: '2026-08-04',
+          classId: 'c1',
+          presence: {'s1': 'Presente', 's2': 'Presente'},
+        ),
+        record(
+          date: '2026-08-04',
+          classId: 'c2',
+          presence: {'s3': 'Presente', 's4': 'Assente'},
+        ),
       ];
       expect(QuickCountLogic.totalPresentCount(records), 3);
     });
@@ -162,13 +171,12 @@ void main() {
   group('presentStudentIds', () {
     test('estrae gli id dei soli presenti', () {
       final records = [
-        record(date: '2026-08-04', classId: 'c1', presence: {
-          's1': 'Presente',
-          's2': 'Assente',
-        }),
-        record(date: '2026-08-04', classId: 'c2', presence: {
-          's3': 'Presente',
-        }),
+        record(
+          date: '2026-08-04',
+          classId: 'c1',
+          presence: {'s1': 'Presente', 's2': 'Assente'},
+        ),
+        record(date: '2026-08-04', classId: 'c2', presence: {'s3': 'Presente'}),
       ];
       expect(
         QuickCountLogic.presentStudentIds(records),

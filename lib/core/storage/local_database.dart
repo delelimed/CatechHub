@@ -48,13 +48,13 @@ import 'package:hive_flutter/hive_flutter.dart';
 /// errore fatale. Tutti gli altri Box sono recuperabili con perdita dati
 /// limitata al singolo dominio.
 class LocalDatabase {
-// ─────────────────────────────────────────────────────────────────────────
-// NOMI BOX HIVE
-// Ogni costante identifica un Box Hive su disco. I nomi sono versionati
-// implicitamente: se si cambia struttura dati, si apre un NUOVO Box con
-// nome diverso (es. students_box_v2) e si migrano i dati. Questo evita
-// conflitti di TypeAdapter tra versioni dell'app.
-// ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // NOMI BOX HIVE
+  // Ogni costante identifica un Box Hive su disco. I nomi sono versionati
+  // implicitamente: se si cambia struttura dati, si apre un NUOVO Box con
+  // nome diverso (es. students_box_v2) e si migrano i dati. Questo evita
+  // conflitti di TypeAdapter tra versioni dell'app.
+  // ─────────────────────────────────────────────────────────────────────────
   static const authBox = 'registroBox';
   static const classesBox = 'classes_box';
   static const studentsBox = 'students_box';
@@ -161,11 +161,16 @@ class LocalDatabase {
       const secureStorage = FlutterSecureStorage();
       const encryptionKeyName = 'secure_database_key';
 
-      var encryptionKeyString = await secureStorage.read(key: encryptionKeyName);
+      var encryptionKeyString = await secureStorage.read(
+        key: encryptionKeyName,
+      );
       if (encryptionKeyString == null) {
         final key = Hive.generateSecureKey();
         encryptionKeyString = base64UrlEncode(key);
-        await secureStorage.write(key: encryptionKeyName, value: encryptionKeyString);
+        await secureStorage.write(
+          key: encryptionKeyName,
+          value: encryptionKeyString,
+        );
       }
       _cipher = HiveAesCipher(base64Url.decode(encryptionKeyString));
     }
@@ -190,14 +195,30 @@ class LocalDatabase {
       _BoxDefinition(name: planningBox, isMap: true, isCritical: false),
       _BoxDefinition(name: attendanceBox, isMap: true, isCritical: false),
       _BoxDefinition(name: documentsBox, isMap: true, isCritical: false),
-      _BoxDefinition(name: documentDeliveriesBox, isMap: true, isCritical: false),
+      _BoxDefinition(
+        name: documentDeliveriesBox,
+        isMap: true,
+        isCritical: false,
+      ),
       _BoxDefinition(name: attachmentsBox, isMap: true, isCritical: false),
       _BoxDefinition(name: contactNotesBox, isMap: true, isCritical: false),
       _BoxDefinition(name: catechesiBox, isMap: true, isCritical: false),
-      _BoxDefinition(name: meetingCatechesiBox, isMap: false, isCritical: false),
-      _BoxDefinition(name: studentDailyNotesBox, isMap: true, isCritical: false),
+      _BoxDefinition(
+        name: meetingCatechesiBox,
+        isMap: false,
+        isCritical: false,
+      ),
+      _BoxDefinition(
+        name: studentDailyNotesBox,
+        isMap: true,
+        isCritical: false,
+      ),
       _BoxDefinition(name: trustedDevicesBox, isMap: true, isCritical: false),
-      _BoxDefinition(name: meetingNotificationsBox, isMap: true, isCritical: false),
+      _BoxDefinition(
+        name: meetingNotificationsBox,
+        isMap: true,
+        isCritical: false,
+      ),
       _BoxDefinition(name: avvisiBox, isMap: true, isCritical: false),
       _BoxDefinition(name: syncConflictsBox, isMap: true, isCritical: false),
       // Box della modalità "Responsabile Catechistico"
@@ -205,15 +226,31 @@ class LocalDatabase {
       _BoxDefinition(name: auditLogBox, isMap: true, isCritical: false),
       _BoxDefinition(name: aulaBox, isMap: true, isCritical: false),
       _BoxDefinition(name: tombstoneBox, isMap: true, isCritical: false),
-      _BoxDefinition(name: historicalRecordsBox, isMap: true, isCritical: false),
+      _BoxDefinition(
+        name: historicalRecordsBox,
+        isMap: true,
+        isCritical: false,
+      ),
       _BoxDefinition(name: catechistsBox, isMap: true, isCritical: false),
       // Box della "Rete Catechistica Parrocchiale"
       _BoxDefinition(name: classChannelKeysBox, isMap: true, isCritical: false),
-      _BoxDefinition(name: classChannelCiphertextBox, isMap: true, isCritical: false),
+      _BoxDefinition(
+        name: classChannelCiphertextBox,
+        isMap: true,
+        isCritical: false,
+      ),
       _BoxDefinition(name: parishEventsBox, isMap: true, isCritical: false),
       // Box del modulo "Supplenze Temporanee e Delega Sicura"
-      _BoxDefinition(name: substituteDelegationsBox, isMap: true, isCritical: false),
-      _BoxDefinition(name: substituteLessonNotesBox, isMap: true, isCritical: false),
+      _BoxDefinition(
+        name: substituteDelegationsBox,
+        isMap: true,
+        isCritical: false,
+      ),
+      _BoxDefinition(
+        name: substituteLessonNotesBox,
+        isMap: true,
+        isCritical: false,
+      ),
     ];
 
     for (final definition in boxDefinitions) {
@@ -229,7 +266,9 @@ class LocalDatabase {
       await Hive.box(authBox).delete('isLoggedIn');
     } catch (e) {
       // Non fatale: il flag legacy potrebbe non esistere.
-      debugPrint('[LocalDatabase] Cleanup legacy isLoggedIn fallito (non fatale): $e');
+      debugPrint(
+        '[LocalDatabase] Cleanup legacy isLoggedIn fallito (non fatale): $e',
+      );
     }
 
     _initialized = true;
@@ -262,8 +301,12 @@ class LocalDatabase {
       // Causa probabile: file .hive corrotto, lock residuo, o TypeAdapter
       // disallineato rispetto alla struttura dati attuale.
       // ─────────────────────────────────────────────────────────────────────
-      debugPrint('[LocalDatabase] Box "${definition.name}" apertura fallita: $e');
-      debugPrint('[LocalDatabase] Tentativo di recovery per "${definition.name}"...');
+      debugPrint(
+        '[LocalDatabase] Box "${definition.name}" apertura fallita: $e',
+      );
+      debugPrint(
+        '[LocalDatabase] Tentativo di recovery per "${definition.name}"...',
+      );
 
       try {
         // 1. Chiudi eventuali riferimenti parziali a questo Box per
@@ -283,27 +326,35 @@ class LocalDatabase {
         //    manuale dei file, perche' gestisce correttamente i edge case
         //    come i lock temporanei e i file .tmp.
         await Hive.deleteBoxFromDisk(definition.name);
-        debugPrint('[LocalDatabase] Box "${definition.name}" eliminato da disco con deleteBoxFromDisk');
+        debugPrint(
+          '[LocalDatabase] Box "${definition.name}" eliminato da disco con deleteBoxFromDisk',
+        );
       } catch (deleteError) {
         // Se deleteBoxFromDisk fallisce, logghiamo ma continuiamo.
         // Il retry potrebbe comunque riuscire se il problema era solo
         // un lock transitorio.
-        debugPrint('[LocalDatabase] Eliminazione Box "${definition.name}" fallita: $deleteError');
+        debugPrint(
+          '[LocalDatabase] Eliminazione Box "${definition.name}" fallita: $deleteError',
+        );
       }
 
       try {
         // 3. Riapri il Box vuoto (i dati precedenti sono persi ma l'app
         //    non crasha e puo' continuare a funzionare).
         await _openSingleBox(definition);
-        debugPrint('[LocalDatabase] Recovery Box "${definition.name}" completato. '
-            'Dati precedenti persi, Box ricreato vuoto.');
+        debugPrint(
+          '[LocalDatabase] Recovery Box "${definition.name}" completato. '
+          'Dati precedenti persi, Box ricreato vuoto.',
+        );
       } catch (retryError) {
         // ───────────────────────────────────────────────────────────────────
         // ANCHE IL RETRY E' FALLITO per il Box: definition.name
         // Se il Box e' critico (authBox), propaghiamo l'errore.
         // Altrimenti logghiamo e continuiamo con gli altri Box.
         // ───────────────────────────────────────────────────────────────────
-        debugPrint('[LocalDatabase] Retry per "${definition.name}" fallito: $retryError');
+        debugPrint(
+          '[LocalDatabase] Retry per "${definition.name}" fallito: $retryError',
+        );
         if (definition.isCritical) {
           rethrow;
         }
@@ -339,7 +390,8 @@ class LocalDatabase {
   static Box meetingCatechesi() => Hive.box(meetingCatechesiBox);
   static Box<Map> studentDailyNotes() => Hive.box<Map>(studentDailyNotesBox);
   static Box<Map> trustedDevices() => Hive.box<Map>(trustedDevicesBox);
-  static Box<Map> meetingNotifications() => Hive.box<Map>(meetingNotificationsBox);
+  static Box<Map> meetingNotifications() =>
+      Hive.box<Map>(meetingNotificationsBox);
   static Box<Map> avvisi() => Hive.box<Map>(avvisiBox);
   static Box<Map> syncConflicts() => Hive.box<Map>(syncConflictsBox);
 
@@ -399,7 +451,8 @@ class LocalDatabase {
     yield _boxValues(box, mapper);
     var lastUpdate = DateTime.now();
     await for (final _ in box.watch()) {
-      if (DateTime.now().difference(lastUpdate) > const Duration(milliseconds: 500)) {
+      if (DateTime.now().difference(lastUpdate) >
+          const Duration(milliseconds: 500)) {
         yield _boxValues(box, mapper);
         lastUpdate = DateTime.now();
       }

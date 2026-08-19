@@ -23,7 +23,11 @@ class ResponsabileGuard extends StatelessWidget {
   /// Contenuto amministrativo mostrato solo al Responsabile.
   final Widget child;
 
-  const ResponsabileGuard({super.key, required this.title, required this.child});
+  const ResponsabileGuard({
+    super.key,
+    required this.title,
+    required this.child,
+  });
 
   @override
   Widget build(BuildContext context) {

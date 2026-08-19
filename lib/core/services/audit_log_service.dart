@@ -22,12 +22,12 @@
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:crypto/crypto.dart' show Hmac, sha256;
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../shared/models/audit_log.dart';
 import '../storage/local_database.dart';
+import 'crypto_utils.dart';
 
 /// Servizio di firma e verifica HMAC per il Registro Trattamenti.
 class AuditLogService {
@@ -82,8 +82,10 @@ class AuditLogService {
   /// Deriva la chiave HMAC-specifica dell'operatore corrente dal segreto.
   static Future<List<int>> _deriveKey() async {
     final base = await _getBaseSecret();
-    final hmac = Hmac(sha256, utf8.encode('$_context:$base'));
-    return hmac.convert(utf8.encode(_operatorKey())).bytes;
+    return hmacSha256Bytes(
+      utf8.encode('$_context:$base'),
+      utf8.encode(_operatorKey()),
+    );
   }
 
   /// Costruisce il payload canonico da firmare per [log].
@@ -97,8 +99,8 @@ class AuditLogService {
   /// Firmerà [log] e restituisce una copia immutabile con la signature valorizzata.
   static Future<AuditLog> sign(AuditLog log) async {
     final key = await _deriveKey();
-    final mac = Hmac(sha256, key).convert(utf8.encode(buildPayload(log)));
-    return log.copyWith(signature: base64Encode(mac.bytes));
+    final mac = await hmacSha256Bytes(key, utf8.encode(buildPayload(log)));
+    return log.copyWith(signature: base64Encode(mac));
   }
 
   /// Verifica l'integrità di [log] confrontando la signature con i campi.
@@ -106,8 +108,8 @@ class AuditLogService {
   static Future<bool> verify(AuditLog log) async {
     if (log.signature.isEmpty) return false;
     final key = await _deriveKey();
-    final mac = Hmac(sha256, key).convert(utf8.encode(buildPayload(log)));
-    final expected = base64Encode(mac.bytes);
+    final mac = await hmacSha256Bytes(key, utf8.encode(buildPayload(log)));
+    final expected = base64Encode(mac);
     return _constantTimeEquals(expected, log.signature);
   }
 

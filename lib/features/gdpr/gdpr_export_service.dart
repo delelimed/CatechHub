@@ -31,19 +31,19 @@ class GdprExportService {
     final logs = AuditLogRepository().getAllLogsSync();
     final buf = StringBuffer()
       ..write('\ufeff')
-      ..writeln(
-        'Timestamp;Azione;Operatore;OperatoreId;Entita;EntityId;Firma',
-      );
+      ..writeln('Timestamp;Azione;Operatore;OperatoreId;Entita;EntityId;Firma');
     for (final log in logs) {
-      buf.writeln([
-        log.timestamp.toUtc().toIso8601String(),
-        log.actionType.storageValue,
-        log.executedByCatechistName,
-        log.executedByCatechistId,
-        log.affectedEntityType,
-        log.affectedEntityId,
-        log.signature,
-      ].map(_csvEscape).join(';'));
+      buf.writeln(
+        [
+          log.timestamp.toUtc().toIso8601String(),
+          log.actionType.storageValue,
+          log.executedByCatechistName,
+          log.executedByCatechistId,
+          log.affectedEntityType,
+          log.affectedEntityId,
+          log.signature,
+        ].map(_csvEscape).join(';'),
+      );
     }
     return buf.toString();
   }
@@ -52,24 +52,25 @@ class GdprExportService {
   ///
   /// Include: config parrocchiale, studenti (con campi GDPR), registro,
   /// tombstone (diritto all'oblio) e metadata di esportazione.
-  static Map<String, dynamic> buildParishConservationPackage() {
+  static Future<Map<String, dynamic>> buildParishConservationPackage() async {
     // M8 / Fase 3 — item 9: esclude sempre i record demo della guida (PII di
     // esempio taggate `_demo`) anche dall'archivio di conservazione.
-    final demoIds = LocalDatabase.students()
-        .keys
+    final demoIds = LocalDatabase.students().keys
         .map((k) => k.toString())
         .where((id) {
           final raw = LocalDatabase.students().get(id);
           return LocalDatabase.toStringDynamicMap(raw)['_demo'] == true;
         })
         .toSet();
-    final students = StudentsRepository().getAllStudentsSync()
+    final students = (await StudentsRepository().getAllStudentsSync())
         .where((s) => !demoIds.contains(s.id))
         .map((s) => s.toMap()..['id'] = s.id);
-    final logs = AuditLogRepository().getAllLogsSync().map((l) =>
-        l.toMap()..['logId'] = l.logId);
-    final tombstones = TombstoneRepository().getAll().map((t) =>
-        t.toMap()..['id'] = t.id);
+    final logs = AuditLogRepository().getAllLogsSync().map(
+      (l) => l.toMap()..['logId'] = l.logId,
+    );
+    final tombstones = TombstoneRepository().getAll().map(
+      (t) => t.toMap()..['id'] = t.id,
+    );
 
     return {
       'schema': 'CatechHub.Compliance.v1',
@@ -82,17 +83,18 @@ class GdprExportService {
   }
 
   /// Cifra il pacchetto di conservazione con [pin] (AES-256-GCM + PBKDF2).
-  static String encryptParishConservationPackage(String pin) {
+  static Future<String> encryptParishConservationPackage(String pin) async {
     return BackupEncryptionService.encryptBackup(
-      jsonEncode(buildParishConservationPackage()),
+      jsonEncode(await buildParishConservationPackage()),
       pin,
     );
   }
 
   /// Breve riepilogo testuale (art. 30) per stampa/archivio cartaceo.
-  static String buildAuditSummaryText() {
+  static Future<String> buildAuditSummaryText() async {
     final logs = AuditLogRepository().getAllLogsSync();
-    final studentCount = StudentsRepository().getAllStudentsSync().length;
+    final studentCount =
+        (await StudentsRepository().getAllStudentsSync()).length;
     final tombCount = TombstoneRepository().getAll().length;
     final buf = StringBuffer()
       ..writeln('= Registro Trattamenti — Riepilogo =')
@@ -114,7 +116,9 @@ class GdprExportService {
 
   static String _csvEscape(String value) {
     final escaped = value.replaceAll('"', '""');
-    return escaped.contains(';') || escaped.contains('"') || escaped.contains('\n')
+    return escaped.contains(';') ||
+            escaped.contains('"') ||
+            escaped.contains('\n')
         ? '"$escaped"'
         : escaped;
   }

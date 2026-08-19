@@ -41,14 +41,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.13.1"
-  barbecue:
-    dependency: transitive
-    description:
-      name: barbecue
-      sha256: e3a0afaf9005e466887d6c87411a2ddd8d72fc46db3caabf278ee600f1e2f92c
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.4.0"
   barcode:
     dependency: transitive
     description:
@@ -129,14 +121,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.19.1"
-  colorize:
-    dependency: transitive
-    description:
-      name: colorize
-      sha256: "584746cd6ba1cba0633b6720f494fe6f9601c4170f0666c1579d2aa2a61071ba"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.0.0"
   convert:
     dependency: transitive
     description:
@@ -162,7 +146,7 @@ packages:
     source: hosted
     version: "0.3.5+4"
   crypto:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: crypto
       sha256: c8ea0233063ba03258fbcf2ca4d6dadfefe14f02fab57702265467a19f27fadf
@@ -177,14 +161,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.9.0"
-  csslib:
-    dependency: transitive
-    description:
-      name: csslib
-      sha256: "09bad715f418841f976c77db72d5398dc1253c21fb9c0c7f0b0b985860b2d58e"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.2"
   cupertino_icons:
     dependency: "direct main"
     description:
@@ -493,14 +469,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.2.0"
-  html:
-    dependency: transitive
-    description:
-      name: html
-      sha256: "6d1264f2dffa1b1101c25a91dff0dc2daee4c18e87cd8538729773c073dbf602"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.15.6"
   http:
     dependency: "direct main"
     description:
@@ -669,14 +637,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.2"
-  license_checker:
-    dependency: "direct main"
-    description:
-      name: license_checker
-      sha256: "8a35b6946e50811e070ac6fe4717ee431cd1a334e080df2116956b54b0bb0d0f"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.6.2"
   lints:
     dependency: transitive
     description:
@@ -741,14 +701,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.3.0"
-  markdown:
-    dependency: transitive
-    description:
-      name: markdown
-      sha256: ee85086ad7698b42522c6ad42fe195f1b9898e4d974a1af4576c1a3a176cada9
-      url: "https://pub.dev"
-    source: hosted
-    version: "7.3.1"
   matcher:
     dependency: transitive
     description:
@@ -853,14 +805,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.1.0"
-  pana:
-    dependency: transitive
-    description:
-      name: pana
-      sha256: "847ee5df6ac13fdc6c53d641095de1b25886c973d0b0f0469c73521ebe4602fa"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.23.12"
   path:
     dependency: transitive
     description:
@@ -1013,14 +957,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.8"
-  pointycastle:
-    dependency: "direct main"
-    description:
-      name: pointycastle
-      sha256: "92aa3841d083cc4b0f4709b5c74fd6409a3e6ba833ffc7dc6a8fee096366acf5"
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.0.0"
   pool:
     dependency: transitive
     description:
@@ -1053,14 +989,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.2.0"
-  pubspec_parse:
-    dependency: transitive
-    description:
-      name: pubspec_parse
-      sha256: "0560ba233314abbed0a48a2956f7f022cce7c3e1e73df540277da7544cad4082"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.5.0"
   qr:
     dependency: transitive
     description:
@@ -1085,14 +1013,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.1"
-  retry:
-    dependency: transitive
-    description:
-      name: retry
-      sha256: "822e118d5b3aafed083109c72d5f484c6dc66707885e07c0fbcb8b986bba7efc"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.1.2"
   riverpod:
     dependency: transitive
     description:
@@ -1101,14 +1021,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.4.2"
-  safe_url_check:
-    dependency: transitive
-    description:
-      name: safe_url_check
-      sha256: "49a3e060a7869cbafc8f4845ca1ecbbaaa53179980a32f4fdfeab1607e90f41d"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.1.2"
   share_plus:
     dependency: "direct main"
     description:
@@ -1251,7 +1163,7 @@ packages:
     source: hosted
     version: "1.12.1"
   state_notifier:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: state_notifier
       sha256: b8677376aa54f2d7c58280d5a007f9e8774f1968d1fb1c096adcb4792fba29bb
@@ -1274,14 +1186,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.1"
-  string_validator:
-    dependency: transitive
-    description:
-      name: string_validator
-      sha256: "50dd8ecf91db6a732f4a851eeae81ee12406eedc62d0da72f2d91a04a2d10dd8"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.3.0"
   term_glyph:
     dependency: transitive
     description:

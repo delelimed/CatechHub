@@ -42,9 +42,7 @@ void main() {
         approvedByDeviceId: 'CH_resp_1',
         expiresAt: DateTime.utc(2026, 8, 15, 12),
       );
-      final other = base.copyWith(
-        expiresAt: DateTime.utc(2026, 9, 15, 12),
-      );
+      final other = base.copyWith(expiresAt: DateTime.utc(2026, 9, 15, 12));
       expect(base.canonicalPayload, isNot(other.canonicalPayload));
     });
 
@@ -69,10 +67,7 @@ void main() {
       expect(restored.approvedByName, 'Don Rossi');
       expect(restored.publicKey, 'pubkey');
       expect(restored.expiresAt, isNotNull);
-      expect(
-        restored.expiresAt!.isAtSameMomentAs(cert.expiresAt!),
-        isTrue,
-      );
+      expect(restored.expiresAt!.isAtSameMomentAs(cert.expiresAt!), isTrue);
     });
   });
 
@@ -143,28 +138,31 @@ void main() {
       expect(ok, isFalse);
     });
 
-    test('la chiave pubblica non permette di falsificare (mitM defense)',
-        () async {
-      // Anche conoscendo la sola chiave pubblica non si può produrre una firma
-      // valida per un payload arbitrario.
-      final forged = await P2PSecurityService.signApprovalPayload(
-        'payload_forgiato',
-        privateKeyBytes,
-      );
-      final ok = await P2PSecurityService.verifyApprovalSignature(
-        canonicalPayload: cert.canonicalPayload,
-        signature: forged,
-        publicKeyBase64: publicKeyBase64,
-      );
-      expect(ok, isFalse);
-    });
+    test(
+      'la chiave pubblica non permette di falsificare (mitM defense)',
+      () async {
+        // Anche conoscendo la sola chiave pubblica non si può produrre una firma
+        // valida per un payload arbitrario.
+        final forged = await P2PSecurityService.signApprovalPayload(
+          'payload_forgiato',
+          privateKeyBytes,
+        );
+        final ok = await P2PSecurityService.verifyApprovalSignature(
+          canonicalPayload: cert.canonicalPayload,
+          signature: forged,
+          publicKeyBase64: publicKeyBase64,
+        );
+        expect(ok, isFalse);
+      },
+    );
 
     test('firma base64 stabile attraverso JSON', () async {
       final sig = await P2PSecurityService.signApprovalPayload(
         cert.canonicalPayload,
         privateKeyBytes,
       );
-      final decoded = jsonDecode(jsonEncode({'sig': sig})) as Map<String, dynamic>;
+      final decoded =
+          jsonDecode(jsonEncode({'sig': sig})) as Map<String, dynamic>;
       expect(decoded['sig'], sig);
     });
   });

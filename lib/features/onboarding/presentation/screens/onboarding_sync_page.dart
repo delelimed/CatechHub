@@ -12,7 +12,16 @@ import '../../../../core/storage/local_database.dart';
 import '../../../../features/sync/p2p/p2p_sync_service.dart';
 import '../../../../features/sync/p2p/p2p_security_service.dart';
 
-enum _OnboardingStep { roleChoice, actionChoice, showQr, scanQr, pairingVerification, syncing, complete, error }
+enum _OnboardingStep {
+  roleChoice,
+  actionChoice,
+  showQr,
+  scanQr,
+  pairingVerification,
+  syncing,
+  complete,
+  error,
+}
 
 class OnboardingSyncPage extends ConsumerStatefulWidget {
   const OnboardingSyncPage({super.key});
@@ -156,7 +165,8 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
     _pairingTimeoutTimer = Timer(const Duration(seconds: 120), () {
       if (mounted && !_syncCompleted) {
         setState(() {
-          _errorMessage = 'Tempo scaduto. Assicurati che l\'altro dispositivo '
+          _errorMessage =
+              'Tempo scaduto. Assicurati che l\'altro dispositivo '
               'sia in modalità associazione.';
           _isPairing = false;
           _currentStep = _OnboardingStep.error;
@@ -169,11 +179,14 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
   void _startP2pDiscoverOnly(String targetEndpoint) {
     if (_isPairing) return;
     _isPairing = true;
-    ref.read(nearbySyncServiceProvider).startPairingDiscoverOnly(targetEndpoint);
+    ref
+        .read(nearbySyncServiceProvider)
+        .startPairingDiscoverOnly(targetEndpoint);
     _pairingTimeoutTimer = Timer(const Duration(seconds: 120), () {
       if (mounted && !_syncCompleted) {
         setState(() {
-          _errorMessage = 'Tempo scaduto. Assicurati che l\'altro dispositivo '
+          _errorMessage =
+              'Tempo scaduto. Assicurati che l\'altro dispositivo '
               'sia in modalità associazione.';
           _isPairing = false;
           _currentStep = _OnboardingStep.error;
@@ -191,7 +204,8 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
 
       if (state.status == P2PSyncStatus.pairingVerification) {
         _pairingTimeoutTimer?.cancel();
-        if (state.pairingCode != null && _currentStep != _OnboardingStep.pairingVerification) {
+        if (state.pairingCode != null &&
+            _currentStep != _OnboardingStep.pairingVerification) {
           setState(() {
             _currentStep = _OnboardingStep.pairingVerification;
             _pairingCode = state.pairingCode;
@@ -205,7 +219,8 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
         setState(() {
           _currentStep = _OnboardingStep.syncing;
           _syncProgressTotal = state.totalRecordsToExchange;
-          _syncProgressCurrent = state.sentRecordsCount + state.receivedRecordsCount;
+          _syncProgressCurrent =
+              state.sentRecordsCount + state.receivedRecordsCount;
           _syncedDeviceName = state.connectedDeviceName;
         });
       } else if (state.status == P2PSyncStatus.completed) {
@@ -258,7 +273,8 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
 
       if (!found) {
         setState(() {
-          _errorMessage = 'Sincronizzazione completata ma non risulti in '
+          _errorMessage =
+              'Sincronizzazione completata ma non risulti in '
               'nessuna classe. Assicurati che l\'altro catechista ti abbia '
               'aggiunto al gruppo.';
           _currentStep = _OnboardingStep.error;
@@ -275,9 +291,10 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
     _syncCompleted = true;
     setState(() {
       _currentStep = _OnboardingStep.complete;
-      _successMessage = 'Sei stato aggiunto alla classe '
-          '${state.connectedDeviceName != null ? "di ${state.connectedDeviceName}" : ""}!'
-          .trim();
+      _successMessage =
+          'Sei stato aggiunto alla classe '
+                  '${state.connectedDeviceName != null ? "di ${state.connectedDeviceName}" : ""}!'
+              .trim();
       _isPairing = false;
     });
   }
@@ -289,6 +306,35 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
       final raw = barcode.rawValue;
       if (raw == null || raw.isEmpty) continue;
 
+      // QR della Catena di Fiducia (trust/approvazione del Responsabile):
+      // non è un QR di associazione. Guida l'utente verso la schermata
+      // corretta invece di mostrare il generico "QR code non valido".
+      final qrType = P2PSecurityService.classifyQrPayload(raw);
+      if (qrType == P2PQrType.trust) {
+        if (mounted) {
+          setState(
+            () => _errorMessage =
+                'Questo è il QR di fiducia del Responsabile: si importa da '
+                '"Catena di fiducia" → "Scansiona QR di fiducia", non qui. '
+                'Per associare il dispositivo usa il QR mostrato dall\'altro '
+                'dispositivo.',
+          );
+        }
+        return;
+      }
+      if (qrType == P2PQrType.approval) {
+        if (mounted) {
+          setState(
+            () => _errorMessage =
+                'Questo è un QR di approvazione del Responsabile: si riceve da '
+                '"Catena di fiducia" → "Ricevi approvazione", non qui. Per '
+                'associare il dispositivo usa il QR mostrato dall\'altro '
+                'dispositivo.',
+          );
+        }
+        return;
+      }
+
       final remoteIdentity = P2PSecurityService.parseQrPayload(raw);
       if (remoteIdentity == null) {
         if (mounted) setState(() => _errorMessage = 'QR code non valido.');
@@ -297,12 +343,15 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
 
       final existing = await _security.getAssociation(remoteIdentity.deviceId);
       if (existing != null && existing.isValid) {
-        if (mounted) setState(() => _errorMessage = 'Dispositivo già associato.');
+        if (mounted) {
+          setState(() => _errorMessage = 'Dispositivo già associato.');
+        }
         return;
       }
 
       final sharedSecret = await _security.computeStaticSharedSecret(
-          remoteIdentity.publicKeyBase64);
+        remoteIdentity.publicKeyBase64,
+      );
       final service = ref.read(nearbySyncServiceProvider);
       await service.storePendingAssociation(
         deviceId: remoteIdentity.deviceId,
@@ -395,15 +444,19 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
                         RadioListTile<String>(
                           value: localId,
                           title: const Text('Questo dispositivo'),
-                          subtitle: Text('Identità: $localId',
-                              style: const TextStyle(fontSize: 11)),
+                          subtitle: Text(
+                            'Identità: $localId',
+                            style: const TextStyle(fontSize: 11),
+                          ),
                           contentPadding: EdgeInsets.zero,
                         ),
                         RadioListTile<String>(
                           value: remoteId,
                           title: Text(remoteName),
-                          subtitle: Text('Identità: $remoteId',
-                              style: const TextStyle(fontSize: 11)),
+                          subtitle: Text(
+                            'Identità: $remoteId',
+                            style: const TextStyle(fontSize: 11),
+                          ),
                           contentPadding: EdgeInsets.zero,
                         ),
                       ],
@@ -434,7 +487,8 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
     final service = ref.read(nearbySyncServiceProvider);
     service.rejectPairingCode();
     setState(() {
-      _errorMessage = 'Codice di verifica non corrispondente. Associazione annullata.';
+      _errorMessage =
+          'Codice di verifica non corrispondente. Associazione annullata.';
       _currentStep = _OnboardingStep.error;
       _isPairing = false;
     });
@@ -449,9 +503,7 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
           title: const Text('Unisciti a una classe'),
           automaticallyImplyLeading: false,
         ),
-        body: SafeArea(
-          child: _buildBody(),
-        ),
+        body: SafeArea(child: _buildBody()),
       ),
     );
   }
@@ -490,18 +542,30 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
               color: const Color(0xFF174A7E).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Icon(Icons.people_rounded, size: 36, color: Color(0xFF174A7E)),
+            child: const Icon(
+              Icons.people_rounded,
+              size: 36,
+              color: Color(0xFF174A7E),
+            ),
           ),
           const SizedBox(height: 24),
           const Text(
             'Scegli il tipo di associazione',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF174A7E),
+            ),
           ),
           const SizedBox(height: 12),
           Text(
             'Entrambi i dispositivi devono selezionare lo STESSO ruolo '
             'per poter sincronizzare. Accordati con l\'altro catechista.',
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.5),
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade700,
+              height: 1.5,
+            ),
           ),
           const SizedBox(height: 24),
           _buildRoleOption(
@@ -509,8 +573,8 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
             Icons.phone_android_rounded,
             'Mio dispositivo',
             'Sei il catechista principale che ha già i dati della classe '
-            'sul proprio dispositivo oppure sei un nuovo catechista '
-            'che si unisce a una classe esistente.',
+                'sul proprio dispositivo oppure sei un nuovo catechista '
+                'che si unisce a una classe esistente.',
           ),
           const SizedBox(height: 12),
           _buildRoleOption(
@@ -518,7 +582,7 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
             Icons.person_add_rounded,
             'Altro catechista',
             'Sei un catechista che si associa per la sincronizzazione '
-            'dei dati con il collega.',
+                'dei dati con il collega.',
           ),
           const SizedBox(height: 24),
           SizedBox(
@@ -528,11 +592,15 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
                 backgroundColor: const Color(0xFF174A7E),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
               icon: const Icon(Icons.arrow_forward_rounded),
-              label: const Text('Continua',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              label: const Text(
+                'Continua',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
               onPressed: _proceedToActionChoice,
             ),
           ),
@@ -542,7 +610,12 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
     );
   }
 
-  Widget _buildRoleOption(P2PSyncRole role, IconData icon, String title, String description) {
+  Widget _buildRoleOption(
+    P2PSyncRole role,
+    IconData icon,
+    String title,
+    String description,
+  ) {
     final isSelected = _selectedRole == role;
     return Material(
       color: isSelected
@@ -557,7 +630,9 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: isSelected ? const Color(0xFF174A7E) : Colors.grey.shade200,
+              color: isSelected
+                  ? const Color(0xFF174A7E)
+                  : Colors.grey.shade200,
               width: isSelected ? 2 : 1,
             ),
           ),
@@ -567,10 +642,16 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFF174A7E) : const Color(0xFF174A7E).withValues(alpha: 0.1),
+                  color: isSelected
+                      ? const Color(0xFF174A7E)
+                      : const Color(0xFF174A7E).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(icon, color: isSelected ? Colors.white : const Color(0xFF174A7E), size: 26),
+                child: Icon(
+                  icon,
+                  color: isSelected ? Colors.white : const Color(0xFF174A7E),
+                  size: 26,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -582,7 +663,9 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
-                        color: isSelected ? const Color(0xFF174A7E) : Colors.black87,
+                        color: isSelected
+                            ? const Color(0xFF174A7E)
+                            : Colors.black87,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -598,7 +681,10 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
                 ),
               ),
               if (isSelected)
-                Icon(Icons.check_circle_rounded, color: const Color(0xFF174A7E)),
+                Icon(
+                  Icons.check_circle_rounded,
+                  color: const Color(0xFF174A7E),
+                ),
             ],
           ),
         ),
@@ -619,12 +705,20 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
               color: const Color(0xFF174A7E).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Icon(Icons.bluetooth_rounded, size: 36, color: Color(0xFF174A7E)),
+            child: const Icon(
+              Icons.bluetooth_rounded,
+              size: 36,
+              color: Color(0xFF174A7E),
+            ),
           ),
           const SizedBox(height: 24),
           const Text(
             'Sincronizzazione con un catechista',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF174A7E),
+            ),
           ),
           const SizedBox(height: 12),
           Text(
@@ -632,7 +726,11 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
             'di QR code tra i due dispositivi.\n\n'
             'Uno dei due deve iniziare scansionando il QR dell\'altro.\n'
             'Dopo la scansione, il passaggio sarà automatico.',
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.5),
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade700,
+              height: 1.5,
+            ),
           ),
           const SizedBox(height: 24),
           SizedBox(
@@ -642,11 +740,15 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
                 backgroundColor: const Color(0xFF174A7E),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
               icon: const Icon(Icons.qr_code_scanner_rounded),
-              label: const Text('Inquadra QR del partner',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              label: const Text(
+                'Inquadra QR del partner',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
               onPressed: _chooseScanFirst,
             ),
           ),
@@ -658,11 +760,15 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
                 foregroundColor: const Color(0xFF174A7E),
                 side: const BorderSide(color: Color(0xFF174A7E)),
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
               icon: const Icon(Icons.qr_code_rounded),
-              label: const Text('Mostra QR al partner',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              label: const Text(
+                'Mostra QR al partner',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
               onPressed: _chooseShowFirst,
             ),
           ),
@@ -699,21 +805,29 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
             _choseScanFirst
                 ? 'Mostra questo QR al partner'
                 : _scannedDeviceId != null
-                    ? 'QR acquisito!'
-                    : 'Mostra il tuo QR',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
+                ? 'QR acquisito!'
+                : 'Mostra il tuo QR',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF174A7E),
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             _choseScanFirst
                 ? 'Hai già scansionato il QR del partner.\n'
-                    'Ora l\'altro catechista deve scansionare il tuo QR.'
+                      'Ora l\'altro catechista deve scansionare il tuo QR.'
                 : _scannedDeviceId != null
-                    ? 'In attesa della verifica del codice di sicurezza...'
-                    : 'Quando l\'altro dispositivo lo scansionerà,\n'
-                        'passerai automaticamente alla fotocamera.',
+                ? 'In attesa della verifica del codice di sicurezza...'
+                : 'Quando l\'altro dispositivo lo scansionerà,\n'
+                      'passerai automaticamente alla fotocamera.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.4),
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade600,
+              height: 1.4,
+            ),
           ),
           const SizedBox(height: 24),
           if (_choseScanFirst || _scannedDeviceId == null) ...[
@@ -736,7 +850,11 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
           ] else
             const Column(
               children: [
-                Icon(Icons.check_circle_outline_rounded, size: 48, color: Colors.green),
+                Icon(
+                  Icons.check_circle_outline_rounded,
+                  size: 48,
+                  color: Colors.green,
+                ),
                 SizedBox(height: 8),
                 Text(
                   'Scambio completato, attesa verifica...',
@@ -777,7 +895,10 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
         if (_errorMessage != null)
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+            child: Text(
+              _errorMessage!,
+              style: const TextStyle(color: Colors.red),
+            ),
           ),
         Expanded(
           child: Stack(
@@ -809,15 +930,18 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
                 _choseScanFirst
                     ? 'Inquadra il QR dell\'altro catechista'
                     : 'Ora scansiona il QR del partner',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 _choseScanFirst
                     ? 'Dopo la scansione passerai automaticamente\n'
-                        'alla schermata "Mostra QR".'
+                          'alla schermata "Mostra QR".'
                     : 'Il QR si trova nella schermata "Mostra QR"\n'
-                        'dell\'altra app.',
+                          'dell\'altra app.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
               ),
@@ -842,18 +966,30 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
               color: const Color(0xFF174A7E).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Icon(Icons.lock_rounded, size: 36, color: Color(0xFF174A7E)),
+            child: const Icon(
+              Icons.lock_rounded,
+              size: 36,
+              color: Color(0xFF174A7E),
+            ),
           ),
           const SizedBox(height: 20),
           const Text(
             'Verifica sicurezza',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF174A7E),
+            ),
           ),
           const SizedBox(height: 12),
           Text(
             'Conferma che su entrambi i dispositivi\nsia visualizzato lo STESSO codice:',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade700, height: 1.4),
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade700,
+              height: 1.4,
+            ),
           ),
           const SizedBox(height: 24),
           if (_pairingCode != null)
@@ -862,7 +998,9 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
               decoration: BoxDecoration(
                 color: const Color(0xFF174A7E).withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF174A7E).withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: const Color(0xFF174A7E).withValues(alpha: 0.3),
+                ),
               ),
               child: Text(
                 _pairingCode!,
@@ -889,11 +1027,15 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
                 backgroundColor: Colors.green,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
               icon: const Icon(Icons.check_rounded),
-              label: const Text('Codici corrispondono, conferma',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              label: const Text(
+                'Codici corrispondono, conferma',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
               onPressed: _onConfirmPairingCode,
             ),
           ),
@@ -905,11 +1047,15 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
                 foregroundColor: Colors.red,
                 side: const BorderSide(color: Colors.red),
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
               icon: const Icon(Icons.close_rounded),
-              label: const Text('Codici DIVERSI, Annulla',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              label: const Text(
+                'Codici DIVERSI, Annulla',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
               onPressed: _onRejectPairingCode,
             ),
           ),
@@ -934,7 +1080,11 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
           const SizedBox(height: 24),
           const Text(
             'Sincronizzazione in corso...',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF174A7E),
+            ),
           ),
           const SizedBox(height: 24),
           ClipRRect(
@@ -943,7 +1093,9 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
               value: progress > 0 ? progress : null,
               minHeight: 8,
               backgroundColor: Colors.grey.shade200,
-              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF174A7E)),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                Color(0xFF174A7E),
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -976,14 +1128,22 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
           const SizedBox(height: 24),
           const Text(
             'Sincronizzazione completata!',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.green),
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.green,
+            ),
           ),
           if (_successMessage != null) ...[
             const SizedBox(height: 12),
             Text(
               _successMessage!,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 15, color: Colors.black87, height: 1.4),
+              style: const TextStyle(
+                fontSize: 15,
+                color: Colors.black87,
+                height: 1.4,
+              ),
             ),
           ],
           const SizedBox(height: 32),
@@ -994,11 +1154,15 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
                 backgroundColor: const Color(0xFF174A7E),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
               icon: const Icon(Icons.groups_rounded),
-              label: const Text('Gestisci le tue classi',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              label: const Text(
+                'Gestisci le tue classi',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
               onPressed: () {
                 context.go('/onboarding-classes');
               },
@@ -1021,14 +1185,22 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
           const SizedBox(height: 24),
           const Text(
             'Sincronizzazione non riuscita',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.red),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.red,
+            ),
           ),
           if (_errorMessage != null) ...[
             const SizedBox(height: 12),
             Text(
               _errorMessage!,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, color: Colors.black87, height: 1.4),
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.black87,
+                height: 1.4,
+              ),
             ),
           ],
           const SizedBox(height: 32),
@@ -1039,11 +1211,15 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
                 backgroundColor: const Color(0xFF174A7E),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Riprova',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              label: const Text(
+                'Riprova',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
               onPressed: _retry,
             ),
           ),

@@ -87,7 +87,8 @@ class AuditLog {
       logId: logId ?? this.logId,
       timestamp: timestamp ?? this.timestamp,
       actionType: actionType ?? this.actionType,
-      executedByCatechistId: executedByCatechistId ?? this.executedByCatechistId,
+      executedByCatechistId:
+          executedByCatechistId ?? this.executedByCatechistId,
       executedByCatechistName:
           executedByCatechistName ?? this.executedByCatechistName,
       affectedEntityType: affectedEntityType ?? this.affectedEntityType,
@@ -100,8 +101,11 @@ class AuditLog {
     return AuditLog(
       logId: id,
       timestamp:
-          DateTime.tryParse(data['timestamp']?.toString() ?? '') ?? DateTime.now(),
-      actionType: AuditActionType.fromStorageValue(data['actionType']?.toString()),
+          DateTime.tryParse(data['timestamp']?.toString() ?? '') ??
+          DateTime.now(),
+      actionType: AuditActionType.fromStorageValue(
+        data['actionType']?.toString(),
+      ),
       executedByCatechistId: data['executedByCatechistId'] ?? '',
       executedByCatechistName: data['executedByCatechistName'] ?? '',
       affectedEntityType: data['affectedEntityType'] ?? '',

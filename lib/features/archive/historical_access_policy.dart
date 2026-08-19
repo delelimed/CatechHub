@@ -51,9 +51,7 @@ class HistoricalAccessPolicy {
           .map((e) => e.toString())
           .toList();
       if (!catechistIds.contains(_localUserId)) continue;
-      ids.addAll(
-        (data['studentIds'] as List? ?? []).map((e) => e.toString()),
-      );
+      ids.addAll((data['studentIds'] as List? ?? []).map((e) => e.toString()));
     }
     return ids;
   }

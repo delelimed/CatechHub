@@ -20,10 +20,7 @@ class SubstituteCenterPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (!AppModeUtils.supplenzeEnabled()) {
-      return AppScaffold(
-        title: 'Supplenze',
-        child: const _AccessDenied(),
-      );
+      return AppScaffold(title: 'Supplenze', child: const _AccessDenied());
     }
     final delegationsAsync = ref.watch(substituteDelegationsProvider);
     final me = AuthService.getCatechistId();
@@ -35,14 +32,12 @@ class SubstituteCenterPage extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Errore: $e')),
         data: (delegations) {
-          final owned = delegations
-              .where((d) => d.ownerCatechistId == me)
-              .toList()
-            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          final received = delegations
-              .where((d) => d.substituteCatechistId == me)
-              .toList()
-            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          final owned =
+              delegations.where((d) => d.ownerCatechistId == me).toList()
+                ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          final received =
+              delegations.where((d) => d.substituteCatechistId == me).toList()
+                ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -82,15 +77,13 @@ class _AccessDenied extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.swap_horiz_rounded,
-                size: 56, color: Colors.grey),
+            const Icon(Icons.swap_horiz_rounded, size: 56, color: Colors.grey),
             const SizedBox(height: 16),
             Text(
               'Supplenze non disponibili',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             const Text(
@@ -406,7 +399,9 @@ class _IntroCard extends StatelessWidget {
             children: [
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: canCreate ? onNewDelegation : () => _noOwnClass(context),
+                  onPressed: canCreate
+                      ? onNewDelegation
+                      : () => _noOwnClass(context),
                   icon: const Icon(Icons.qr_code_2_rounded),
                   label: const Text('Nuova supplenza'),
                 ),

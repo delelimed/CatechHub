@@ -24,7 +24,8 @@ class DataShareReceivePage extends ConsumerStatefulWidget {
   const DataShareReceivePage({super.key});
 
   @override
-  ConsumerState<DataShareReceivePage> createState() => _DataShareReceivePageState();
+  ConsumerState<DataShareReceivePage> createState() =>
+      _DataShareReceivePageState();
 }
 
 class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
@@ -62,13 +63,16 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
   }
 
   Future<void> _prepareIndex() async {
-    final options = ref.read(dataShareOptionsProvider) ?? const DataShareOptions();
+    final options =
+        ref.read(dataShareOptionsProvider) ?? const DataShareOptions();
     try {
       final indexMap = QRDataService.buildDatabaseIndex(options);
       if (!mounted) return;
       final chunkMaps = QRDataService.serializeIndexToChunks(indexMap);
       if (!mounted) return;
-      final chunks = chunkMaps.map((m) => QRChunk.fromMap(Map<String, dynamic>.from(m))).toList();
+      final chunks = chunkMaps
+          .map((m) => QRChunk.fromMap(Map<String, dynamic>.from(m)))
+          .toList();
       setState(() {
         _indexChunks = chunks;
         _startIndexAnimation();
@@ -81,7 +85,10 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
   void _startIndexAnimation() {
     if (_indexChunks.isEmpty) return;
     _indexTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
-      if (!mounted) { timer.cancel(); return; }
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       setState(() {
         _currentIndexChunk = (_currentIndexChunk + 1) % _indexChunks.length;
         _isIndexPlaying = true;
@@ -130,7 +137,9 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
           _receivedChunkIndices.add(chunk.chunkIndex);
           _errorMessage = null;
         });
-        if (_receivedChunkIndices.length == chunk.totalChunks) _allChunksReceived();
+        if (_receivedChunkIndices.length == chunk.totalChunks) {
+          _allChunksReceived();
+        }
       }
     } catch (e) {
       setState(() => _errorMessage = 'Errore QR: $e');
@@ -161,7 +170,10 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
     }
     final inputPin = _pinController.text.trim();
     if (inputPin.length != QRDataService.pinLength) {
-      setState(() => _errorMessage = 'Il PIN deve essere di ${QRDataService.pinLength} cifre');
+      setState(
+        () => _errorMessage =
+            'Il PIN deve essere di ${QRDataService.pinLength} cifre',
+      );
       return;
     }
     setState(() {
@@ -174,10 +186,16 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
   Future<void> _importData(String pin) async {
     try {
       setState(() => _phaseMessage = 'Decifratura dati…');
-      final receivedData = QRDataService.extractPackageData(_assembledPackageData!, pin);
+      final receivedData = await QRDataService.extractPackageData(
+        _assembledPackageData!,
+        pin,
+      );
 
       setState(() => _phaseMessage = 'Verifica integrità…');
-      if (!DataExportService.verifyDataIntegrity(receivedData, requireFullPackage: false)) {
+      if (!DataExportService.verifyDataIntegrity(
+        receivedData,
+        requireFullPackage: false,
+      )) {
         setState(() {
           _errorMessage = 'Integrità dei dati non valida';
           _phase = _ReceivePhase.scanData;
@@ -200,9 +218,12 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
           },
         );
       } else {
-        await DataExportService.importData(receivedData, onPhase: (phase) {
-          if (mounted) setState(() => _phaseMessage = phase);
-        });
+        await DataExportService.importData(
+          receivedData,
+          onPhase: (phase) {
+            if (mounted) setState(() => _phaseMessage = phase);
+          },
+        );
       }
 
       ref.invalidate(classesStreamProvider);
@@ -210,7 +231,9 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
       ref.invalidate(planningRepoProvider);
       ref.invalidate(studentsRepoProvider);
 
-      setState(() { _phaseMessage = null; });
+      setState(() {
+        _phaseMessage = null;
+      });
       if (mounted) _showSuccessDialog();
     } catch (e) {
       setState(() {
@@ -233,10 +256,15 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
             Text('Importazione Completata'),
           ],
         ),
-        content: const Text('I dati differenziali sono stati importati con successo.'),
+        content: const Text(
+          'I dati differenziali sono stati importati con successo.',
+        ),
         actions: [
           TextButton(
-            onPressed: () { Navigator.of(ctx).pop(); context.go('/'); },
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              context.go('/');
+            },
             child: const Text('OK'),
           ),
         ],
@@ -271,7 +299,9 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      title: _phase == _ReceivePhase.showIndex ? 'Mostra Indice Database' : 'Ricezione Dati',
+      title: _phase == _ReceivePhase.showIndex
+          ? 'Mostra Indice Database'
+          : 'Ricezione Dati',
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -298,7 +328,9 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
           decoration: BoxDecoration(
             color: const Color(0xFF174A7E).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF174A7E).withValues(alpha: 0.3)),
+            border: Border.all(
+              color: const Color(0xFF174A7E).withValues(alpha: 0.3),
+            ),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -311,7 +343,10 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
                   children: [
                     Text(
                       'I dati ricevuti verranno inseriti nella classe attualmente aperta.',
-                      style: TextStyle(fontSize: 13, color: const Color(0xFF174A7E)),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: const Color(0xFF174A7E),
+                      ),
                     ),
                   ],
                 ),
@@ -321,7 +356,8 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
         ),
         _InfoBanner(
           icon: Icons.qr_code_2_rounded,
-          message: 'Mostra questo QR code al mittente\nper consentirgli di confrontare i database',
+          message:
+              'Mostra questo QR code al mittente\nper consentirgli di confrontare i database',
           color: const Color(0xFF174A7E),
         ),
         const SizedBox(height: 16),
@@ -330,7 +366,13 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 20, offset: const Offset(0, 10))],
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
             border: Border.all(color: const Color(0xFF174A7E), width: 2),
           ),
           child: Column(
@@ -349,11 +391,16 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
                     size: 380,
                     backgroundColor: Colors.white,
                     eyeStyle: const QrEyeStyle(color: Colors.black),
-                    dataModuleStyle: const QrDataModuleStyle(color: Colors.black),
+                    dataModuleStyle: const QrDataModuleStyle(
+                      color: Colors.black,
+                    ),
                   ),
                 )
               else
-                const SizedBox(height: 200, child: Center(child: CircularProgressIndicator())),
+                const SizedBox(
+                  height: 200,
+                  child: Center(child: CircularProgressIndicator()),
+                ),
               const SizedBox(height: 12),
               Text(
                 'Chunk ${_currentIndexChunk + 1} di ${_indexChunks.length}',
@@ -368,7 +415,9 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
           children: [
             if (_indexChunks.isNotEmpty) ...[
               _MiniButton(
-                icon: _isIndexPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                icon: _isIndexPlaying
+                    ? Icons.pause_rounded
+                    : Icons.play_arrow_rounded,
                 label: _isIndexPlaying ? 'Pausa' : 'Riprendi',
                 color: _isIndexPlaying ? Colors.orange : Colors.green,
                 onTap: _isIndexPlaying ? _pauseIndex : _resumeIndex,
@@ -427,14 +476,23 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
             child: _isScanning
                 ? MobileScanner(onDetect: _onQRCodeDetected)
                 : Container(
-                    color: isDark ? colorScheme.surfaceContainer : Colors.grey.shade200,
+                    color: isDark
+                        ? colorScheme.surfaceContainer
+                        : Colors.grey.shade200,
                     child: const Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.qr_code_scanner_rounded, size: 64, color: Colors.grey),
+                          Icon(
+                            Icons.qr_code_scanner_rounded,
+                            size: 64,
+                            color: Colors.grey,
+                          ),
                           SizedBox(height: 16),
-                          Text('Scansione in pausa', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                          Text(
+                            'Scansione in pausa',
+                            style: TextStyle(fontSize: 16, color: Colors.grey),
+                          ),
                         ],
                       ),
                     ),
@@ -454,8 +512,13 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
           children: [
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () => setState(() { _isScanning = !_isScanning; _errorMessage = null; }),
-                icon: Icon(_isScanning ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                onPressed: () => setState(() {
+                  _isScanning = !_isScanning;
+                  _errorMessage = null;
+                }),
+                icon: Icon(
+                  _isScanning ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                ),
                 label: Text(_isScanning ? 'Pausa' : 'Riprendi'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _isScanning ? Colors.orange : Colors.green,
@@ -497,7 +560,9 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
         Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: isDark ? Colors.green.withValues(alpha: 0.15) : Colors.green.withValues(alpha: 0.1),
+            color: isDark
+                ? Colors.green.withValues(alpha: 0.15)
+                : Colors.green.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
           ),
@@ -507,7 +572,11 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
               SizedBox(height: 16),
               Text(
                 'Tutti i chunk ricevuti!',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF174A7E),
+                ),
               ),
               SizedBox(height: 8),
               Text(
@@ -527,7 +596,9 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
             labelText: 'PIN di sicurezza',
             hintText: 'Inserisci ${QRDataService.pinLength} cifre',
             prefixIcon: Icon(Icons.security_rounded),
-            border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+            ),
             counterText: '',
           ),
           style: const TextStyle(fontSize: 20, letterSpacing: 8),
@@ -567,7 +638,9 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
       padding: const EdgeInsets.all(32),
       child: Column(
         children: [
-          CircularProgressIndicator(color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+          CircularProgressIndicator(
+            color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+          ),
           const SizedBox(height: 24),
           const Text(
             'Importazione in corso...',
@@ -578,7 +651,11 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
             Text(
               _phaseMessage!,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF174A7E)),
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF174A7E),
+              ),
             ),
           ],
           const SizedBox(height: 8),
@@ -600,7 +677,11 @@ class _InfoBanner extends StatelessWidget {
   final String message;
   final Color color;
 
-  const _InfoBanner({required this.icon, required this.message, required this.color});
+  const _InfoBanner({
+    required this.icon,
+    required this.message,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -615,7 +696,9 @@ class _InfoBanner extends StatelessWidget {
         children: [
           Icon(icon, color: color, size: 24),
           const SizedBox(width: 12),
-          Expanded(child: Text(message, style: TextStyle(fontSize: 13, color: color))),
+          Expanded(
+            child: Text(message, style: TextStyle(fontSize: 13, color: color)),
+          ),
         ],
       ),
     );
@@ -628,7 +711,12 @@ class _MiniButton extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
 
-  const _MiniButton({required this.icon, required this.label, required this.color, required this.onTap});
+  const _MiniButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -660,13 +748,17 @@ class _ProgressInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final percentage = totalChunks > 0 ? (receivedCount / totalChunks * 100).toStringAsFixed(1) : '0';
+    final percentage = totalChunks > 0
+        ? (receivedCount / totalChunks * 100).toStringAsFixed(1)
+        : '0';
     return Column(
       children: [
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [Color(0xFF174A7E), Color(0xFF2E5A8F)]),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF174A7E), Color(0xFF2E5A8F)],
+            ),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -676,22 +768,51 @@ class _ProgressInfo extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 24),
+                      const Icon(
+                        Icons.qr_code_2_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
                       const SizedBox(width: 12),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          Text('$receivedCount${totalChunks > 0 ? '/$totalChunks' : ''}',
-                              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                          Text(
+                            label,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            '$receivedCount${totalChunks > 0 ? '/$totalChunks' : ''}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ],
                       ),
                     ],
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8)),
-                    child: Text('$percentage%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '$percentage%',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -702,7 +823,9 @@ class _ProgressInfo extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: receivedCount / totalChunks,
                     backgroundColor: Colors.white.withValues(alpha: 0.3),
-                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      Colors.white,
+                    ),
                     minHeight: 6,
                   ),
                 ),
@@ -721,10 +844,16 @@ class _ProgressInfo extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 20),
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.orange,
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
-                Text('Mancanti: #${missingChunkIndices.join(', #')}',
-                    style: const TextStyle(fontSize: 12, color: Colors.orange)),
+                Text(
+                  'Mancanti: #${missingChunkIndices.join(', #')}',
+                  style: const TextStyle(fontSize: 12, color: Colors.orange),
+                ),
               ],
             ),
           ),
@@ -751,7 +880,12 @@ class _ErrorMessage extends StatelessWidget {
         children: [
           const Icon(Icons.error_outline, color: Colors.red, size: 20),
           const SizedBox(width: 8),
-          Expanded(child: Text(message, style: const TextStyle(color: Colors.red, fontSize: 13))),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(color: Colors.red, fontSize: 13),
+            ),
+          ),
         ],
       ),
     );
@@ -773,19 +907,29 @@ class _InstructionsCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? colorScheme.surfaceContainer : Colors.blue.shade50,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.blue.shade200),
+        border: Border.all(
+          color: isDark
+              ? colorScheme.outline.withValues(alpha: 0.2)
+              : Colors.blue.shade200,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.info_rounded, color: isDark ? colorScheme.primary : Colors.blue.shade700),
+              Icon(
+                Icons.info_rounded,
+                color: isDark ? colorScheme.primary : Colors.blue.shade700,
+              ),
               const SizedBox(width: 8),
-              Text('Istruzioni',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? colorScheme.primary : Colors.blue.shade700)),
+              Text(
+                'Istruzioni',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? colorScheme.primary : Colors.blue.shade700,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -799,16 +943,32 @@ class _InstructionsCard extends StatelessWidget {
                     width: 24,
                     height: 24,
                     decoration: BoxDecoration(
-                      color: isDark ? colorScheme.primary : Colors.blue.shade700,
+                      color: isDark
+                          ? colorScheme.primary
+                          : Colors.blue.shade700,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(
-                      child: Text('${i + 1}',
-                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                      child: Text(
+                        '${i + 1}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(steps[i], style: TextStyle(fontSize: 13, color: isDark ? colorScheme.onSurface : null))),
+                  Expanded(
+                    child: Text(
+                      steps[i],
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark ? colorScheme.onSurface : null,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),

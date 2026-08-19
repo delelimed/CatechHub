@@ -99,11 +99,11 @@ class ClassCopyService {
           lastModifiedBy: catechistName,
         );
         await LocalDatabase.catechesi().put(
-              newId,
-              copy.toMap()
-                ..['createdAt'] = now
-                ..['updatedAt'] = now,
-            );
+          newId,
+          copy.toMap()
+            ..['createdAt'] = now
+            ..['updatedAt'] = now,
+        );
         catechesiIdMap[c.id] = newId;
         catechesi++;
       }
@@ -114,8 +114,10 @@ class ClassCopyService {
       final avvisiList = _getAvvisiByClassSync(sourceClass.uniqueCode);
       for (final a in avvisiList) {
         final newId = LocalDatabase.newId('avviso_template');
-        final copy =
-            a.copyWith(id: newId, classUniqueCode: targetClass.uniqueCode);
+        final copy = a.copyWith(
+          id: newId,
+          classUniqueCode: targetClass.uniqueCode,
+        );
         await LocalDatabase.avvisi().put(newId, copy.toMap());
         avvisi++;
       }
@@ -133,11 +135,11 @@ class ClassCopyService {
           lastModifiedBy: catechistName,
         );
         await LocalDatabase.planning().put(
-              newId,
-              copy.toMap()
-                ..['createdAt'] = now
-                ..['updatedAt'] = now,
-            );
+          newId,
+          copy.toMap()
+            ..['createdAt'] = now
+            ..['updatedAt'] = now,
+        );
         meetingIdMap[meeting.id] = newId;
         meetings++;
       }
@@ -181,22 +183,31 @@ class ClassCopyService {
 
   static List<Catechesi> _getCatechesiByClassSync(String classUniqueCode) {
     return _recordsOfClass(
-      LocalDatabase.catechesi(),
-      'classUniqueCode',
-      classUniqueCode,
-    )
-        .map((e) =>
-            Catechesi.fromMap(e['id'] as String, e['data'] as Map<String, dynamic>))
+          LocalDatabase.catechesi(),
+          'classUniqueCode',
+          classUniqueCode,
+        )
+        .map(
+          (e) => Catechesi.fromMap(
+            e['id'] as String,
+            e['data'] as Map<String, dynamic>,
+          ),
+        )
         .toList();
   }
 
   static List<AvvisoTemplate> _getAvvisiByClassSync(String classUniqueCode) {
     return _recordsOfClass(
-      LocalDatabase.avvisi(),
-      'classUniqueCode',
-      classUniqueCode,
-    ).map((e) =>
-        AvvisoTemplate.fromMap(e['id'] as String, e['data'] as Map<String, dynamic>))
+          LocalDatabase.avvisi(),
+          'classUniqueCode',
+          classUniqueCode,
+        )
+        .map(
+          (e) => AvvisoTemplate.fromMap(
+            e['id'] as String,
+            e['data'] as Map<String, dynamic>,
+          ),
+        )
         .toList();
   }
 

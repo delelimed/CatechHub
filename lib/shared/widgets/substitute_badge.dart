@@ -22,8 +22,11 @@ class SubstituteBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.swap_horiz_rounded,
-              size: compact ? 12 : 14, color: Colors.deepOrange.shade800),
+          Icon(
+            Icons.swap_horiz_rounded,
+            size: compact ? 12 : 14,
+            color: Colors.deepOrange.shade800,
+          ),
           const SizedBox(width: 4),
           Text(
             'SUPPLENZA',

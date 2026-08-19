@@ -40,23 +40,23 @@ void main() {
   });
 
   Map<String, dynamic> classEntry(String id, String code, String name) => {
-        'id': id,
-        'uniqueCode': code,
-        'name': name,
-        'updatedAt': '2026-01-01T00:00:00.000Z',
-        'createdAt': '2026-01-01T00:00:00.000Z',
-        'isDeleted': false,
-      };
+    'id': id,
+    'uniqueCode': code,
+    'name': name,
+    'updatedAt': '2026-01-01T00:00:00.000Z',
+    'createdAt': '2026-01-01T00:00:00.000Z',
+    'isDeleted': false,
+  };
 
   Map<String, dynamic> studentEntry(String id, String classId, String name) => {
-        'id': id,
-        'classId': classId,
-        'name': name,
-        'allergies': 'segreto medico $name',
-        'updatedAt': '2026-01-01T00:00:00.000Z',
-        'createdAt': '2026-01-01T00:00:00.000Z',
-        'isDeleted': false,
-      };
+    'id': id,
+    'classId': classId,
+    'name': name,
+    'allergies': 'segreto medico $name',
+    'updatedAt': '2026-01-01T00:00:00.000Z',
+    'createdAt': '2026-01-01T00:00:00.000Z',
+    'isDeleted': false,
+  };
 
   Future<void> seedLocalData() async {
     await LocalDatabase.classes().put(
@@ -82,16 +82,18 @@ void main() {
   }
 
   group('buildLocalIndex — indice limitato allo scope classe', () {
-    test('senza scope (Mio Dispositivo) l\'indice include tutte le classi',
-        () async {
-      await seedLocalData();
-      final index = HiveSyncEngine().buildLocalIndex();
-      final ids = index.map((e) => '${e.boxName}:${e.id}').toSet();
-      expect(ids, contains('${LocalDatabase.studentsBox}:STU_A1'));
-      expect(ids, contains('${LocalDatabase.studentsBox}:STU_B1'));
-      expect(ids, contains('${LocalDatabase.classesBox}:$classAId'));
-      expect(ids, contains('${LocalDatabase.classesBox}:$classBId'));
-    });
+    test(
+      'senza scope (Mio Dispositivo) l\'indice include tutte le classi',
+      () async {
+        await seedLocalData();
+        final index = await HiveSyncEngine().buildLocalIndex();
+        final ids = index.map((e) => '${e.boxName}:${e.id}').toSet();
+        expect(ids, contains('${LocalDatabase.studentsBox}:STU_A1'));
+        expect(ids, contains('${LocalDatabase.studentsBox}:STU_B1'));
+        expect(ids, contains('${LocalDatabase.classesBox}:$classAId'));
+        expect(ids, contains('${LocalDatabase.classesBox}:$classBId'));
+      },
+    );
 
     test('con scope della classe A l\'indice esclude la classe B', () async {
       await seedLocalData();
@@ -99,7 +101,7 @@ void main() {
         classId: classAId,
         classUniqueCode: classACode,
       );
-      final index = HiveSyncEngine().buildLocalIndex([scope]);
+      final index = await HiveSyncEngine().buildLocalIndex([scope]);
       final ids = index.map((e) => '${e.boxName}:${e.id}').toSet();
 
       expect(ids, contains('${LocalDatabase.studentsBox}:STU_A1'));
@@ -112,7 +114,7 @@ void main() {
 
     test('con scope vuoto nessun record è condiviso', () async {
       await seedLocalData();
-      final index = HiveSyncEngine().buildLocalIndex(const []);
+      final index = await HiveSyncEngine().buildLocalIndex(const []);
       expect(index, isEmpty);
     });
 
@@ -122,7 +124,7 @@ void main() {
         classId: classAId,
         classUniqueCode: classACode,
       );
-      final index = HiveSyncEngine().buildLocalIndex([scope]);
+      final index = await HiveSyncEngine().buildLocalIndex([scope]);
       final payload = index.map((e) => e.toJson()).toList().toString();
       expect(payload, isNot(contains('Anna B')));
       expect(payload, isNot(contains('segreto medico')));
@@ -168,14 +170,8 @@ void main() {
 
       // Solo il record della classe A viene applicato.
       expect(result.receivedRecords, 1);
-      expect(
-        LocalDatabase.students().get('STU_REMOTE_A'),
-        isNotNull,
-      );
-      expect(
-        LocalDatabase.students().get('STU_REMOTE_B'),
-        isNull,
-      );
+      expect(LocalDatabase.students().get('STU_REMOTE_A'), isNotNull);
+      expect(LocalDatabase.students().get('STU_REMOTE_B'), isNull);
       expect(LocalDatabase.classes().get(classBId), isNull);
     });
 

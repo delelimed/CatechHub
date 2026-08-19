@@ -26,7 +26,8 @@ class DemoGuideService {
 
   static bool isGuidePending() {
     try {
-      return LocalDatabase.auth().get(guidePendingKey, defaultValue: false) as bool;
+      return LocalDatabase.auth().get(guidePendingKey, defaultValue: false)
+          as bool;
     } catch (_) {
       return false;
     }
@@ -42,7 +43,8 @@ class DemoGuideService {
 
   static bool isDemoDataActive() {
     try {
-      return LocalDatabase.auth().get(demoDataActiveKey, defaultValue: false) as bool;
+      return LocalDatabase.auth().get(demoDataActiveKey, defaultValue: false)
+          as bool;
     } catch (_) {
       return false;
     }
@@ -50,7 +52,11 @@ class DemoGuideService {
 
   static bool isJoinedMode() {
     try {
-      return LocalDatabase.auth().get(_responsabileModeKey, defaultValue: 'create') == _joinValue;
+      return LocalDatabase.auth().get(
+            _responsabileModeKey,
+            defaultValue: 'create',
+          ) ==
+          _joinValue;
     } catch (_) {
       return false;
     }
@@ -107,7 +113,9 @@ class DemoGuideService {
       final studentIds = (data['studentIds'] as List? ?? [])
           .map((e) => e.toString())
           .toList();
-      final filtered = studentIds.where((id) => !demoStudentIds.contains(id)).toList();
+      final filtered = studentIds
+          .where((id) => !demoStudentIds.contains(id))
+          .toList();
       if (filtered.length != studentIds.length) {
         data['studentIds'] = filtered;
         data['updatedAt'] = DateTime.now().toIso8601String();
@@ -160,7 +168,8 @@ class DemoGuideService {
     final avvisiBox = LocalDatabase.avvisi();
     final catechesiBox = LocalDatabase.catechesi();
 
-    final currentClassId = LocalDatabase.auth().get('current_class_id') as String?;
+    final currentClassId =
+        LocalDatabase.auth().get('current_class_id') as String?;
     if (currentClassId == null || currentClassId.isEmpty) return;
     final classRaw = classBox.get(currentClassId);
     if (classRaw == null) return;
@@ -172,12 +181,27 @@ class DemoGuideService {
     final demoIds = <String>[];
     final students = <Student>[];
     final names = [
-      (name: 'Luca', surname: 'Bianchi', birth: '2015-03-12', allergy: 'Nichel'),
+      (
+        name: 'Luca',
+        surname: 'Bianchi',
+        birth: '2015-03-12',
+        allergy: 'Nichel',
+      ),
       (name: 'Sofia', surname: 'Romano', birth: '2014-07-01', allergy: null),
-      (name: 'Matteo', surname: 'Ferrari', birth: '2015-11-23', allergy: 'Glutine'),
+      (
+        name: 'Matteo',
+        surname: 'Ferrari',
+        birth: '2015-11-23',
+        allergy: 'Glutine',
+      ),
       (name: 'Giulia', surname: 'Esposito', birth: '2014-02-18', allergy: null),
       (name: 'Davide', surname: 'Conti', birth: '2015-09-05', allergy: null),
-      (name: 'Chiara', surname: 'Marino', birth: '2014-12-14', allergy: 'Lattosio'),
+      (
+        name: 'Chiara',
+        surname: 'Marino',
+        birth: '2014-12-14',
+        allergy: 'Lattosio',
+      ),
     ];
     final now = DateTime.now();
     for (var i = 0; i < names.length; i++) {
@@ -226,9 +250,18 @@ class DemoGuideService {
 
     final meetings = <(PlanningMeeting, Map<String, String>)>[];
     final pastMeetings = <(String, String)>[
-      ('Incontro sulla Pasqua', 'Racconto della risurrezione e attività di gruppo'),
-      ('La parabola del buon samaritano', 'Lettura dal Vangelo di Luca e disegno'),
-      ('Giornata della carità', 'Preparazione delle buste di carità per la domenica'),
+      (
+        'Incontro sulla Pasqua',
+        'Racconto della risurrezione e attività di gruppo',
+      ),
+      (
+        'La parabola del buon samaritano',
+        'Lettura dal Vangelo di Luca e disegno',
+      ),
+      (
+        'Giornata della carità',
+        'Preparazione delle buste di carità per la domenica',
+      ),
     ];
     for (var i = 0; i < pastMeetings.length; i++) {
       final (title, activity) = pastMeetings[i];
@@ -245,7 +278,8 @@ class DemoGuideService {
         lastModifiedBy: operator,
       );
       final presence = <String, String>{
-        for (final s in students) s.id: (s.id.hashCode % 5 == 0 ? 'Assente' : 'Presente'),
+        for (final s in students)
+          s.id: (s.id.hashCode % 5 == 0 ? 'Assente' : 'Presente'),
       };
       meetings.add((meeting, presence));
     }
@@ -254,7 +288,13 @@ class DemoGuideService {
       classId: currentClassId,
       classUniqueCode: classUniqueCode,
       createdBy: AuthService.localUserId,
-      date: DateTime(now.year, now.month, now.day, 16, 0).add(const Duration(days: 7)),
+      date: DateTime(
+        now.year,
+        now.month,
+        now.day,
+        16,
+        0,
+      ).add(const Duration(days: 7)),
       title: 'Preparazione alla Messa',
       activity: 'Prove delle letture e canti',
       notes: 'Portare i foglietti preparati.',
@@ -297,43 +337,65 @@ class DemoGuideService {
       final student = students[i];
       await contactNotesBox.put(
         LocalDatabase.newId('note'),
-        _tagged(ContactNote(
-          id: LocalDatabase.newId('note'),
-          studentId: student.id,
-          classUniqueCode: classUniqueCode,
-          dateTime: now.subtract(Duration(days: 5 + i * 2)),
-          medium: i == 0 ? 'whatsapp' : 'de_visu',
-          notes: i == 0
-              ? 'Contattata la mamma per comunicare l\'assenza di ${student.name}.'
-              : 'Incontro a fine Messa con i genitori di ${student.name}.',
-          lastModifiedBy: operator,
-        ).toMap()),
+        _tagged(
+          ContactNote(
+            id: LocalDatabase.newId('note'),
+            studentId: student.id,
+            classUniqueCode: classUniqueCode,
+            dateTime: now.subtract(Duration(days: 5 + i * 2)),
+            medium: i == 0 ? 'whatsapp' : 'de_visu',
+            notes: i == 0
+                ? 'Contattata la mamma per comunicare l\'assenza di ${student.name}.'
+                : 'Incontro a fine Messa con i genitori di ${student.name}.',
+            lastModifiedBy: operator,
+          ).toMap(),
+        ),
       );
     }
 
     final avvisi = [
-      ('Avviso di assenze consecutive', 'Caro/a {nome_genitore},\n\n{assenze_consecutive} assenze consecutive di {nome_ragazzo} sono state registrate in {nome_gruppo}. Il prossimo incontro è il {data_incontro}.'),
-      ('Avviso incontro di catechismo', 'Caro/a {nome_genitore},\n\nil prossimo incontro di {nome_gruppo} è fissato per il {data_incontro}. Grazie per la collaborazione.'),
+      (
+        'Avviso di assenze consecutive',
+        'Caro/a {nome_genitore},\n\n{assenze_consecutive} assenze consecutive di {nome_ragazzo} sono state registrate in {nome_gruppo}. Il prossimo incontro è il {data_incontro}.',
+      ),
+      (
+        'Avviso incontro di catechismo',
+        'Caro/a {nome_genitore},\n\nil prossimo incontro di {nome_gruppo} è fissato per il {data_incontro}. Grazie per la collaborazione.',
+      ),
     ];
     for (final (title, text) in avvisi) {
       await avvisiBox.put(
         LocalDatabase.newId('avviso'),
-        _tagged(AvvisoTemplate(
-          id: LocalDatabase.newId('avviso'),
-          classUniqueCode: classUniqueCode,
-          title: title,
-          text: text,
-        ).toMap()),
+        _tagged(
+          AvvisoTemplate(
+            id: LocalDatabase.newId('avviso'),
+            classUniqueCode: classUniqueCode,
+            title: title,
+            text: text,
+          ).toMap(),
+        ),
       );
     }
 
     final catechesi = [
-      ('La parabola del buon samaritano', ['Vangelo', 'Parabole'], ['Lc 10,25-37'],
-          'Chi è il mio prossimo? Storia di compassione e misericordia.'),
-      ('Le Beatitudini', ['Vangelo'], ['Mt 5,1-12'],
-          'Il discorso della montagna: le promesse di Gesù per chi lo segue.'),
-      ('Il Padre Nostro', ['Preghiera'], ['Mt 6,9-13'],
-          'La preghiera che Gesù insegna ai discepoli.'),
+      (
+        'La parabola del buon samaritano',
+        ['Vangelo', 'Parabole'],
+        ['Lc 10,25-37'],
+        'Chi è il mio prossimo? Storia di compassione e misericordia.',
+      ),
+      (
+        'Le Beatitudini',
+        ['Vangelo'],
+        ['Mt 5,1-12'],
+        'Il discorso della montagna: le promesse di Gesù per chi lo segue.',
+      ),
+      (
+        'Il Padre Nostro',
+        ['Preghiera'],
+        ['Mt 6,9-13'],
+        'La preghiera che Gesù insegna ai discepoli.',
+      ),
     ];
     for (final (title, tags, refs, description) in catechesi) {
       final catechesi = Catechesi(
@@ -435,8 +497,16 @@ class DemoGuideService {
     }
 
     final classDefs = [
-      (name: 'Prima Comunione - 1° anno', percorso: 'Prima Comunione', livello: 1),
-      (name: 'Prima Comunione - 2° anno', percorso: 'Prima Comunione', livello: 2),
+      (
+        name: 'Prima Comunione - 1° anno',
+        percorso: 'Prima Comunione',
+        livello: 1,
+      ),
+      (
+        name: 'Prima Comunione - 2° anno',
+        percorso: 'Prima Comunione',
+        livello: 2,
+      ),
       (name: 'Cresima - 1° anno', percorso: 'Cresima', livello: 1),
       (name: 'Cresima - 2° anno', percorso: 'Cresima', livello: 2),
     ];
@@ -495,15 +565,17 @@ class DemoGuideService {
 
       await auditLogBox.put(
         generateAuditLogUuidV4(),
-        _tagged(AuditLog(
-          logId: generateAuditLogUuidV4(),
-          timestamp: now.subtract(Duration(days: 20 - i)),
-          actionType: AuditActionType.createClass,
-          executedByCatechistId: operatorId,
-          executedByCatechistName: operator,
-          affectedEntityType: AuditLog.entityClasse,
-          affectedEntityId: classId,
-        ).toMap()),
+        _tagged(
+          AuditLog(
+            logId: generateAuditLogUuidV4(),
+            timestamp: now.subtract(Duration(days: 20 - i)),
+            actionType: AuditActionType.createClass,
+            executedByCatechistId: operatorId,
+            executedByCatechistName: operator,
+            affectedEntityType: AuditLog.entityClasse,
+            affectedEntityId: classId,
+          ).toMap(),
+        ),
       );
     }
 
@@ -511,7 +583,8 @@ class DemoGuideService {
     for (var i = 0; i < studentNames.length; i++) {
       final (name, surname, classIdx) = studentNames[i];
       final classId = ids[classIdx];
-      final classUniqueCode = classRecords[classId]!['uniqueCode']?.toString() ?? '';
+      final classUniqueCode =
+          classRecords[classId]!['uniqueCode']?.toString() ?? '';
       final id = LocalDatabase.newId('student');
       final student = Student(
         id: id,
@@ -530,7 +603,9 @@ class DemoGuideService {
         parentEmail: 'famiglia${i + 1}@esempio.it',
         allergies: i % 4 == 0 ? 'Allergia al nichel' : null,
         consensoPrivacyFirmato: i % 5 != 3,
-        dataFirmaConsenso: i % 5 != 3 ? now.subtract(const Duration(days: 15)) : null,
+        dataFirmaConsenso: i % 5 != 3
+            ? now.subtract(const Duration(days: 15))
+            : null,
         consensoUsciteAutonome: i % 2 == 0,
         contributoVersato: i % 3 == 0,
         statoPercorso: 'ATTIVO',
@@ -545,15 +620,21 @@ class DemoGuideService {
 
       await auditLogBox.put(
         generateAuditLogUuidV4(),
-        _tagged(AuditLog(
-          logId: generateAuditLogUuidV4(),
-          timestamp: now.subtract(Duration(days: 14 - i % 5)),
-          actionType: i % 5 == 3 ? AuditActionType.grantConsent : AuditActionType.createStudent,
-          executedByCatechistId: operatorId,
-          executedByCatechistName: operator,
-          affectedEntityType: i % 5 == 3 ? AuditLog.entityConsenso : AuditLog.entityRagazzo,
-          affectedEntityId: id,
-        ).toMap()),
+        _tagged(
+          AuditLog(
+            logId: generateAuditLogUuidV4(),
+            timestamp: now.subtract(Duration(days: 14 - i % 5)),
+            actionType: i % 5 == 3
+                ? AuditActionType.grantConsent
+                : AuditActionType.createStudent,
+            executedByCatechistId: operatorId,
+            executedByCatechistName: operator,
+            affectedEntityType: i % 5 == 3
+                ? AuditLog.entityConsenso
+                : AuditLog.entityRagazzo,
+            affectedEntityId: id,
+          ).toMap(),
+        ),
       );
     }
 
@@ -570,7 +651,9 @@ class DemoGuideService {
           classUniqueCode: uniqueCode,
           createdBy: operatorId,
           date: DateTime(date.year, date.month, date.day, 16, 0),
-          title: i == 0 ? 'Incontro di catechismo' : 'Riunione con i catechisti',
+          title: i == 0
+              ? 'Incontro di catechismo'
+              : 'Riunione con i catechisti',
           activity: 'Attività sul Vangelo della domenica',
           notes: 'Demo',
           isReunion: i == 1,

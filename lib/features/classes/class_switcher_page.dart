@@ -28,13 +28,22 @@ class ClassSwitcherPage extends ConsumerWidget {
             return _EmptyState(
               isDark: isDark,
               colorScheme: colorScheme,
-              onCreateClass: () => _showCreateClassDialog(context, ref, isDark, colorScheme),
+              onCreateClass: () =>
+                  _showCreateClassDialog(context, ref, isDark, colorScheme),
               onOpenGroups: () => context.push('/view-groups'),
             );
           }
 
           final currentName = myClasses
-              .firstWhere((c) => c.id == currentClassId, orElse: () => SchoolClass(id: '', name: '', studentIds: [], catechistIds: []))
+              .firstWhere(
+                (c) => c.id == currentClassId,
+                orElse: () => SchoolClass(
+                  id: '',
+                  name: '',
+                  studentIds: [],
+                  catechistIds: [],
+                ),
+              )
               .name;
 
           return ListView(
@@ -50,25 +59,28 @@ class ClassSwitcherPage extends ConsumerWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
-              ...myClasses.map((c) => _ClassCard(
-                schoolClass: c,
-                isDark: isDark,
-                colorScheme: colorScheme,
-                isSelected: c.id == currentClassId,
-                onTap: () async {
-                  if (c.id != currentClassId) {
-                    await currentClassNotifier.setClass(c.id);
-                    if (context.mounted) {
-                      context.go('/');
+              ...myClasses.map(
+                (c) => _ClassCard(
+                  schoolClass: c,
+                  isDark: isDark,
+                  colorScheme: colorScheme,
+                  isSelected: c.id == currentClassId,
+                  onTap: () async {
+                    if (c.id != currentClassId) {
+                      await currentClassNotifier.setClass(c.id);
+                      if (context.mounted) {
+                        context.go('/');
+                      }
                     }
-                  }
-                },
-              )),
+                  },
+                ),
+              ),
               const SizedBox(height: 16),
               _CreateClassButton(
                 isDark: isDark,
                 colorScheme: colorScheme,
-                onTap: () => _showCreateClassDialog(context, ref, isDark, colorScheme),
+                onTap: () =>
+                    _showCreateClassDialog(context, ref, isDark, colorScheme),
               ),
               const SizedBox(height: 32),
             ],
@@ -79,7 +91,11 @@ class ClassSwitcherPage extends ConsumerWidget {
   }
 
   void _showCreateClassDialog(
-      BuildContext context, WidgetRef ref, bool isDark, ColorScheme colorScheme) {
+    BuildContext context,
+    WidgetRef ref,
+    bool isDark,
+    ColorScheme colorScheme,
+  ) {
     final controller = TextEditingController();
 
     showDialog(
@@ -89,7 +105,10 @@ class ClassSwitcherPage extends ConsumerWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: const Text(
           'Nuovo gruppo',
-          style: TextStyle(color: Color(0xFF174A7E), fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Color(0xFF174A7E),
+            fontWeight: FontWeight.bold,
+          ),
         ),
         content: TextField(
           controller: controller,
@@ -107,7 +126,9 @@ class ClassSwitcherPage extends ConsumerWidget {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+              backgroundColor: isDark
+                  ? colorScheme.primary
+                  : const Color(0xFF174A7E),
               foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -118,7 +139,9 @@ class ClassSwitcherPage extends ConsumerWidget {
               if (name.isEmpty) return;
               Navigator.of(ctx).pop();
               try {
-                await ref.read(classesRepoProvider).addClass(
+                await ref
+                    .read(classesRepoProvider)
+                    .addClass(
                       SchoolClass(
                         id: '',
                         name: name,
@@ -170,13 +193,17 @@ class _ClassCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isSelected
-              ? (isDark ? colorScheme.primaryContainer.withValues(alpha: 0.3) : const Color(0xFF174A7E).withValues(alpha: 0.1))
+              ? (isDark
+                    ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+                    : const Color(0xFF174A7E).withValues(alpha: 0.1))
               : (isDark ? colorScheme.surfaceContainer : Colors.white),
           borderRadius: BorderRadius.circular(22),
           border: Border.all(
             color: isSelected
                 ? (isDark ? colorScheme.primary : const Color(0xFF174A7E))
-                : (isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.blue.shade100),
+                : (isDark
+                      ? colorScheme.outline.withValues(alpha: 0.2)
+                      : Colors.blue.shade100),
             width: isSelected ? 2 : 1,
           ),
           boxShadow: [
@@ -197,7 +224,8 @@ class _ClassCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isSelected
                     ? (isDark ? colorScheme.primary : const Color(0xFF174A7E))
-                    : (isDark ? colorScheme.primary : const Color(0xFF174A7E)).withValues(alpha: 0.1),
+                    : (isDark ? colorScheme.primary : const Color(0xFF174A7E))
+                          .withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(
@@ -218,8 +246,12 @@ class _ClassCard extends StatelessWidget {
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: isSelected
-                          ? (isDark ? colorScheme.onPrimary : const Color(0xFF174A7E))
-                          : (isDark ? colorScheme.onSurface : const Color(0xFF174A7E)),
+                          ? (isDark
+                                ? colorScheme.onPrimary
+                                : const Color(0xFF174A7E))
+                          : (isDark
+                                ? colorScheme.onSurface
+                                : const Color(0xFF174A7E)),
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -290,19 +322,13 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             'Non fai parte di nessun gruppo',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade600,
-            ),
+            style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 8),
           Text(
             'Puoi creare un nuovo gruppo qui sotto.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey.shade500,
-            ),
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
           ),
           const SizedBox(height: 24),
           _CreateClassButton(
@@ -316,7 +342,9 @@ class _EmptyState extends StatelessWidget {
             icon: const Icon(Icons.groups_rounded),
             label: const Text('Vai a "I miei gruppi"'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+              foregroundColor: isDark
+                  ? colorScheme.primary
+                  : const Color(0xFF174A7E),
               side: BorderSide(
                 color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
               ),
@@ -351,7 +379,9 @@ class _CreateClassButton extends StatelessWidget {
         icon: const Icon(Icons.add),
         label: const Text('Crea nuovo gruppo'),
         style: ElevatedButton.styleFrom(
-          backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+          backgroundColor: isDark
+              ? colorScheme.primary
+              : const Color(0xFF174A7E),
           foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(

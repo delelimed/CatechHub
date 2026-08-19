@@ -30,10 +30,12 @@ class _StatisticsPageState extends State<StatisticsPage> {
     _loadData();
   }
 
-  void _loadData() {
+  Future<void> _loadData() async {
     try {
       final studentsRepo = StudentsRepository();
-      final classStudents = studentsRepo.getStudentsByClassSync(widget.classId);
+      final classStudents = await studentsRepo.getStudentsByClassSync(
+        widget.classId,
+      );
       _hasStudents = classStudents.isNotEmpty;
 
       final attendanceRepo = AttendanceRepository();
@@ -103,7 +105,11 @@ class _StatisticsPageState extends State<StatisticsPage> {
                   color: Colors.orange.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.people_outline, size: 40, color: Colors.orange.shade700),
+                child: Icon(
+                  Icons.people_outline,
+                  size: 40,
+                  color: Colors.orange.shade700,
+                ),
               ),
               const SizedBox(height: 16),
               Text(
@@ -142,7 +148,11 @@ class _StatisticsPageState extends State<StatisticsPage> {
                   color: Colors.orange.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.event_busy_rounded, size: 40, color: Colors.orange.shade700),
+                child: Icon(
+                  Icons.event_busy_rounded,
+                  size: 40,
+                  color: Colors.orange.shade700,
+                ),
               ),
               const SizedBox(height: 16),
               Text(
@@ -184,15 +194,9 @@ class _StatisticsPageState extends State<StatisticsPage> {
         const SizedBox(height: 24),
         _BestWorstCard(stats: stats, isDark: isDark),
         const SizedBox(height: 24),
-        _AttendanceTrendChart(
-          stats: stats.perMeetingStats,
-          isDark: isDark,
-        ),
+        _AttendanceTrendChart(stats: stats.perMeetingStats, isDark: isDark),
         const SizedBox(height: 24),
-        _PerMeetingBreakdown(
-          stats: stats.perMeetingStats,
-          isDark: isDark,
-        ),
+        _PerMeetingBreakdown(stats: stats.perMeetingStats, isDark: isDark),
       ],
     );
   }
@@ -214,21 +218,29 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
       var p = 0, a = 0;
       for (final value in presence.values) {
-        if (value == 'Presente') { p++; totalPresent++; }
-        if (value == 'Assente') { a++; totalAbsent++; }
+        if (value == 'Presente') {
+          p++;
+          totalPresent++;
+        }
+        if (value == 'Assente') {
+          a++;
+          totalAbsent++;
+        }
       }
 
       final total = p + a;
       if (total > 0) {
-        perMeetingStats.add(_PerMeetingStat(
-          meetingId: meetingId,
-          date: dateStr,
-          title: meetingName,
-          present: p,
-          absent: a,
-          total: total,
-          presentPercent: p / total * 100,
-        ));
+        perMeetingStats.add(
+          _PerMeetingStat(
+            meetingId: meetingId,
+            date: dateStr,
+            title: meetingName,
+            present: p,
+            absent: a,
+            total: total,
+            presentPercent: p / total * 100,
+          ),
+        );
       }
     }
 
@@ -241,30 +253,34 @@ class _StatisticsPageState extends State<StatisticsPage> {
     perMeetingStats.sort((a, b) => a.date.compareTo(b.date));
 
     final overallTotal = totalPresent + totalAbsent;
-    final overallPresentRate =
-        overallTotal > 0 ? totalPresent / overallTotal * 100 : 0.0;
-    final overallAbsentRate =
-        overallTotal > 0 ? totalAbsent / overallTotal * 100 : 0.0;
+    final overallPresentRate = overallTotal > 0
+        ? totalPresent / overallTotal * 100
+        : 0.0;
+    final overallAbsentRate = overallTotal > 0
+        ? totalAbsent / overallTotal * 100
+        : 0.0;
 
     final avgPresentPerMeeting = perMeetingStats.isNotEmpty
         ? perMeetingStats.map((s) => s.presentPercent).reduce((a, b) => a + b) /
-            perMeetingStats.length
+              perMeetingStats.length
         : 0.0;
 
     final avgStudentsPerMeeting = perMeetingStats.isNotEmpty
         ? (perMeetingStats.map((s) => s.present).reduce((a, b) => a + b) /
-                perMeetingStats.length)
-            .round()
+                  perMeetingStats.length)
+              .round()
         : 0;
 
     final best = perMeetingStats.isEmpty
         ? null
         : perMeetingStats.reduce(
-            (a, b) => a.presentPercent > b.presentPercent ? a : b);
+            (a, b) => a.presentPercent > b.presentPercent ? a : b,
+          );
     final worst = perMeetingStats.isEmpty
         ? null
         : perMeetingStats.reduce(
-            (a, b) => a.presentPercent < b.presentPercent ? a : b);
+            (a, b) => a.presentPercent < b.presentPercent ? a : b,
+          );
 
     return _StatsData(
       overallPresentRate: overallPresentRate,
@@ -282,9 +298,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
   String _meetingTitle(String meetingId) {
     final planning = LocalDatabase.planning().get(meetingId);
     if (planning == null) {
-      return meetingId.length > 8
-          ? meetingId.substring(0, 8)
-          : meetingId;
+      return meetingId.length > 8 ? meetingId.substring(0, 8) : meetingId;
     }
     final data = Map<String, dynamic>.from(planning);
     return data['title']?.toString() ?? data['date']?.toString() ?? meetingId;
@@ -399,17 +413,17 @@ class _StatGrid extends StatelessWidget {
           children: [
             Expanded(
               child: _StatCard(
-                  label: 'Ragazzi nel gruppo',
-                  value: '${stats.totalStudents}',
-                  icon: Icons.people_rounded,
-                  color: Colors.purple,
-                  isDark: isDark,
-                ),
+                label: 'Ragazzi nel gruppo',
+                value: '${stats.totalStudents}',
+                icon: Icons.people_rounded,
+                color: Colors.purple,
+                isDark: isDark,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _StatCard(
-                  label: 'Media ragazzi per incontro',
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _StatCard(
+                label: 'Media ragazzi per incontro',
                 value: '${stats.avgStudentsPerMeeting}',
                 icon: Icons.person_rounded,
                 color: Colors.teal,
@@ -441,7 +455,9 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cardColor = isDark ? theme.colorScheme.surfaceContainer : Colors.white;
+    final cardColor = isDark
+        ? theme.colorScheme.surfaceContainer
+        : Colors.white;
     final borderColor = isDark
         ? theme.colorScheme.outline.withValues(alpha: 0.2)
         : Colors.grey.shade200;
@@ -505,7 +521,9 @@ class _BestWorstCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cardColor = isDark ? theme.colorScheme.surfaceContainer : Colors.white;
+    final cardColor = isDark
+        ? theme.colorScheme.surfaceContainer
+        : Colors.white;
     final borderColor = isDark
         ? theme.colorScheme.outline.withValues(alpha: 0.2)
         : Colors.grey.shade200;
@@ -552,7 +570,9 @@ class _BestWorstCard extends StatelessWidget {
           if (stats.bestMeeting == null)
             Text(
               'Nessun dato disponibile',
-              style: TextStyle(color: isDark ? Colors.grey.shade500 : Colors.grey),
+              style: TextStyle(
+                color: isDark ? Colors.grey.shade500 : Colors.grey,
+              ),
             ),
         ],
       ),
@@ -625,15 +645,14 @@ class _AttendanceTrendChart extends StatelessWidget {
   final List<_PerMeetingStat> stats;
   final bool isDark;
 
-  const _AttendanceTrendChart({
-    required this.stats,
-    required this.isDark,
-  });
+  const _AttendanceTrendChart({required this.stats, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cardColor = isDark ? theme.colorScheme.surfaceContainer : Colors.white;
+    final cardColor = isDark
+        ? theme.colorScheme.surfaceContainer
+        : Colors.white;
     final borderColor = isDark
         ? theme.colorScheme.outline.withValues(alpha: 0.2)
         : Colors.grey.shade200;
@@ -660,15 +679,14 @@ class _AttendanceTrendChart extends StatelessWidget {
           if (stats.isEmpty)
             Text(
               'Nessun dato disponibile',
-              style: TextStyle(color: isDark ? Colors.grey.shade500 : Colors.grey),
+              style: TextStyle(
+                color: isDark ? Colors.grey.shade500 : Colors.grey,
+              ),
             )
           else
             SizedBox(
               height: 220,
-              child: _LineChart(
-                stats: stats,
-                isDark: isDark,
-              ),
+              child: _LineChart(stats: stats, isDark: isDark),
             ),
         ],
       ),
@@ -730,7 +748,9 @@ class _LineChartPainter extends CustomPainter {
 
     // Griglia orizzontale
     final gridPaint = Paint()
-      ..color = (isDark ? Colors.white24 : Colors.black12).withValues(alpha: 0.3)
+      ..color = (isDark ? Colors.white24 : Colors.black12).withValues(
+        alpha: 0.3,
+      )
       ..strokeWidth = 0.5;
 
     final gridLines = 4;
@@ -751,35 +771,37 @@ class _LineChartPainter extends CustomPainter {
           fontSize: 11,
         ),
       );
-      final tp = TextPainter(
-        text: textSpan,
-        textDirection: TextDirection.ltr,
-      )..layout();
+      final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)
+        ..layout();
       tp.paint(canvas, Offset(padding.left - tp.width - 8, y - tp.height / 2));
     }
 
     // Calcola punti
     final points = <Offset>[];
-    final stepX = stats.length > 1 ? chartWidth / (stats.length - 1) : chartWidth / 2;
+    final stepX = stats.length > 1
+        ? chartWidth / (stats.length - 1)
+        : chartWidth / 2;
 
     for (var i = 0; i < stats.length; i++) {
       final x = padding.left + i * stepX;
-      final y = padding.top +
-          chartHeight * (1 - stats[i].present / maxPresent);
+      final y = padding.top + chartHeight * (1 - stats[i].present / maxPresent);
       points.add(Offset(x, y));
     }
 
     // Area fill sotto la linea
     if (points.length >= 2) {
       final areaPaint = Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.green.withValues(alpha: 0.25),
-            Colors.green.withValues(alpha: 0.02),
-          ],
-        ).createShader(Rect.fromLTWH(padding.left, padding.top, chartWidth, chartHeight));
+        ..shader =
+            LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.green.withValues(alpha: 0.25),
+                Colors.green.withValues(alpha: 0.02),
+              ],
+            ).createShader(
+              Rect.fromLTWH(padding.left, padding.top, chartWidth, chartHeight),
+            );
 
       final path = Path()..moveTo(points.first.dx, padding.top + chartHeight);
       for (final pt in points) {
@@ -812,7 +834,9 @@ class _LineChartPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     final labelPaint = Paint()
-      ..color = (isDark ? Colors.white38 : Colors.black38).withValues(alpha: 0.4)
+      ..color = (isDark ? Colors.white38 : Colors.black38).withValues(
+        alpha: 0.4,
+      )
       ..strokeWidth = 0.5;
 
     for (var i = 0; i < points.length; i++) {
@@ -827,7 +851,10 @@ class _LineChartPainter extends CustomPainter {
         while (startY < padding.top + chartHeight) {
           canvas.drawLine(
             Offset(points[i].dx, startY),
-            Offset(points[i].dx, (startY + dashWidth).clamp(0, padding.top + chartHeight)),
+            Offset(
+              points[i].dx,
+              (startY + dashWidth).clamp(0, padding.top + chartHeight),
+            ),
             labelPaint,
           );
           startY += dashWidth + dashSpace;
@@ -843,10 +870,8 @@ class _LineChartPainter extends CustomPainter {
           fontSize: 10,
         ),
       );
-      final tp = TextPainter(
-        text: textSpan,
-        textDirection: TextDirection.ltr,
-      )..layout();
+      final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr)
+        ..layout();
       tp.paint(
         canvas,
         Offset(points[i].dx - tp.width / 2, padding.top + chartHeight + 12),
@@ -865,15 +890,14 @@ class _PerMeetingBreakdown extends StatelessWidget {
   final List<_PerMeetingStat> stats;
   final bool isDark;
 
-  const _PerMeetingBreakdown({
-    required this.stats,
-    required this.isDark,
-  });
+  const _PerMeetingBreakdown({required this.stats, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cardColor = isDark ? theme.colorScheme.surfaceContainer : Colors.white;
+    final cardColor = isDark
+        ? theme.colorScheme.surfaceContainer
+        : Colors.white;
     final borderColor = isDark
         ? theme.colorScheme.outline.withValues(alpha: 0.2)
         : Colors.grey.shade200;
@@ -900,20 +924,24 @@ class _PerMeetingBreakdown extends StatelessWidget {
           if (stats.isEmpty)
             Text(
               'Nessun dato disponibile',
-              style: TextStyle(color: isDark ? Colors.grey.shade500 : Colors.grey),
+              style: TextStyle(
+                color: isDark ? Colors.grey.shade500 : Colors.grey,
+              ),
             )
           else
-            ...stats.map((stat) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _AttendanceBar(
-                title: stat.title,
-                present: stat.present,
-                absent: stat.absent,
-                total: stat.total,
-                percent: stat.presentPercent,
-                isDark: isDark,
+            ...stats.map(
+              (stat) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _AttendanceBar(
+                  title: stat.title,
+                  present: stat.present,
+                  absent: stat.absent,
+                  total: stat.total,
+                  percent: stat.presentPercent,
+                  isDark: isDark,
+                ),
               ),
-            )),
+            ),
         ],
       ),
     );
@@ -967,8 +995,8 @@ class _AttendanceBar extends StatelessWidget {
                 color: percent >= 75
                     ? Colors.green
                     : percent >= 50
-                        ? Colors.orange
-                        : Colors.red,
+                    ? Colors.orange
+                    : Colors.red,
               ),
             ),
           ],

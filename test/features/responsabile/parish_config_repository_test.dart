@@ -52,23 +52,22 @@ void main() {
       await UserRole.setCurrent(UserRole.catechista);
       final repo = ParishConfigRepository();
       final config = const ParishConfig(nomeParrocchia: 'X');
-      await expectLater(
-        repo.save(config),
-        throwsA(isA<UnsupportedError>()),
-      );
+      await expectLater(repo.save(config), throwsA(isA<UnsupportedError>()));
     });
 
-    test('setResponsabileModeActive abilita la modalità conservando il resto',
-        () async {
-      await UserRole.setCurrent(UserRole.responsabile);
-      final repo = ParishConfigRepository();
-      await repo.save(const ParishConfig(nomeParrocchia: 'Parrocchia X'));
+    test(
+      'setResponsabileModeActive abilita la modalità conservando il resto',
+      () async {
+        await UserRole.setCurrent(UserRole.responsabile);
+        final repo = ParishConfigRepository();
+        await repo.save(const ParishConfig(nomeParrocchia: 'Parrocchia X'));
 
-      final updated = await repo.setResponsabileModeActive(true);
-      expect(updated.isResponsabileModeActive, isTrue);
-      expect(updated.nomeParrocchia, 'Parrocchia X');
-      expect(repo.getConfig().isResponsabileModeActive, isTrue);
-    });
+        final updated = await repo.setResponsabileModeActive(true);
+        expect(updated.isResponsabileModeActive, isTrue);
+        expect(updated.nomeParrocchia, 'Parrocchia X');
+        expect(repo.getConfig().isResponsabileModeActive, isTrue);
+      },
+    );
 
     test('reset riporta alla configurazione vuota', () async {
       await UserRole.setCurrent(UserRole.responsabile);

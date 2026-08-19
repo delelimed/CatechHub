@@ -15,58 +15,77 @@ class AllergiesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final repo = StudentsRepository();
-    final allStudents = repo.getAllStudentsSync();
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-    final studentsWithAllergies = Student.sortedBySurname(
-      allStudents.where((s) => s.allergies != null && s.allergies!.isNotEmpty),
-    );
-
     return AppScaffold(
       title: 'Allergie',
-      child: studentsWithAllergies.isEmpty
-          ? Center(
+      child: FutureBuilder<List<Student>>(
+        future: repo.getAllStudentsSync(),
+        builder: (context, snapshot) {
+          final allStudents = snapshot.data ?? const <Student>[];
+          final studentsWithAllergies = Student.sortedBySurname(
+            allStudents.where(
+              (s) => s.allergies != null && s.allergies!.isNotEmpty,
+            ),
+          );
+          if (studentsWithAllergies.isEmpty) {
+            return Center(
               child: Text(
                 'Nessun ragazzo con allergie segnate.',
-                style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey),
+                style: TextStyle(
+                  color: isDark ? Colors.grey.shade400 : Colors.grey,
+                ),
               ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: studentsWithAllergies.length,
-              itemBuilder: (context, index) {
-                final student = studentsWithAllergies[index];
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: isDark ? colorScheme.surfaceContainer : Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade200),
+            );
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: studentsWithAllergies.length,
+            itemBuilder: (context, index) {
+              final student = studentsWithAllergies[index];
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: isDark ? colorScheme.surfaceContainer : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDark
+                        ? colorScheme.outline.withValues(alpha: 0.2)
+                        : Colors.grey.shade200,
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${student.surname} ${student.name}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-                        ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${student.surname} ${student.name}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: isDark
+                            ? colorScheme.primary
+                            : const Color(0xFF174A7E),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        student.allergies!,
-                        style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade700),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      student.allergies!,
+                      style: TextStyle(
+                        color: isDark
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade700,
                       ),
-                    ],
-                  ),
-                );
-              },
-            ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

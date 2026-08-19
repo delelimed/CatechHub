@@ -82,15 +82,15 @@ class ClassChannelKey {
   }
 
   Map<String, dynamic> toMap() => {
-        'classId': classId,
-        'classUniqueCode': classUniqueCode,
-        'className': className,
-        'keyBase64': keyBase64,
-        'keyId': keyId,
-        'grantorCatechistId': grantorCatechistId,
-        'grantedAt': grantedAt.toUtc().toIso8601String(),
-        'isActive': isActive,
-      };
+    'classId': classId,
+    'classUniqueCode': classUniqueCode,
+    'className': className,
+    'keyBase64': keyBase64,
+    'keyId': keyId,
+    'grantorCatechistId': grantorCatechistId,
+    'grantedAt': grantedAt.toUtc().toIso8601String(),
+    'isActive': isActive,
+  };
 
   factory ClassChannelKey.fromMap(String id, Map<String, dynamic> data) =>
       ClassChannelKey(
@@ -102,7 +102,7 @@ class ClassChannelKey {
         grantorCatechistId: data['grantorCatechistId']?.toString() ?? '',
         grantedAt:
             DateTime.tryParse(data['grantedAt']?.toString() ?? '')?.toUtc() ??
-                DateTime.now().toUtc(),
+            DateTime.now().toUtc(),
         isActive: data['isActive'] != false,
       );
 }

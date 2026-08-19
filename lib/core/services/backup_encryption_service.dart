@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════════════════════
 // backup_encryption_service.dart — CatechHub (Cifratura backup con PIN utente)
-// 
+//
 // NUOVO FLUSSO (post-migrazione): non esiste più un PIN dell'app.
 // Quando l'utente esporta un backup, DEVE inserire e confermare un PIN
 // scelto al momento (diverso dal PIN del telefono). Questo PIN deriva
@@ -20,9 +20,9 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:pointycastle/export.dart' as pc;
 
 class BackupEncryptionService {
   static const int _version = 2;
@@ -67,8 +67,8 @@ class BackupEncryptionService {
     utf8.encode('CatechHub_Context_Backup_v1'),
   );
 
-/// Genera byte casuali crittograficamente sicuri (Random.secure del sistema,
-/// NON seminati dal timestamp: salt/nonce prevedibili romperebbero AES-GCM).
+  /// Genera byte casuali crittograficamente sicuri (Random.secure del sistema,
+  /// NON seminati dal timestamp: salt/nonce prevedibili romperebbero AES-GCM).
   static Uint8List _secureRandomBytes(int length) {
     final random = Random.secure();
     return Uint8List.fromList(
@@ -77,28 +77,32 @@ class BackupEncryptionService {
   }
 
   /// Deriva chiave AES-256 da PIN con PBKDF2-HMAC-SHA256.
-  static Uint8List _deriveKey(String pin, Uint8List salt) {
-    final mac = pc.HMac(pc.SHA256Digest(), 64);
-    final derivator = pc.PBKDF2KeyDerivator(mac)
-      ..init(pc.Pbkdf2Parameters(salt, _iterations, _keyLength));
-    return derivator.process(Uint8List.fromList(utf8.encode(pin)));
+  static Future<Uint8List> _deriveKey(String pin, Uint8List salt) async {
+    final pbkdf2 = Pbkdf2.hmacSha256(
+      iterations: _iterations,
+      bits: _keyLength * 8,
+    );
+    final key = await pbkdf2.deriveKeyFromPassword(password: pin, nonce: salt);
+    final bytes = await key.extractBytes();
+    return Uint8List.fromList(bytes);
   }
 
   /// Cifra [data] (JSON string) con PIN usando AES-256-GCM.
   /// Restituisce pacchetto completo Base64 pronto per salvataggio su file.
-  static String encryptBackup(String jsonData, String pin) {
+  static Future<String> encryptBackup(String jsonData, String pin) async {
     final salt = _secureRandomBytes(_saltLength);
     final nonce = _secureRandomBytes(_nonceLength);
-    final key = _deriveKey(pin, salt);
+    final key = await _deriveKey(pin, salt);
 
-    final cipher = pc.GCMBlockCipher(pc.AESEngine())
-      ..init(
-        true,
-        pc.AEADParameters(pc.KeyParameter(key), _tagLengthBits, nonce, _aad),
-      );
-
-    final plaintext = utf8.encode(jsonData);
-    final ciphertext = cipher.process(Uint8List.fromList(plaintext));
+    // AES-256-GCM standard: ciphertext || tag (16 byte), identico al formato
+    // prodotto in precedenza con pointycastle.
+    final box = await AesGcm.with256bits().encrypt(
+      utf8.encode(jsonData),
+      secretKey: SecretKey(key),
+      nonce: nonce,
+      aad: _aad,
+    );
+    final ciphertext = box.concatenation(nonce: false);
 
     final package = {
       'v': _version,
@@ -115,8 +119,11 @@ class BackupEncryptionService {
 
   /// Decifra pacchetto backup con PIN.
   /// Lancia Exception se PIN errato, dati corrotti o formato non valido.
-  static String decryptBackup(String encryptedPackage, String pin) {
-    final packageKey = _packageKey(encryptedPackage);
+  static Future<String> decryptBackup(
+    String encryptedPackage,
+    String pin,
+  ) async {
+    final packageKey = await _packageKey(encryptedPackage);
     final lockedUntil = _lockedUntil[packageKey];
     if (lockedUntil != null && DateTime.now().isBefore(lockedUntil)) {
       final remaining = lockedUntil.difference(DateTime.now()).inMinutes + 1;
@@ -135,7 +142,9 @@ class BackupEncryptionService {
 
       final iterations = package['iter'] as int;
       if (iterations != _iterations && iterations != _legacyIterations) {
-        throw Exception('Iterazioni KDF non corrispondenti: $iterations (attese $_iterations o legacy $_legacyIterations)');
+        throw Exception(
+          'Iterazioni KDF non corrispondenti: $iterations (attese $_iterations o legacy $_legacyIterations)',
+        );
       }
 
       final salt = base64Decode(package['salt'] as String);
@@ -149,20 +158,22 @@ class BackupEncryptionService {
         throw Exception('Nonce lunghezza non valida: ${nonce.length}');
       }
 
-      final key = _deriveKey(pin, Uint8List.fromList(salt));
+      final key = await _deriveKey(pin, Uint8List.fromList(salt));
 
-      final cipher = pc.GCMBlockCipher(pc.AESEngine())
-        ..init(
-          false,
-          pc.AEADParameters(
-            pc.KeyParameter(key),
-            _tagLengthBits,
-            Uint8List.fromList(nonce),
-            _aad,
-          ),
-        );
-
-      final decrypted = cipher.process(base64Decode(dataB64));
+      final sealed = base64Decode(dataB64);
+      final concatenated = Uint8List(nonce.length + sealed.length)
+        ..setAll(0, nonce)
+        ..setAll(nonce.length, sealed);
+      final box = SecretBox.fromConcatenation(
+        concatenated,
+        nonceLength: _nonceLength,
+        macLength: _tagLengthBits ~/ 8,
+      );
+      final decrypted = await AesGcm.with256bits().decrypt(
+        box,
+        secretKey: SecretKey(key),
+        aad: _aad,
+      );
       // Decifratura riuscita: azzera il contatore di tentativi per questo file.
       _failedAttempts.remove(packageKey);
       _lockedUntil.remove(packageKey);
@@ -170,7 +181,7 @@ class BackupEncryptionService {
     } on FormatException catch (e) {
       _recordFailure(packageKey);
       throw Exception('Formato backup non valido: $e');
-    } on pc.InvalidCipherTextException catch (_) {
+    } on SecretBoxAuthenticationError catch (_) {
       _recordFailure(packageKey);
       throw Exception('PIN non corretto o dati corrotti');
     } catch (e) {
@@ -182,17 +193,13 @@ class BackupEncryptionService {
 
   /// Chiave identificativa del pacchetto (hash SHA-256 troncato) usata per
   /// il rate-limiting: lega i tentativi al singolo file, non all'utente.
-  static String _packageKey(String encryptedPackage) {
+  static Future<String> _packageKey(String encryptedPackage) {
     return sha256Of(encryptedPackage);
   }
 
-  static String sha256Of(String value) {
-    final d = pc.SHA256Digest();
-    final bytes = Uint8List.fromList(utf8.encode(value));
-    final out = Uint8List(d.digestSize);
-    d.update(bytes, 0, bytes.length);
-    d.doFinal(out, 0);
-    return base64Encode(out).substring(0, 24);
+  static Future<String> sha256Of(String value) async {
+    final hash = await Sha256().hash(utf8.encode(value));
+    return base64Encode(hash.bytes).substring(0, 24);
   }
 
   static void _recordFailure(String packageKey) {
@@ -207,9 +214,9 @@ class BackupEncryptionService {
   /// Verifica se [pin] decifra correttamente [encryptedPackage] SENZA restituire i dati.
   /// Usato per validare il PIN prima dell'import completo.
   /// Rispetta il rate-limiting di [decryptBackup] (lockout dopo tentativi falliti).
-  static bool verifyPin(String encryptedPackage, String pin) {
+  static Future<bool> verifyPin(String encryptedPackage, String pin) async {
     try {
-      decryptBackup(encryptedPackage, pin);
+      await decryptBackup(encryptedPackage, pin);
       return true;
     } catch (_) {
       return false;
@@ -223,7 +230,8 @@ class BackupEncryptionService {
   /// brute-force offline). In lettura accetta anche i PIN numerici legacy.
   static Future<String?> showBackupPinDialog({
     required BuildContext context,
-    required bool isExport, // true = esportazione (crea PIN), false = importazione (inserisci PIN)
+    required bool
+    isExport, // true = esportazione (crea PIN), false = importazione (inserisci PIN)
   }) async {
     final controller = TextEditingController();
     final confirmController = TextEditingController();
@@ -251,8 +259,8 @@ class BackupEncryptionService {
               Text(
                 isExport
                     ? 'Scegli una passphrase di almeno $minPinLength caratteri alfanumerici '
-                      '(lettere e cifre, almeno una di ogni tipo) per proteggere il file di backup. '
-                      'Questo PIN serve SOLO per questo backup e non è il PIN del telefono.'
+                          '(lettere e cifre, almeno una di ogni tipo) per proteggere il file di backup. '
+                          'Questo PIN serve SOLO per questo backup e non è il PIN del telefono.'
                     : 'Inserisci il PIN usato per cifrare questo backup.',
                 style: const TextStyle(fontSize: 13, color: Colors.grey),
               ),
@@ -263,7 +271,11 @@ class BackupEncryptionService {
                 obscureText: true,
                 maxLength: 16,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 24, letterSpacing: 8, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 24,
+                  letterSpacing: 8,
+                  fontWeight: FontWeight.bold,
+                ),
                 decoration: InputDecoration(
                   labelText: 'PIN',
                   hintText: '••••',
@@ -272,13 +284,17 @@ class BackupEncryptionService {
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(
-                      color: showError ? Colors.red.shade300 : Colors.grey.shade300,
+                      color: showError
+                          ? Colors.red.shade300
+                          : Colors.grey.shade300,
                       width: showError ? 2 : 1,
                     ),
                   ),
                   counterText: '',
                 ),
-                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]'))],
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
+                ],
                 onChanged: (_) => setState(() => showError = false),
               ),
               if (isExport) ...[
@@ -289,7 +305,11 @@ class BackupEncryptionService {
                   obscureText: true,
                   maxLength: 16,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 24, letterSpacing: 8, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 24,
+                    letterSpacing: 8,
+                    fontWeight: FontWeight.bold,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Conferma PIN',
                     hintText: '••••',
@@ -298,19 +318,26 @@ class BackupEncryptionService {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: showError ? Colors.red.shade300 : Colors.grey.shade300,
+                        color: showError
+                            ? Colors.red.shade300
+                            : Colors.grey.shade300,
                         width: showError ? 2 : 1,
                       ),
                     ),
                     counterText: '',
                   ),
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]'))],
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
+                  ],
                   onChanged: (_) => setState(() => showError = false),
                 ),
               ],
               if (showError && errorText != null) ...[
                 const SizedBox(height: 8),
-                Text(errorText!, style: TextStyle(color: Colors.red.shade700, fontSize: 12)),
+                Text(
+                  errorText!,
+                  style: TextStyle(color: Colors.red.shade700, fontSize: 12),
+                ),
               ],
             ],
           ),
@@ -325,7 +352,8 @@ class BackupEncryptionService {
                 if (pin.length < minPinLength) {
                   setState(() {
                     showError = true;
-                    errorText = 'Il PIN deve essere di almeno $minPinLength caratteri';
+                    errorText =
+                        'Il PIN deve essere di almeno $minPinLength caratteri';
                   });
                   return;
                 }
@@ -335,7 +363,8 @@ class BackupEncryptionService {
                   if (!hasLetter || !hasDigit) {
                     setState(() {
                       showError = true;
-                      errorText = 'Il PIN deve contenere almeno una lettera e una cifra';
+                      errorText =
+                          'Il PIN deve contenere almeno una lettera e una cifra';
                     });
                     return;
                   }
@@ -349,7 +378,9 @@ class BackupEncryptionService {
                 }
                 Navigator.pop(ctx, pin);
               },
-              style: TextButton.styleFrom(foregroundColor: const Color(0xFF174A7E)),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF174A7E),
+              ),
               child: Text(isExport ? 'Crea Backup' : 'Decifra'),
             ),
           ],

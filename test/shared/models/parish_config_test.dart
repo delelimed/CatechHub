@@ -70,7 +70,7 @@ void main() {
       );
       expect(
         ParishConfig.fromMap({'durataValiditaConsensoMesi': -5}),
-            const ParishConfig(durataValiditaConsensoMesi: 12),
+        const ParishConfig(durataValiditaConsensoMesi: 12),
       );
     });
 

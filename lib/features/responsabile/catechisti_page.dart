@@ -81,8 +81,8 @@ class CatechistiPage extends ConsumerWidget {
                   final crossAxisCount = constraints.maxWidth >= 900
                       ? 3
                       : constraints.maxWidth >= 560
-                          ? 2
-                          : 1;
+                      ? 2
+                      : 1;
                   return GridView.builder(
                     padding: const EdgeInsets.only(bottom: 96),
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -203,7 +203,11 @@ class CatechistiPage extends ConsumerWidget {
     if (result == true && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(existing == null ? 'Catechista aggiunto.' : 'Catechista aggiornato.'),
+          content: Text(
+            existing == null
+                ? 'Catechista aggiunto.'
+                : 'Catechista aggiornato.',
+          ),
         ),
       );
     }
@@ -225,10 +229,8 @@ class CatechistiPage extends ConsumerWidget {
       backgroundColor: Theme.of(context).brightness == Brightness.dark
           ? Theme.of(context).colorScheme.surfaceContainer
           : Colors.white,
-      builder: (sheetContext) => _CatechistDetailSheet(
-        profile: profile,
-        ref: ref,
-      ),
+      builder: (sheetContext) =>
+          _CatechistDetailSheet(profile: profile, ref: ref),
     );
   }
 }
@@ -237,10 +239,7 @@ class _CatechistDetailSheet extends ConsumerStatefulWidget {
   final CatechistProfile profile;
   final WidgetRef ref;
 
-  const _CatechistDetailSheet({
-    required this.profile,
-    required this.ref,
-  });
+  const _CatechistDetailSheet({required this.profile, required this.ref});
 
   @override
   ConsumerState<_CatechistDetailSheet> createState() =>
@@ -379,8 +378,7 @@ class _CatechistDetailSheetState extends ConsumerState<_CatechistDetailSheet> {
           ListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.groups_rounded,
-                color: Color(0xFF174A7E)),
+            leading: const Icon(Icons.groups_rounded, color: Color(0xFF174A7E)),
             title: Text(c.name),
             subtitle: Text(
               ClassesRepository().roleOf(c, widget.profile.id) ==
@@ -392,8 +390,10 @@ class _CatechistDetailSheetState extends ConsumerState<_CatechistDetailSheet> {
               tooltip: 'Ruolo o rimozione',
               onSelected: (value) async {
                 if (value == 'remove') {
-                  await ClassesRepository()
-                      .removeCatechistFromClass(c.id, widget.profile.id);
+                  await ClassesRepository().removeCatechistFromClass(
+                    c.id,
+                    widget.profile.id,
+                  );
                 } else {
                   await ClassesRepository().setCatechistRole(
                     c.id,
@@ -414,8 +414,10 @@ class _CatechistDetailSheetState extends ConsumerState<_CatechistDetailSheet> {
                 const PopupMenuDivider(),
                 const PopupMenuItem(
                   value: 'remove',
-                  child: Text('Rimuovi dalla classe',
-                      style: TextStyle(color: Colors.red)),
+                  child: Text(
+                    'Rimuovi dalla classe',
+                    style: TextStyle(color: Colors.red),
+                  ),
                 ),
               ],
             ),
@@ -434,11 +436,12 @@ class _CatechistDetailSheetState extends ConsumerState<_CatechistDetailSheet> {
     List<SchoolClass> active,
     List<SchoolClass> myClasses,
   ) async {
-    final candidates =
-        active.where((c) => !myClasses.contains(c)).toList();
+    final candidates = active.where((c) => !myClasses.contains(c)).toList();
     if (candidates.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Il catechista è già in tutte le classi.')),
+        const SnackBar(
+          content: Text('Il catechista è già in tutte le classi.'),
+        ),
       );
       return;
     }
@@ -449,7 +452,9 @@ class _CatechistDetailSheetState extends ConsumerState<_CatechistDetailSheet> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
           title: const Text(
             'Assegna a una classe',
             style: TextStyle(
@@ -520,8 +525,9 @@ class _CatechistDetailSheetState extends ConsumerState<_CatechistDetailSheet> {
     CatechistProfile profile,
     List<P2PDeviceAssociation> associations,
   ) {
-    final mine =
-        associations.where((a) => a.catechistId == profile.id).toList();
+    final mine = associations
+        .where((a) => a.catechistId == profile.id)
+        .toList();
 
     if (mine.isEmpty) {
       return Column(
@@ -624,11 +630,7 @@ class _CatechistDetailSheetState extends ConsumerState<_CatechistDetailSheet> {
   Future<void> _editProfile() async {
     Navigator.pop(context);
     // La modifica passa dal form condiviso della pagina madre.
-    await _CatechistiPageBuilder.showEdit(
-      context,
-      widget.ref,
-      widget.profile,
-    );
+    await _CatechistiPageBuilder.showEdit(context, widget.ref, widget.profile);
   }
 
   Future<void> _deleteProfile() async {
@@ -809,7 +811,9 @@ class _CatechistCard extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 24,
-                  backgroundColor: const Color(0xFF174A7E).withValues(alpha: 0.12),
+                  backgroundColor: const Color(
+                    0xFF174A7E,
+                  ).withValues(alpha: 0.12),
                   child: Text(
                     profile.initials,
                     style: const TextStyle(
@@ -838,8 +842,9 @@ class _CatechistCard extends StatelessWidget {
                           profile.phone,
                           style: TextStyle(
                             fontSize: 12,
-                            color:
-                                isDark ? Colors.grey.shade400 : Colors.black54,
+                            color: isDark
+                                ? Colors.grey.shade400
+                                : Colors.black54,
                           ),
                         ),
                     ],

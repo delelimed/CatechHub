@@ -86,8 +86,8 @@ class PlanningMeeting {
     this.lastModifiedBy = '',
     DateTime? createdAt,
     DateTime? updatedAt,
-  })  : createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now();
+  }) : createdAt = createdAt ?? DateTime.now(),
+       updatedAt = updatedAt ?? DateTime.now();
 
   PlanningMeeting copyWith({
     String? id,
@@ -139,7 +139,8 @@ class PlanningMeeting {
   }
 
   factory PlanningMeeting.fromMap(String id, Map<String, dynamic> data) {
-    final date = DateTime.tryParse(data['date']?.toString() ?? '') ?? DateTime.now();
+    final date =
+        DateTime.tryParse(data['date']?.toString() ?? '') ?? DateTime.now();
     final legacyTitle = data['title']?.toString().trim();
 
     return PlanningMeeting(
@@ -156,8 +157,12 @@ class PlanningMeeting {
       notes: data['notes'] ?? data['publicNotes'] ?? '',
       isReunion: data['isReunion'] == true,
       lastModifiedBy: data['lastModifiedBy'] ?? '',
-      createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(data['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(data['updatedAt']?.toString() ?? '') ??
+          DateTime.now(),
     );
   }
 }

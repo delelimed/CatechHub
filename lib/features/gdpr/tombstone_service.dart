@@ -14,7 +14,7 @@
 
 import 'dart:convert';
 
-import 'package:crypto/crypto.dart' show Hmac, sha256;
+import '../../core/services/crypto_utils.dart';
 
 /// Servizio di firma/verifica dei tombstone P2P.
 class TombstoneService {
@@ -29,8 +29,11 @@ class TombstoneService {
 
   /// Firma HMAC-SHA256 base64 del payload canonico con [secretKey].
   static String sign(String canonicalPayload, String secretKey) {
-    final mac = Hmac(sha256, utf8.encode(secretKey));
-    return base64Encode(mac.convert(utf8.encode(canonicalPayload)).bytes);
+    final mac = hmacSha256BytesSync(
+      utf8.encode(secretKey),
+      utf8.encode(canonicalPayload),
+    );
+    return base64Encode(mac);
   }
 
   /// Ritorna una copia di [ts] con 'signature' ricalcolata con [secretKey].

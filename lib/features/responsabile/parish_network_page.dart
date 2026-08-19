@@ -91,9 +91,7 @@ class _ParishNetworkPageState extends State<ParishNetworkPage>
     try {
       await service.sendParishChannelToAll();
       messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Canale parrocchiale sincronizzato.'),
-        ),
+        const SnackBar(content: Text('Canale parrocchiale sincronizzato.')),
       );
     } catch (e) {
       messenger.showSnackBar(
@@ -112,9 +110,7 @@ class _ParishNetworkPageState extends State<ParishNetworkPage>
     if (classes.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Nessuna classe presente su questo dispositivo.',
-          ),
+          content: Text('Nessuna classe presente su questo dispositivo.'),
         ),
       );
       return;
@@ -412,7 +408,8 @@ class _RiunioniTab extends ConsumerWidget {
             data: (list) => list.isEmpty
                 ? const _EmptyTabState(
                     icon: Icons.event_rounded,
-                    message: 'Nessuna riunione parrocchiale.\nCreane una con '
+                    message:
+                        'Nessuna riunione parrocchiale.\nCreane una con '
                         'il pulsante +.',
                   )
                 : ListView.separated(
@@ -421,9 +418,7 @@ class _RiunioniTab extends ConsumerWidget {
                     itemBuilder: (context, index) =>
                         _EventTile(event: list[index]),
                   ),
-            loading: () => const Center(
-              child: CircularProgressIndicator(),
-            ),
+            loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('Errore: $e')),
           ),
         ),
@@ -442,10 +437,7 @@ class _EventTile extends ConsumerWidget {
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: theme.colorScheme.primaryContainer,
-        child: Icon(
-          Icons.event_rounded,
-          color: theme.colorScheme.primary,
-        ),
+        child: Icon(Icons.event_rounded, color: theme.colorScheme.primary),
       ),
       title: Text(
         event.title,
@@ -525,7 +517,8 @@ class _AvvisiTab extends ConsumerWidget {
             data: (list) => list.isEmpty
                 ? const _EmptyTabState(
                     icon: Icons.campaign_rounded,
-                    message: 'Nessun avviso parrocchiale.\nCreane uno con il '
+                    message:
+                        'Nessun avviso parrocchiale.\nCreane uno con il '
                         'pulsante +.',
                   )
                 : ListView.separated(
@@ -534,9 +527,7 @@ class _AvvisiTab extends ConsumerWidget {
                     itemBuilder: (context, index) =>
                         _AvvisoTile(avviso: list[index]),
                   ),
-            loading: () => const Center(
-              child: CircularProgressIndicator(),
-            ),
+            loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('Errore: $e')),
           ),
         ),
@@ -555,20 +546,13 @@ class _AvvisoTile extends ConsumerWidget {
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: theme.colorScheme.secondaryContainer,
-        child: Icon(
-          Icons.campaign_rounded,
-          color: theme.colorScheme.secondary,
-        ),
+        child: Icon(Icons.campaign_rounded, color: theme.colorScheme.secondary),
       ),
       title: Text(
         avviso.title,
         style: const TextStyle(fontWeight: FontWeight.w600),
       ),
-      subtitle: Text(
-        avviso.text,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-      ),
+      subtitle: Text(avviso.text, maxLines: 2, overflow: TextOverflow.ellipsis),
       trailing: IconButton(
         icon: const Icon(Icons.delete_outline),
         color: Colors.red.shade400,
@@ -719,7 +703,10 @@ class _ClassTitleTile extends ConsumerWidget {
 
 /// Genera un QR grant del titolo della classe [classModel] (PIN protetto).
 /// Condiviso tra il pulsante della riga classe e il FAB "Concedi titolo".
-Future<void> _grantTitleForClass(BuildContext context, SchoolClass classModel) async {
+Future<void> _grantTitleForClass(
+  BuildContext context,
+  SchoolClass classModel,
+) async {
   final key = ClassChannelService.getKeyByClassId(classModel.id);
   if (key == null) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -738,16 +725,13 @@ Future<void> _grantTitleForClass(BuildContext context, SchoolClass classModel) a
     key: key,
     grantorName: _localDisplayName(),
   );
-  final chunks = ClassChannelService.createKeyGrantChunks(grantMap, pin);
+  final chunks = await ClassChannelService.createKeyGrantChunks(grantMap, pin);
 
   if (!context.mounted) return;
   await showDialog(
     context: context,
-    builder: (d) => _GrantQrDialog(
-      className: classModel.name,
-      pin: pin,
-      chunks: chunks,
-    ),
+    builder: (d) =>
+        _GrantQrDialog(className: classModel.name, pin: pin, chunks: chunks),
   );
 }
 
@@ -822,7 +806,9 @@ class _GrantQrDialogState extends State<_GrantQrDialog> {
             ),
             const SizedBox(height: 4),
             Text(
-              _pinVisible ? 'Tocca per nascondere' : 'Tocca per mostrare il PIN',
+              _pinVisible
+                  ? 'Tocca per nascondere'
+                  : 'Tocca per mostrare il PIN',
               style: const TextStyle(color: Colors.grey, fontSize: 12),
             ),
             const SizedBox(height: 16),
@@ -859,9 +845,7 @@ class _GrantQrDialogState extends State<_GrantQrDialog> {
       actions: [
         if (widget.chunks.length > 1) ...[
           TextButton(
-            onPressed: _index > 0
-                ? () => setState(() => _index--)
-                : null,
+            onPressed: _index > 0 ? () => setState(() => _index--) : null,
             child: const Text('Precedente'),
           ),
           TextButton(
@@ -882,10 +866,7 @@ class _GrantQrDialogState extends State<_GrantQrDialog> {
 
 /// Flusso di scansione del QR del titolo (con riassemblaggio dei chunk).
 Future<void> _scanTitleFlow(BuildContext context) async {
-  await showDialog(
-    context: context,
-    builder: (_) => const _ScanTitleDialog(),
-  );
+  await showDialog(context: context, builder: (_) => const _ScanTitleDialog());
 }
 
 class _ScanTitleDialog extends StatefulWidget {
@@ -939,9 +920,9 @@ class _ScanTitleDialogState extends State<_ScanTitleDialog> {
       assembled = QRDataService.assembleChunks(_chunks);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Errore QR: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Errore QR: $e')));
       Navigator.pop(context);
       return;
     }
@@ -977,28 +958,24 @@ class _ScanTitleDialogState extends State<_ScanTitleDialog> {
     }
 
     try {
-      final key = ClassChannelService.importKeyGrant(assembled, pin);
+      final key = await ClassChannelService.importKeyGrant(assembled, pin);
       if (key == null) {
         throw Exception('Grant non valido o PIN errato.');
       }
       // Applica eventuali dati cifrati ricevuti in relay prima del titolo.
-      await P2PSyncService().tryApplyRelayedCiphertext(
-        key.classUniqueCode,
-      );
+      await P2PSyncService().tryApplyRelayedCiphertext(key.classUniqueCode);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Titolo acquisito per la classe "${key.className}".',
-          ),
+          content: Text('Titolo acquisito per la classe "${key.className}".'),
         ),
       );
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Titolo non acquisito: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Titolo non acquisito: $e')));
       Navigator.pop(context);
     }
   }
@@ -1056,8 +1033,7 @@ class _EmptyTabState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon,
-                size: 52, color: Theme.of(context).colorScheme.primary),
+            Icon(icon, size: 52, color: Theme.of(context).colorScheme.primary),
             const SizedBox(height: 12),
             Text(
               message,

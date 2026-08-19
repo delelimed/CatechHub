@@ -69,9 +69,11 @@ class _ClasseDetailPageState extends ConsumerState<ClasseDetailPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(c.archived ? 'Ripristina classe' : 'Archivia classe'),
-        content: Text(c.archived
-            ? 'Ripristinare "${c.name}" tra le classi attive?'
-            : 'Archiviare "${c.name}"? I dati restano conservati nello storico.'),
+        content: Text(
+          c.archived
+              ? 'Ripristinare "${c.name}" tra le classi attive?'
+              : 'Archiviare "${c.name}"? I dati restano conservati nello storico.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -102,7 +104,8 @@ class _ClasseDetailPageState extends ConsumerState<ClasseDetailPage> {
       builder: (context) => AlertDialog(
         title: const Text('Elimina classe'),
         content: Text(
-            'Eliminare definitivamente "${c.name}" e tutti i suoi dati?'),
+          'Eliminare definitivamente "${c.name}" e tutti i suoi dati?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -129,10 +132,7 @@ class _ClasseDetailPageState extends ConsumerState<ClasseDetailPage> {
   @override
   Widget build(BuildContext context) {
     if (!RolePermissions.currentCan(RolePermission.manageClasses)) {
-      return const ResponsabileGuard(
-        title: 'Classe',
-        child: SizedBox.shrink(),
-      );
+      return const ResponsabileGuard(title: 'Classe', child: SizedBox.shrink());
     }
 
     final classesAsync = ref.watch(classesStreamProvider);
@@ -144,8 +144,10 @@ class _ClasseDetailPageState extends ConsumerState<ClasseDetailPage> {
         title: 'Classe',
         child: Center(child: CircularProgressIndicator()),
       ),
-      error: (e, _) =>
-          AppScaffold(title: 'Classe', child: Center(child: Text('Errore: $e'))),
+      error: (e, _) => AppScaffold(
+        title: 'Classe',
+        child: Center(child: Text('Errore: $e')),
+      ),
       data: (classes) {
         SchoolClass? found;
         for (final c in classes) {
@@ -284,13 +286,16 @@ class _ClasseDetailPageState extends ConsumerState<ClasseDetailPage> {
         color: sectionBg,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-            color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+          color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Catechisti',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          const Text(
+            'Catechisti',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          ),
           const SizedBox(height: 10),
           if (c.catechistIds.isEmpty)
             Text(
@@ -315,8 +320,9 @@ class _ClasseDetailPageState extends ConsumerState<ClasseDetailPage> {
                         contentPadding: EdgeInsets.zero,
                         leading: CircleAvatar(
                           radius: 16,
-                          backgroundColor: const Color(0xFF174A7E)
-                              .withValues(alpha: 0.12),
+                          backgroundColor: const Color(
+                            0xFF174A7E,
+                          ).withValues(alpha: 0.12),
                           child: Text(
                             _initialsOf(id, byId),
                             style: const TextStyle(
@@ -332,13 +338,15 @@ class _ClasseDetailPageState extends ConsumerState<ClasseDetailPage> {
                         ),
                         trailing: Chip(
                           label: Text(
-                            c.catechistRoles[id] == ClassesRepository.roleTitolare
+                            c.catechistRoles[id] ==
+                                    ClassesRepository.roleTitolare
                                 ? 'Titolare'
                                 : 'Aiuto',
                             style: const TextStyle(fontSize: 11),
                           ),
                           visualDensity: VisualDensity.compact,
-                          backgroundColor: c.catechistRoles[id] ==
+                          backgroundColor:
+                              c.catechistRoles[id] ==
                                   ClassesRepository.roleTitolare
                               ? Colors.orange.shade50
                               : Colors.purple.shade50,
@@ -367,7 +375,8 @@ class _ClasseDetailPageState extends ConsumerState<ClasseDetailPage> {
         color: sectionBg,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-            color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+          color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -408,7 +417,9 @@ class _ClasseDetailPageState extends ConsumerState<ClasseDetailPage> {
                             ].join(' · '),
                             style: TextStyle(
                               fontSize: 11,
-                              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                              color: isDark
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
                             ),
                           ),
                         ),
@@ -424,9 +435,7 @@ class _ClasseDetailPageState extends ConsumerState<ClasseDetailPage> {
     final p = byId[id];
     if (p != null) return p.fullName;
     if (id == 'local_catechist_id') return 'Catechista locale';
-    return id.length > 8
-        ? 'Catechista ${id.substring(id.length - 8)}'
-        : id;
+    return id.length > 8 ? 'Catechista ${id.substring(id.length - 8)}' : id;
   }
 
   String _initialsOf(String id, Map<String, CatechistProfile> byId) {

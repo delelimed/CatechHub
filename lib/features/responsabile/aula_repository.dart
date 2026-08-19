@@ -24,12 +24,19 @@ class AulaRepository {
   bool get canManage => RolePermissions.currentCan(RolePermission.manageAulas);
 
   Stream<List<Aula>> getAulas() {
-    return LocalDatabase.watchList(_box, (id, data) => Aula.fromMap(id, data))
-        .map((aulas) => (aulas..sort((a, b) => a.nomeStanza.compareTo(b.nomeStanza))));
+    return LocalDatabase.watchList(
+      _box,
+      (id, data) => Aula.fromMap(id, data),
+    ).map(
+      (aulas) => (aulas..sort((a, b) => a.nomeStanza.compareTo(b.nomeStanza))),
+    );
   }
 
   List<Aula> getAulasSync() {
-    final aulas = LocalDatabase.values(_box, (id, data) => Aula.fromMap(id, data));
+    final aulas = LocalDatabase.values(
+      _box,
+      (id, data) => Aula.fromMap(id, data),
+    );
     aulas.sort((a, b) => a.nomeStanza.compareTo(b.nomeStanza));
     return aulas;
   }
@@ -42,11 +49,18 @@ class AulaRepository {
 
   Future<void> saveAula(Aula aula) async {
     if (!canManage) {
-      throw UnsupportedError('Solo il Responsabile Catechistico può gestire '
-          'le aule parrocchiali.');
+      throw UnsupportedError(
+        'Solo il Responsabile Catechistico può gestire '
+        'le aule parrocchiali.',
+      );
     }
-    final id = aula.stanzaId.isEmpty ? LocalDatabase.newId('stanza') : aula.stanzaId;
-    await _box.put(id, aula.copyWith(stanzaId: id, updatedAt: DateTime.now()).toMap());
+    final id = aula.stanzaId.isEmpty
+        ? LocalDatabase.newId('stanza')
+        : aula.stanzaId;
+    await _box.put(
+      id,
+      aula.copyWith(stanzaId: id, updatedAt: DateTime.now()).toMap(),
+    );
     await _box.flush();
   }
 

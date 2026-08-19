@@ -88,131 +88,140 @@ void main() {
   });
 
   group('ParishChannelService — sync del canale globale', () {
-    test('buildChannelPayload include eventi e avvisi globali, non di classe',
-        () async {
-      await ParishChannelService.saveEvent(
-        ParishEvent(id: 'e1', title: 'E1', date: DateTime(2026, 9, 1)),
-      );
-      await ParishChannelService.saveParishAvviso(
-        const AvvisoTemplate(
-          id: 'a1',
-          classUniqueCode: null,
-          title: 'A1',
-          text: 'testo',
-        ),
-      );
-      await LocalDatabase.avvisi().put(
-        'a2',
-        const AvvisoTemplate(
-          id: 'a2',
-          classUniqueCode: '999',
-          title: 'A2',
-          text: 'classe',
-        ).toMap(),
-      );
+    test(
+      'buildChannelPayload include eventi e avvisi globali, non di classe',
+      () async {
+        await ParishChannelService.saveEvent(
+          ParishEvent(id: 'e1', title: 'E1', date: DateTime(2026, 9, 1)),
+        );
+        await ParishChannelService.saveParishAvviso(
+          const AvvisoTemplate(
+            id: 'a1',
+            classUniqueCode: null,
+            title: 'A1',
+            text: 'testo',
+          ),
+        );
+        await LocalDatabase.avvisi().put(
+          'a2',
+          const AvvisoTemplate(
+            id: 'a2',
+            classUniqueCode: '999',
+            title: 'A2',
+            text: 'classe',
+          ).toMap(),
+        );
 
-      final payload = ParishChannelService.buildChannelPayload();
-      final events = payload['events'] as List<dynamic>;
-      final avvisi = payload['avvisi'] as List<dynamic>;
+        final payload = ParishChannelService.buildChannelPayload();
+        final events = payload['events'] as List<dynamic>;
+        final avvisi = payload['avvisi'] as List<dynamic>;
 
-      expect(events, hasLength(1));
-      expect(avvisi, hasLength(1));
-      expect((avvisi.first as Map)['id'], 'a1');
-    });
+        expect(events, hasLength(1));
+        expect(avvisi, hasLength(1));
+        expect((avvisi.first as Map)['id'], 'a1');
+      },
+    );
 
-    test('applyChannelPayload applica i record nuovi e ignora gli identici',
-        () async {
-      // Stato "remoto": un evento e un avviso.
-      final remoteEvent = ParishEvent(
-        id: 'e_remote',
-        title: 'Riunione remota',
-        date: DateTime(2026, 9, 10),
-        createdAt: DateTime.utc(2026, 1, 1),
-        updatedAt: DateTime.utc(2026, 1, 1),
-      );
-      final remoteEventRecord = SyncRecord.fromHiveEntry(
-        id: remoteEvent.id,
-        boxName: LocalDatabase.parishEventsBox,
-        entry: remoteEvent.toMap(),
-      );
+    test(
+      'applyChannelPayload applica i record nuovi e ignora gli identici',
+      () async {
+        // Stato "remoto": un evento e un avviso.
+        final remoteEvent = ParishEvent(
+          id: 'e_remote',
+          title: 'Riunione remota',
+          date: DateTime(2026, 9, 10),
+          createdAt: DateTime.utc(2026, 1, 1),
+          updatedAt: DateTime.utc(2026, 1, 1),
+        );
+        final remoteEventRecord = SyncRecord.fromHiveEntry(
+          id: remoteEvent.id,
+          boxName: LocalDatabase.parishEventsBox,
+          entry: remoteEvent.toMap(),
+        );
 
-      final payload = {
-        'events': [remoteEventRecord.toJson()],
-        'avvisi': <Map<String, dynamic>>[],
-      };
+        final payload = {
+          'events': [remoteEventRecord.toJson()],
+          'avvisi': <Map<String, dynamic>>[],
+        };
 
-      // Primo apply: il record nuovo viene inserito.
-      final applied = await ParishChannelService.applyChannelPayload(payload);
-      expect(applied, 1);
-      expect(ParishChannelService.getAllEvents(), hasLength(1));
+        // Primo apply: il record nuovo viene inserito.
+        final applied = await ParishChannelService.applyChannelPayload(payload);
+        expect(applied, 1);
+        expect(ParishChannelService.getAllEvents(), hasLength(1));
 
-      // Secondo apply: record identico → nessuna modifica.
-      final again =
-          await ParishChannelService.applyChannelPayload(payload);
-      expect(again, 0);
-      expect(ParishChannelService.getAllEvents(), hasLength(1));
-    });
+        // Secondo apply: record identico → nessuna modifica.
+        final again = await ParishChannelService.applyChannelPayload(payload);
+        expect(again, 0);
+        expect(ParishChannelService.getAllEvents(), hasLength(1));
+      },
+    );
 
-    test('applyChannelPayload LWW: vince il record con updatedAt più recente',
-        () async {
-      final base = ParishEvent(
-        id: 'e_conflict',
-        title: 'Titolo vecchio',
-        date: DateTime(2026, 9, 10),
-        updatedAt: DateTime.utc(2026, 1, 1),
-      );
-      await ParishChannelService.saveEvent(base);
+    test(
+      'applyChannelPayload LWW: vince il record con updatedAt più recente',
+      () async {
+        final base = ParishEvent(
+          id: 'e_conflict',
+          title: 'Titolo vecchio',
+          date: DateTime(2026, 9, 10),
+          updatedAt: DateTime.utc(2026, 1, 1),
+        );
+        await ParishChannelService.saveEvent(base);
 
-      final newer = base.copyWith(
-        title: 'Titolo nuovo',
-        updatedAt: DateTime.utc(2026, 2, 1),
-      );
-      final record = SyncRecord.fromHiveEntry(
-        id: newer.id,
-        boxName: LocalDatabase.parishEventsBox,
-        entry: newer.toMap(),
-      );
+        final newer = base.copyWith(
+          title: 'Titolo nuovo',
+          updatedAt: DateTime.utc(2026, 2, 1),
+        );
+        final record = SyncRecord.fromHiveEntry(
+          id: newer.id,
+          boxName: LocalDatabase.parishEventsBox,
+          entry: newer.toMap(),
+        );
 
-      final payload = {
-        'events': [record.toJson()],
-        'avvisi': <Map<String, dynamic>>[],
-      };
-      final applied = await ParishChannelService.applyChannelPayload(payload);
+        final payload = {
+          'events': [record.toJson()],
+          'avvisi': <Map<String, dynamic>>[],
+        };
+        final applied = await ParishChannelService.applyChannelPayload(payload);
 
-      expect(applied, 1);
-      final stored = ParishChannelService.getAllEvents().first;
-      expect(stored.title, 'Titolo nuovo');
-    });
+        expect(applied, 1);
+        final stored = ParishChannelService.getAllEvents().first;
+        expect(stored.title, 'Titolo nuovo');
+      },
+    );
 
-    test('applyChannelPayload LWW: un record più vecchio NON sovrascrive',
-        () async {
-      final current = ParishEvent(
-        id: 'e_older',
-        title: 'Versione attuale',
-        date: DateTime(2026, 9, 10),
-        updatedAt: DateTime.utc(2026, 5, 1),
-      );
-      await ParishChannelService.saveEvent(current);
+    test(
+      'applyChannelPayload LWW: un record più vecchio NON sovrascrive',
+      () async {
+        final current = ParishEvent(
+          id: 'e_older',
+          title: 'Versione attuale',
+          date: DateTime(2026, 9, 10),
+          updatedAt: DateTime.utc(2026, 5, 1),
+        );
+        await ParishChannelService.saveEvent(current);
 
-      final older = current.copyWith(
-        title: 'Versione obsoleta',
-        updatedAt: DateTime.utc(2026, 3, 1),
-      );
-      final record = SyncRecord.fromHiveEntry(
-        id: older.id,
-        boxName: LocalDatabase.parishEventsBox,
-        entry: older.toMap(),
-      );
-      final payload = {
-        'events': [record.toJson()],
-        'avvisi': <Map<String, dynamic>>[],
-      };
+        final older = current.copyWith(
+          title: 'Versione obsoleta',
+          updatedAt: DateTime.utc(2026, 3, 1),
+        );
+        final record = SyncRecord.fromHiveEntry(
+          id: older.id,
+          boxName: LocalDatabase.parishEventsBox,
+          entry: older.toMap(),
+        );
+        final payload = {
+          'events': [record.toJson()],
+          'avvisi': <Map<String, dynamic>>[],
+        };
 
-      final applied = await ParishChannelService.applyChannelPayload(payload);
-      expect(applied, 0);
-      expect(ParishChannelService.getAllEvents().first.title,
-          'Versione attuale');
-    });
+        final applied = await ParishChannelService.applyChannelPayload(payload);
+        expect(applied, 0);
+        expect(
+          ParishChannelService.getAllEvents().first.title,
+          'Versione attuale',
+        );
+      },
+    );
 
     test('applyChannelPayload propaga la cancellazione (isDeleted)', () async {
       final evt = ParishEvent(
@@ -238,8 +247,7 @@ void main() {
 
       final applied = await ParishChannelService.applyChannelPayload(payload);
       expect(applied, 1);
-      final stored = LocalDatabase.parishEvents()
-          .get(evt.id) as Map;
+      final stored = LocalDatabase.parishEvents().get(evt.id) as Map;
       expect(stored['isDeleted'], isTrue);
     });
   });

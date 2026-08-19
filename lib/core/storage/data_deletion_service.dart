@@ -67,7 +67,16 @@ class DataDeletionCounts {
   final int deliveries;
   final int associations;
 
-  int get total => students + attendance + planning + catechesi + contactNotes + attachments + documents + deliveries + associations;
+  int get total =>
+      students +
+      attendance +
+      planning +
+      catechesi +
+      contactNotes +
+      attachments +
+      documents +
+      deliveries +
+      associations;
 }
 
 /// Stato della richiesta di cancellazione totale dei dati.
@@ -255,7 +264,10 @@ class DataDeletionService {
   /// 3. Giornate: pulizia del Box planning.
   /// 4. Anagrafica: pulizia studenti, classi (con reset lista IDs) e
   ///    consegna documenti.
-  Future<void> deleteSelected(Set<DataDeletionCategory> categories, {String? classId}) async {
+  Future<void> deleteSelected(
+    Set<DataDeletionCategory> categories, {
+    String? classId,
+  }) async {
     if (categories.isEmpty) {
       throw Exception('Seleziona almeno una voce da cancellare');
     }
@@ -314,9 +326,14 @@ class DataDeletionService {
     }
   }
 
-  Future<void> _deleteForClass(Set<DataDeletionCategory> categories, String classId) async {
+  Future<void> _deleteForClass(
+    Set<DataDeletionCategory> categories,
+    String classId,
+  ) async {
     final classData = LocalDatabase.classes().get(classId);
-    final classMap = classData != null ? LocalDatabase.toStringDynamicMap(classData) : null;
+    final classMap = classData != null
+        ? LocalDatabase.toStringDynamicMap(classData)
+        : null;
     final uniqueCode = classMap?['uniqueCode'] as String?;
     final studentIdsInClass = _getStudentIdsInClass(classId);
     final studentSet = studentIdsInClass.toSet();
@@ -326,8 +343,9 @@ class DataDeletionService {
         await LocalDatabase.students().delete(sid);
       }
       // Rimuove anche gli snapshot storici dei ragazzi cancellati.
-      await HistoricalRecordRepository()
-          .deleteRecordsForStudents(studentIdsInClass);
+      await HistoricalRecordRepository().deleteRecordsForStudents(
+        studentIdsInClass,
+      );
       if (classMap != null) {
         classMap['studentIds'] = <String>[];
         await LocalDatabase.classes().put(classId, classMap);

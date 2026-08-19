@@ -13,7 +13,8 @@ class AttendanceMeetingsPage extends ConsumerStatefulWidget {
   const AttendanceMeetingsPage({super.key});
 
   @override
-  ConsumerState<AttendanceMeetingsPage> createState() => _AttendanceMeetingsPageState();
+  ConsumerState<AttendanceMeetingsPage> createState() =>
+      _AttendanceMeetingsPageState();
 }
 
 class _AttendanceInfo {
@@ -28,7 +29,8 @@ class _AttendanceInfo {
   });
 }
 
-class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage> {
+class _AttendanceMeetingsPageState
+    extends ConsumerState<AttendanceMeetingsPage> {
   bool _showPast = false;
 
   Stream<Map<String, _AttendanceInfo>> _getAttendanceStatus() {
@@ -37,8 +39,7 @@ class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage>
         for (final record in records)
           record['id'].toString(): _AttendanceInfo(
             exists: true,
-            updatedAt:
-                DateTime.tryParse(record['updatedAt']?.toString() ?? ''),
+            updatedAt: DateTime.tryParse(record['updatedAt']?.toString() ?? ''),
             lastModifiedBy: record['lastModifiedBy']?.toString() ?? '',
           ),
       };
@@ -72,15 +73,17 @@ class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage>
                 final now = DateTime.now();
                 final today = DateTime(now.year, now.month, now.day);
 
-                var meetings = allMeetings
-                    .where((m) => !m.isReunion)
-                    .toList();
+                var meetings = allMeetings.where((m) => !m.isReunion).toList();
 
                 if (_showPast) {
-                  meetings = meetings.where((m) => m.date.isBefore(today)).toList();
+                  meetings = meetings
+                      .where((m) => m.date.isBefore(today))
+                      .toList();
                   meetings.sort((a, b) => b.date.compareTo(a.date));
                 } else {
-                  meetings = meetings.where((m) => !m.date.isBefore(today)).toList();
+                  meetings = meetings
+                      .where((m) => !m.date.isBefore(today))
+                      .toList();
                   meetings.sort((a, b) => a.date.compareTo(b.date));
                 }
 
@@ -92,7 +95,8 @@ class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage>
                         child: _EmptyState(
                           icon: Icons.event_note_rounded,
                           title: 'Nessun incontro',
-                          subtitle: 'Non ci sono incontri programmati per la tua classe.',
+                          subtitle:
+                              'Non ci sono incontri programmati per la tua classe.',
                         ),
                       ),
                     ],
@@ -104,165 +108,194 @@ class _AttendanceMeetingsPageState extends ConsumerState<AttendanceMeetingsPage>
                   builder: (context, attendanceSnapshot) {
                     final attendanceMap = attendanceSnapshot.data ?? {};
 
-                  return ListView.builder(
-                    padding: const EdgeInsets.only(
-                      bottom: 100,
-                      left: 4,
-                      right: 4,
-                      top: 16,
-                    ),
-                    itemCount: meetings.length + 1,
-                    itemBuilder: (context, index) {
-                      if (index == 0) {
-                        return Column(
-                          children: [
-                            _buildToggleBar(),
-                            const SizedBox(height: 14),
-                            _GridButton(
-                              onTap: () => context.push('/attendance-grid'),
-                            ),
-                          ],
-                        );
-                      }
-                      final m = meetings[index - 1];
-                      final attInfo = attendanceMap[m.id];
-                      final exists = attInfo?.exists ?? false;
-
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(24),
-                          onTap: () => context.push('/attendance', extra: m),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: isDark
-                                    ? [
-                                        colorScheme.surfaceContainer,
-                                        colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                                      ]
-                                    : [
-                                        Colors.white,
-                                        Colors.blue.shade50.withValues(alpha: 0.35),
-                                      ],
+                    return ListView.builder(
+                      padding: const EdgeInsets.only(
+                        bottom: 100,
+                        left: 4,
+                        right: 4,
+                        top: 16,
+                      ),
+                      itemCount: meetings.length + 1,
+                      itemBuilder: (context, index) {
+                        if (index == 0) {
+                          return Column(
+                            children: [
+                              _buildToggleBar(),
+                              const SizedBox(height: 14),
+                              _GridButton(
+                                onTap: () => context.push('/attendance-grid'),
                               ),
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.blue.shade100),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: isDark
-                                      ? Colors.black.withValues(alpha: 0.3)
-                                      : Colors.black.withValues(alpha: 0.04),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 8),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 56,
-                                      padding: const EdgeInsets.symmetric(vertical: 8),
-                                      decoration: BoxDecoration(
-                                        color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            DateFormat('dd').format(m.date),
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 17,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          Text(
-                                            DateFormat('MMM', 'it_IT')
-                                                .format(m.date)
-                                                .toUpperCase(),
-                                            style: const TextStyle(
-                                              color: Colors.white70,
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 10,
-                                            ),
+                            ],
+                          );
+                        }
+                        final m = meetings[index - 1];
+                        final attInfo = attendanceMap[m.id];
+                        final exists = attInfo?.exists ?? false;
+
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(24),
+                            onTap: () => context.push('/attendance', extra: m),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: isDark
+                                      ? [
+                                          colorScheme.surfaceContainer,
+                                          colorScheme.surfaceContainerHighest
+                                              .withValues(alpha: 0.5),
+                                        ]
+                                      : [
+                                          Colors.white,
+                                          Colors.blue.shade50.withValues(
+                                            alpha: 0.35,
                                           ),
                                         ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            m.title,
-                                            style: theme.textTheme.titleMedium?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                              color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-                                            ),
+                                ),
+                                borderRadius: BorderRadius.circular(24),
+                                border: Border.all(
+                                  color: isDark
+                                      ? colorScheme.outline.withValues(
+                                          alpha: 0.2,
+                                        )
+                                      : Colors.blue.shade100,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: isDark
+                                        ? Colors.black.withValues(alpha: 0.3)
+                                        : Colors.black.withValues(alpha: 0.04),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 56,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 8,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: isDark
+                                              ? colorScheme.primary
+                                              : const Color(0xFF174A7E),
+                                          borderRadius: BorderRadius.circular(
+                                            14,
                                           ),
-                                          if (exists) ...[
-                                            const SizedBox(height: 8),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 10,
-                                                vertical: 4,
+                                        ),
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              DateFormat('dd').format(m.date),
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 17,
+                                                fontWeight: FontWeight.bold,
                                               ),
-                                              decoration: BoxDecoration(
-                                                color: Colors.green.withValues(alpha: 0.1),
-                                                borderRadius: BorderRadius.circular(12),
-                                                border: Border.all(
-                                                  color: Colors.green.withValues(alpha: 0.4),
-                                                ),
-                                              ),
-                                              child: const Text(
-                                                'Presenza già registrata',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Colors.green,
-                                                ),
+                                            ),
+                                            Text(
+                                              DateFormat(
+                                                'MMM',
+                                                'it_IT',
+                                              ).format(m.date).toUpperCase(),
+                                              style: const TextStyle(
+                                                color: Colors.white70,
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 10,
                                               ),
                                             ),
                                           ],
-                                        ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              m.title,
+                                              style: theme.textTheme.titleMedium
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: isDark
+                                                        ? colorScheme.primary
+                                                        : const Color(
+                                                            0xFF174A7E,
+                                                          ),
+                                                  ),
+                                            ),
+                                            if (exists) ...[
+                                              const SizedBox(height: 8),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 4,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.green
+                                                      .withValues(alpha: 0.1),
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                  border: Border.all(
+                                                    color: Colors.green
+                                                        .withValues(alpha: 0.4),
+                                                  ),
+                                                ),
+                                                child: const Text(
+                                                  'Presenza già registrata',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Colors.green,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                      Icon(
+                                        Icons.arrow_forward_ios_rounded,
+                                        size: 16,
+                                        color: isDark
+                                            ? Colors.grey.shade500
+                                            : Colors.grey,
+                                      ),
+                                    ],
+                                  ),
+                                  if (attInfo != null &&
+                                      attInfo.updatedAt != null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 8),
+                                      child: LastModifiedInfo(
+                                        updatedAt: attInfo.updatedAt!,
+                                        lastModifiedBy: attInfo.lastModifiedBy,
+                                        compact: true,
                                       ),
                                     ),
-                                    Icon(
-                                      Icons.arrow_forward_ios_rounded,
-                                      size: 16,
-                                      color: isDark ? Colors.grey.shade500 : Colors.grey,
-                                    ),
-                                  ],
-                                ),
-                                if (attInfo != null && attInfo.updatedAt != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 8),
-                                    child: LastModifiedInfo(
-                                      updatedAt: attInfo.updatedAt!,
-                                      lastModifiedBy: attInfo.lastModifiedBy,
-                                      compact: true,
-                                    ),
-                                  ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              );
-            },
-          ),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
     );
   }
 
@@ -446,22 +479,35 @@ class _EmptyState extends StatelessWidget {
               width: 90,
               height: 90,
               decoration: BoxDecoration(
-                color: isDark ? colorScheme.primaryContainer.withValues(alpha: 0.3) : Colors.blue.shade50,
+                color: isDark
+                    ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+                    : Colors.blue.shade50,
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 42, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+              child: Icon(
+                icon,
+                size: 42,
+                color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+              ),
             ),
             const SizedBox(height: 20),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? colorScheme.onSurface : null),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? colorScheme.onSurface : null,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade700, fontSize: 14),
+              style: TextStyle(
+                color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
+                fontSize: 14,
+              ),
             ),
           ],
         ),

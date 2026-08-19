@@ -30,7 +30,8 @@ class _CatechistManagerDialog extends StatefulWidget {
   const _CatechistManagerDialog({required this.classModel});
 
   @override
-  State<_CatechistManagerDialog> createState() => _CatechistManagerDialogState();
+  State<_CatechistManagerDialog> createState() =>
+      _CatechistManagerDialogState();
 }
 
 class _CatechistManagerDialogState extends State<_CatechistManagerDialog> {
@@ -63,8 +64,9 @@ class _CatechistManagerDialogState extends State<_CatechistManagerDialog> {
       }
     }
 
-    final rimossi =
-        c.catechistIds.where((id) => !_roles.containsKey(id)).toList();
+    final rimossi = c.catechistIds
+        .where((id) => !_roles.containsKey(id))
+        .toList();
     for (final id in rimossi) {
       await repo.removeCatechistFromClass(c.id, id);
     }
@@ -142,15 +144,15 @@ class _CatechistManagerDialogState extends State<_CatechistManagerDialog> {
                           ),
                         ],
                         selected: {entry.value},
-                        onSelectionChanged: (sel) => setState(
-                          () => _roles[entry.key] = sel.first,
-                        ),
+                        onSelectionChanged: (sel) =>
+                            setState(() => _roles[entry.key] = sel.first),
                       ),
                       IconButton(
                         tooltip: 'Rimuovi dalla classe',
                         icon: const Icon(Icons.person_remove_outlined),
                         color: Colors.red.shade400,
-                        onPressed: () => setState(() => _roles.remove(entry.key)),
+                        onPressed: () =>
+                            setState(() => _roles.remove(entry.key)),
                       ),
                     ],
                   ),
@@ -264,10 +266,7 @@ class _CatechistManagerDialogState extends State<_CatechistManagerDialog> {
           onPressed: () => Navigator.pop(context, false),
           child: const Text('Annulla'),
         ),
-        FilledButton(
-          onPressed: _save,
-          child: const Text('Salva'),
-        ),
+        FilledButton(onPressed: _save, child: const Text('Salva')),
       ],
     );
   }
@@ -302,8 +301,8 @@ class _RoleFlag extends StatelessWidget {
           color: selected
               ? accent.withValues(alpha: isDark ? 0.25 : 0.15)
               : (isDark
-                  ? Colors.white.withValues(alpha: 0.04)
-                  : Colors.grey.shade50),
+                    ? Colors.white.withValues(alpha: 0.04)
+                    : Colors.grey.shade50),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: selected

@@ -48,9 +48,7 @@ class _ImportRagazziPageState extends ConsumerState<ImportRagazziPage> {
       return AppScaffold(
         title: 'Importa Dati Ragazzi',
         child: const Center(
-          child: Text(
-            'Funzione riservata al Responsabile Catechistico.',
-          ),
+          child: Text('Funzione riservata al Responsabile Catechistico.'),
         ),
       );
     }
@@ -167,9 +165,7 @@ class _ImportRagazziPageState extends ConsumerState<ImportRagazziPage> {
         children: [
           Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800),
           const SizedBox(width: 10),
-          Expanded(
-            child: Text(message, style: const TextStyle(fontSize: 13)),
-          ),
+          Expanded(child: Text(message, style: const TextStyle(fontSize: 13))),
         ],
       ),
     );
@@ -294,7 +290,9 @@ class _ImportRagazziPageState extends ConsumerState<ImportRagazziPage> {
 
   void _snack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   // ═════════════════════════════════════════════════════════════════════
@@ -303,8 +301,10 @@ class _ImportRagazziPageState extends ConsumerState<ImportRagazziPage> {
 
   void _goToMapping() {
     if (_headers.isEmpty) {
-      _snack('Il file non contiene intestazioni: impossibile mappare le '
-          'colonne.');
+      _snack(
+        'Il file non contiene intestazioni: impossibile mappare le '
+        'colonne.',
+      );
       return;
     }
     setState(() {
@@ -329,9 +329,7 @@ class _ImportRagazziPageState extends ConsumerState<ImportRagazziPage> {
                   color: isDark ? Colors.grey.shade900 : Colors.white,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: isDark
-                        ? Colors.grey.shade700
-                        : Colors.blue.shade100,
+                    color: isDark ? Colors.grey.shade700 : Colors.blue.shade100,
                   ),
                 ),
                 child: Column(
@@ -419,8 +417,8 @@ class _ImportRagazziPageState extends ConsumerState<ImportRagazziPage> {
           color: current != null
               ? Colors.green.shade300
               : isDark
-                  ? Colors.grey.shade700
-                  : Colors.grey.shade300,
+              ? Colors.grey.shade700
+              : Colors.grey.shade300,
         ),
       ),
       child: Row(
@@ -489,9 +487,9 @@ class _ImportRagazziPageState extends ConsumerState<ImportRagazziPage> {
   // PASSO 3 — ANTEPRIMA, VALIDAZIONE E DEDUPLICA
   // ═════════════════════════════════════════════════════════════════════
 
-  void _proceedToReview() {
+  Future<void> _proceedToReview() async {
     final rowsStatus = _service.buildRows(_rows, _mapping);
-    final withDuplicates = _service.detectDuplicates(rowsStatus);
+    final withDuplicates = await _service.detectDuplicates(rowsStatus);
     setState(() {
       _rowsStatus = withDuplicates;
       _step = _Step.review;
@@ -584,9 +582,11 @@ class _ImportRagazziPageState extends ConsumerState<ImportRagazziPage> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.check_rounded),
-                  label: Text(_importing
-                      ? 'Importazione…'
-                      : 'Importa ${valid.length} ragazzi'),
+                  label: Text(
+                    _importing
+                        ? 'Importazione…'
+                        : 'Importa ${valid.length} ragazzi',
+                  ),
                 ),
               ),
             ],
@@ -631,8 +631,11 @@ class _ImportRagazziPageState extends ConsumerState<ImportRagazziPage> {
         children: [
           Row(
             children: [
-              Icon(Icons.person_search_rounded,
-                  color: Colors.orange.shade700, size: 18),
+              Icon(
+                Icons.person_search_rounded,
+                color: Colors.orange.shade700,
+                size: 18,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -666,18 +669,24 @@ class _ImportRagazziPageState extends ConsumerState<ImportRagazziPage> {
                   items: const [
                     DropdownMenuItem(
                       value: DuplicateAction.ignore,
-                      child: Text('Ignora duplicato',
-                          style: TextStyle(fontSize: 13)),
+                      child: Text(
+                        'Ignora duplicato',
+                        style: TextStyle(fontSize: 13),
+                      ),
                     ),
                     DropdownMenuItem(
                       value: DuplicateAction.update,
-                      child: Text('Aggiorna dati esistenti',
-                          style: TextStyle(fontSize: 13)),
+                      child: Text(
+                        'Aggiorna dati esistenti',
+                        style: TextStyle(fontSize: 13),
+                      ),
                     ),
                     DropdownMenuItem(
                       value: DuplicateAction.createNew,
-                      child: Text('Crea come nuovo',
-                          style: TextStyle(fontSize: 13)),
+                      child: Text(
+                        'Crea come nuovo',
+                        style: TextStyle(fontSize: 13),
+                      ),
                     ),
                   ],
                   onChanged: (action) {
@@ -781,25 +790,42 @@ class _ImportRagazziPageState extends ConsumerState<ImportRagazziPage> {
           ),
         ),
         const SizedBox(height: 20),
-        _reportRow(Icons.check_circle_rounded, Colors.green,
-            'Ragazzi importati', report?.imported ?? 0),
-        _reportRow(Icons.update_rounded, Colors.blue,
-            'Duplicati aggiornati', report?.updated ?? 0),
-        _reportRow(Icons.skip_next_rounded, Colors.orange,
-            'Duplicati ignorati', report?.duplicatesIgnored ?? 0),
-        _reportRow(Icons.error_rounded, Colors.red,
-            'Errori saltati', report?.errors ?? 0),
+        _reportRow(
+          Icons.check_circle_rounded,
+          Colors.green,
+          'Ragazzi importati',
+          report?.imported ?? 0,
+        ),
+        _reportRow(
+          Icons.update_rounded,
+          Colors.blue,
+          'Duplicati aggiornati',
+          report?.updated ?? 0,
+        ),
+        _reportRow(
+          Icons.skip_next_rounded,
+          Colors.orange,
+          'Duplicati ignorati',
+          report?.duplicatesIgnored ?? 0,
+        ),
+        _reportRow(
+          Icons.error_rounded,
+          Colors.red,
+          'Errori saltati',
+          report?.errors ?? 0,
+        ),
         if (report != null && report.errorMessages.isNotEmpty) ...[
           const SizedBox(height: 16),
-          for (final msg in report.errorMessages) _errorCard(
-            ImportRow(
-              rowNumber: 0,
-              values: const {},
-              errors: [msg],
-              status: ImportRowStatus.error,
+          for (final msg in report.errorMessages)
+            _errorCard(
+              ImportRow(
+                rowNumber: 0,
+                values: const {},
+                errors: [msg],
+                status: ImportRowStatus.error,
+              ),
+              isDark,
             ),
-            isDark,
-          ),
         ],
         const SizedBox(height: 24),
         FilledButton.icon(
@@ -826,9 +852,7 @@ class _ImportRagazziPageState extends ConsumerState<ImportRagazziPage> {
         children: [
           Icon(icon, color: color, size: 20),
           const SizedBox(width: 10),
-          Expanded(
-            child: Text(label, style: const TextStyle(fontSize: 14)),
-          ),
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 14))),
           Text(
             '$count',
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
@@ -841,4 +865,3 @@ class _ImportRagazziPageState extends ConsumerState<ImportRagazziPage> {
   String _formatDate(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 }
-

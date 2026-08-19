@@ -86,7 +86,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Modalità Responsabile Catechistico'), findsOneWidget);
-      expect(find.text('Modalità Normale (Senza Responsabile)'), findsOneWidget);
+      expect(
+        find.text('Modalità Normale (Senza Responsabile)'),
+        findsOneWidget,
+      );
       expect(find.text('Associa a Classe Esistente'), findsOneWidget);
     });
 
@@ -107,7 +110,10 @@ void main() {
       expect(LocalDatabase.auth().get('setup_mode'), 'create');
       expect(UserRole.current(), UserRole.catechista);
       expect(LocalDatabase.auth().get('onboarding_completed'), true);
-      expect(ParishConfigRepository().getConfig().isResponsabileModeActive, false);
+      expect(
+        ParishConfigRepository().getConfig().isResponsabileModeActive,
+        false,
+      );
     });
 
     testWidgets('modalità Responsabile attiva la modalità e naviga a /login', (
@@ -127,29 +133,33 @@ void main() {
       expect(LocalDatabase.auth().get('setup_mode'), 'responsabile');
       expect(UserRole.current(), UserRole.responsabile);
       expect(LocalDatabase.auth().get('onboarding_completed'), true);
-      expect(ParishConfigRepository().getConfig().isResponsabileModeActive, true);
+      expect(
+        ParishConfigRepository().getConfig().isResponsabileModeActive,
+        true,
+      );
     });
 
-    testWidgets('Associa a Classe Esistente naviga a /onboarding-sync senza form', (
-      tester,
-    ) async {
-      await pumpOnboarding(tester);
+    testWidgets(
+      'Associa a Classe Esistente naviga a /onboarding-sync senza form',
+      (tester) async {
+        await pumpOnboarding(tester);
 
-      await tester.tap(find.text('Salta'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Associa a Classe Esistente'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Conferma modalità'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.text('Salta'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Associa a Classe Esistente'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Conferma modalità'));
+        await tester.pumpAndSettle();
 
-      expect(find.text('SYNC_DEST'), findsOneWidget);
-      expect(LocalDatabase.auth().get('app_mode'), 'REPLICATED_PEER');
-      expect(LocalDatabase.auth().get('setup_mode'), 'join');
-      expect(UserRole.current(), UserRole.catechista);
-      expect(LocalDatabase.auth().get('onboarding_completed'), true);
-      // Nessun form anagrafico richiesto
-      expect(LocalDatabase.auth().get('first_name'), isNot(isA<String>()));
-    });
+        expect(find.text('SYNC_DEST'), findsOneWidget);
+        expect(LocalDatabase.auth().get('app_mode'), 'REPLICATED_PEER');
+        expect(LocalDatabase.auth().get('setup_mode'), 'join');
+        expect(UserRole.current(), UserRole.catechista);
+        expect(LocalDatabase.auth().get('onboarding_completed'), true);
+        // Nessun form anagrafico richiesto
+        expect(LocalDatabase.auth().get('first_name'), isNot(isA<String>()));
+      },
+    );
 
     testWidgets('Conferma senza selezione mostra un errore', (tester) async {
       await pumpOnboarding(tester);

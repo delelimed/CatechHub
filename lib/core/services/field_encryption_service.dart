@@ -16,8 +16,8 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
-import 'package:pointycastle/export.dart' as pc;
 
 import '../storage/local_database.dart';
 
@@ -41,16 +41,16 @@ class FieldEncryptionService {
     );
   }
 
-  static Uint8List _sha256(List<int> input) {
-    final digest = pc.Digest('SHA-256');
-    return digest.process(Uint8List.fromList(input));
+  static Future<Uint8List> _sha256(List<int> input) async {
+    final hash = await Sha256().hash(input);
+    return Uint8List.fromList(hash.bytes);
   }
 
   /// Chiave di campo del dispositivo: un segreto casuale conservato nel box
   /// auth (già cifrato AES da Hive). Fallimento = fail-closed: non esiste
   /// alcuna chiave di fallback deterministica derivata da una costante
   /// pubblica, che renderebbe il ciphertext decifrabile da chiunque.
-  static Uint8List deviceKey() {
+  static Future<Uint8List> deviceKey() async {
     if (kDebugMode && debugSecretOverride != null) {
       return _sha256(utf8.encode(debugSecretOverride!));
     }
@@ -63,65 +63,49 @@ class FieldEncryptionService {
       box.flush();
     }
     final seed = base64Decode(raw);
-    _cachedKey = _sha256(seed);
+    _cachedKey = await _sha256(seed);
     return _cachedKey!;
   }
 
-  static String _cipherBytes(Uint8List key, String plain) {
+  static Future<String> _cipherBytes(Uint8List key, String plain) async {
     final nonce = _secureBytes(12);
-    final cipher = pc.GCMBlockCipher(pc.AESEngine())
-      ..init(
-        true,
-        pc.AEADParameters(
-          pc.KeyParameter(key),
-          128,
-          nonce,
-          Uint8List(0),
-        ),
-      );
-    final input = Uint8List.fromList(utf8.encode(plain));
-    final out = Uint8List(cipher.getOutputSize(input.length));
-    var len = cipher.processBytes(input, 0, input.length, out, 0);
-    len += cipher.doFinal(out, len);
-    final payload = Uint8List(nonce.length + len)
-      ..setAll(0, nonce)
-      ..setAll(nonce.length, Uint8List.sublistView(out, 0, len));
-    return base64Encode(payload);
+    // AES-256-GCM standard: nonce || ciphertext || tag, byte-identico al
+    // vecchio formato pointycastle (GCMBlockCipher con mac da 128 bit).
+    final box = await AesGcm.with256bits().encrypt(
+      utf8.encode(plain),
+      secretKey: SecretKey(key),
+      nonce: nonce,
+    );
+    return base64Encode(box.concatenation());
   }
 
   /// Cifra [plain]. Ritorna null per input nulli/vuoti. Idempotente: un
   /// valore già cifrato (prefisso `cieI1:`) viene restituito invariato.
-  static String? encrypt(String? plain) {
+  static Future<String?> encrypt(String? plain) async {
     if (plain == null || plain.trim().isEmpty) return null;
     if (plain.startsWith(_prefix)) return plain;
-    return '$_prefix${_cipherBytes(deviceKey(), plain)}';
+    return '$_prefix${await _cipherBytes(await deviceKey(), plain)}';
   }
 
   /// Decifra un valore cifrato. Ritorna il valore così com'è se il valore
   /// non è cifrato o se la decifratura fallisce.
-  static String? decrypt(String? stored) {
+  static Future<String?> decrypt(String? stored) async {
     if (stored == null) return null;
     if (!stored.startsWith(_prefix)) return stored;
     try {
       final sealed = stored.substring(_prefix.length);
       final bytes = base64Decode(sealed);
-      if (bytes.length < 12) return stored;
-      final nonce = Uint8List.sublistView(bytes, 0, 12);
-      final data = Uint8List.sublistView(bytes, 12);
-      final cipher = pc.GCMBlockCipher(pc.AESEngine())
-        ..init(
-          false,
-          pc.AEADParameters(
-            pc.KeyParameter(deviceKey()),
-            128,
-            nonce,
-            Uint8List(0),
-          ),
-        );
-      final out = Uint8List(cipher.getOutputSize(data.length));
-      var len = cipher.processBytes(data, 0, data.length, out, 0);
-      len += cipher.doFinal(out, len);
-      return utf8.decode(Uint8List.sublistView(out, 0, len));
+      if (bytes.length < 12 + 16) return stored;
+      final box = SecretBox.fromConcatenation(
+        bytes,
+        nonceLength: 12,
+        macLength: 16,
+      );
+      final plain = await AesGcm.with256bits().decrypt(
+        box,
+        secretKey: SecretKey(await deviceKey()),
+      );
+      return utf8.decode(plain);
     } catch (_) {
       return stored;
     }
@@ -167,15 +151,15 @@ class FieldEncryptionService {
 
   /// Restituisce una copia di [map] con i campi sensibili DECIFRATI
   /// (da usare in uscita: export/backup e payload P2P).
-  static Map<String, dynamic> decryptStudentMapForTransport(
+  static Future<Map<String, dynamic>> decryptStudentMapForTransport(
     Map<String, dynamic> map,
-  ) {
+  ) async {
     if (map.isEmpty) return map;
     final copy = Map<String, dynamic>.from(map);
     for (final field in studentSensitiveFields) {
       final value = copy[field];
       if (value is String) {
-        copy[field] = decrypt(value);
+        copy[field] = await decrypt(value);
       }
     }
     return copy;
@@ -184,15 +168,15 @@ class FieldEncryptionService {
   /// Restituisce una copia di [map] con i campi sensibili CIFRATI con la
   /// chiave locale (da usare in ingresso: import/backup e ricezione P2P).
   /// I campi già cifrati (prefisso `cieI1:`) restano invariati (idempotente).
-  static Map<String, dynamic> encryptStudentMapForStorage(
+  static Future<Map<String, dynamic>> encryptStudentMapForStorage(
     Map<String, dynamic> map,
-  ) {
+  ) async {
     if (map.isEmpty) return map;
     final copy = Map<String, dynamic>.from(map);
     for (final field in studentSensitiveFields) {
       final value = copy[field];
       if (value is String) {
-        copy[field] = encrypt(value);
+        copy[field] = await encrypt(value);
       }
     }
     return copy;

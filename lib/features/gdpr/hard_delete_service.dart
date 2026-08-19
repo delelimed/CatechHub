@@ -44,8 +44,10 @@ class HardDeleteService {
   static Future<Tombstone?> hardDeleteStudent(Student student) async {
     if (!canHardDelete()) {
       if (kDebugMode) {
-      debugPrint('[HardDelete] Diritto all\'Oblio non consentito per il ruolo corrente');
-    }
+        debugPrint(
+          '[HardDelete] Diritto all\'Oblio non consentito per il ruolo corrente',
+        );
+      }
       return null;
     }
 
@@ -64,8 +66,10 @@ class HardDeleteService {
       await P2PSyncService().broadcastTombstone(tombstone);
     } catch (e) {
       if (kDebugMode) {
-      debugPrint('[HardDelete] Broadcast tombstone fallito (non bloccante): $e');
-    }
+        debugPrint(
+          '[HardDelete] Broadcast tombstone fallito (non bloccante): $e',
+        );
+      }
     }
 
     return tombstone;
@@ -95,10 +99,12 @@ class HardDeleteService {
 
     // 1. La cancellazione irreversibile richiede il Diritto all'Oblio.
     if (!canHardDelete()) {
-if (kDebugMode) {
-      debugPrint('[HardDelete] Tombstone registrato ma cancellazione non '
-          'eseguita: l\'operatore locale non possiede il Diritto all\'Oblio');
-    }
+      if (kDebugMode) {
+        debugPrint(
+          '[HardDelete] Tombstone registrato ma cancellazione non '
+          'eseguita: l\'operatore locale non possiede il Diritto all\'Oblio',
+        );
+      }
       return false;
     }
 
@@ -110,8 +116,8 @@ if (kDebugMode) {
         deleted = true;
       } catch (e) {
         if (kDebugMode) {
-      debugPrint('[HardDelete] Errore cancellazione ragazzo remoto: $e');
-    }
+          debugPrint('[HardDelete] Errore cancellazione ragazzo remoto: $e');
+        }
       }
     } else {
       try {
@@ -119,8 +125,8 @@ if (kDebugMode) {
         deleted = true;
       } catch (e) {
         if (kDebugMode) {
-      debugPrint('[HardDelete] Errore cancellazione entità generica: $e');
-    }
+          debugPrint('[HardDelete] Errore cancellazione entità generica: $e');
+        }
       }
     }
 
@@ -134,8 +140,10 @@ if (kDebugMode) {
         );
       } catch (e) {
         if (kDebugMode) {
-      debugPrint('[HardDelete] Audit tombstone ricevuto non registrato: $e');
-    }
+          debugPrint(
+            '[HardDelete] Audit tombstone ricevuto non registrato: $e',
+          );
+        }
       }
     }
 
@@ -144,8 +152,7 @@ if (kDebugMode) {
 
   static String _operatorName() {
     try {
-      final name =
-          LocalDatabase.auth().get('local_user_name') as String?;
+      final name = LocalDatabase.auth().get('local_user_name') as String?;
       if (name != null && name.isNotEmpty) return name;
     } catch (_) {}
     return 'Responsabile Catechistico';
@@ -188,8 +195,10 @@ if (kDebugMode) {
       'signerDeviceId': signer,
     };
     // Firma locale (chiave legata al dispositivo, non transata via rete).
-    final signature =
-        TombstoneService.sign(TombstoneService.canonical(base), signingSecret);
+    final signature = TombstoneService.sign(
+      TombstoneService.canonical(base),
+      signingSecret,
+    );
 
     return Tombstone(
       id: LocalDatabase.newId('ts'),
@@ -211,7 +220,7 @@ if (kDebugMode) {
       entityId: ts['entityId'] ?? '',
       deletedAt:
           DateTime.tryParse(ts['deletedAt']?.toString() ?? '') ??
-              DateTime.now().toUtc(),
+          DateTime.now().toUtc(),
       executedBy: ts['executedBy'] ?? '',
       executedByCatechistId: ts['executedByCatechistId'] ?? '',
       signature: ts['signature'] ?? '',

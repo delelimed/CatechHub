@@ -24,59 +24,77 @@ void main() {
       tempDir.deleteSync(recursive: true);
     });
 
-    test('removeCatechistFromClass rimuove il catechista dalla classe', () async {
-      await Hive.openBox<Map>(LocalDatabase.classesBox);
-      final repo = ClassesRepository();
-      const classId = 'class_test_1';
+    test(
+      'removeCatechistFromClass rimuove il catechista dalla classe',
+      () async {
+        await Hive.openBox<Map>(LocalDatabase.classesBox);
+        final repo = ClassesRepository();
+        const classId = 'class_test_1';
 
-      await repo.addClass(SchoolClass(
-        id: classId,
-        name: 'Classe Test',
-        studentIds: [],
-        catechistIds: ['cat_1', 'cat_2', 'cat_3'],
-      ));
+        await repo.addClass(
+          SchoolClass(
+            id: classId,
+            name: 'Classe Test',
+            studentIds: [],
+            catechistIds: ['cat_1', 'cat_2', 'cat_3'],
+          ),
+        );
 
-      await repo.removeCatechistFromClass(classId, 'cat_2');
+        await repo.removeCatechistFromClass(classId, 'cat_2');
 
-      final updated = repo.getClassesSync().firstWhere((c) => c.id == classId);
-      expect(updated.catechistIds, ['cat_1', 'cat_3']);
-      expect(updated.catechistIds, isNot(contains('cat_2')));
-    });
+        final updated = repo.getClassesSync().firstWhere(
+          (c) => c.id == classId,
+        );
+        expect(updated.catechistIds, ['cat_1', 'cat_3']);
+        expect(updated.catechistIds, isNot(contains('cat_2')));
+      },
+    );
 
-    test('removeCatechistFromClass non modifica se il catechista non esiste', () async {
-      await Hive.openBox<Map>(LocalDatabase.classesBox);
-      final repo = ClassesRepository();
-      const classId = 'class_test_2';
+    test(
+      'removeCatechistFromClass non modifica se il catechista non esiste',
+      () async {
+        await Hive.openBox<Map>(LocalDatabase.classesBox);
+        final repo = ClassesRepository();
+        const classId = 'class_test_2';
 
-      await repo.addClass(SchoolClass(
-        id: classId,
-        name: 'Classe Test',
-        studentIds: [],
-        catechistIds: ['cat_1'],
-      ));
+        await repo.addClass(
+          SchoolClass(
+            id: classId,
+            name: 'Classe Test',
+            studentIds: [],
+            catechistIds: ['cat_1'],
+          ),
+        );
 
-      await repo.removeCatechistFromClass(classId, 'cat_inesistente');
+        await repo.removeCatechistFromClass(classId, 'cat_inesistente');
 
-      final updated = repo.getClassesSync().firstWhere((c) => c.id == classId);
-      expect(updated.catechistIds, ['cat_1']);
-    });
+        final updated = repo.getClassesSync().firstWhere(
+          (c) => c.id == classId,
+        );
+        expect(updated.catechistIds, ['cat_1']);
+      },
+    );
 
     test('removeCatechistFromClass non modifica altre classi', () async {
       await Hive.openBox<Map>(LocalDatabase.classesBox);
       final repo = ClassesRepository();
 
-      await repo.addClass(SchoolClass(
-        id: 'class_a',
-        name: 'Classe A',
-        studentIds: [],
-        catechistIds: ['cat_1', 'cat_2'],
-      ));
-      await repo.addClass(SchoolClass(
-        id: 'class_b',
-        name: 'Classe B',
-        studentIds: [],
-        catechistIds: ['cat_2', 'cat_3'],
-      ));
+      await repo.addClass(
+        SchoolClass(
+          id: 'class_a',
+          name: 'Classe A',
+          studentIds: [],
+          catechistIds: ['cat_1', 'cat_2'],
+        ),
+      );
+      await repo.addClass(
+        SchoolClass(
+          id: 'class_b',
+          name: 'Classe B',
+          studentIds: [],
+          catechistIds: ['cat_2', 'cat_3'],
+        ),
+      );
 
       await repo.removeCatechistFromClass('class_a', 'cat_2');
 
@@ -92,12 +110,14 @@ void main() {
       final repo = ClassesRepository();
       const classId = 'class_test_3';
 
-      await repo.addClass(SchoolClass(
-        id: classId,
-        name: 'Classe Test',
-        studentIds: [],
-        catechistIds: ['cat_1'],
-      ));
+      await repo.addClass(
+        SchoolClass(
+          id: classId,
+          name: 'Classe Test',
+          studentIds: [],
+          catechistIds: ['cat_1'],
+        ),
+      );
 
       await repo.addCatechistToClass(classId, 'cat_2');
 
@@ -110,12 +130,14 @@ void main() {
       final repo = ClassesRepository();
       const classId = 'class_test_4';
 
-      await repo.addClass(SchoolClass(
-        id: classId,
-        name: 'Classe Test',
-        studentIds: [],
-        catechistIds: ['cat_1'],
-      ));
+      await repo.addClass(
+        SchoolClass(
+          id: classId,
+          name: 'Classe Test',
+          studentIds: [],
+          catechistIds: ['cat_1'],
+        ),
+      );
 
       await repo.addCatechistToClass(classId, 'cat_1');
 
@@ -128,15 +150,17 @@ void main() {
       final repo = ClassesRepository();
       const classId = 'class_test_rename';
 
-      await repo.addClass(SchoolClass(
-        id: classId,
-        name: 'Vecchio Nome',
-        studentIds: ['s1', 's2'],
-        catechistIds: ['cat_1', 'cat_2'],
-        percorso: 'Prima Comunione',
-        livello: 2,
-        annoCatechistico: '2026-2027',
-      ));
+      await repo.addClass(
+        SchoolClass(
+          id: classId,
+          name: 'Vecchio Nome',
+          studentIds: ['s1', 's2'],
+          catechistIds: ['cat_1', 'cat_2'],
+          percorso: 'Prima Comunione',
+          livello: 2,
+          annoCatechistico: '2026-2027',
+        ),
+      );
 
       await repo.renameClass(classId, '  Nuovo Nome  ');
 
@@ -153,20 +177,26 @@ void main() {
       final repo = ClassesRepository();
       const classId = 'class_test_rename2';
 
-      await repo.addClass(SchoolClass(
-        id: classId,
-        name: 'Nome Stabile',
-        studentIds: [],
-        catechistIds: [],
-      ));
+      await repo.addClass(
+        SchoolClass(
+          id: classId,
+          name: 'Nome Stabile',
+          studentIds: [],
+          catechistIds: [],
+        ),
+      );
 
       await repo.renameClass(classId, '   ');
-      expect(repo.getClassesSync().firstWhere((c) => c.id == classId).name,
-          'Nome Stabile');
+      expect(
+        repo.getClassesSync().firstWhere((c) => c.id == classId).name,
+        'Nome Stabile',
+      );
 
       await repo.renameClass(classId, 'Nome Stabile');
-      expect(repo.getClassesSync().firstWhere((c) => c.id == classId).name,
-          'Nome Stabile');
+      expect(
+        repo.getClassesSync().firstWhere((c) => c.id == classId).name,
+        'Nome Stabile',
+      );
     });
   });
 }

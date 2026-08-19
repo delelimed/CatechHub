@@ -63,23 +63,22 @@ enum AuditActionType {
 
   /// Etichetta localizzata per le UI.
   String get label => switch (this) {
-        AuditActionType.createStudent => 'Creazione ragazzo',
-        AuditActionType.updateStudent => 'Modifica ragazzo',
-        AuditActionType.deleteStudentHard => 'Eliminazione definitiva ragazzo',
-        AuditActionType.createClass => 'Creazione classe',
-        AuditActionType.deleteClass => 'Eliminazione classe',
-        AuditActionType.reassignCatechist => 'Riassegnazione catechista',
-        AuditActionType.grantConsent => 'Concessione consenso',
-        AuditActionType.revokeConsent => 'Revoca consenso',
-        AuditActionType.exportData => 'Esportazione dati',
-        AuditActionType.tombstoneReceived => 'Tombstone ricevuto',
-        AuditActionType.passaggioAnno => 'Passaggio di anno',
-        AuditActionType.concludiAnno => 'Conclusione anno catechistico',
-        AuditActionType.promuoviStudente => 'Promozione ragazzo',
-        AuditActionType.archiviaStudente => 'Archiviazione ragazzo',
-        AuditActionType.retentionTreatmentExpired =>
-          'Trattamento scaduto (GDPR)',
-      };
+    AuditActionType.createStudent => 'Creazione ragazzo',
+    AuditActionType.updateStudent => 'Modifica ragazzo',
+    AuditActionType.deleteStudentHard => 'Eliminazione definitiva ragazzo',
+    AuditActionType.createClass => 'Creazione classe',
+    AuditActionType.deleteClass => 'Eliminazione classe',
+    AuditActionType.reassignCatechist => 'Riassegnazione catechista',
+    AuditActionType.grantConsent => 'Concessione consenso',
+    AuditActionType.revokeConsent => 'Revoca consenso',
+    AuditActionType.exportData => 'Esportazione dati',
+    AuditActionType.tombstoneReceived => 'Tombstone ricevuto',
+    AuditActionType.passaggioAnno => 'Passaggio di anno',
+    AuditActionType.concludiAnno => 'Conclusione anno catechistico',
+    AuditActionType.promuoviStudente => 'Promozione ragazzo',
+    AuditActionType.archiviaStudente => 'Archiviazione ragazzo',
+    AuditActionType.retentionTreatmentExpired => 'Trattamento scaduto (GDPR)',
+  };
 
   static AuditActionType fromStorageValue(String? value) {
     return AuditActionType.values.firstWhere(

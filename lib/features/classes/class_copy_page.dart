@@ -31,7 +31,10 @@ class _ClassCopyPageState extends ConsumerState<ClassCopyPage> {
     required SchoolClass target,
   }) async {
     final anySelected =
-        _includeDocuments || _includeCatechesi || _includeAvvisi || _includeCalendar;
+        _includeDocuments ||
+        _includeCatechesi ||
+        _includeAvvisi ||
+        _includeCalendar;
     if (!anySelected) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -86,7 +89,8 @@ class _ClassCopyPageState extends ConsumerState<ClassCopyPage> {
     if (confirmed != true || !mounted) return;
 
     final ok = await AuthService().authenticate(
-      localizedReason: 'Autenticati per copiare i contenuti da "${source.name}"',
+      localizedReason:
+          'Autenticati per copiare i contenuti da "${source.name}"',
     );
     if (!ok) {
       if (mounted) {
@@ -108,7 +112,10 @@ class _ClassCopyPageState extends ConsumerState<ClassCopyPage> {
     required SchoolClass target,
   }) async {
     final anySelected =
-        _includeDocuments || _includeCatechesi || _includeAvvisi || _includeCalendar;
+        _includeDocuments ||
+        _includeCatechesi ||
+        _includeAvvisi ||
+        _includeCalendar;
     if (!anySelected) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -155,9 +162,9 @@ class _ClassCopyPageState extends ConsumerState<ClassCopyPage> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Errore durante la copia: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Errore durante la copia: $e')));
       }
     } finally {
       if (mounted) setState(() => _isCopying = false);
@@ -176,8 +183,9 @@ class _ClassCopyPageState extends ConsumerState<ClassCopyPage> {
     for (final c in myClasses) {
       if (c.id == currentClassId) currentClass = c;
     }
-    final sourceClasses =
-        myClasses.where((c) => c.id != currentClassId).toList();
+    final sourceClasses = myClasses
+        .where((c) => c.id != currentClassId)
+        .toList();
 
     return AppScaffold(
       title: 'Copia da altra classe',
@@ -225,10 +233,8 @@ class _ClassCopyPageState extends ConsumerState<ClassCopyPage> {
               _SourceSelector(
                 sourceClasses: sourceClasses,
                 isCopying: _isCopying,
-                onCopy: (source) => _confirmAndCopy(
-                  source: source,
-                  target: currentClass!,
-                ),
+                onCopy: (source) =>
+                    _confirmAndCopy(source: source, target: currentClass!),
               ),
               const SizedBox(height: 20),
               _SectionTitle(
@@ -313,8 +319,10 @@ class _InfoCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon,
-              color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+          Icon(
+            icon,
+            color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -334,9 +342,7 @@ class _InfoCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     height: 1.4,
-                    color: isDark
-                        ? Colors.grey.shade400
-                        : Colors.grey.shade600,
+                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                   ),
                 ),
               ],
@@ -373,11 +379,13 @@ class _SourceSelector extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        ...sourceClasses.map((c) => _SourceCard(
-          schoolClass: c,
-          isCopying: isCopying,
-          onTap: () => onCopy(c),
-        )),
+        ...sourceClasses.map(
+          (c) => _SourceCard(
+            schoolClass: c,
+            isCopying: isCopying,
+            onTap: () => onCopy(c),
+          ),
+        ),
       ],
     );
   }
@@ -423,8 +431,10 @@ class _SourceCard extends StatelessWidget {
                 color: const Color(0xFF174A7E).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.content_copy_rounded,
-                  color: Color(0xFF174A7E)),
+              child: const Icon(
+                Icons.content_copy_rounded,
+                color: Color(0xFF174A7E),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -441,10 +451,7 @@ class _SourceCard extends StatelessWidget {
                   ),
                   Text(
                     '${schoolClass.studentIds.length} ragazzi',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                 ],
               ),
@@ -456,8 +463,7 @@ class _SourceCard extends StatelessWidget {
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
             else
-              const Icon(Icons.chevron_right_rounded,
-                  color: Color(0xFF174A7E)),
+              const Icon(Icons.chevron_right_rounded, color: Color(0xFF174A7E)),
           ],
         ),
       ),

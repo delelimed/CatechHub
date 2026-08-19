@@ -38,32 +38,30 @@ void main() {
     required bool isDeleted,
     required DateTime updatedAt,
     String name = 'Gino Protetto',
-  }) =>
-      {
-        'id': id,
-        'classId': 'class_1',
-        'name': name,
-        'allergies': 'segreto medico',
-        'createdAt': '2026-01-01T00:00:00.000Z',
-        'updatedAt': updatedAt.toUtc().toIso8601String(),
-        'isDeleted': isDeleted,
-      };
+  }) => {
+    'id': id,
+    'classId': 'class_1',
+    'name': name,
+    'allergies': 'segreto medico',
+    'createdAt': '2026-01-01T00:00:00.000Z',
+    'updatedAt': updatedAt.toUtc().toIso8601String(),
+    'isDeleted': isDeleted,
+  };
 
   SyncRecord liveRecord(String id) => SyncRecord(
-        id: id,
-        boxName: LocalDatabase.studentsBox,
-        data: studentEntry(
-          id: id,
-          isDeleted: false,
-          updatedAt: DateTime.utc(2026, 1, 15),
-        ),
-        createdAt: DateTime.utc(2026, 1, 1),
-        updatedAt: DateTime.utc(2026, 1, 15),
-      );
+    id: id,
+    boxName: LocalDatabase.studentsBox,
+    data: studentEntry(
+      id: id,
+      isDeleted: false,
+      updatedAt: DateTime.utc(2026, 1, 15),
+    ),
+    createdAt: DateTime.utc(2026, 1, 1),
+    updatedAt: DateTime.utc(2026, 1, 15),
+  );
 
   group('applyRemoteRecords — Diritto all\'Oblio (H5)', () {
-    test(
-        'un record cancellato localmente NON viene resuscitato da una copia '
+    test('un record cancellato localmente NON viene resuscitato da una copia '
         'live remota (la PII del minore non riappare)', () async {
       // Dispositivo offline che conserva il record (cancellazione avvenuta
       // mentre era disconnesso): il box locale ha il record con isDeleted=true.
@@ -76,39 +74,46 @@ void main() {
         ),
       );
 
-// Un altro peer (non aggiornato) gli invia la copia live: il record
+      // Un altro peer (non aggiornato) gli invia la copia live: il record
       // cancellato NON viene resuscitato e la PII non viene sostituita da
       // una versione "viva" riproposta da un dispositivo rimasto offline.
-      final result =
-          await HiveSyncEngine().applyRemoteRecords([liveRecord('STU_1')]);
+      final result = await HiveSyncEngine().applyRemoteRecords([
+        liveRecord('STU_1'),
+      ]);
 
       expect(result.success, isTrue);
-      final stored =
-          LocalDatabase.toStringDynamicMap(LocalDatabase.students().get('STU_1'));
-      expect(stored['isDeleted'], isTrue,
-          reason: 'la cancellazione locale deve vincere sul dato live');
-      expect(stored['name'], isNot('Minore Protetto'),
-          reason: 'il dato live remoto non deve sovrascrivere il record '
-              'cancellato');
+      final stored = LocalDatabase.toStringDynamicMap(
+        LocalDatabase.students().get('STU_1'),
+      );
+      expect(
+        stored['isDeleted'],
+        isTrue,
+        reason: 'la cancellazione locale deve vincere sul dato live',
+      );
+      expect(
+        stored['name'],
+        isNot('Minore Protetto'),
+        reason:
+            'il dato live remoto non deve sovrascrivere il record '
+            'cancellato',
+      );
     });
 
     test('la cancellazione resta appiccicosa e viene ripropagata', () async {
       final localUpdatedAt = DateTime.utc(2026, 1, 10);
       await LocalDatabase.students().put(
         'STU_2',
-        studentEntry(
-          id: 'STU_2',
-          isDeleted: true,
-          updatedAt: localUpdatedAt,
-        ),
+        studentEntry(id: 'STU_2', isDeleted: true, updatedAt: localUpdatedAt),
       );
 
-      final result =
-          await HiveSyncEngine().applyRemoteRecords([liveRecord('STU_2')]);
+      final result = await HiveSyncEngine().applyRemoteRecords([
+        liveRecord('STU_2'),
+      ]);
 
       expect(result.success, isTrue);
-      final stored =
-          LocalDatabase.toStringDynamicMap(LocalDatabase.students().get('STU_2'));
+      final stored = LocalDatabase.toStringDynamicMap(
+        LocalDatabase.students().get('STU_2'),
+      );
       expect(stored['isDeleted'], isTrue);
       // updatedAt deve essere stato aggiornato oltre la copia live così
       // l'indice la pubblica come cancellazione (ripropagazione ai peer).
@@ -116,8 +121,7 @@ void main() {
       expect(newUpdatedAt.isAfter(DateTime.utc(2026, 1, 15)), isTrue);
     });
 
-    test(
-        'una cancellazione remota sovrascrive comunque la copia live locale '
+    test('una cancellazione remota sovrascrive comunque la copia live locale '
         '(comportamento LWW per il verso opposto)', () async {
       await LocalDatabase.students().put(
         'STU_3',
@@ -140,12 +144,12 @@ void main() {
         updatedAt: DateTime.utc(2026, 1, 20),
         isDeleted: true,
       );
-      final result = await HiveSyncEngine()
-          .applyRemoteRecords([remoteDeleted]);
+      final result = await HiveSyncEngine().applyRemoteRecords([remoteDeleted]);
 
       expect(result.success, isTrue);
-      final stored =
-          LocalDatabase.toStringDynamicMap(LocalDatabase.students().get('STU_3'));
+      final stored = LocalDatabase.toStringDynamicMap(
+        LocalDatabase.students().get('STU_3'),
+      );
       expect(stored['isDeleted'], isTrue);
     });
   });

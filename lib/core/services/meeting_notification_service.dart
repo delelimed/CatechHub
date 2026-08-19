@@ -18,7 +18,6 @@
 //   - hive_flutter: per lettura box meeting_notifications_box
 // ══════════════════════════════════════════════════════════════════════════════
 
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -66,7 +65,9 @@ class MeetingNotificationService {
     if (_initialized) return;
 
     // 1. Configura canale notifiche Android
-    const androidSettings = AndroidInitializationSettings('@mipmap/launcher_icon');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/launcher_icon',
+    );
     const settings = InitializationSettings(android: androidSettings);
 
     await _notificationsPlugin.initialize(
@@ -96,7 +97,8 @@ class MeetingNotificationService {
 
     await _notificationsPlugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(androidChannel);
   }
 
@@ -218,8 +220,8 @@ class MeetingNotificationService {
     final hasPermission = await isPermissionGranted;
     if (!hasPermission) {
       if (kDebugMode) {
-      debugPrint('Permesso notifiche non concesso, impossibile programmare');
-    }
+        debugPrint('Permesso notifiche non concesso, impossibile programmare');
+      }
       return;
     }
 
@@ -330,18 +332,18 @@ class MeetingNotificationService {
       if (e.code == 'exact_alarms_not_permitted') {
         if (kDebugMode) {
           debugPrint(
-              'Permesso SCHEDULE_EXACT_ALARM non concesso, uso modalità inesatta',
-            );
+            'Permesso SCHEDULE_EXACT_ALARM non concesso, uso modalità inesatta',
+          );
           await _notificationsPlugin.zonedSchedule(
-          id: id,
-          title: title,
-          body: body,
-          scheduledDate: _toTZDateTime(scheduledDate),
-          notificationDetails: details,
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-          matchDateTimeComponents: null,
-          payload: payload,
-        );
+            id: id,
+            title: title,
+            body: body,
+            scheduledDate: _toTZDateTime(scheduledDate),
+            notificationDetails: details,
+            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+            matchDateTimeComponents: null,
+            payload: payload,
+          );
         } // close kDebugMode if
         rethrow;
       } // close e.code if
@@ -388,7 +390,9 @@ class MeetingNotificationService {
   }
 
   /// Programma la notifica per un singolo meeting.
-  static Future<void> _scheduleNotificationForMeeting(PlanningMeeting meeting) async {
+  static Future<void> _scheduleNotificationForMeeting(
+    PlanningMeeting meeting,
+  ) async {
     final timeParts = notificationTime.split(':');
     if (timeParts.length != 2) return;
 

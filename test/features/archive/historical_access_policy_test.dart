@@ -84,8 +84,7 @@ void main() {
 
       final visible = policy.applyVisibility(records);
       expect(visible, hasLength(4));
-      expect(visible.map((r) => r.studentId).toSet(),
-          {'s1', 's2', 's3'});
+      expect(visible.map((r) => r.studentId).toSet(), {'s1', 's2', 's3'});
     });
 
     test('canViewRecord è true per ogni record', () async {
@@ -102,26 +101,36 @@ void main() {
       await UserRole.setCurrent(UserRole.catechista);
     });
 
-    test('vede lo storico dei ragazzi ATTUALMENTE nelle proprie classi',
-        () async {
-      // Il catechista locale (local_catechist_id) ha la classe C1 con s1.
-      await _classa('c1',
-          catechistIds: [AuthService.localUserId], studentIds: ['s1']);
+    test(
+      'vede lo storico dei ragazzi ATTUALMENTE nelle proprie classi',
+      () async {
+        // Il catechista locale (local_catechist_id) ha la classe C1 con s1.
+        await _classa(
+          'c1',
+          catechistIds: [AuthService.localUserId],
+          studentIds: ['s1'],
+        );
 
-      final policy = HistoricalAccessPolicy();
-      final visible = policy.applyVisibility(records);
+        final policy = HistoricalAccessPolicy();
+        final visible = policy.applyVisibility(records);
 
-      // Solo i record di s1 (2 anni). s2 e s3 sono di altre classi.
-      expect(visible.map((r) => r.studentId).toSet(), {'s1'});
-      expect(visible, hasLength(2));
-    });
+        // Solo i record di s1 (2 anni). s2 e s3 sono di altre classi.
+        expect(visible.map((r) => r.studentId).toSet(), {'s1'});
+        expect(visible, hasLength(2));
+      },
+    );
 
-    test('un ragazzo di un\'altra classe del catechista è visibile',
-        () async {
-      await _classa('c1',
-          catechistIds: [AuthService.localUserId], studentIds: ['s1', 's3']);
-      await _classa('c2',
-          catechistIds: [AuthService.localUserId], studentIds: ['s2']);
+    test('un ragazzo di un\'altra classe del catechista è visibile', () async {
+      await _classa(
+        'c1',
+        catechistIds: [AuthService.localUserId],
+        studentIds: ['s1', 's3'],
+      );
+      await _classa(
+        'c2',
+        catechistIds: [AuthService.localUserId],
+        studentIds: ['s2'],
+      );
 
       final policy = HistoricalAccessPolicy();
       final visible = policy.applyVisibility(records);
@@ -129,33 +138,38 @@ void main() {
       expect(visible.map((r) => r.studentId).toSet(), {'s1', 's2', 's3'});
     });
 
-    test('SE IL RAGAZZO ESCE DALLE CLASSI, I SUOI RECORD SPARISCONO (scadenza)',
-        () async {
-      await _classa('c1',
-          catechistIds: [AuthService.localUserId], studentIds: ['s1', 's2']);
+    test(
+      'SE IL RAGAZZO ESCE DALLE CLASSI, I SUOI RECORD SPARISCONO (scadenza)',
+      () async {
+        await _classa(
+          'c1',
+          catechistIds: [AuthService.localUserId],
+          studentIds: ['s1', 's2'],
+        );
 
-      final policy = HistoricalAccessPolicy();
-      expect(
-        policy.applyVisibility(records).map((r) => r.studentId).toSet(),
-        {'s1', 's2'},
-      );
+        final policy = HistoricalAccessPolicy();
+        expect(
+          policy.applyVisibility(records).map((r) => r.studentId).toSet(),
+          {'s1', 's2'},
+        );
 
-      // s2 viene rimosso dalla classe: nessuna ri-associazione né job
-      // temporizzato, alla PROSSIMA lettura i suoi record non ci sono più.
-      await LocalDatabase.classes().put('c1', {
-        'name': 'Comunione A',
-        'studentIds': ['s1'],
-        'catechistIds': [AuthService.localUserId],
-        'catechistRoles': {AuthService.localUserId: 'TITOLARE'},
-        'archived': false,
-        'percorso': 'Prima Comunione',
-        'livello': 1,
-      });
+        // s2 viene rimosso dalla classe: nessuna ri-associazione né job
+        // temporizzato, alla PROSSIMA lettura i suoi record non ci sono più.
+        await LocalDatabase.classes().put('c1', {
+          'name': 'Comunione A',
+          'studentIds': ['s1'],
+          'catechistIds': [AuthService.localUserId],
+          'catechistRoles': {AuthService.localUserId: 'TITOLARE'},
+          'archived': false,
+          'percorso': 'Prima Comunione',
+          'livello': 1,
+        });
 
-      final after = policy.applyVisibility(records);
-      expect(after.map((r) => r.studentId).toSet(), {'s1'});
-      expect(after.any((r) => r.studentId == 's2'), isFalse);
-    });
+        final after = policy.applyVisibility(records);
+        expect(after.map((r) => r.studentId).toSet(), {'s1'});
+        expect(after.any((r) => r.studentId == 's2'), isFalse);
+      },
+    );
 
     test('se il catechista non ha classi non vede alcun record', () async {
       final policy = HistoricalAccessPolicy();
@@ -163,8 +177,11 @@ void main() {
     });
 
     test('canViewRecord è false per i record degli studenti altrui', () async {
-      await _classa('c1',
-          catechistIds: [AuthService.localUserId], studentIds: ['s1']);
+      await _classa(
+        'c1',
+        catechistIds: [AuthService.localUserId],
+        studentIds: ['s1'],
+      );
 
       final policy = HistoricalAccessPolicy();
       expect(policy.canViewRecord(_record('s1', '2024-2025')), isTrue);

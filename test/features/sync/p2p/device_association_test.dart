@@ -25,10 +25,16 @@ void main() {
       final json = original.toJson();
 
       // I segreti non devono MAI finire nel box Hive.
-      expect(json.containsKey('sharedSecret'), isFalse,
-          reason: 'il shared secret non deve essere serializzato nel box');
-      expect(json.containsKey('privKey'), isFalse,
-          reason: 'la chiave privata non deve essere serializzata nel box');
+      expect(
+        json.containsKey('sharedSecret'),
+        isFalse,
+        reason: 'il shared secret non deve essere serializzato nel box',
+      );
+      expect(
+        json.containsKey('privKey'),
+        isFalse,
+        reason: 'la chiave privata non deve essere serializzata nel box',
+      );
 
       final restored = P2PDeviceAssociation.fromJson(json);
 
@@ -279,6 +285,40 @@ void main() {
 
       final payload = P2PEncryptedPayload.fromJson(json);
       expect(payload.useChacha, isTrue);
+    });
+  });
+
+  group('P2PSecurityService.classifyQrPayload', () {
+    test('classifica il QR del dispositivo come deviceIdentity', () {
+      final identity = P2PIdentity(
+        deviceId: 'CH_classify',
+        deviceName: 'Tablet',
+        username: 'Catechista',
+        publicKeyBase64: base64Encode([1, 2, 3]),
+        fingerprint: 'fp',
+        connectionEndpoint: 'CH_classify',
+      );
+      expect(
+        P2PSecurityService.classifyQrPayload(identity.encode()),
+        P2PQrType.deviceIdentity,
+      );
+    });
+
+    test('classifica il QR di fiducia come trust', () {
+      final raw = P2PSecurityService.trustQrPrefix + jsonEncode({'v': 2});
+      expect(P2PSecurityService.classifyQrPayload(raw), P2PQrType.trust);
+    });
+
+    test('classifica il QR di approvazione come approval', () {
+      final raw = P2PSecurityService.approvalQrPrefix + jsonEncode({'v': 1});
+      expect(P2PSecurityService.classifyQrPayload(raw), P2PQrType.approval);
+    });
+
+    test('classifica il payload sconosciuto come unknown', () {
+      expect(
+        P2PSecurityService.classifyQrPayload('testo non valido'),
+        P2PQrType.unknown,
+      );
     });
   });
 }

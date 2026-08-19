@@ -1,14 +1,30 @@
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:crypto/crypto.dart' as crypto show sha256;
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive/hive.dart';
 
+import '../../../core/services/crypto_utils.dart';
 import '../../../core/storage/local_database.dart';
 import '../data/association_models.dart';
+
+/// Tipo di payload QR riconosciuto dall'app.
+enum P2PQrType {
+  /// QR del dispositivo: payload `P2PIdentity` per la sincronizzazione
+  /// (associazione normale / onboarding).
+  deviceIdentity,
+
+  /// "QR di fiducia" del Responsabile (trust root Ed25519 + revoche).
+  trust,
+
+  /// "QR di approvazione" firmato dal Responsabile (certificato).
+  approval,
+
+  /// Payload non riconosciuto.
+  unknown,
+}
 
 class P2PIdentity {
   final String deviceId;
@@ -37,16 +53,16 @@ class P2PIdentity {
       '$firstName$lastName'.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '');
 
   Map<String, dynamic> toJson() => {
-        'deviceId': deviceId,
-        'deviceName': deviceName,
-        'username': username,
-        'publicKey': publicKeyBase64,
-        'fingerprint': fingerprint,
-        'endpoint': connectionEndpoint,
-        'firstName': firstName,
-        'lastName': lastName,
-        'v': 4,
-      };
+    'deviceId': deviceId,
+    'deviceName': deviceName,
+    'username': username,
+    'publicKey': publicKeyBase64,
+    'fingerprint': fingerprint,
+    'endpoint': connectionEndpoint,
+    'firstName': firstName,
+    'lastName': lastName,
+    'v': 4,
+  };
 
   factory P2PIdentity.fromJson(Map<String, dynamic> json) {
     final ver = json['v'] as int? ?? 1;
@@ -68,7 +84,11 @@ class P2PIdentity {
     }
     // v < 4: anagrafica assente, fallback su deviceName (spesso "Nome Cognome").
     if (ver < 4) {
-      final parts = username.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+      final parts = username
+          .trim()
+          .split(RegExp(r'\s+'))
+          .where((p) => p.isNotEmpty)
+          .toList();
       if (parts.length >= 2 && firstName.isEmpty && lastName.isEmpty) {
         firstName = parts.first;
         lastName = parts.sublist(1).join(' ');
@@ -209,7 +229,8 @@ class P2PDeviceAssociation {
       associatedAt: associatedAt,
       devicePrivateKeyBase64:
           devicePrivateKeyBase64 ?? this.devicePrivateKeyBase64,
-      devicePublicKeyBase64: devicePublicKeyBase64 ?? this.devicePublicKeyBase64,
+      devicePublicKeyBase64:
+          devicePublicKeyBase64 ?? this.devicePublicKeyBase64,
       localRole: localRole,
       remoteRole: remoteRole,
       catechistId: catechistId ?? this.catechistId,
@@ -243,27 +264,26 @@ class P2PDeviceAssociation {
   /// espone le chiavi crittografiche del canale P2P. La chiave pubblica è
   /// pubblica e resta nel box.
   Map<String, dynamic> toJson() => {
-        'deviceId': deviceId,
-        'deviceName': deviceName,
-        'publicKey': publicKeyBase64,
-        'fingerprint': fingerprint,
-        'associatedAt': associatedAt.toUtc().toIso8601String(),
-        'pubKey': devicePublicKeyBase64,
-        if (localRole != null) 'localRole': localRole,
-        if (remoteRole != null) 'remoteRole': remoteRole,
-        if (catechistId != null) 'catechistId': catechistId,
-        if (lastSyncAt != null) 'lastSyncAt': lastSyncAt!.toUtc().toIso8601String(),
-        'authorizedByResponsabile': authorizedByResponsabile,
-        if (timestampApproval != null)
-          'timestampApproval':
-              timestampApproval!.toUtc().toIso8601String(),
-        if (approvedByDeviceId != null) 'approvedByDeviceId': approvedByDeviceId,
-        if (approvalSignature != null) 'approvalSignature': approvalSignature,
-        if (approvalSignerPublicKey != null)
-          'approvalSignerPublicKey': approvalSignerPublicKey,
-        if (approvalExpiresAt != null)
-          'approvalExpiresAt': approvalExpiresAt!.toUtc().toIso8601String(),
-      };
+    'deviceId': deviceId,
+    'deviceName': deviceName,
+    'publicKey': publicKeyBase64,
+    'fingerprint': fingerprint,
+    'associatedAt': associatedAt.toUtc().toIso8601String(),
+    'pubKey': devicePublicKeyBase64,
+    if (localRole != null) 'localRole': localRole,
+    if (remoteRole != null) 'remoteRole': remoteRole,
+    if (catechistId != null) 'catechistId': catechistId,
+    if (lastSyncAt != null) 'lastSyncAt': lastSyncAt!.toUtc().toIso8601String(),
+    'authorizedByResponsabile': authorizedByResponsabile,
+    if (timestampApproval != null)
+      'timestampApproval': timestampApproval!.toUtc().toIso8601String(),
+    if (approvedByDeviceId != null) 'approvedByDeviceId': approvedByDeviceId,
+    if (approvalSignature != null) 'approvalSignature': approvalSignature,
+    if (approvalSignerPublicKey != null)
+      'approvalSignerPublicKey': approvalSignerPublicKey,
+    if (approvalExpiresAt != null)
+      'approvalExpiresAt': approvalExpiresAt!.toUtc().toIso8601String(),
+  };
 
   factory P2PDeviceAssociation.fromJson(Map<String, dynamic> json) =>
       P2PDeviceAssociation(
@@ -289,8 +309,7 @@ class P2PDeviceAssociation {
             : null,
         approvedByDeviceId: json['approvedByDeviceId'] as String?,
         approvalSignature: json['approvalSignature'] as String?,
-        approvalSignerPublicKey:
-            json['approvalSignerPublicKey'] as String?,
+        approvalSignerPublicKey: json['approvalSignerPublicKey'] as String?,
         approvalExpiresAt: json['approvalExpiresAt'] != null
             ? DateTime.parse(json['approvalExpiresAt'] as String).toLocal()
             : null,
@@ -329,17 +348,18 @@ class P2PEncryptedPayload {
   });
 
   Map<String, dynamic> toJson() => {
-        'nonce': base64Encode(nonce),
-        'ciphertext': base64Encode(ciphertext),
-        'mac': base64Encode(mac),
-        'alg': useChacha ? 'chacha20-poly1305' : 'aes-256-gcm',
-      };
+    'nonce': base64Encode(nonce),
+    'ciphertext': base64Encode(ciphertext),
+    'mac': base64Encode(mac),
+    'alg': useChacha ? 'chacha20-poly1305' : 'aes-256-gcm',
+  };
 
   factory P2PEncryptedPayload.fromJson(Map<String, dynamic> json) =>
       P2PEncryptedPayload(
         nonce: Uint8List.fromList(base64Decode(json['nonce'] as String)),
-        ciphertext:
-            Uint8List.fromList(base64Decode(json['ciphertext'] as String)),
+        ciphertext: Uint8List.fromList(
+          base64Decode(json['ciphertext'] as String),
+        ),
         mac: Uint8List.fromList(base64Decode(json['mac'] as String)),
         useChacha: json['alg'] == 'chacha20-poly1305',
       );
@@ -359,9 +379,7 @@ String _bytesToHex(List<int> bytes) {
   return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 }
 
-final _p2pAad = Uint8List.fromList(
-  utf8.encode('CatechHub_Context_P2P_v1'),
-);
+final _p2pAad = Uint8List.fromList(utf8.encode('CatechHub_Context_P2P_v1'));
 
 class P2PSecurityService {
   static const _storagePrefix = 'p2p_assoc_';
@@ -399,7 +417,7 @@ class P2PSecurityService {
   final X25519 _x25519 = X25519();
 
   P2PSecurityService({FlutterSecureStorage? secureStorage})
-      : _secureStorage = secureStorage ?? const FlutterSecureStorage();
+    : _secureStorage = secureStorage ?? const FlutterSecureStorage();
 
   static Uint8List secureRandom(int length) {
     final random = Random.secure();
@@ -422,8 +440,10 @@ class P2PSecurityService {
         );
       } catch (e) {
         if (kDebugMode) {
-      debugPrint('P2PSecurityService.getOrCreateIdentityKeyPair: stored key corrupted, regenerating: $e');
-    }
+          debugPrint(
+            'P2PSecurityService.getOrCreateIdentityKeyPair: stored key corrupted, regenerating: $e',
+          );
+        }
       }
     }
     return _generateAndStoreIdentityKeyPair();
@@ -468,8 +488,10 @@ class P2PSecurityService {
         return P2PIdentity.fromJson(jsonDecode(stored) as Map<String, dynamic>);
       } catch (e) {
         if (kDebugMode) {
-      debugPrint('P2PSecurityService.getLocalIdentity: stored identity corrupted, regenerating: $e');
-    }
+          debugPrint(
+            'P2PSecurityService.getLocalIdentity: stored identity corrupted, regenerating: $e',
+          );
+        }
       }
     }
     return _createAndStoreIdentity();
@@ -495,7 +517,9 @@ class P2PSecurityService {
       lastName: _getLastName(),
     );
     await _secureStorage.write(
-        key: _localIdentityKey, value: jsonEncode(identity.toJson()));
+      key: _localIdentityKey,
+      value: jsonEncode(identity.toJson()),
+    );
     return identity;
   }
 
@@ -556,7 +580,10 @@ class P2PSecurityService {
 
   String _randomHex(int length) {
     final random = Random.secure();
-    return List.generate(length, (_) => random.nextInt(16).toRadixString(16)).join();
+    return List.generate(
+      length,
+      (_) => random.nextInt(16).toRadixString(16),
+    ).join();
   }
 
   Future<void> refreshIdentityName() async {
@@ -640,12 +667,31 @@ class P2PSecurityService {
     return P2PIdentity.decode(raw);
   }
 
-  Future<String> computeStaticSharedSecret(String remotePublicKeyBase64, {String? forDeviceId}) async {
+  /// Prefissi dei QR della Catena di Fiducia del Responsabile
+  /// (vedi ApprovalCenterPage). Centralizzati qui perché devono essere
+  /// riconosciuti anche dagli scanner di associazione/onboarding.
+  static const String trustQrPrefix = 'CatechHub_TRUST_v2|';
+  static const String approvalQrPrefix = 'CatechHub_APPROVAL_v1|';
+
+  /// Classifica il payload grezzo di un QR scansionato.
+  static P2PQrType classifyQrPayload(String raw) {
+    if (raw.startsWith(trustQrPrefix)) return P2PQrType.trust;
+    if (raw.startsWith(approvalQrPrefix)) return P2PQrType.approval;
+    if (parseQrPayload(raw) != null) return P2PQrType.deviceIdentity;
+    return P2PQrType.unknown;
+  }
+
+  Future<String> computeStaticSharedSecret(
+    String remotePublicKeyBase64, {
+    String? forDeviceId,
+  }) async {
     Uint8List remoteKeyBytes;
     try {
       remoteKeyBytes = base64Decode(remotePublicKeyBase64);
     } catch (_) {
-      throw FormatException('Chiave pubblica remota non valida: formato base64 errato');
+      throw FormatException(
+        'Chiave pubblica remota non valida: formato base64 errato',
+      );
     }
     final keyPair = forDeviceId != null
         ? await _getOrCreateAssociationKeyPair(forDeviceId)
@@ -653,14 +699,19 @@ class P2PSecurityService {
 
     final sharedSecret = await _x25519.sharedSecretKey(
       keyPair: keyPair,
-      remotePublicKey: SimplePublicKey(remoteKeyBytes, type: KeyPairType.x25519),
+      remotePublicKey: SimplePublicKey(
+        remoteKeyBytes,
+        type: KeyPairType.x25519,
+      ),
     );
 
     final secretBytes = await sharedSecret.extractBytes();
     return base64Encode(secretBytes);
   }
 
-  Future<SimpleKeyPairData> _getOrCreateAssociationKeyPair(String deviceId) async {
+  Future<SimpleKeyPairData> _getOrCreateAssociationKeyPair(
+    String deviceId,
+  ) async {
     final existing = await getAssociation(deviceId);
     if (existing != null && existing.devicePrivateKeyBase64.isNotEmpty) {
       final kp = existing.keyPair;
@@ -683,7 +734,9 @@ class P2PSecurityService {
     try {
       remoteKeyBytes = base64Decode(remotePublicKeyBase64);
     } catch (_) {
-      throw FormatException('Chiave pubblica remota non valida: formato base64 errato in createEphemeralSession');
+      throw FormatException(
+        'Chiave pubblica remota non valida: formato base64 errato in createEphemeralSession',
+      );
     }
     final identityKeyPair = await getOrCreateIdentityKeyPair();
 
@@ -696,7 +749,8 @@ class P2PSecurityService {
     // I contributi vengono ordinati in modo canonico (sort lexicografico)
     // così che entrambi i peer convergano sulla stessa concatenazione pur
     // calcolandola dal proprio punto di vista.
-    final sharedBytes = (localEphemeralKeyPair != null &&
+    final sharedBytes =
+        (localEphemeralKeyPair != null &&
             remoteEphemeralPublicKeyBase64 != null)
         ? await _computeForwardSecret(
             identityKeyPair: identityKeyPair,
@@ -751,14 +805,13 @@ class P2PSecurityService {
     required SimpleKeyPairData localEphemeral,
     required String remoteStaticPublicKeyBase64,
     required String remoteEphemeralPublicKeyBase64,
-  }) =>
-      computeForwardSecretKey(
-        x25519: _x25519,
-        localStatic: identityKeyPair,
-        localEphemeral: localEphemeral,
-        remoteStaticPublicKeyBase64: remoteStaticPublicKeyBase64,
-        remoteEphemeralPublicKeyBase64: remoteEphemeralPublicKeyBase64,
-      );
+  }) => computeForwardSecretKey(
+    x25519: _x25519,
+    localStatic: identityKeyPair,
+    localEphemeral: localEphemeral,
+    remoteStaticPublicKeyBase64: remoteStaticPublicKeyBase64,
+    remoteEphemeralPublicKeyBase64: remoteEphemeralPublicKeyBase64,
+  );
 
   /// Calcola il segreto combinato TripleDH in forma statica e pura (testabile
   /// senza secure storage / Hive). Entrambi i peer convergono sullo stesso
@@ -778,12 +831,18 @@ class P2PSecurityService {
       remoteStaticBytes = base64Decode(remoteStaticPublicKeyBase64);
       remoteEphemeralBytes = base64Decode(remoteEphemeralPublicKeyBase64);
     } catch (_) {
-      throw FormatException('Chiave pubblica efimera remota non valida in _computeForwardSecret');
+      throw FormatException(
+        'Chiave pubblica efimera remota non valida in _computeForwardSecret',
+      );
     }
-    final remoteStaticPub =
-        SimplePublicKey(remoteStaticBytes, type: KeyPairType.x25519);
-    final remoteEphemeralPub =
-        SimplePublicKey(remoteEphemeralBytes, type: KeyPairType.x25519);
+    final remoteStaticPub = SimplePublicKey(
+      remoteStaticBytes,
+      type: KeyPairType.x25519,
+    );
+    final remoteEphemeralPub = SimplePublicKey(
+      remoteEphemeralBytes,
+      type: KeyPairType.x25519,
+    );
 
     final dh1 = await x25519.sharedSecretKey(
       keyPair: localStatic,
@@ -846,13 +905,12 @@ class P2PSecurityService {
     required SecretKeyData sessionKey,
     required SimpleKeyPairData localAssociationKeyPair,
     required String remoteAssociationPublicBase64,
-  }) =>
-      P2PSecurityService.mixAssociationFactor(
-        x25519: _x25519,
-        sessionKey: sessionKey,
-        localAssociationKeyPair: localAssociationKeyPair,
-        remoteAssociationPublicBase64: remoteAssociationPublicBase64,
-      );
+  }) => P2PSecurityService.mixAssociationFactor(
+    x25519: _x25519,
+    sessionKey: sessionKey,
+    localAssociationKeyPair: localAssociationKeyPair,
+    remoteAssociationPublicBase64: remoteAssociationPublicBase64,
+  );
 
   /// Variante statica e pura (testabile senza secure storage / Hive).
   static Future<SecretKeyData> mixAssociationFactor({
@@ -870,10 +928,7 @@ class P2PSecurityService {
         ),
       );
       final dhBytes = await dh.extractBytes();
-      final hkdf = Hkdf(
-        hmac: Hmac(_sha256Algo),
-        outputLength: 32,
-      );
+      final hkdf = Hkdf(hmac: Hmac(_sha256Algo), outputLength: 32);
       final combined = <int>[...sessionKey.bytes, ...dhBytes];
       final derived = await hkdf.deriveKey(
         secretKey: SecretKey(combined),
@@ -895,10 +950,10 @@ class P2PSecurityService {
     // durante l'handshake, invece di un hash deterministico del shared secret.
     // Questo garantisce che ogni sessione usi una chiave diversa.
     if (sessionNonce != null && sessionNonce.isNotEmpty) {
-      final nonceHash = crypto.sha256.convert(utf8.encode(sessionNonce));
-      return Uint8List.fromList(nonceHash.bytes.sublist(0, 32));
+      final nonceHash = sha256BytesSync(utf8.encode(sessionNonce));
+      return Uint8List.fromList(nonceHash.sublist(0, 32));
     }
-    final hkdfInput = crypto.sha256.convert(sharedSecretBytes).bytes;
+    final hkdfInput = sha256BytesSync(sharedSecretBytes);
     return Uint8List.fromList(hkdfInput.sublist(0, 32));
   }
 
@@ -919,15 +974,13 @@ class P2PSecurityService {
       sessionNonce: sessionNonce,
     );
 
-    final hkdf = Hkdf(
-      hmac: Hmac(_sha256Algo),
-      outputLength: 32,
-    );
+    final hkdf = Hkdf(hmac: Hmac(_sha256Algo), outputLength: 32);
 
     final windowIndex = sessionWindowIndex(at);
     final ids = [localDeviceId, remoteDeviceId]..sort();
     final info = utf8.encode(
-        'CatechHub_P2P_Session_v3:${ids[0]}:${ids[1]}:${sessionWindowId(windowIndex)}');
+      'CatechHub_P2P_Session_v3:${ids[0]}:${ids[1]}:${sessionWindowId(windowIndex)}',
+    );
 
     return hkdf.deriveKey(
       secretKey: SecretKey(Uint8List.fromList(sharedSecretBytes)),
@@ -1103,7 +1156,8 @@ class P2PSecurityService {
     if ((secret?.isNotEmpty ?? false) && hydrated.sharedSecretBase64.isEmpty) {
       hydrated = hydrated.copyWith(sharedSecretBase64: secret);
     }
-    if ((privKey?.isNotEmpty ?? false) && hydrated.devicePrivateKeyBase64.isEmpty) {
+    if ((privKey?.isNotEmpty ?? false) &&
+        hydrated.devicePrivateKeyBase64.isEmpty) {
       hydrated = hydrated.copyWith(devicePrivateKeyBase64: privKey);
     }
 
@@ -1131,8 +1185,9 @@ class P2PSecurityService {
         if (migrated != null) return migrated;
         return null;
       }
-      final assoc =
-          P2PDeviceAssociation.fromJson(Map<String, dynamic>.from(raw));
+      final assoc = P2PDeviceAssociation.fromJson(
+        Map<String, dynamic>.from(raw),
+      );
       final hydrated = await _hydrateSecrets(
         deviceId,
         assoc,
@@ -1145,8 +1200,8 @@ class P2PSecurityService {
       return hydrated;
     } catch (e) {
       if (kDebugMode) {
-      debugPrint('P2PSecurityService.getAssociation error for $deviceId: $e');
-    }
+        debugPrint('P2PSecurityService.getAssociation error for $deviceId: $e');
+      }
       return null;
     }
   }
@@ -1212,7 +1267,8 @@ class P2PSecurityService {
   }
 
   Future<P2PDeviceAssociation?> _migrateFromSecureStorage(
-      String deviceId) async {
+    String deviceId,
+  ) async {
     final key = '$_storagePrefix$deviceId';
     final raw = await _secureStorage.read(key: key);
     if (raw == null) return null;
@@ -1233,7 +1289,8 @@ class P2PSecurityService {
   }
 
   Future<void> _migrateAllFromSecureStorage(
-      List<P2PDeviceAssociation> associations) async {
+    List<P2PDeviceAssociation> associations,
+  ) async {
     final allKeys = await _secureStorage.readAll();
     for (final entry in allKeys.entries) {
       if (!entry.key.startsWith(_storagePrefix)) continue;
@@ -1288,21 +1345,25 @@ class P2PSecurityService {
     String? remoteEphemeralPub,
   }) {
     final secretBytes = base64Decode(sharedSecretBase64);
-    final hasAuxInput = sessionNonce != null ||
+    final hasAuxInput =
+        sessionNonce != null ||
         localEphemeralPub != null ||
         remoteEphemeralPub != null;
     final combined = hasAuxInput
-        ? crypto.sha256
-                .convert(utf8.encode(_pairingAuxInput(
-                  sessionNonce: sessionNonce,
-                  localEphemeralPub: localEphemeralPub,
-                  remoteEphemeralPub: remoteEphemeralPub,
-                )))
-                .bytes +
+        ? sha256BytesSync(
+                utf8.encode(
+                  _pairingAuxInput(
+                    sessionNonce: sessionNonce,
+                    localEphemeralPub: localEphemeralPub,
+                    remoteEphemeralPub: remoteEphemeralPub,
+                  ),
+                ),
+              ) +
             secretBytes
         : secretBytes;
-    final hash = crypto.sha256.convert(combined);
-    final code = ((hash.bytes[0] << 16) | (hash.bytes[1] << 8) | hash.bytes[2]) % 1000000;
+    final hash = sha256BytesSync(combined);
+    final code =
+        ((hash[0] << 16) | (hash[1] << 8) | hash[2]) % 1000000;
     return code.toString().padLeft(6, '0');
   }
 
@@ -1314,7 +1375,9 @@ class P2PSecurityService {
     String? remoteEphemeralPub,
   }) {
     final parts = <String>[];
-    if (sessionNonce != null && sessionNonce.isNotEmpty) parts.add(sessionNonce);
+    if (sessionNonce != null && sessionNonce.isNotEmpty) {
+      parts.add(sessionNonce);
+    }
     final ephs = <String>[
       if (localEphemeralPub != null && localEphemeralPub.isNotEmpty)
         localEphemeralPub,
@@ -1385,8 +1448,10 @@ class P2PSecurityService {
         return await _ed25519.newKeyPairFromSeed(seed);
       } catch (e) {
         if (kDebugMode) {
-          debugPrint('P2PSecurityService.getOrCreateParishSignerKeyPair: '
-              'chiave corrotta, rigenero: $e');
+          debugPrint(
+            'P2PSecurityService.getOrCreateParishSignerKeyPair: '
+            'chiave corrotta, rigenero: $e',
+          );
         }
       }
     }
@@ -1440,10 +1505,7 @@ class P2PSecurityService {
         base64Decode(publicKeyBase64),
         type: KeyPairType.ed25519,
       );
-      final sig = Signature(
-        base64Decode(signature),
-        publicKey: publicKey,
-      );
+      final sig = Signature(base64Decode(signature), publicKey: publicKey);
       return await Ed25519().verify(
         utf8.encode(canonicalPayload),
         signature: sig,
@@ -1665,7 +1727,9 @@ class P2PSecurityService {
     );
   }
 
-  static String _revocationCanonicalPayload(List<Map<String, dynamic>> revocations) {
+  static String _revocationCanonicalPayload(
+    List<Map<String, dynamic>> revocations,
+  ) {
     final canonical = <String>[];
     for (final r in revocations) {
       canonical.add(
@@ -1724,15 +1788,16 @@ class P2PSecurityService {
   /// (sul dispositivo approvato).
   Future<void> storeLocalApproval(AssociatedDevice cert) async {
     await _secureStorage.write(
-        key: _localApprovalKey, value: jsonEncode(cert.toJson()));
+      key: _localApprovalKey,
+      value: jsonEncode(cert.toJson()),
+    );
   }
 
   Future<AssociatedDevice?> getLocalApproval() async {
     final raw = await _secureStorage.read(key: _localApprovalKey);
     if (raw == null || raw.isEmpty) return null;
     try {
-      return AssociatedDevice.fromJson(
-          jsonDecode(raw) as Map<String, dynamic>);
+      return AssociatedDevice.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     } catch (_) {
       return null;
     }

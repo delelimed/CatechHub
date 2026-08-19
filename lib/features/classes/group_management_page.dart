@@ -12,6 +12,7 @@
 /// Navigazione CateREG: dalla scheda ragazzo si può andare a
 /// [EditStudentPage] (modifica) o eliminare lo studente con conferma.
 library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -57,9 +58,7 @@ class GroupManagementPage extends ConsumerWidget {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (_) => const AddStudentPage(),
-            ),
+            MaterialPageRoute(builder: (_) => const AddStudentPage()),
           ).then((_) {
             // ignore: unused_result
             ref.refresh(classesStreamProvider);
@@ -99,10 +98,7 @@ class _GroupHeader extends ConsumerWidget {
   final SchoolClass schoolClass;
   final VoidCallback onNameChanged;
 
-  const _GroupHeader({
-    required this.schoolClass,
-    required this.onNameChanged,
-  });
+  const _GroupHeader({required this.schoolClass, required this.onNameChanged});
 
   void _showEditNameDialog(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -113,18 +109,16 @@ class _GroupHeader extends ConsumerWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: isDark ? colorScheme.surface : Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Modifica nome gruppo',
-          style: TextStyle(color: isDark ? colorScheme.onSurface : Colors.black87),
+          style: TextStyle(
+            color: isDark ? colorScheme.onSurface : Colors.black87,
+          ),
         ),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'Nome gruppo',
-          ),
+          decoration: const InputDecoration(labelText: 'Nome gruppo'),
         ),
         actions: [
           TextButton(
@@ -133,7 +127,9 @@ class _GroupHeader extends ConsumerWidget {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+              backgroundColor: isDark
+                  ? colorScheme.primary
+                  : const Color(0xFF174A7E),
               foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
             ),
             onPressed: () async {
@@ -151,9 +147,9 @@ class _GroupHeader extends ConsumerWidget {
                 } catch (e) {
                   if (dialogContext.mounted) {
                     Navigator.of(dialogContext).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Errore: $e')),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text('Errore: $e')));
                   }
                 }
               }
@@ -169,10 +165,19 @@ class _GroupHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
-    final hasKnownCreator = schoolClass.creatorCatechistId.isNotEmpty || schoolClass.creatorId.isNotEmpty || schoolClass.creatorName.isNotEmpty;
-    final canEdit = schoolClass.isCreator(AuthService.localUserId, getCurrentCatechistName(),
-            catechistId: AuthService.getCatechistId()) &&
-        (!hasKnownCreator || schoolClass.creatorCatechistId.isNotEmpty || !schoolClass.nameLocked);
+    final hasKnownCreator =
+        schoolClass.creatorCatechistId.isNotEmpty ||
+        schoolClass.creatorId.isNotEmpty ||
+        schoolClass.creatorName.isNotEmpty;
+    final canEdit =
+        schoolClass.isCreator(
+          AuthService.localUserId,
+          getCurrentCatechistName(),
+          catechistId: AuthService.getCatechistId(),
+        ) &&
+        (!hasKnownCreator ||
+            schoolClass.creatorCatechistId.isNotEmpty ||
+            !schoolClass.nameLocked);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -183,14 +188,13 @@ class _GroupHeader extends ConsumerWidget {
                   colorScheme.surfaceContainer,
                   colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                 ]
-              : [
-                  Colors.white,
-                  Colors.blue.shade50.withValues(alpha: 0.3),
-                ],
+              : [Colors.white, Colors.blue.shade50.withValues(alpha: 0.3)],
         ),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.blue.shade100,
+          color: isDark
+              ? colorScheme.outline.withValues(alpha: 0.2)
+              : Colors.blue.shade100,
         ),
         boxShadow: [
           BoxShadow(
@@ -199,7 +203,7 @@ class _GroupHeader extends ConsumerWidget {
                 : Colors.black.withValues(alpha: 0.05),
             blurRadius: 16,
             offset: const Offset(0, 10),
-          )
+          ),
         ],
       ),
       child: Row(
@@ -226,7 +230,9 @@ class _GroupHeader extends ConsumerWidget {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
+                    color: isDark
+                        ? colorScheme.onSurface
+                        : const Color(0xFF174A7E),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -234,8 +240,8 @@ class _GroupHeader extends ConsumerWidget {
                   !canEdit
                       ? 'Solo il creatore può modificare'
                       : (schoolClass.nameLocked
-                          ? 'Nome sincronizzato — non modificabile'
-                          : 'Tap per modificare il nome'),
+                            ? 'Nome sincronizzato — non modificabile'
+                            : 'Tap per modificare il nome'),
                   style: TextStyle(
                     fontSize: 12,
                     color: isDark ? Colors.grey.shade400 : Colors.grey,
@@ -245,10 +251,11 @@ class _GroupHeader extends ConsumerWidget {
             ),
           ),
           IconButton(
-            icon: Icon(Icons.edit, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
-            onPressed: canEdit
-                ? () => _showEditNameDialog(context, ref)
-                : null,
+            icon: Icon(
+              Icons.edit,
+              color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+            ),
+            onPressed: canEdit ? () => _showEditNameDialog(context, ref) : null,
           ),
         ],
       ),
@@ -268,8 +275,11 @@ class _CatechistButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
-    final canManage = myClass.isCreator(AuthService.localUserId, getCurrentCatechistName(),
-        catechistId: AuthService.getCatechistId());
+    final canManage = myClass.isCreator(
+      AuthService.localUserId,
+      getCurrentCatechistName(),
+      catechistId: AuthService.getCatechistId(),
+    );
 
     return InkWell(
       borderRadius: BorderRadius.circular(22),
@@ -284,7 +294,9 @@ class _CatechistButton extends ConsumerWidget {
                 ).then((_) => ref.refresh(classesStreamProvider));
               } catch (_) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Errore durante la navigazione')),
+                  const SnackBar(
+                    content: Text('Errore durante la navigazione'),
+                  ),
                 );
               }
             }
@@ -298,14 +310,13 @@ class _CatechistButton extends ConsumerWidget {
                     colorScheme.surfaceContainer,
                     colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
                   ]
-                : [
-                    Colors.white,
-                    Colors.green.shade50.withValues(alpha: 0.35),
-                  ],
+                : [Colors.white, Colors.green.shade50.withValues(alpha: 0.35)],
           ),
           borderRadius: BorderRadius.circular(22),
           border: Border.all(
-            color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.green.shade200,
+            color: isDark
+                ? colorScheme.outline.withValues(alpha: 0.2)
+                : Colors.green.shade200,
           ),
           boxShadow: [
             BoxShadow(
@@ -338,7 +349,9 @@ class _CatechistButton extends ConsumerWidget {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
+                      color: isDark
+                          ? colorScheme.onSurface
+                          : const Color(0xFF174A7E),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -346,11 +359,13 @@ class _CatechistButton extends ConsumerWidget {
                     !canManage
                         ? 'Solo il creatore può gestire i catechisti'
                         : (myClass.nameLocked
-                            ? '${myClass.catechistIds.length} catechist${myClass.catechistIds.length == 1 ? 'a' : 'i'} — sola lettura'
-                            : '${myClass.catechistIds.length} catechist${myClass.catechistIds.length == 1 ? 'a' : 'i'}'),
+                              ? '${myClass.catechistIds.length} catechist${myClass.catechistIds.length == 1 ? 'a' : 'i'} — sola lettura'
+                              : '${myClass.catechistIds.length} catechist${myClass.catechistIds.length == 1 ? 'a' : 'i'}'),
                     style: TextStyle(
                       fontSize: 12,
-                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
+                      color: isDark
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade500,
                     ),
                   ),
                 ],
@@ -466,12 +481,12 @@ class _StudentsList extends StatelessWidget {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: isDark ? colorScheme.surface : Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Eliminare ragazzo?',
-          style: TextStyle(color: isDark ? colorScheme.onSurface : Colors.black87),
+          style: TextStyle(
+            color: isDark ? colorScheme.onSurface : Colors.black87,
+          ),
         ),
         content: Text(
           'Sei sicuro di voler eliminare ${student.name} ${student.surname}?',
@@ -532,14 +547,13 @@ class _StudentCard extends StatelessWidget {
                     colorScheme.surfaceContainer,
                     colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
                   ]
-                : [
-                    Colors.white,
-                    Colors.blue.shade50.withValues(alpha: 0.35),
-                  ],
+                : [Colors.white, Colors.blue.shade50.withValues(alpha: 0.35)],
           ),
           borderRadius: BorderRadius.circular(22),
           border: Border.all(
-            color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.blue.shade100,
+            color: isDark
+                ? colorScheme.outline.withValues(alpha: 0.2)
+                : Colors.blue.shade100,
           ),
           boxShadow: [
             BoxShadow(
@@ -555,7 +569,9 @@ class _StudentCard extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 26,
-              backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+              backgroundColor: isDark
+                  ? colorScheme.primary
+                  : const Color(0xFF174A7E),
               child: Text(
                 student.name.isNotEmpty ? student.name[0] : '?',
                 style: const TextStyle(
@@ -575,7 +591,9 @@ class _StudentCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
+                      color: isDark
+                          ? colorScheme.onSurface
+                          : const Color(0xFF174A7E),
                     ),
                   ),
                 ],
@@ -627,10 +645,7 @@ class _EmptyState extends StatelessWidget {
   final bool isDark;
   final ColorScheme colorScheme;
 
-  const _EmptyState({
-    required this.isDark,
-    required this.colorScheme,
-  });
+  const _EmptyState({required this.isDark, required this.colorScheme});
 
   @override
   Widget build(BuildContext context) {

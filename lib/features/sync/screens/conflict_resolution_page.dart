@@ -5,7 +5,9 @@ import 'package:hive/hive.dart';
 import '../../../core/services/field_encryption_service.dart';
 import '../../../core/storage/local_database.dart';
 
-final syncConflictsProvider = StreamProvider<List<Map<String, dynamic>>>((ref) async* {
+final syncConflictsProvider = StreamProvider<List<Map<String, dynamic>>>((
+  ref,
+) async* {
   final box = LocalDatabase.syncConflicts();
   yield _loadConflicts(box);
   await for (final _ in box.watch()) {
@@ -43,8 +45,10 @@ class ConflictResolutionPage extends ConsumerWidget {
                 children: [
                   Icon(Icons.check_circle, size: 64, color: Colors.green),
                   SizedBox(height: 16),
-                  Text('Nessun conflitto presente',
-                      style: TextStyle(fontSize: 16)),
+                  Text(
+                    'Nessun conflitto presente',
+                    style: TextStyle(fontSize: 16),
+                  ),
                 ],
               ),
             );
@@ -70,24 +74,52 @@ class _ConflictCard extends ConsumerStatefulWidget {
 }
 
 class _ConflictCardState extends ConsumerState<_ConflictCard> {
+  Map<String, dynamic>? _localData;
+  Map<String, dynamic>? _remoteData;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final c = widget.conflict;
+    final isStudents = c['boxName'] == LocalDatabase.studentsBox;
+    final localRaw = Map<String, dynamic>.from(c['localData'] ?? {});
+    final remoteRaw = Map<String, dynamic>.from(c['remoteData'] ?? {});
+    final localData = isStudents
+        ? await FieldEncryptionService.decryptStudentMapForTransport(localRaw)
+        : localRaw;
+    final remoteData = isStudents
+        ? await FieldEncryptionService.decryptStudentMapForTransport(remoteRaw)
+        : remoteRaw;
+    if (mounted) {
+      setState(() {
+        _localData = localData;
+        _remoteData = remoteData;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = widget.conflict;
-    final fields = (c['conflictingFields'] as List<dynamic>?)
+    final fields =
+        (c['conflictingFields'] as List<dynamic>?)
             ?.map((e) => e.toString())
             .toList() ??
         [];
-    final isStudents = c['boxName'] == LocalDatabase.studentsBox;
-    // M3: i dati degli studenti nel box conflitti sono cifrati con la chiave
-    // di campo del dispositivo; li decifriamo SOLO per la visualizzazione.
-    final localData = isStudents
-        ? FieldEncryptionService.decryptStudentMapForTransport(
-            Map<String, dynamic>.from(c['localData'] ?? {}))
-        : Map<String, dynamic>.from(c['localData'] ?? {});
-    final remoteData = isStudents
-        ? FieldEncryptionService.decryptStudentMapForTransport(
-            Map<String, dynamic>.from(c['remoteData'] ?? {}))
-        : Map<String, dynamic>.from(c['remoteData'] ?? {});
+    final localData = _localData;
+    final remoteData = _remoteData;
+    if (localData == null || remoteData == null) {
+      return const Card(
+        child: ListTile(
+          leading: Icon(Icons.warning_amber, color: Colors.orange),
+          title: Text('Caricamento…'),
+        ),
+      );
+    }
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -104,14 +136,18 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Campi in conflitto:',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text(
+                  'Campi in conflitto:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 8),
-                ...fields.map((f) => _FieldConflict(
-                      field: f,
-                      localValue: localData[f]?.toString() ?? '(vuoto)',
-                      remoteValue: remoteData[f]?.toString() ?? '(vuoto)',
-                    )),
+                ...fields.map(
+                  (f) => _FieldConflict(
+                    field: f,
+                    localValue: localData[f]?.toString() ?? '(vuoto)',
+                    remoteValue: remoteData[f]?.toString() ?? '(vuoto)',
+                  ),
+                ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -192,7 +228,7 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
       // prima della persistenza sul box studenti i campi sensibili vanno
       // ricifrati (idempotente per i campi già cifrati non modificati).
       final toStore = boxName == LocalDatabase.studentsBox
-          ? FieldEncryptionService.encryptStudentMapForStorage(existing)
+          ? await FieldEncryptionService.encryptStudentMapForStorage(existing)
           : existing;
       await box.put(recordId, toStore);
 
@@ -245,9 +281,10 @@ class _FieldConflict extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(field,
-              style: const TextStyle(
-                  fontWeight: FontWeight.w600, fontSize: 13)),
+          Text(
+            field,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+          ),
           const SizedBox(height: 4),
           Row(
             children: [
@@ -257,7 +294,10 @@ class _FieldConflict extends StatelessWidget {
               const SizedBox(width: 4),
               Expanded(
                 child: _ValueChip(
-                    label: 'Remoto', value: remoteValue, isRemote: true),
+                  label: 'Remoto',
+                  value: remoteValue,
+                  isRemote: true,
+                ),
               ),
             ],
           ),
@@ -291,16 +331,21 @@ class _ValueChip extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: isRemote ? Colors.blue : Colors.green)),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: isRemote ? Colors.blue : Colors.green,
+            ),
+          ),
           const SizedBox(height: 2),
-          Text(value,
-              style: const TextStyle(fontSize: 12),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 12),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );

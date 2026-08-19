@@ -28,8 +28,10 @@ void main() {
   group('ConsensiService.stato', () {
     test('ritorna nonFirmato se la scheda non e firmata', () {
       final s = student(firmato: false);
-      expect(ConsensiService.stato(s, now: DateTime(2026, 8, 8)),
-          StatoConsenso.nonFirmato);
+      expect(
+        ConsensiService.stato(s, now: DateTime(2026, 8, 8)),
+        StatoConsenso.nonFirmato,
+      );
     });
 
     test('ritorna valido se dentro la validita', () {
@@ -39,8 +41,10 @@ void main() {
         firma: firma,
         scadenza: DateTime(2027, 1, 1),
       );
-      expect(ConsensiService.stato(s, now: DateTime(2026, 8, 8)),
-          StatoConsenso.valido);
+      expect(
+        ConsensiService.stato(s, now: DateTime(2026, 8, 8)),
+        StatoConsenso.valido,
+      );
     });
 
     test('ritorna scaduto dopo la scadenza', () {
@@ -50,17 +54,23 @@ void main() {
         firma: firma,
         scadenza: DateTime(2026, 1, 1),
       );
-      expect(ConsensiService.stato(s, now: DateTime(2026, 8, 8)),
-          StatoConsenso.scaduto);
+      expect(
+        ConsensiService.stato(s, now: DateTime(2026, 8, 8)),
+        StatoConsenso.scaduto,
+      );
     });
 
     test('calcola la scadenza di fallback (firma + 12 mesi)', () {
       final firma = DateTime(2026, 1, 1);
       final s = student(firmato: true, firma: firma);
-      expect(ConsensiService.stato(s, now: DateTime(2026, 8, 8)),
-          StatoConsenso.valido);
-      expect(ConsensiService.stato(s, now: DateTime(2027, 2, 1)),
-          StatoConsenso.scaduto);
+      expect(
+        ConsensiService.stato(s, now: DateTime(2026, 8, 8)),
+        StatoConsenso.valido,
+      );
+      expect(
+        ConsensiService.stato(s, now: DateTime(2027, 2, 1)),
+        StatoConsenso.scaduto,
+      );
     });
   });
 

@@ -31,9 +31,17 @@ class _AllarmeAssenzePageState extends ConsumerState<AllarmeAssenzePage> {
   @override
   void initState() {
     super.initState();
-    _soglia = ref.read(parishConfigRepositoryProvider).getConfig().sogliaAssenzeConsecutive == 0
+    _soglia =
+        ref
+                .read(parishConfigRepositoryProvider)
+                .getConfig()
+                .sogliaAssenzeConsecutive ==
+            0
         ? ParishConfig.defaultSogliaAssenzeConsecutive
-        : ref.read(parishConfigRepositoryProvider).getConfig().sogliaAssenzeConsecutive;
+        : ref
+              .read(parishConfigRepositoryProvider)
+              .getConfig()
+              .sogliaAssenzeConsecutive;
   }
 
   void _snack(String msg) =>
@@ -76,8 +84,7 @@ class _AllarmeAssenzePageState extends ConsumerState<AllarmeAssenzePage> {
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
-                      contentPadding:
-                          EdgeInsets.symmetric(vertical: 12),
+                      contentPadding: EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
                 ),
@@ -130,27 +137,26 @@ class _AllarmeAssenzePageState extends ConsumerState<AllarmeAssenzePage> {
   }
 
   Future<void> _contactFamily(AllertaAssenza alert) async {
-    final student = StudentsRepository()
-        .getAllStudentsSync()
+    final student = (await StudentsRepository().getAllStudentsSync())
         .where((s) => s.id == alert.studentId)
         .firstOrNull;
     final phone = student?.motherPhone.isNotEmpty == true
         ? student!.motherPhone
         : (student?.fatherPhone.isNotEmpty == true
-            ? student!.fatherPhone
-            : null);
+              ? student!.fatherPhone
+              : null);
     if (phone == null) {
+      if (!mounted) return;
       _snack('Nessun recapito famigliare registrato per ${alert.fullName}.');
       return;
     }
 
+    if (!mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Contatta la famiglia'),
-        content: Text(
-          'Vuoi chiamare ${alert.fullName} al numero $phone?',
-        ),
+        content: Text('Vuoi chiamare ${alert.fullName} al numero $phone?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -191,9 +197,17 @@ class _AllarmeAssenzePageState extends ConsumerState<AllarmeAssenzePage> {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Text('Errore: $e'),
             data: (classes) {
-              final alerts = const PresenzeParrocchialiService()
+              final alertsFuture = const PresenzeParrocchialiService()
                   .rilevaIstanza(threshold: _soglia, classes: classes);
-              return _alertList(alerts, isDark);
+              return FutureBuilder<List<AllertaAssenza>>(
+                future: alertsFuture,
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  return _alertList(snapshot.data!, isDark);
+                },
+              );
             },
           ),
         ],
@@ -210,15 +224,19 @@ class _AllarmeAssenzePageState extends ConsumerState<AllarmeAssenzePage> {
             : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-            color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+          color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.warning_amber_rounded,
-                  color: Colors.orange, size: 28),
+              const Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.orange,
+                size: 28,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -259,8 +277,11 @@ class _AllarmeAssenzePageState extends ConsumerState<AllarmeAssenzePage> {
         ),
         child: const Column(
           children: [
-            Icon(Icons.check_circle_outline_rounded,
-                color: Colors.green, size: 44),
+            Icon(
+              Icons.check_circle_outline_rounded,
+              color: Colors.green,
+              size: 44,
+            ),
             SizedBox(height: 10),
             Text(
               'Nessun allarme attivo. Tutti i ragazzi sono sotto la soglia.',
@@ -313,7 +334,9 @@ class _AllarmeAssenzePageState extends ConsumerState<AllarmeAssenzePage> {
                 Text(
                   alert.fullName,
                   style: const TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 14),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
                 ),
                 Text(
                   '${alert.className} · ${alert.assenzeConsecutive} assenze '

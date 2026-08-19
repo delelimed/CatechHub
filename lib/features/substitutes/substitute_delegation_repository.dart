@@ -8,6 +8,7 @@
 /// Gestisce inoltre il ciclo di vita locale della classe «ombra» sul
 /// dispositivo del Supplente (snapshot di classi/studenti + chiave temporanea).
 library;
+
 import 'dart:convert';
 
 import '../../core/storage/local_database.dart';
@@ -62,19 +63,17 @@ class SubstituteDelegationRepository {
   Future<void> updateStatus(String delegationId, String status) async {
     final current = getById(delegationId);
     if (current == null) return;
-    await save(current.copyWith(
-      status: status,
-      updatedAt: DateTime.now().toUtc(),
-    ));
+    await save(
+      current.copyWith(status: status, updatedAt: DateTime.now().toUtc()),
+    );
   }
 
   Future<void> markCollected(String delegationId) async {
     final current = getById(delegationId);
     if (current == null) return;
-    await save(current.copyWith(
-      dataCollected: true,
-      updatedAt: DateTime.now().toUtc(),
-    ));
+    await save(
+      current.copyWith(dataCollected: true, updatedAt: DateTime.now().toUtc()),
+    );
   }
 
   /// Registry: rende persistente la scadenza naturale delle deleghe attive
@@ -207,13 +206,16 @@ class SubstituteDelegationRepository {
     for (final s in students) {
       final id = s['id'];
       if (id == null || studentsBox.containsKey(id)) continue;
-      await studentsBox.put(id, _shadowStudentMap(
-        delegation,
+      await studentsBox.put(
         id,
-        name: s['name'] ?? '',
-        surname: s['surname'] ?? '',
-        now: now,
-      ));
+        _shadowStudentMap(
+          delegation,
+          id,
+          name: s['name'] ?? '',
+          surname: s['surname'] ?? '',
+          now: now,
+        ),
+      );
     }
     await studentsBox.flush();
 
@@ -235,19 +237,23 @@ class SubstituteDelegationRepository {
     final rawClass = classesBox.get(delegation.classId);
     if (rawClass != null) {
       final map = LocalDatabase.toStringDynamicMap(rawClass);
-      final catechistIds =
-          (map['catechistIds'] as List? ?? []).map((e) => e.toString()).toList();
+      final catechistIds = (map['catechistIds'] as List? ?? [])
+          .map((e) => e.toString())
+          .toList();
       if (catechistIds.isEmpty) {
         // Classe ombra: eliminazione completa.
         await classesBox.delete(delegation.classId);
       } else {
         // Caso limite (classe già reale per il Supplente): non si tocca la
         // classe, ma si rimuovono gli id snapshot non più appartenenti.
-        final studentIds =
-            (map['studentIds'] as List? ?? []).map((e) => e.toString()).toList();
+        final studentIds = (map['studentIds'] as List? ?? [])
+            .map((e) => e.toString())
+            .toList();
         await classesBox.put(delegation.classId, {
           ...map,
-          'studentIds': studentIds.where((id) => !snapshotIds.contains(id)).toList(),
+          'studentIds': studentIds
+              .where((id) => !snapshotIds.contains(id))
+              .toList(),
         });
       }
     }
@@ -348,7 +354,9 @@ class SubstituteDelegationRepository {
       'classUniqueCode': delegation.classUniqueCode,
       'className': delegation.className,
       'keyBase64': delegation.temporaryClassKey,
-      'keyId': ClassChannelService.computeKeyId(delegation.temporaryClassKey),
+      'keyId': await ClassChannelService.computeKeyId(
+        delegation.temporaryClassKey,
+      ),
       'grantorCatechistId': delegation.ownerCatechistId,
       'grantedAt': DateTime.now().toUtc().toIso8601String(),
       'isActive': true,

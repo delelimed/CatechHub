@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════════════════════
 // auth_provider.dart — CatechHub (Riverpod auth state machine - POST MIGRAZIONE)
-// 
+//
 // NUOVO FLUSSO (solo biometria/PIN telefono):
 //   - NESSUN PIN app proprio
 //   - isPinConfigured → SEMPRE false (rimosso per compatibilità, deprecato)
@@ -18,9 +18,10 @@ import '../../shared/models/user_role.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
-final authStateProvider = AsyncNotifierProvider<LocalAuthNotifier, Map<String, dynamic>?>(
-  () => LocalAuthNotifier(),
-);
+final authStateProvider =
+    AsyncNotifierProvider<LocalAuthNotifier, Map<String, dynamic>?>(
+      () => LocalAuthNotifier(),
+    );
 
 class LocalAuthNotifier extends AsyncNotifier<Map<String, dynamic>?> {
   AuthService get _authService => ref.read(authServiceProvider);

@@ -88,7 +88,9 @@ class SecurityService {
   ///
   /// - `null` = ambiente sicuro, mostra app normale
   /// - `String` = messaggio di blocco (es. "Root rilevato"), mostra SecurityBlockScreen
-  static final ValueNotifier<String?> blockMessage = ValueNotifier<String?>(null);
+  static final ValueNotifier<String?> blockMessage = ValueNotifier<String?>(
+    null,
+  );
 
   /// Flag per evitare doppia inizializzazione.
   static bool _initialized = false;
@@ -148,7 +150,9 @@ class SecurityService {
 
     if (kDebugMode) {
       debugPrint('[SecurityService] Package: $packageName');
-      debugPrint('[SecurityService] Release Hash: ${releaseHash.isNotEmpty ? "presente (${releaseHash.length} char)" : "vuoto (debug mode)"}');
+      debugPrint(
+        '[SecurityService] Release Hash: ${releaseHash.isNotEmpty ? "presente (${releaseHash.length} char)" : "vuoto (debug mode)"}',
+      );
       debugPrint('[SecurityService] Debug Mode: $kDebugMode');
     }
 
@@ -277,13 +281,13 @@ class SecurityService {
     _triggerBlock(msg);
   }
 
-/// Callback: Opzioni sviluppatore attive.
-///
-/// BLOCCA l'avvio dell'applicazione con schermata rossa.
-/// Le opzioni sviluppatore abilitano vettori di attacco (debug USB, hooking,
-/// installazione app non certificate) che compromettono la sicurezza dei
-/// dati sensibili, especially those of minors.
-static void _onDeveloperOptionsEnabledDetected() {
+  /// Callback: Opzioni sviluppatore attive.
+  ///
+  /// BLOCCA l'avvio dell'applicazione con schermata rossa.
+  /// Le opzioni sviluppatore abilitano vettori di attacco (debug USB, hooking,
+  /// installazione app non certificate) che compromettono la sicurezza dei
+  /// dati sensibili, especially those of minors.
+  static void _onDeveloperOptionsEnabledDetected() {
     const msg = 'Opzioni sviluppatore attive rilevate';
     _triggerBlock(msg);
     // Usa un notifier separato per la schermata arancione bypassabile
@@ -296,7 +300,8 @@ static void _onDeveloperOptionsEnabledDetected() {
   ///
   /// - `null` = nessun avviso, app normale
   /// - `String` = messaggio di avviso, mostra DeveloperOptionsWarningScreen
-  static final ValueNotifier<String?> developerOptionsWarningMessage = ValueNotifier<String?>(null);
+  static final ValueNotifier<String?> developerOptionsWarningMessage =
+      ValueNotifier<String?>(null);
 
   /// Attiva lo stato di blocco e notifica l'UI (schermata rossa, NON bypassabile).
   static void _triggerBlock(String message) {

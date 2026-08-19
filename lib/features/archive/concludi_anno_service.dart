@@ -63,8 +63,7 @@ class ConcludiAnnoService {
   /// Stato percorso di un ragazzo archiviato ad anno concluso.
   static const statoArchiviato = 'ARCHIVIATO';
 
-  final HistoricalRecordRepository _historyRepo =
-      HistoricalRecordRepository();
+  final HistoricalRecordRepository _historyRepo = HistoricalRecordRepository();
   final ClassesRepository _classesRepo = ClassesRepository();
   final StudentsRepository _studentsRepo = StudentsRepository();
   final AuditLogRepository _auditRepo = AuditLogRepository();
@@ -72,8 +71,10 @@ class ConcludiAnnoService {
   /// Verifica che l'operazione sia eseguita dal Responsabile Catechistico.
   void _requireResponsabile() {
     if (!RolePermissions.currentCan(RolePermission.manageParishConfig)) {
-      throw UnsupportedError('Solo il Responsabile Catechistico può '
-          'concludere l\'anno catechistico.');
+      throw UnsupportedError(
+        'Solo il Responsabile Catechistico può '
+        'concludere l\'anno catechistico.',
+      );
     }
   }
 
@@ -86,7 +87,9 @@ class ConcludiAnnoService {
     for (final key in attendanceBox.keys) {
       final data = LocalDatabase.toStringDynamicMap(attendanceBox.get(key));
       if (data['classId']?.toString() != classId) continue;
-      final presence = Map<String, dynamic>.from(data['presence'] as Map? ?? {});
+      final presence = Map<String, dynamic>.from(
+        data['presence'] as Map? ?? {},
+      );
       final stato = presence[studentId]?.toString();
       if (stato == 'Presente') {
         presenze++;
@@ -140,11 +143,11 @@ class ConcludiAnnoService {
   /// True se esiste già uno snapshot per lo studente nell'anno/classi dati.
   bool _hasSnapshot(String studentId, String academicYear, String classId) {
     final existing = _historyRepo.getAllRecordsSync().where(
-          (r) =>
-              r.studentId == studentId &&
-              r.academicYear == academicYear &&
-              (classId.isEmpty || r.classId == classId),
-        );
+      (r) =>
+          r.studentId == studentId &&
+          r.academicYear == academicYear &&
+          (classId.isEmpty || r.classId == classId),
+    );
     return existing.isNotEmpty;
   }
 
@@ -190,7 +193,7 @@ class ConcludiAnnoService {
     // STEP 1 — Snapshot immutabili dell'anno corrente.
     final records = <HistoricalRecord>[];
     for (final cls in candidates) {
-      final studenti = _studentsRepo.getStudentsByClassSync(cls.id);
+      final studenti = await _studentsRepo.getStudentsByClassSync(cls.id);
       for (final student in studenti) {
         // Idempotenza: evita duplicati se la chiusura viene rieseguita.
         if (_hasSnapshot(student.id, annoCorrente, cls.id)) continue;
@@ -210,8 +213,11 @@ class ConcludiAnnoService {
     );
 
     // STEP 3 — Registro Trattamenti GDPR.
-    await _log(AuditActionType.concludiAnno, 'anno:$annoCorrente',
-        AuditLog.entityClasse);
+    await _log(
+      AuditActionType.concludiAnno,
+      'anno:$annoCorrente',
+      AuditLog.entityClasse,
+    );
 
     return ConcludiAnnoResult(
       records: records,
@@ -266,8 +272,11 @@ class ConcludiAnnoService {
       }
     }
 
-    await _log(AuditActionType.promuoviStudente, student.id,
-        AuditLog.entityRagazzo);
+    await _log(
+      AuditActionType.promuoviStudente,
+      student.id,
+      AuditLog.entityRagazzo,
+    );
     return record;
   }
 
@@ -295,8 +304,11 @@ class ConcludiAnnoService {
     await _studentsRepo.setStatoPercorso(student.id, statoArchiviato);
     await _studentsRepo.removeFromClass(student.id, cls.id);
 
-    await _log(AuditActionType.archiviaStudente, student.id,
-        AuditLog.entityRagazzo);
+    await _log(
+      AuditActionType.archiviaStudente,
+      student.id,
+      AuditLog.entityRagazzo,
+    );
     return record;
   }
 
@@ -323,8 +335,10 @@ class ConcludiAnnoService {
       );
     } catch (e) {
       if (kDebugMode) {
-      debugPrint('[ConcludiAnnoService] AuditLog non registrato ($action): $e');
-    }
+        debugPrint(
+          '[ConcludiAnnoService] AuditLog non registrato ($action): $e',
+        );
+      }
     }
   }
 }

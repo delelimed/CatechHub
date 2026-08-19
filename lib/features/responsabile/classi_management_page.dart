@@ -111,16 +111,18 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
 
   Future<void> _createClass(String nome, String? percorso) async {
     final repo = ClassesRepository();
-    await repo.addClass(SchoolClass(
-      id: LocalDatabase.newId('class'),
-      name: nome,
-      studentIds: [],
-      catechistIds: [],
-      uniqueCode: generateClassUniqueCode(),
-      percorso: percorso ?? '',
-      annoCatechistico: currentCatechisticYear(),
-      lastModifiedBy: getCurrentCatechistName(),
-    ));
+    await repo.addClass(
+      SchoolClass(
+        id: LocalDatabase.newId('class'),
+        name: nome,
+        studentIds: [],
+        catechistIds: [],
+        uniqueCode: generateClassUniqueCode(),
+        percorso: percorso ?? '',
+        annoCatechistico: currentCatechisticYear(),
+        lastModifiedBy: getCurrentCatechistName(),
+      ),
+    );
     _snack('Classe "$nome" creata.');
   }
 
@@ -185,11 +187,12 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
                               tooltip: 'Rinomina',
                               icon: const Icon(Icons.edit_outlined, size: 20),
                               onPressed: () async {
-                                final nuovoNome =
-                                    await _renamePercorso(d, p);
+                                final nuovoNome = await _renamePercorso(d, p);
                                 if (nuovoNome != null) {
                                   setState(() {
-                                    percorsi = percorsi.map((x) => x == p ? nuovoNome : x).toList();
+                                    percorsi = percorsi
+                                        .map((x) => x == p ? nuovoNome : x)
+                                        .toList();
                                   });
                                 }
                               },
@@ -404,8 +407,11 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
                           padding: const EdgeInsets.only(top: 8, bottom: 6),
                           child: Row(
                             children: [
-                              Icon(Icons.route_outlined,
-                                  size: 16, color: sectionColor),
+                              Icon(
+                                Icons.route_outlined,
+                                size: 16,
+                                color: sectionColor,
+                              ),
                               const SizedBox(width: 6),
                               Text(
                                 percorso,
@@ -418,8 +424,9 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
                             ],
                           ),
                         ),
-                      for (final c
-                          in active.where((c) => c.percorso == percorso))
+                      for (final c in active.where(
+                        (c) => c.percorso == percorso,
+                      ))
                         _manageClassCard(c, namesById: namesById),
                     ],
                     if (archived.isNotEmpty) ...[
@@ -466,7 +473,8 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
         color: cardColor,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-            color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+          color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: Material(
@@ -493,8 +501,9 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
                             '${c.percorso.isNotEmpty ? " · ${c.percorso}" : ""}',
                             style: TextStyle(
                               fontSize: 12,
-                              color:
-                                  isDark ? Colors.grey.shade400 : Colors.black54,
+                              color: isDark
+                                  ? Colors.grey.shade400
+                                  : Colors.black54,
                             ),
                           ),
                         ],
@@ -503,7 +512,9 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
                     if (!archived) ...[
                       Icon(
                         Icons.chevron_right_rounded,
-                        color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+                        color: isDark
+                            ? Colors.grey.shade500
+                            : Colors.grey.shade400,
                       ),
                     ],
                   ],
@@ -513,7 +524,8 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
                     spacing: 6,
                     runSpacing: 6,
                     children: c.catechistRoles.entries.map((e) {
-                      final isTitolo = e.value == ClassesRepository.roleTitolare;
+                      final isTitolo =
+                          e.value == ClassesRepository.roleTitolare;
                       return Chip(
                         label: Text(
                           '${_catechistLabel(e.key, namesById)} · ${isTitolo ? "Titolare" : "Aiuto"}',
@@ -538,9 +550,7 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
     final name = namesById[id];
     if (name != null && name.isNotEmpty) return name;
     if (id == 'local_catechist_id') return 'Catechista locale';
-    return id.length > 8
-        ? 'Catechista ${id.substring(id.length - 8)}'
-        : id;
+    return id.length > 8 ? 'Catechista ${id.substring(id.length - 8)}' : id;
   }
 
   void _snack(String msg) =>

@@ -61,38 +61,39 @@ class _ConsensiPageState extends ConsumerState<ConsensiPage> {
           _filters(),
           const SizedBox(height: 8),
           Expanded(
-            child: ref.watch(parrocchiaStudentsProvider).when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Errore: $e')),
-              data: (students) {
-                final filtered = _filtro == null
-                    ? students
-                    : students
-                        .where((s) =>
-                            ConsensiService.stato(s) == _filtro)
-                        .toList();
-                if (filtered.isEmpty) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text(
-                        'Nessun ragazzo corrisponde al filtro selezionato.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontStyle: FontStyle.italic),
+            child: ref
+                .watch(parrocchiaStudentsProvider)
+                .when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(child: Text('Errore: $e')),
+                  data: (students) {
+                    final filtered = _filtro == null
+                        ? students
+                        : students
+                              .where((s) => ConsensiService.stato(s) == _filtro)
+                              .toList();
+                    if (filtered.isEmpty) {
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Text(
+                            'Nessun ragazzo corrisponde al filtro selezionato.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontStyle: FontStyle.italic),
+                          ),
+                        ),
+                      );
+                    }
+                    return RefreshIndicator(
+                      onRefresh: () =>
+                          ref.refresh(parrocchiaStudentsProvider.future),
+                      child: ListView(
+                        children: [for (final s in filtered) _studentCard(s)],
                       ),
-                    ),
-                  );
-                }
-                return RefreshIndicator(
-                  onRefresh: () => ref.refresh(parrocchiaStudentsProvider.future),
-                  child: ListView(
-                    children: [
-                      for (final s in filtered) _studentCard(s),
-                    ],
-                  ),
-                );
-              },
-            ),
+                    );
+                  },
+                ),
           ),
         ],
       ),
@@ -157,8 +158,9 @@ class _ConsensiPageState extends ConsumerState<ConsensiPage> {
   Widget _studentCard(Student s) {
     final info = ConsensiService.info(s);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor =
-        isDark ? Theme.of(context).colorScheme.surfaceContainer : Colors.white;
+    final cardColor = isDark
+        ? Theme.of(context).colorScheme.surfaceContainer
+        : Colors.white;
 
     final statoColor = switch (info.stato) {
       StatoConsenso.valido => Colors.green,
@@ -192,12 +194,13 @@ class _ConsensiPageState extends ConsumerState<ConsensiPage> {
                 child: Text(
                   '${s.name} ${s.surname}'.trim(),
                   style: const TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 14),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: statoColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(20),
@@ -226,7 +229,7 @@ class _ConsensiPageState extends ConsumerState<ConsensiPage> {
             Icons.payments_rounded,
             s.contributoVersato
                 ? 'Contributo versato: ${s.contributoEuros.toStringAsFixed(2)} €'
-                    '${s.annoContributo.isNotEmpty ? ' · ${s.annoContributo}' : ''}'
+                      '${s.annoContributo.isNotEmpty ? ' · ${s.annoContributo}' : ''}'
                 : 'Contributo volontario: non versato',
           ),
           const Divider(height: 16),
@@ -366,7 +369,10 @@ class _ConsensiPageState extends ConsumerState<ConsensiPage> {
                 dense: true,
                 contentPadding: EdgeInsets.zero,
                 controlAffinity: ListTileControlAffinity.leading,
-                title: const Text('Contributo versato', style: TextStyle(fontSize: 14)),
+                title: const Text(
+                  'Contributo versato',
+                  style: TextStyle(fontSize: 14),
+                ),
                 value: versato,
                 onChanged: (v) => setState(() => versato = v ?? false),
               ),
@@ -375,7 +381,8 @@ class _ConsensiPageState extends ConsumerState<ConsensiPage> {
                 TextField(
                   controller: ctrl,
                   keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true),
+                    decimal: true,
+                  ),
                   decoration: const InputDecoration(
                     labelText: 'Importo (€)',
                     border: OutlineInputBorder(),
@@ -403,10 +410,8 @@ class _ConsensiPageState extends ConsumerState<ConsensiPage> {
             ),
             FilledButton(
               onPressed: () async {
-                final euros = double.tryParse(
-                      ctrl.text.trim().replaceAll(',', '.'),
-                    ) ??
-                    0;
+                final euros =
+                    double.tryParse(ctrl.text.trim().replaceAll(',', '.')) ?? 0;
                 await ConsensiService.aggiornaContributo(
                   s,
                   versato: versato,

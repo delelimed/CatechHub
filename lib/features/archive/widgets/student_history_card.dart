@@ -66,7 +66,9 @@ class _HistoryTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark ? Colors.blueGrey.withValues(alpha: 0.15) : Colors.blue.shade50,
+        color: isDark
+            ? Colors.blueGrey.withValues(alpha: 0.15)
+            : Colors.blue.shade50,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isDark
@@ -91,8 +93,7 @@ class _HistoryTile extends StatelessWidget {
               ),
               const Spacer(),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: primary.withValues(alpha: isDark ? 0.25 : 0.1),
                   borderRadius: BorderRadius.circular(999),
@@ -110,7 +111,9 @@ class _HistoryTile extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            record.className.isEmpty ? 'Classe non specificata' : record.className,
+            record.className.isEmpty
+                ? 'Classe non specificata'
+                : record.className,
             style: TextStyle(
               fontSize: 12,
               color: isDark ? Colors.grey.shade400 : Colors.black54,

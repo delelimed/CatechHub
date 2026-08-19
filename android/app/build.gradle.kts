@@ -18,7 +18,7 @@ plugins {
 
 android {
     namespace = "com.delelimed.catechhub"
-    compileSdk = 37
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -30,7 +30,7 @@ android {
     defaultConfig {
         applicationId = "com.delelimed.catechhub"
         minSdk = 30
-        targetSdk = 37
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         multiDexEnabled = true
@@ -110,7 +110,13 @@ android {
             )
         }
         jniLibs {
-            keepDebugSymbols.clear() 
+            keepDebugSymbols.clear()
+            // Comprime le librerie native (.so) dentro l'APK invece di
+            // memorizzarle allineate e non compresse (default AGP 3.6+ con
+            // minSdk >= 23). Con minSdk 30 tutte le librerie vengono estratte
+            // in installazione: l'APK pesa molto meno (~30-40% sulle .so)
+            // senza alcuna riduzione di sicurezza.
+            useLegacyPackaging = true
         }
     }
 }

@@ -108,10 +108,9 @@ class ParishConfig {
   }
 
   /// Anno catechistico formattato o fallback leggibile.
-  String get annoLabel =>
-      annoCatechisticoCorrente.trim().isEmpty
-          ? 'Anno catechistico non impostato'
-          : annoCatechisticoCorrente.trim();
+  String get annoLabel => annoCatechisticoCorrente.trim().isEmpty
+      ? 'Anno catechistico non impostato'
+      : annoCatechisticoCorrente.trim();
 
   @override
   bool operator ==(Object other) =>
@@ -125,11 +124,11 @@ class ParishConfig {
 
   @override
   int get hashCode => Object.hash(
-        isResponsabileModeActive,
-        nomeParrocchia,
-        diocesi,
-        annoCatechisticoCorrente,
-        durataValiditaConsensoMesi,
-        sogliaAssenzeConsecutive,
-      );
+    isResponsabileModeActive,
+    nomeParrocchia,
+    diocesi,
+    annoCatechisticoCorrente,
+    durataValiditaConsensoMesi,
+    sogliaAssenzeConsecutive,
+  );
 }

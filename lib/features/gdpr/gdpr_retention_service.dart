@@ -109,7 +109,7 @@ class GdprRetentionService {
     }
 
     final repository = StudentsRepository();
-    final students = repository.getAllStudentsSync();
+    final students = await repository.getAllStudentsSync();
 
     // Carica lo stato processato: mappa studentId -> {expirationKey, markedAt}
     Map<String, Map<String, dynamic>> processed = {};
@@ -159,7 +159,8 @@ class GdprRetentionService {
 
       // Nuova marcatura: registra la scadenza e la data di marcatura.
       // Se markedAt è null, questa è una nuova marcatura.
-      final markedAt = studentData?['markedAt'] as String? ?? now.toUtc().toIso8601String();
+      final markedAt =
+          studentData?['markedAt'] as String? ?? now.toUtc().toIso8601String();
       processed[student.id] = {
         'expirationKey': scadenzaKey,
         'markedAt': markedAt,
@@ -167,7 +168,8 @@ class GdprRetentionService {
       changed = true;
 
       // Marca il percorso come non più attivo (il trattamento è terminato).
-      if (student.statoPercorso == 'ATTIVO' || student.statoPercorso == 'FERMO') {
+      if (student.statoPercorso == 'ATTIVO' ||
+          student.statoPercorso == 'FERMO') {
         await repository.setStatoPercorso(student.id, 'RITIRATO');
       }
 
@@ -186,7 +188,11 @@ class GdprRetentionService {
 
   /// Controlla se uno studente marcato RITIRATO deve essere sottoposto a
   /// pulizia automatica dei dati in base al grace period.
-  static void _checkRetentionCleanup(Student student, DateTime now, String? markedAt) {
+  static void _checkRetentionCleanup(
+    Student student,
+    DateTime now,
+    String? markedAt,
+  ) {
     if (markedAt == null) return;
 
     final markedDate = DateTime.tryParse(markedAt);
@@ -220,12 +226,14 @@ class GdprRetentionService {
       // storage limitation.
       await StudentsRepository().deleteStudent(studentId);
       debugPrint(
-          '[GdprRetention] Cleanup automatico dati completato per studente: $studentId '
-          '(grace period scaduto, cascata allegati/note/storici/presenze)',
-        );
+        '[GdprRetention] Cleanup automatico dati completato per studente: $studentId '
+        '(grace period scaduto, cascata allegati/note/storici/presenze)',
+      );
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('[GdprRetention] Errore cleanup automatico studente $studentId: $e');
+        debugPrint(
+          '[GdprRetention] Errore cleanup automatico studente $studentId: $e',
+        );
       }
     }
   }
@@ -233,9 +241,9 @@ class GdprRetentionService {
   /// Esegue la pulizia automatica per tutti gli studenti i cui grace period
   //  è scaduto nell'arco dell'esecuzione corrente.
   static Future<void> _performRetentionCleanup(
-      final Map<String, Map<String, dynamic>> processed,
-      final DateTime now,
-      ) async {
+    final Map<String, Map<String, dynamic>> processed,
+    final DateTime now,
+  ) async {
     for (final entry in processed.entries) {
       final studentId = entry.key;
       final studentData = entry.value;
@@ -253,7 +261,10 @@ class GdprRetentionService {
   }
 
   /// Registra nel Registro Trattamenti una voce di ritenzione scaduta per uno studente.
-  static Future<void> _recordExpiry(Student student, String expirationKey) async {
+  static Future<void> _recordExpiry(
+    Student student,
+    String expirationKey,
+  ) async {
     final logId = generateAuditLogUuidV4();
     final now = DateTime.now().toUtc();
     final executedByCatechistId = _currentOperatorId();

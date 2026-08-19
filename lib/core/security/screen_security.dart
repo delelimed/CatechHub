@@ -30,8 +30,7 @@ import 'package:flutter/services.dart';
 
 /// Blocca screenshot e registrazione schermo su Android (FLAG_SECURE).
 class ScreenSecurity {
-  static const _channel =
-      MethodChannel('com.delelimed.catechhub/security');
+  static const _channel = MethodChannel('com.delelimed.catechhub/security');
 
   static Future<void> setEnabled(bool enabled) async {
     if (!Platform.isAndroid) return;

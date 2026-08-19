@@ -32,7 +32,10 @@ String resolvePlaceholders(
     result = result.replaceAll('{data_incontro}', meetingDate);
   }
   if (consecutiveAbsences != null) {
-    result = result.replaceAll('{assenze_consecutive}', consecutiveAbsences.toString());
+    result = result.replaceAll(
+      '{assenze_consecutive}',
+      consecutiveAbsences.toString(),
+    );
   }
   if (lastPresenceDate != null) {
     result = result.replaceAll('{ultima_presenza}', lastPresenceDate);
@@ -45,10 +48,7 @@ class AbsenceData {
   final int consecutiveAbsences;
   final String? lastPresenceDate;
 
-  AbsenceData({
-    required this.consecutiveAbsences,
-    this.lastPresenceDate,
-  });
+  AbsenceData({required this.consecutiveAbsences, this.lastPresenceDate});
 }
 
 AbsenceData computeAbsenceData(String studentId, String classId) {
@@ -62,10 +62,10 @@ AbsenceData computeAbsenceData(String studentId, String classId) {
   try {
     final sortedRecords = attendances.toList()
       ..sort((a, b) {
-        final aDate = DateTime.tryParse(a['date']?.toString() ?? '') ??
-            DateTime.now();
-        final bDate = DateTime.tryParse(b['date']?.toString() ?? '') ??
-            DateTime.now();
+        final aDate =
+            DateTime.tryParse(a['date']?.toString() ?? '') ?? DateTime.now();
+        final bDate =
+            DateTime.tryParse(b['date']?.toString() ?? '') ?? DateTime.now();
         return bDate.compareTo(aDate);
       });
 
@@ -74,8 +74,9 @@ AbsenceData computeAbsenceData(String studentId, String classId) {
     bool countingConsecutive = true;
 
     for (final record in sortedRecords) {
-      final presenceMap =
-          Map<String, dynamic>.from(record['presence'] as Map? ?? {});
+      final presenceMap = Map<String, dynamic>.from(
+        record['presence'] as Map? ?? {},
+      );
       final studentStatus = presenceMap[studentId]?.toString();
 
       if (studentStatus == null) continue;

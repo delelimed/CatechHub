@@ -67,8 +67,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
               children: [
                 FilledButton.tonalIcon(
                   onPressed: () async {
-                    final tampered =
-                        await AuditLogRepository().findTampered();
+                    final tampered = await AuditLogRepository().findTampered();
                     if (!context.mounted) return;
                     setState(() {
                       _tamperedIds
@@ -81,7 +80,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
                           tampered.isEmpty
                               ? 'Registro integro: tutte le firme sono valide.'
                               : 'Attenzione: ${tampered.length} voce/i con firma '
-                                  'non valida.',
+                                    'non valida.',
                         ),
                       ),
                     );
@@ -104,20 +103,22 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
           ),
           const SizedBox(height: 12),
           Expanded(
-            child: ref.watch(auditLogStreamProvider).when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Errore: $e')),
-              data: (logs) {
-                return RefreshIndicator(
-                  onRefresh: () => ref.refresh(auditLogStreamProvider.future),
-                  child: ListView(
-                    children: [
-                      for (final log in logs) _logCard(log),
-                    ],
-                  ),
-                );
-              },
-            ),
+            child: ref
+                .watch(auditLogStreamProvider)
+                .when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(child: Text('Errore: $e')),
+                  data: (logs) {
+                    return RefreshIndicator(
+                      onRefresh: () =>
+                          ref.refresh(auditLogStreamProvider.future),
+                      child: ListView(
+                        children: [for (final log in logs) _logCard(log)],
+                      ),
+                    );
+                  },
+                ),
           ),
         ],
       ),
@@ -139,9 +140,9 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Esportazione CSV fallita: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Esportazione CSV fallita: $e')));
       }
     }
   }
@@ -154,7 +155,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
     if (pin == null || !mounted) return;
     try {
       final encrypted =
-          GdprExportService.encryptParishConservationPackage(pin);
+          await GdprExportService.encryptParishConservationPackage(pin);
       await _saveFile(
         bytes: Uint8List.fromList(utf8.encode(encrypted)),
         fileName: 'conformita_parrocchia',
@@ -163,9 +164,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              'Backup di conformità salvato (crittato con PIN).',
-            ),
+            content: Text('Backup di conformità salvato (crittato con PIN).'),
           ),
         );
       }
@@ -187,7 +186,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
     final fullName = '${fileName}_$timestamp.$extension';
     String? savedPath;
     var saved = false;
-try {
+    try {
       // file_picker 12: saveFile restituisce String?.
       final uri = await FilePicker.saveFile(
         dialogTitle: 'Salva esportazione',
@@ -261,8 +260,8 @@ try {
           color: isTampered
               ? Colors.red.shade400
               : isDark
-                  ? Colors.grey.shade800
-                  : Colors.grey.shade200,
+              ? Colors.grey.shade800
+              : Colors.grey.shade200,
         ),
       ),
       child: Column(
@@ -282,7 +281,9 @@ try {
                 child: Text(
                   action,
                   style: const TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 14),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
                 ),
               ),
               Text(
@@ -298,13 +299,17 @@ try {
           Text(
             'Entità: ${log.affectedEntityType} · ${log.affectedEntityId}',
             style: TextStyle(
-                fontSize: 12, color: isDark ? Colors.grey.shade400 : Colors.black54),
+              fontSize: 12,
+              color: isDark ? Colors.grey.shade400 : Colors.black54,
+            ),
           ),
           Text(
             'Operatore: ${log.executedByCatechistName} '
             '(${log.executedByCatechistId})',
             style: TextStyle(
-                fontSize: 11, color: isDark ? Colors.grey.shade500 : Colors.grey),
+              fontSize: 11,
+              color: isDark ? Colors.grey.shade500 : Colors.grey,
+            ),
           ),
           if (isTampered)
             const Padding(

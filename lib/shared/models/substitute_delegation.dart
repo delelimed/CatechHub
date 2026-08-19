@@ -117,8 +117,8 @@ class SubstituteDelegation {
     this.qrChunks = const [],
     DateTime? createdAt,
     DateTime? updatedAt,
-  })  : createdAt = createdAt ?? DateTime.now().toUtc(),
-        updatedAt = updatedAt ?? DateTime.now().toUtc();
+  }) : createdAt = createdAt ?? DateTime.now().toUtc(),
+       updatedAt = updatedAt ?? DateTime.now().toUtc();
 
   /// True se la delega è ancora valida nell'istante corrente.
   bool isActiveAt(DateTime now, {String? asStatus}) {
@@ -186,10 +186,7 @@ class SubstituteDelegation {
     };
   }
 
-  factory SubstituteDelegation.fromMap(
-    String id,
-    Map<String, dynamic> data,
-  ) {
+  factory SubstituteDelegation.fromMap(String id, Map<String, dynamic> data) {
     return SubstituteDelegation(
       delegationId: data['delegationId']?.toString() ?? id,
       classId: data['classId']?.toString() ?? '',
@@ -203,9 +200,11 @@ class SubstituteDelegation {
       substituteDeviceId: data['substituteDeviceId']?.toString() ?? '',
       substitutePublicKey: data['substitutePublicKey']?.toString() ?? '',
       validFrom:
-          DateTime.tryParse(data['validFrom']?.toString() ?? '') ?? DateTime.now(),
+          DateTime.tryParse(data['validFrom']?.toString() ?? '') ??
+          DateTime.now(),
       validUntil:
-          DateTime.tryParse(data['validUntil']?.toString() ?? '') ?? DateTime.now(),
+          DateTime.tryParse(data['validUntil']?.toString() ?? '') ??
+          DateTime.now(),
       temporaryClassKey: data['temporaryClassKey']?.toString() ?? '',
       status: data['status']?.toString() ?? SubstituteDelegationStatus.active,
       dataCollected: data['dataCollected'] == true,
@@ -214,9 +213,11 @@ class SubstituteDelegation {
           .map((e) => Map<String, dynamic>.from(e))
           .toList(),
       createdAt:
-          DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
+          DateTime.tryParse(data['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
       updatedAt:
-          DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+          DateTime.tryParse(data['updatedAt']?.toString() ?? '') ??
+          DateTime.now(),
     );
   }
 
@@ -250,15 +251,15 @@ class SubstituteLessonNote {
   }) : createdAt = createdAt ?? DateTime.now().toUtc();
 
   Map<String, dynamic> toMap() => {
-        'noteId': noteId,
-        'delegationId': delegationId,
-        'classId': classId,
-        'classUniqueCode': classUniqueCode,
-        'date': date.toUtc().toIso8601String(),
-        'note': note,
-        'authorName': authorName,
-        'createdAt': createdAt.toUtc().toIso8601String(),
-      };
+    'noteId': noteId,
+    'delegationId': delegationId,
+    'classId': classId,
+    'classUniqueCode': classUniqueCode,
+    'date': date.toUtc().toIso8601String(),
+    'note': note,
+    'authorName': authorName,
+    'createdAt': createdAt.toUtc().toIso8601String(),
+  };
 
   factory SubstituteLessonNote.fromMap(String id, Map<String, dynamic> data) {
     return SubstituteLessonNote(
@@ -266,7 +267,10 @@ class SubstituteLessonNote {
       delegationId: data['delegationId']?.toString() ?? '',
       classId: data['classId']?.toString() ?? '',
       classUniqueCode: data['classUniqueCode']?.toString() ?? '',
-      date: SubstituteDelegation.parseUtc(data['date']?.toString(), DateTime.now()),
+      date: SubstituteDelegation.parseUtc(
+        data['date']?.toString(),
+        DateTime.now(),
+      ),
       note: data['note']?.toString() ?? '',
       authorName: data['authorName']?.toString() ?? '',
       createdAt: SubstituteDelegation.parseUtc(

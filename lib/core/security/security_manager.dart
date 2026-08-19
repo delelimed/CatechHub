@@ -81,9 +81,7 @@ const int _currentKeyVersion = 1;
 ///   Non è quindi necessario (né possibile in modo affidabile) forzare
 ///   StrongBox via opzioni del plugin: il Keystore usa TEE/StrongBox in base
 ///   all'hardware disponibile.
-const AndroidOptions _androidOptions = AndroidOptions(
-  resetOnError: false,
-);
+const AndroidOptions _androidOptions = AndroidOptions(resetOnError: false);
 
 /// Opzioni complete per FlutterSecureStorage.
 const FlutterSecureStorage _secureStorage = FlutterSecureStorage(
@@ -123,7 +121,9 @@ class SecurityManager {
   /// Restituisce il cipher Hive per l'apertura dei Box cifrati.
   HiveAesCipher get hiveCipher {
     if (_hiveCipher == null) {
-      throw StateError('SecurityManager non inizializzato. Chiamare initialize() prima.');
+      throw StateError(
+        'SecurityManager non inizializzato. Chiamare initialize() prima.',
+      );
     }
     return _hiveCipher!;
   }
@@ -252,8 +252,7 @@ class SecurityManager {
     final LocalAuthentication auth = LocalAuthentication();
 
     final bool canCheck = await auth.canCheckBiometrics;
-    final List<BiometricType> available =
-        await auth.getAvailableBiometrics();
+    final List<BiometricType> available = await auth.getAvailableBiometrics();
 
     // Nessun metodo di autenticazione configurato
     if (!canCheck && available.isEmpty) {
@@ -272,15 +271,16 @@ class SecurityManager {
     // Su Android 10+, la verifica PIN/Pattern/Password è TEE-backed
     if (available.isEmpty) {
       if (kDebugMode) {
-      debugPrint('[SECURITY] Autenticazione: solo credenziali dispositivo (PIN/pattern)');
-    }
+        debugPrint(
+          '[SECURITY] Autenticazione: solo credenziali dispositivo (PIN/pattern)',
+        );
+      }
       return;
     }
 
     // Biometrie disponibili: verifica siano forti
-    final bool hasStrongBiometric = available.contains(
-      BiometricType.strong,
-    ) ||
+    final bool hasStrongBiometric =
+        available.contains(BiometricType.strong) ||
         available.contains(BiometricType.fingerprint) ||
         available.contains(BiometricType.face) ||
         available.contains(BiometricType.iris);
@@ -293,7 +293,9 @@ class SecurityManager {
     }
 
     if (kDebugMode) {
-      debugPrint('[SECURITY] Autenticazione: biometria forte disponibile (TEE garantito)');
+      debugPrint(
+        '[SECURITY] Autenticazione: biometria forte disponibile (TEE garantito)',
+      );
     }
   }
 
@@ -313,7 +315,8 @@ class SecurityManager {
   ///
   /// THROWS: HardwareSecurityException se Keystore non disponibile
   Future<void> _verifyKeystoreAvailability() async {
-    final String testKey = '_hw_keystore_test_${DateTime.now().millisecondsSinceEpoch}';
+    final String testKey =
+        '_hw_keystore_test_${DateTime.now().millisecondsSinceEpoch}';
     const String testValue = 'hardware_keystore_verification_test';
 
     try {
@@ -374,12 +377,17 @@ class SecurityManager {
       try {
         _masterKey = base64Decode(existingKeyB64);
         if (_masterKey!.length != 32) {
-          throw FormatException('Lunghezza chiave non valida: ${_masterKey!.length}');
+          throw FormatException(
+            'Lunghezza chiave non valida: ${_masterKey!.length}',
+          );
         }
         return;
       } on FormatException catch (_) {
         // Chiave corrotta: rigenera
-        await _secureStorage.delete(key: _StorageKeys.masterKey, aOptions: _androidOptions);
+        await _secureStorage.delete(
+          key: _StorageKeys.masterKey,
+          aOptions: _androidOptions,
+        );
       }
     }
 

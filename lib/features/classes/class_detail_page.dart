@@ -12,6 +12,7 @@
 /// scheda classe; le modifiche alle assegnazioni vengono salvate su Hive
 /// tramite [classesRepoProvider].
 library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -26,12 +27,13 @@ import '../students/students_provider.dart';
 // Definizione dello StreamProvider per i ragazzi
 final studentsStreamProvider = StreamProvider<List<Student>>((ref) {
   final repo = ref.watch(studentsRepoProvider);
-  return repo.getStudents(); // Se riscontri errore qui, sostituisci con il metodo esatto (es. getAllStudents())
+  return repo
+      .getStudents(); // Se riscontri errore qui, sostituisci con il metodo esatto (es. getAllStudents())
 });
 
 // Provider temporaneo per i catechisti (puoi modificarlo quando implementerai la loro repository)
 final catechistsProvider = Provider<List<Map<String, dynamic>>>((ref) {
-  return []; 
+  return [];
 });
 
 class ClassDetailPage extends ConsumerWidget {
@@ -42,20 +44,24 @@ class ClassDetailPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final classesAsync = ref.watch(classesStreamProvider);
-    final studentsAsync = ref.watch(studentsStreamProvider); 
+    final studentsAsync = ref.watch(studentsStreamProvider);
     final catechistsList = ref.watch(catechistsProvider);
 
     return classesAsync.when(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (err, stack) => Scaffold(
         body: Center(child: Text('Errore caricamento classi: $err')),
       ),
       data: (classes) {
         final currentClass = classes.firstWhere(
           (e) => e.id == classId,
-          orElse: () => SchoolClass(id: '', name: 'Gruppo non trovato', studentIds: [], catechistIds: []),
+          orElse: () => SchoolClass(
+            id: '',
+            name: 'Gruppo non trovato',
+            studentIds: [],
+            catechistIds: [],
+          ),
         );
 
         return Scaffold(
@@ -67,7 +73,9 @@ class ClassDetailPage extends ConsumerWidget {
             actions: [
               if (currentClass.id.isNotEmpty)
                 PopupMenuButton<String>(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                   onSelected: (value) async {
                     if (value == 'edit') {
                       _showEditNameDialog(context, ref, currentClass);
@@ -76,12 +84,21 @@ class ClassDetailPage extends ConsumerWidget {
                     }
                   },
                   itemBuilder: (_) => [
-                    if (currentClass.isCreator(AuthService.localUserId, getCurrentCatechistName(),
-                            catechistId: AuthService.getCatechistId()) &&
+                    if (currentClass.isCreator(
+                          AuthService.localUserId,
+                          getCurrentCatechistName(),
+                          catechistId: AuthService.getCatechistId(),
+                        ) &&
                         (currentClass.creatorCatechistId.isNotEmpty ||
                             !currentClass.nameLocked))
-                      const PopupMenuItem(value: 'edit', child: Text('Modifica nome')),
-                    const PopupMenuItem(value: 'delete', child: Text('Elimina')),
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Text('Modifica nome'),
+                      ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Text('Elimina'),
+                    ),
                   ],
                 ),
             ],
@@ -89,15 +106,19 @@ class ClassDetailPage extends ConsumerWidget {
           body: currentClass.id.isEmpty
               ? const Center(child: Text('Il gruppo richiesto non esiste più.'))
               : studentsAsync.when(
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (err, stack) => Center(child: Text('Errore caricamento ragazzi: $err')),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (err, stack) =>
+                      Center(child: Text('Errore caricamento ragazzi: $err')),
                   data: (allStudents) {
                     final assignedStudents = allStudents
                         .where((s) => currentClass.studentIds.contains(s.id))
                         .toList();
 
                     final assignedCatechists = catechistsList
-                        .where((c) => currentClass.catechistIds.contains(c['id']))
+                        .where(
+                          (c) => currentClass.catechistIds.contains(c['id']),
+                        )
                         .toList();
 
                     return ListView(
@@ -108,25 +129,48 @@ class ClassDetailPage extends ConsumerWidget {
                         const SizedBox(height: 20),
 
                         /// Sezione Ragazzi
-                        _SectionTitle(title: 'Ragazzi', count: assignedStudents.length),
+                        _SectionTitle(
+                          title: 'Ragazzi',
+                          count: assignedStudents.length,
+                        ),
                         const SizedBox(height: 8),
                         if (assignedStudents.isEmpty)
                           const Padding(
                             padding: EdgeInsets.symmetric(vertical: 8.0),
-                            child: Text('Nessun ragazzo assegnato', style: TextStyle(color: Colors.grey)),
+                            child: Text(
+                              'Nessun ragazzo assegnato',
+                              style: TextStyle(color: Colors.grey),
+                            ),
                           ),
-                        ...assignedStudents.map((s) => _PersonCard(title: '${s.name} ${s.surname}', icon: Icons.person)),
+                        ...assignedStudents.map(
+                          (s) => _PersonCard(
+                            title: '${s.name} ${s.surname}',
+                            icon: Icons.person,
+                          ),
+                        ),
                         const SizedBox(height: 20),
 
                         /// Sezione Catechisti
-                        _SectionTitle(title: 'Catechisti', count: assignedCatechists.length),
+                        _SectionTitle(
+                          title: 'Catechisti',
+                          count: assignedCatechists.length,
+                        ),
                         const SizedBox(height: 8),
                         if (assignedCatechists.isEmpty)
                           const Padding(
                             padding: EdgeInsets.symmetric(vertical: 8.0),
-                            child: Text('Nessun catechista assegnato', style: TextStyle(color: Colors.grey)),
+                            child: Text(
+                              'Nessun catechista assegnato',
+                              style: TextStyle(color: Colors.grey),
+                            ),
                           ),
-                        ...assignedCatechists.map((c) => _PersonCard(title: c['name'] ?? '', subtitle: c['email'] ?? '', icon: Icons.badge)),
+                        ...assignedCatechists.map(
+                          (c) => _PersonCard(
+                            title: c['name'] ?? '',
+                            subtitle: c['email'] ?? '',
+                            icon: Icons.badge,
+                          ),
+                        ),
                         const SizedBox(height: 30),
 
                         /// Pulsante per aprire il BottomSheet di modifica
@@ -137,14 +181,26 @@ class ClassDetailPage extends ConsumerWidget {
                               backgroundColor: const Color(0xFF174A7E),
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
                             ),
                             icon: const Icon(Icons.edit),
                             label: const Text('Modifica assegnazioni'),
-                            onPressed: currentClass.isCreator(AuthService.localUserId, getCurrentCatechistName(),
-                                    catechistId: AuthService.getCatechistId())
+                            onPressed:
+                                currentClass.isCreator(
+                                  AuthService.localUserId,
+                                  getCurrentCatechistName(),
+                                  catechistId: AuthService.getCatechistId(),
+                                )
                                 ? () {
-                                    _openAssignmentPanel(context, ref, currentClass, allStudents, catechistsList);
+                                    _openAssignmentPanel(
+                                      context,
+                                      ref,
+                                      currentClass,
+                                      allStudents,
+                                      catechistsList,
+                                    );
                                   }
                                 : null,
                           ),
@@ -158,7 +214,11 @@ class ClassDetailPage extends ConsumerWidget {
     );
   }
 
-  void _showEditNameDialog(BuildContext context, WidgetRef ref, SchoolClass currentClass) {
+  void _showEditNameDialog(
+    BuildContext context,
+    WidgetRef ref,
+    SchoolClass currentClass,
+  ) {
     final controller = TextEditingController(text: currentClass.name);
 
     showDialog(
@@ -182,7 +242,9 @@ class ClassDetailPage extends ConsumerWidget {
             ),
             onPressed: () {
               if (controller.text.isNotEmpty) {
-                ref.read(classesRepoProvider).updateClass(
+                ref
+                    .read(classesRepoProvider)
+                    .updateClass(
                       currentClass.id,
                       currentClass.copyWith(name: controller.text),
                     );
@@ -196,7 +258,11 @@ class ClassDetailPage extends ConsumerWidget {
     );
   }
 
-  void _showDeleteConfirmation(BuildContext context, WidgetRef ref, SchoolClass currentClass) {
+  void _showDeleteConfirmation(
+    BuildContext context,
+    WidgetRef ref,
+    SchoolClass currentClass,
+  ) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -219,7 +285,9 @@ class ClassDetailPage extends ConsumerWidget {
             onPressed: () async {
               Navigator.pop(context);
               try {
-                await ref.read(classesRepoProvider).deleteClass(currentClass.id);
+                await ref
+                    .read(classesRepoProvider)
+                    .deleteClass(currentClass.id);
                 // Se si eliminava la classe aperta, pulisce la selezione
                 await clearCurrentClassIfDeleted(ref, currentClass.id);
                 if (context.mounted) Navigator.pop(context);
@@ -257,7 +325,9 @@ class ClassDetailPage extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (_) {
         return StatefulBuilder(
           builder: (context, setState) {
@@ -274,10 +344,16 @@ class ClassDetailPage extends ConsumerWidget {
                   Container(
                     width: 50,
                     height: 5,
-                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(20)),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
                   ),
                   const SizedBox(height: 16),
-                  const Text('Gestione assegnazioni', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Gestione assegnazioni',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 16),
 
                   /// Input di ricerca testuale per i ragazzi
@@ -289,10 +365,15 @@ class ClassDetailPage extends ConsumerWidget {
                         hintText: 'Cerca ragazzo...',
                         filled: true,
                         fillColor: Colors.grey.shade100,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
                       ),
                       onChanged: (value) {
-                        setState(() { searchStudents = value; });
+                        setState(() {
+                          searchStudents = value;
+                        });
                       },
                     ),
                   ),
@@ -302,21 +383,30 @@ class ClassDetailPage extends ConsumerWidget {
                     child: ListView(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       children: [
-                        _PanelSectionTitle(title: 'Ragazzi', count: filteredStudents.length),
+                        _PanelSectionTitle(
+                          title: 'Ragazzi',
+                          count: filteredStudents.length,
+                        ),
                         ...filteredStudents.map((s) {
                           return _CheckboxPerson(
                             title: '${s.name} ${s.surname}',
                             selected: selectedStudents.contains(s.id),
                             onChanged: (val) {
                               setState(() {
-                                if (val == true) { selectedStudents.add(s.id); } 
-                                else { selectedStudents.remove(s.id); }
+                                if (val == true) {
+                                  selectedStudents.add(s.id);
+                                } else {
+                                  selectedStudents.remove(s.id);
+                                }
                               });
                             },
                           );
                         }),
                         const SizedBox(height: 24),
-                        _PanelSectionTitle(title: 'Catechisti', count: allCatechists.length),
+                        _PanelSectionTitle(
+                          title: 'Catechisti',
+                          count: allCatechists.length,
+                        ),
                         ...allCatechists.map((c) {
                           final String cId = c['id'] ?? '';
                           return _CheckboxPerson(
@@ -325,8 +415,11 @@ class ClassDetailPage extends ConsumerWidget {
                             selected: selectedCatechists.contains(cId),
                             onChanged: (val) {
                               setState(() {
-                                if (val == true) { selectedCatechists.add(cId); } 
-                                else { selectedCatechists.remove(cId); }
+                                if (val == true) {
+                                  selectedCatechists.add(cId);
+                                } else {
+                                  selectedCatechists.remove(cId);
+                                }
                               });
                             },
                           );
@@ -345,19 +438,28 @@ class ClassDetailPage extends ConsumerWidget {
                           backgroundColor: const Color(0xFF174A7E),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
                         onPressed: () async {
-                          await ref.read(classesRepoProvider).updateClass(
+                          await ref
+                              .read(classesRepoProvider)
+                              .updateClass(
                                 currentClass.id,
                                 currentClass.copyWith(
                                   studentIds: selectedStudents.toList(),
                                   catechistIds: selectedCatechists.toList(),
                                 ),
                               );
-                          if (context.mounted) { Navigator.pop(context); }
+                          if (context.mounted) {
+                            Navigator.pop(context);
+                          }
                         },
-                        child: const Text('Salva modifiche', style: TextStyle(fontSize: 16)),
+                        child: const Text(
+                          'Salva modifiche',
+                          style: TextStyle(fontSize: 16),
+                        ),
                       ),
                     ),
                   ),
@@ -387,9 +489,22 @@ class _HeaderCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: Text(name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF174A7E))),
+      child: Text(
+        name,
+        style: const TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF174A7E),
+        ),
+      ),
     );
   }
 }
@@ -403,12 +518,25 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
         const SizedBox(width: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(color: const Color(0xFF174A7E).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-          child: Text('$count', style: const TextStyle(color: Color(0xFF174A7E), fontWeight: FontWeight.bold, fontSize: 12)),
+          decoration: BoxDecoration(
+            color: const Color(0xFF174A7E).withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            '$count',
+            style: const TextStyle(
+              color: Color(0xFF174A7E),
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+          ),
         ),
       ],
     );
@@ -426,9 +554,19 @@ class _PanelSectionTitle extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         children: [
-          Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.grey)),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
+          ),
           const SizedBox(width: 6),
-          Text('($count)', style: const TextStyle(color: Colors.grey, fontSize: 14)),
+          Text(
+            '($count)',
+            style: const TextStyle(color: Colors.grey, fontSize: 14),
+          ),
         ],
       ),
     );
@@ -466,14 +604,22 @@ class _CheckboxPerson extends StatelessWidget {
   final bool selected;
   final ValueChanged<bool?> onChanged;
 
-  const _CheckboxPerson({required this.title, required this.selected, required this.onChanged, this.subtitle});
+  const _CheckboxPerson({
+    required this.title,
+    required this.selected,
+    required this.onChanged,
+    this.subtitle,
+  });
 
   @override
   Widget build(BuildContext context) {
     return CheckboxListTile(
       value: selected,
       onChanged: onChanged,
-      title: Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+      title: Text(
+        title,
+        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+      ),
       subtitle: subtitle != null ? Text(subtitle!) : null,
       activeColor: const Color(0xFF174A7E),
       contentPadding: EdgeInsets.zero,

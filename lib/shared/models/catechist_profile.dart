@@ -70,7 +70,7 @@ class CatechistProfile {
       phone: data['phone'] ?? '',
       createdAt:
           DateTime.tryParse(data['createdAt']?.toString() ?? '') ??
-              DateTime.now(),
+          DateTime.now(),
     );
   }
 

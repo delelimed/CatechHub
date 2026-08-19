@@ -22,7 +22,8 @@ class SubstituteRegisterPage extends ConsumerStatefulWidget {
       _SubstituteRegisterPageState();
 }
 
-class _SubstituteRegisterPageState extends ConsumerState<SubstituteRegisterPage> {
+class _SubstituteRegisterPageState
+    extends ConsumerState<SubstituteRegisterPage> {
   late Future<SubstituteDelegation?> _delegationFuture;
   final _noteController = TextEditingController();
   DateTime _attendanceDate = DateTime.now();
@@ -127,7 +128,10 @@ class _SubstituteRegisterPageState extends ConsumerState<SubstituteRegisterPage>
   }
 
   // ─── Presenze ─────────────────────────────────────────────────────────
-  Widget _attendanceCard(SubstituteDelegation d, List<Map<String, String>> students) {
+  Widget _attendanceCard(
+    SubstituteDelegation d,
+    List<Map<String, String>> students,
+  ) {
     if (students.isEmpty) {
       return _card(
         title: 'Presenze',
@@ -143,8 +147,7 @@ class _SubstituteRegisterPageState extends ConsumerState<SubstituteRegisterPage>
       ),
       child: Column(
         children: [
-          for (final s in students)
-            _studentRow(s),
+          for (final s in students) _studentRow(s),
           const SizedBox(height: 12),
           FilledButton.icon(
             onPressed: _savingAttendance
@@ -172,15 +175,13 @@ class _SubstituteRegisterPageState extends ConsumerState<SubstituteRegisterPage>
         color: isPresent
             ? Colors.green.withValues(alpha: 0.1)
             : isAbsent
-                ? Colors.red.withValues(alpha: 0.08)
-                : Colors.grey.withValues(alpha: 0.06),
+            ? Colors.red.withValues(alpha: 0.08)
+            : Colors.grey.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
-          Expanded(
-            child: Text(name, style: const TextStyle(fontSize: 14)),
-          ),
+          Expanded(child: Text(name, style: const TextStyle(fontSize: 14))),
           _toggleChip('Presente', isPresent, () {
             setState(() => _presence[id] = isPresent ? 'Assente' : 'Presente');
           }),
@@ -199,8 +200,9 @@ class _SubstituteRegisterPageState extends ConsumerState<SubstituteRegisterPage>
       selected: active,
       onSelected: (_) => onTap(),
       visualDensity: VisualDensity.compact,
-      selectedColor:
-          label == 'Presente' ? Colors.green.shade200 : Colors.red.shade200,
+      selectedColor: label == 'Presente'
+          ? Colors.green.shade200
+          : Colors.red.shade200,
     );
   }
 
@@ -214,12 +216,16 @@ class _SubstituteRegisterPageState extends ConsumerState<SubstituteRegisterPage>
     if (picked != null && mounted) setState(() => _attendanceDate = picked);
   }
 
-  Future<void> _saveAttendance(SubstituteDelegation d,
-      List<Map<String, String>> students) async {
-    final presentIds =
-        _presence.entries.where((e) => e.value == 'Presente').map((e) => e.key);
-    final absentIds =
-        _presence.entries.where((e) => e.value == 'Assente').map((e) => e.key);
+  Future<void> _saveAttendance(
+    SubstituteDelegation d,
+    List<Map<String, String>> students,
+  ) async {
+    final presentIds = _presence.entries
+        .where((e) => e.value == 'Presente')
+        .map((e) => e.key);
+    final absentIds = _presence.entries
+        .where((e) => e.value == 'Assente')
+        .map((e) => e.key);
 
     final presence = <String, String>{};
     for (final s in students) {
@@ -295,12 +301,7 @@ class _SubstituteRegisterPageState extends ConsumerState<SubstituteRegisterPage>
       ),
       child: Row(
         children: [
-          Expanded(
-            child: Text(
-              n.note,
-              style: const TextStyle(fontSize: 13),
-            ),
-          ),
+          Expanded(child: Text(n.note, style: const TextStyle(fontSize: 13))),
           IconButton(
             tooltip: 'Elimina',
             icon: const Icon(Icons.delete_outline_rounded, size: 18),
@@ -449,7 +450,9 @@ class _SubstituteRegisterPageState extends ConsumerState<SubstituteRegisterPage>
 
   void _snack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _fmt(DateTime d) => DateFormat('dd/MM/yyyy', 'it_IT').format(d);

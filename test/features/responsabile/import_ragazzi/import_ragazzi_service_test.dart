@@ -160,7 +160,7 @@ void main() {
       final rows = service.buildRows([
         ['luca', 'bianchi', '01/01/2012'],
       ], mapping);
-      final checked = service.detectDuplicates(rows);
+      final checked = await service.detectDuplicates(rows);
 
       expect(checked.single.status, ImportRowStatus.duplicate);
       expect(checked.single.existing, isNotNull);
@@ -179,7 +179,7 @@ void main() {
       final rows = service.buildRows([
         ['Maria', 'Rossi', '01/01/2012'],
       ], mapping);
-      final checked = service.detectDuplicates(rows);
+      final checked = await service.detectDuplicates(rows);
 
       expect(checked.single.status, ImportRowStatus.valid);
     });
@@ -197,12 +197,12 @@ void main() {
       final rows = service.buildRows([
         ['luca', 'bianchi', '01/01/2012'],
       ], mapping);
-      final checked = service.detectDuplicates(rows);
+      final checked = await service.detectDuplicates(rows);
 
       final report = await service.importRows(checked);
       expect(report.imported, 0);
       expect(report.duplicatesIgnored, 1);
-      expect(repo.getAllStudentsSync(), hasLength(1));
+      expect(await repo.getAllStudentsSync(), hasLength(1));
     });
 
     test('importRows crea nuovo record con azione createNew', () async {
@@ -218,14 +218,13 @@ void main() {
       final rows = service.buildRows([
         ['luca', 'bianchi', '01/01/2012'],
       ], mapping);
-      final checked = service
-          .detectDuplicates(rows)
-          .map((r) => r.copyWith(action: DuplicateAction.createNew))
-          .toList();
+      final checked = (await service.detectDuplicates(
+        rows,
+      )).map((r) => r.copyWith(action: DuplicateAction.createNew)).toList();
 
       final report = await service.importRows(checked);
       expect(report.imported, 1);
-      expect(repo.getAllStudentsSync(), hasLength(2));
+      expect(await repo.getAllStudentsSync(), hasLength(2));
     });
   });
 }

@@ -38,8 +38,8 @@ class Aula {
     this.lastModifiedBy = '',
     DateTime? createdAt,
     DateTime? updatedAt,
-  })  : createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now();
+  }) : createdAt = createdAt ?? DateTime.now(),
+       updatedAt = updatedAt ?? DateTime.now();
 
   Aula copyWith({
     String? stanzaId,
@@ -66,11 +66,17 @@ class Aula {
     return Aula(
       stanzaId: id,
       nomeStanza: data['nomeStanza'] ?? '',
-      capienzaMassima: rawCapienza is int ? rawCapienza : int.tryParse('$rawCapienza') ?? 0,
+      capienzaMassima: rawCapienza is int
+          ? rawCapienza
+          : int.tryParse('$rawCapienza') ?? 0,
       noteAccessibilita: data['noteAccessibilita'] ?? '',
       lastModifiedBy: data['lastModifiedBy'] ?? '',
-      createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(data['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(data['updatedAt']?.toString() ?? '') ??
+          DateTime.now(),
     );
   }
 

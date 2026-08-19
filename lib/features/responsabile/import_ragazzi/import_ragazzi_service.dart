@@ -26,7 +26,7 @@ class ImportRagazziService {
   final StudentsRepository _students;
 
   ImportRagazziService({StudentsRepository? students})
-      : _students = students ?? StudentsRepository();
+    : _students = students ?? StudentsRepository();
 
   // ═════════════════════════════════════════════════════════════════════
   // 1. PARSING
@@ -53,11 +53,7 @@ class ImportRagazziService {
       if (lower.endsWith('.xlsx')) {
         final result = const XlsxParser().parse(bytes);
         if (result.error != null) {
-          return (
-            headers: const [],
-            rows: const [],
-            warnings: [result.error!],
-          );
+          return (headers: const [], rows: const [], warnings: [result.error!]);
         }
         return (
           headers: result.headers ?? const [],
@@ -115,10 +111,7 @@ class ImportRagazziService {
 
   /// Normalizza un'intestazione: lowercase, senza spazi e senza punteggiatura.
   static String _normalizeHeader(String header) {
-    return header
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^a-z0-9]'), '')
-        .trim();
+    return header.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '').trim();
   }
 
   /// Verifica che tutti i campi obbligatori siano mappati.
@@ -303,9 +296,9 @@ class ImportRagazziService {
       value.toLowerCase().replaceAll(RegExp(r'\s+'), '');
 
   /// Costruisce l'indice delle identità già presenti nel DB parrocchiale.
-  Map<String, List<Student>> _existingByIdentity() {
+  Future<Map<String, List<Student>>> _existingByIdentity() async {
     final index = <String, List<Student>>{};
-    for (final student in _students.getAllStudentsSync()) {
+    for (final student in await _students.getAllStudentsSync()) {
       final key = identityKey(
         student.name,
         student.surname,
@@ -323,8 +316,8 @@ class ImportRagazziService {
   }
 
   /// Marca come duplicati le righe valide la cui identità esiste già.
-  List<ImportRow> detectDuplicates(List<ImportRow> rows) {
-    final index = _existingByIdentity();
+  Future<List<ImportRow>> detectDuplicates(List<ImportRow> rows) async {
+    final index = await _existingByIdentity();
     return rows.map((row) {
       if (row.status != ImportRowStatus.valid) return row;
       final key = identityKey(
@@ -356,9 +349,7 @@ class ImportRagazziService {
     for (final row in rows) {
       if (row.status == ImportRowStatus.error) {
         errorCount++;
-        errorMessages.add(
-          'Riga ${row.rowNumber}: ${row.errors.join(' ')}',
-        );
+        errorMessages.add('Riga ${row.rowNumber}: ${row.errors.join(' ')}');
         continue;
       }
 
@@ -443,8 +434,8 @@ class ImportRagazziService {
       id: id,
       name: (v['name'] ?? '').toString(),
       surname: (v['surname'] ?? '').toString(),
-      birthDate: DateTime.tryParse(v['birthDate']?.toString() ?? '') ??
-          DateTime.now(),
+      birthDate:
+          DateTime.tryParse(v['birthDate']?.toString() ?? '') ?? DateTime.now(),
       classId: null,
       classUniqueCode: null,
       motherName: (v['motherName'] ?? '').toString(),

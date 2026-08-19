@@ -152,7 +152,8 @@ class HistoricalRecord {
       attendancePercentage:
           (data['attendancePercentage'] as num?)?.toDouble() ?? 0,
       evaluationsSummary: data['evaluationsSummary'] ?? '',
-      createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ??
+      createdAt:
+          DateTime.tryParse(data['createdAt']?.toString() ?? '') ??
           DateTime.now(),
     );
   }

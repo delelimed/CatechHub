@@ -88,10 +88,7 @@ class PrivacySettingsNotifier extends StateNotifier<PrivacySettings> {
         'privacy_allow_feedback',
         defaultValue: false,
       ),
-      absenceThreshold: box.get(
-        'absence_threshold',
-        defaultValue: 6,
-      ),
+      absenceThreshold: box.get('absence_threshold', defaultValue: 6),
     );
   }
 

@@ -49,7 +49,7 @@ class _BackButtonHandlerState extends State<BackButtonHandler> {
       canPop: _canPop(context),
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        
+
         _handleBackPressed(context);
       },
       child: widget.child,
@@ -81,7 +81,8 @@ class _BackButtonHandlerState extends State<BackButtonHandler> {
     final now = DateTime.now();
 
     if (_lastBackPressed == null ||
-        now.difference(_lastBackPressed!) > const Duration(seconds: _backPressInterval)) {
+        now.difference(_lastBackPressed!) >
+            const Duration(seconds: _backPressInterval)) {
       _lastBackPressed = now;
       _showExitSnackBar(context);
     } else {

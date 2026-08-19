@@ -36,8 +36,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:crypto/crypto.dart' as crypto show Hmac, sha256;
-
+import '../../core/services/crypto_utils.dart';
 import '../../core/services/qr_data_service.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/substitute_delegation.dart';
@@ -59,15 +58,11 @@ class CollectedHandoverData {
   final List<Map<String, dynamic>> attendance;
   final List<Map<String, dynamic>> notes;
 
-  const CollectedHandoverData({
-    required this.attendance,
-    required this.notes,
-  });
+  const CollectedHandoverData({required this.attendance, required this.notes});
 }
 
 class SubstituteDelegationService {
-  static const String domainSeparator =
-      'CatechHub_SubstituteDelegation_v1';
+  static const String domainSeparator = 'CatechHub_SubstituteDelegation_v1';
 
   static const String kindDelegation = 'substitute_delegation';
   static const String kindHandover = 'substitute_handover';
@@ -76,22 +71,20 @@ class SubstituteDelegationService {
   final P2PSecurityService _p2p;
 
   SubstituteDelegationService({P2PSecurityService? p2p})
-      : _p2p = p2p ?? P2PSecurityService();
+    : _p2p = p2p ?? P2PSecurityService();
 
   /// Deriva la chiave di firma HMAC dal segreto condiviso ECDH.
   static String _signingKey(String sharedSecretBase64) {
-    final bytes = crypto.sha256
-        .convert(utf8.encode('$domainSeparator:$sharedSecretBase64'))
-        .bytes;
+    final bytes = sha256BytesSync(utf8.encode('$domainSeparator:$sharedSecretBase64'));
     return base64Encode(bytes);
   }
 
   static String hmacBase64(String canonical, String sharedSecretBase64) {
-    final mac = crypto.Hmac(
-      crypto.sha256,
+    final mac = hmacSha256BytesSync(
       base64Decode(_signingKey(sharedSecretBase64)),
+      utf8.encode(canonical),
     );
-    return base64Encode(mac.convert(utf8.encode(canonical)).bytes);
+    return base64Encode(mac);
   }
 
   static bool hmacValid({
@@ -134,9 +127,16 @@ class SubstituteDelegationService {
 
   static List<Map<String, dynamic>> _chunkTransport(String transport) {
     final segments = QRDataService.segmentData(transport);
-    return segments.asMap().entries
-        .map((e) =>
-            QRDataService.createQRChunk(e.value, e.key, segments.length).toMap())
+    return segments
+        .asMap()
+        .entries
+        .map(
+          (e) => QRDataService.createQRChunk(
+            e.value,
+            e.key,
+            segments.length,
+          ).toMap(),
+        )
         .toList();
   }
 
@@ -162,19 +162,19 @@ class SubstituteDelegationService {
       jsonEncode(_canonicalize(data));
 
   static Map<String, dynamic> buildTokenMap(SubstituteDelegation d) => {
-        'delegationId': d.delegationId,
-        'classId': d.classId,
-        'classUniqueCode': d.classUniqueCode,
-        'className': d.className,
-        'ownerCatechistId': d.ownerCatechistId,
-        'ownerName': d.ownerName,
-        'substituteCatechistId': d.substituteCatechistId,
-        'substituteName': d.substituteName,
-        'substituteDeviceId': d.substituteDeviceId,
-        'substitutePublicKey': d.substitutePublicKey,
-        'validFrom': d.validFrom.toUtc().toIso8601String(),
-        'validUntil': d.validUntil.toUtc().toIso8601String(),
-      };
+    'delegationId': d.delegationId,
+    'classId': d.classId,
+    'classUniqueCode': d.classUniqueCode,
+    'className': d.className,
+    'ownerCatechistId': d.ownerCatechistId,
+    'ownerName': d.ownerName,
+    'substituteCatechistId': d.substituteCatechistId,
+    'substituteName': d.substituteName,
+    'substituteDeviceId': d.substituteDeviceId,
+    'substitutePublicKey': d.substitutePublicKey,
+    'validFrom': d.validFrom.toUtc().toIso8601String(),
+    'validUntil': d.validUntil.toUtc().toIso8601String(),
+  };
 
   // ─────────────────────────────────────────────────────────────────────────
   // 1. CREAZIONE QR DI DELEGA (Titolare)
@@ -216,8 +216,9 @@ class SubstituteDelegationService {
       temporaryClassKey: tempKey,
     );
 
-    final sharedSecret =
-        await _p2p.computeStaticSharedSecret(substitutePublicKeyBase64);
+    final sharedSecret = await _p2p.computeStaticSharedSecret(
+      substitutePublicKeyBase64,
+    );
 
     final token = buildTokenMap(delegation);
 
@@ -239,8 +240,10 @@ class SubstituteDelegationService {
     // Il body viene CIFRATO AES-256-GCM con il segreto condiviso ECDH:
     // chiunque scansiona il QR vede solo ciphertext (niente temp_key, niente
     // nomi dei minori). L'AEAD garantisce autenticità e integrità in transito.
-    final encryptedBody =
-        await _p2p.encryptPayloadString(jsonEncode(payload), sharedSecret);
+    final encryptedBody = await _p2p.encryptPayloadString(
+      jsonEncode(payload),
+      sharedSecret,
+    );
 
     final wrapper = {
       'v': 1,
@@ -385,7 +388,11 @@ class SubstituteDelegationService {
       'attendance': attendance,
       'notes': notes,
     };
-    final wrapper = await _encryptAndWrap(payload, delegation.temporaryClassKey, kindHandover);
+    final wrapper = await _encryptAndWrap(
+      payload,
+      delegation.temporaryClassKey,
+      kindHandover,
+    );
     return _chunkTransport(_encodeTransport(wrapper));
   }
 
@@ -406,8 +413,10 @@ class SubstituteDelegationService {
     final body = wrapper['body']?.toString() ?? '';
     if (body.isEmpty) throw Exception('QR di consegna incompleto.');
 
-    final decrypted =
-        await _p2p.decryptPayloadString(body, delegation.temporaryClassKey);
+    final decrypted = await _p2p.decryptPayloadString(
+      body,
+      delegation.temporaryClassKey,
+    );
     final Map<String, dynamic> payload;
     try {
       payload = Map<String, dynamic>.from(jsonDecode(decrypted) as Map);
@@ -463,8 +472,7 @@ class SubstituteDelegationService {
         'Chiave pubblica del Supplente mancante: impossibile firmare la revoca.',
       );
     }
-    final shared =
-        await _p2p.computeStaticSharedSecret(substitutePublicKey);
+    final shared = await _p2p.computeStaticSharedSecret(substitutePublicKey);
     final signature = hmacBase64(canonical, shared);
     final wrapper = {
       'v': 1,
@@ -536,7 +544,10 @@ class SubstituteDelegationService {
     String keyBase64,
     String kind,
   ) async {
-    final cipher = await _p2p.encryptPayloadString(jsonEncode(payload), keyBase64);
+    final cipher = await _p2p.encryptPayloadString(
+      jsonEncode(payload),
+      keyBase64,
+    );
     return {
       'v': 1,
       'kind': kind,

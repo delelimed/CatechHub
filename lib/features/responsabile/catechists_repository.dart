@@ -44,7 +44,10 @@ class CatechistsRepository {
   /// Lettura sincrona di tutti i profili ordinati per cognome.
   List<CatechistProfile> getAllSync() {
     return _sortBySurname(
-      LocalDatabase.values(_box, (id, data) => CatechistProfile.fromMap(id, data)),
+      LocalDatabase.values(
+        _box,
+        (id, data) => CatechistProfile.fromMap(id, data),
+      ),
     );
   }
 
@@ -52,17 +55,15 @@ class CatechistsRepository {
   CatechistProfile? getById(String id) {
     final raw = _box.get(id);
     if (raw == null) return null;
-    return CatechistProfile.fromMap(
-      id,
-      LocalDatabase.toStringDynamicMap(raw),
-    );
+    return CatechistProfile.fromMap(id, LocalDatabase.toStringDynamicMap(raw));
   }
 
   /// Crea o aggiorna un profilo catechista. Solo il Responsabile può scrivere.
   Future<void> save(CatechistProfile profile) async {
     if (!canManage) {
       throw UnsupportedError(
-          'Solo il Responsabile Catechistico può gestire la rubrica catechisti.');
+        'Solo il Responsabile Catechistico può gestire la rubrica catechisti.',
+      );
     }
     await _box.put(profile.id, profile.toMap());
     await _box.flush();
@@ -72,7 +73,8 @@ class CatechistsRepository {
   Future<void> delete(String id) async {
     if (!canManage) {
       throw UnsupportedError(
-          'Solo il Responsabile Catechistico può gestire la rubrica catechisti.');
+        'Solo il Responsabile Catechistico può gestire la rubrica catechisti.',
+      );
     }
     await _box.delete(id);
     await _box.flush();

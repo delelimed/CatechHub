@@ -23,10 +23,7 @@ class ClassiRoutePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return const ResponsabileGuard(
       title: 'Classi',
-      child: AppScaffold(
-        title: 'Classi',
-        child: ClassiManagementPage(),
-      ),
+      child: AppScaffold(title: 'Classi', child: ClassiManagementPage()),
     );
   }
 }
@@ -39,10 +36,7 @@ class IscrizioniRoutePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return const ResponsabileGuard(
       title: 'Iscrizioni',
-      child: AppScaffold(
-        title: 'Iscrizioni',
-        child: IscrizioniPage(),
-      ),
+      child: AppScaffold(title: 'Iscrizioni', child: IscrizioniPage()),
     );
   }
 }
@@ -55,10 +49,7 @@ class LogisticaRoutePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return const ResponsabileGuard(
       title: 'Logistica',
-      child: AppScaffold(
-        title: 'Logistica',
-        child: AulaManagementSection(),
-      ),
+      child: AppScaffold(title: 'Logistica', child: AulaManagementSection()),
     );
   }
 }
@@ -71,10 +62,7 @@ class AllarmiRoutePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return const ResponsabileGuard(
       title: 'Allarme assenze',
-      child: AppScaffold(
-        title: 'Allarme assenze',
-        child: AllarmeAssenzePage(),
-      ),
+      child: AppScaffold(title: 'Allarme assenze', child: AllarmeAssenzePage()),
     );
   }
 }

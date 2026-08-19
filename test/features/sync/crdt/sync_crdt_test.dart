@@ -35,35 +35,38 @@ void main() {
     }
 
     test('studenti presenti solo su un lato vengono mantenuti', () {
-      final local = record('2026-01-01T10:00:00.000Z', presence: {
-        's1': 'Presente',
-      });
-      final remote = record('2026-01-01T10:00:00.000Z', presence: {
-        's2': 'Assente',
-      });
+      final local = record(
+        '2026-01-01T10:00:00.000Z',
+        presence: {'s1': 'Presente'},
+      );
+      final remote = record(
+        '2026-01-01T10:00:00.000Z',
+        presence: {'s2': 'Assente'},
+      );
 
       final merged = AttendanceCrdt.mergePresence(
         localData: local,
         remoteData: remote,
       );
 
-      expect(merged['presence'], {
-        's1': 'Presente',
-        's2': 'Assente',
-      });
+      expect(merged['presence'], {'s1': 'Presente', 's2': 'Assente'});
     });
 
     test('su uno studente concorrente vince il timestamp più recente', () {
-      final local = record('2026-01-01T10:00:00.000Z', presence: {
-        's1': 'Presente',
-      }, meta: {
-        's1': {'t': 1000, 'by': 'A'},
-      });
-      final remote = record('2026-01-01T10:00:00.000Z', presence: {
-        's1': 'Assente',
-      }, meta: {
-        's1': {'t': 2000, 'by': 'B'},
-      });
+      final local = record(
+        '2026-01-01T10:00:00.000Z',
+        presence: {'s1': 'Presente'},
+        meta: {
+          's1': {'t': 1000, 'by': 'A'},
+        },
+      );
+      final remote = record(
+        '2026-01-01T10:00:00.000Z',
+        presence: {'s1': 'Assente'},
+        meta: {
+          's1': {'t': 2000, 'by': 'B'},
+        },
+      );
 
       final merged = AttendanceCrdt.mergePresence(
         localData: local,
@@ -75,16 +78,20 @@ void main() {
     });
 
     test('con timestamp identici vince l\'autore in modo deterministico', () {
-      final local = record('2026-01-01T10:00:00.000Z', presence: {
-        's1': 'Presente',
-      }, meta: {
-        's1': {'t': 1000, 'by': 'A'},
-      });
-      final remote = record('2026-01-01T10:00:00.000Z', presence: {
-        's1': 'Assente',
-      }, meta: {
-        's1': {'t': 1000, 'by': 'B'},
-      });
+      final local = record(
+        '2026-01-01T10:00:00.000Z',
+        presence: {'s1': 'Presente'},
+        meta: {
+          's1': {'t': 1000, 'by': 'A'},
+        },
+      );
+      final remote = record(
+        '2026-01-01T10:00:00.000Z',
+        presence: {'s1': 'Assente'},
+        meta: {
+          's1': {'t': 1000, 'by': 'B'},
+        },
+      );
 
       final merged = AttendanceCrdt.mergePresence(
         localData: local,
@@ -96,12 +103,14 @@ void main() {
     });
 
     test('record legacy senza meta usa il fallback del timestamp record', () {
-      final local = record('2026-01-02T10:00:00.000Z', presence: {
-        's1': 'Presente',
-      });
-      final remote = record('2026-01-01T10:00:00.000Z', presence: {
-        's1': 'Assente',
-      });
+      final local = record(
+        '2026-01-02T10:00:00.000Z',
+        presence: {'s1': 'Presente'},
+      );
+      final remote = record(
+        '2026-01-01T10:00:00.000Z',
+        presence: {'s1': 'Assente'},
+      );
 
       final merged = AttendanceCrdt.mergePresence(
         localData: local,
@@ -203,7 +212,8 @@ void main() {
     });
 
     test('codificato come JSON il payload è stabile', () {
-      final decoded = jsonDecode(jsonEncode({'sig': sig})) as Map<String, dynamic>;
+      final decoded =
+          jsonDecode(jsonEncode({'sig': sig})) as Map<String, dynamic>;
       expect(decoded['sig'], sig);
     });
   });

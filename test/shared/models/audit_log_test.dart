@@ -11,19 +11,31 @@ void main() {
     test('espone i valori di storage richiesti dallo spec', () {
       expect(AuditActionType.createStudent.storageValue, 'CREATE_STUDENT');
       expect(AuditActionType.updateStudent.storageValue, 'UPDATE_STUDENT');
-      expect(AuditActionType.deleteStudentHard.storageValue, 'DELETE_STUDENT_HARD');
+      expect(
+        AuditActionType.deleteStudentHard.storageValue,
+        'DELETE_STUDENT_HARD',
+      );
       expect(AuditActionType.createClass.storageValue, 'CREATE_CLASS');
       expect(AuditActionType.deleteClass.storageValue, 'DELETE_CLASS');
-      expect(AuditActionType.reassignCatechist.storageValue, 'REASSIGN_CATECHIST');
+      expect(
+        AuditActionType.reassignCatechist.storageValue,
+        'REASSIGN_CATECHIST',
+      );
       expect(AuditActionType.grantConsent.storageValue, 'GRANT_CONSENT');
       expect(AuditActionType.revokeConsent.storageValue, 'REVOKE_CONSENT');
       expect(AuditActionType.exportData.storageValue, 'EXPORT_DATA');
-      expect(AuditActionType.tombstoneReceived.storageValue, 'TOMBSTONE_RECEIVED');
+      expect(
+        AuditActionType.tombstoneReceived.storageValue,
+        'TOMBSTONE_RECEIVED',
+      );
       expect(AuditActionType.passaggioAnno.storageValue, 'PASSAGGIO_ANNO');
     });
 
     test('fromStorageValue risolve i valori e ha fallback', () {
-      expect(AuditActionType.fromStorageValue('GRANT_CONSENT'), AuditActionType.grantConsent);
+      expect(
+        AuditActionType.fromStorageValue('GRANT_CONSENT'),
+        AuditActionType.grantConsent,
+      );
       expect(
         AuditActionType.fromStorageValue('SCONOSCIUTO'),
         AuditActionType.createStudent,
@@ -79,7 +91,10 @@ void main() {
 
     test('toMap serializza timestamp come UTC ISO 8601', () {
       final map = base.toMap();
-      expect(map['timestamp'], DateTime.utc(2026, 8, 7, 10, 30).toIso8601String());
+      expect(
+        map['timestamp'],
+        DateTime.utc(2026, 8, 7, 10, 30).toIso8601String(),
+      );
       expect(map['actionType'], 'GRANT_CONSENT');
     });
 

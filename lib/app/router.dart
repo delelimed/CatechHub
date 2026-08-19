@@ -107,10 +107,13 @@ List<String> _userClassIds() {
       final status = data['status']?.toString() ?? 'active';
       if (status == 'revoked' || status == 'completed') continue;
       final validFrom = DateTime.tryParse(data['validFrom']?.toString() ?? '');
-      final validUntil = DateTime.tryParse(data['validUntil']?.toString() ?? '');
+      final validUntil = DateTime.tryParse(
+        data['validUntil']?.toString() ?? '',
+      );
       if (validFrom != null && validUntil != null) {
         final active = !now.isBefore(validFrom) && !now.isAfter(validUntil);
-        final expired = now.isAfter(validUntil) && data['dataCollected'] != true;
+        final expired =
+            now.isAfter(validUntil) && data['dataCollected'] != true;
         if (active || (status == 'expired' && expired)) {
           final classId = data['classId']?.toString();
           if (classId != null && classId.isNotEmpty) ids.add(classId);
@@ -125,8 +128,7 @@ List<String> _userClassIds() {
 /// True se la route corrente appartiene alla gestione parrocchiale del
 /// Responsabile Catechistico. Queste route NON richiedono una classe
 /// selezionata (gestione parrocchia-wide).
-bool _isParrocchiaRoute(String location) =>
-    location.startsWith('/parrocchia');
+bool _isParrocchiaRoute(String location) => location.startsWith('/parrocchia');
 
 /// Legge `current_class_id` e lo considera valido solo se non è vuoto e punta
 /// a una classe di cui l'utente fa ancora parte. Un id "stantio" (classe
@@ -155,7 +157,8 @@ bool _isJoinPending() {
 /// True se la "Guida live alle funzioni" è ancora da completare (post-onboarding).
 bool _isGuidePending() {
   try {
-    return LocalDatabase.auth().get('guide_pending', defaultValue: false) as bool;
+    return LocalDatabase.auth().get('guide_pending', defaultValue: false)
+        as bool;
   } catch (_) {
     return false;
   }
@@ -452,8 +455,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           // per impedire di lasciare l'onboarding senza essere in una classe.
           if (!isOnboardingSyncPath) {
             try {
-              final setupMode =
-                  LocalDatabase.auth().get('setup_mode', defaultValue: 'create');
+              final setupMode = LocalDatabase.auth().get(
+                'setup_mode',
+                defaultValue: 'create',
+              );
               if (setupMode == 'join') {
                 if (_userClassIds().isEmpty) {
                   return '/onboarding-sync';
@@ -508,7 +513,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 return '/onboarding-classes';
               }
 
-              if (hasClasses && (currentClassId == null || currentClassId.isEmpty)) {
+              if (hasClasses &&
+                  (currentClassId == null || currentClassId.isEmpty)) {
                 return '/class-selection';
               }
             } catch (_) {}
@@ -622,9 +628,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       /// Dettaglio di una classe: catechisti, ragazzi e azioni di gestione.
       GoRoute(
         path: '/parrocchia/classi/:classId',
-        builder: (context, state) => ClasseDetailPage(
-          classId: state.pathParameters['classId'] ?? '',
-        ),
+        builder: (context, state) =>
+            ClasseDetailPage(classId: state.pathParameters['classId'] ?? ''),
       ),
 
       /// Rubrica catechisti: anagrafica, telefono, classi e dispositivi.
@@ -851,10 +856,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
 
       /// Gestione avvisi e messaggi standard per genitori.
-      GoRoute(
-        path: '/avvisi',
-        builder: (context, state) => const AvvisiPage(),
-      ),
+      GoRoute(path: '/avvisi', builder: (context, state) => const AvvisiPage()),
 
       // ═══════════════════════════════════════════════════════════════════
       // CLASSES - Gestione gruppi di catechismo

@@ -44,11 +44,13 @@ class AuditLogRepository {
     String entityType, {
     String? entityId,
   }) {
-    return getAllLogs().map((logs) => logs.where((l) {
-          if (l.affectedEntityType != entityType) return false;
-          if (entityId != null && l.affectedEntityId != entityId) return false;
-          return true;
-        }).toList());
+    return getAllLogs().map(
+      (logs) => logs.where((l) {
+        if (l.affectedEntityType != entityType) return false;
+        if (entityId != null && l.affectedEntityId != entityId) return false;
+        return true;
+      }).toList(),
+    );
   }
 
   /// Scrive una voce firmata [AuditLog] nel registro. Append-only.
@@ -57,8 +59,7 @@ class AuditLogRepository {
   /// voce con firma già calcolata. In produzione la firma viene sempre rigenerata.
   /// Ritorna la voce effettivamente persistita (con firma valorizzata).
   Future<AuditLog> add(AuditLog log, {bool preserveSignature = false}) async {
-    final signed =
-        preserveSignature ? log : await AuditLogService.sign(log);
+    final signed = preserveSignature ? log : await AuditLogService.sign(log);
     await _box.put(signed.logId, signed.toMap());
     await _box.flush();
     return signed;
@@ -78,8 +79,7 @@ class AuditLogRepository {
       logId: generateAuditLogUuidV4(),
       timestamp: now,
       actionType: actionType,
-      executedByCatechistId:
-          executedByCatechistId ?? _currentOperatorId(),
+      executedByCatechistId: executedByCatechistId ?? _currentOperatorId(),
       executedByCatechistName:
           executedByCatechistName ?? _currentOperatorName(),
       affectedEntityType: affectedEntityType,

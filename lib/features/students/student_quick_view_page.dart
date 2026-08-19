@@ -24,69 +24,79 @@ final studentsRepoProvider = Provider((ref) => StudentsRepository());
 
 final _studentDailyNotesStreamProvider = StreamProvider.autoDispose
     .family<List<StudentDailyNote>, String>((ref, studentId) {
-  return ref.read(studentDailyNotesRepoProvider).getNotesForStudent(studentId);
-});
+      return ref
+          .read(studentDailyNotesRepoProvider)
+          .getNotesForStudent(studentId);
+    });
 
 final _studentAbsencesProvider = StreamProvider.autoDispose
     .family<Map<String, dynamic>, String>((ref, studentId) {
-  final attendanceRepo = AttendanceRepository();
-  final planningRepo = PlanningRepository();
+      final attendanceRepo = AttendanceRepository();
+      final planningRepo = PlanningRepository();
 
-  return attendanceRepo.getAttendance().map((attendanceRecords) {
-    final meetings = planningRepo.getMeetingsSync();
-    final meetingMap = {for (var m in meetings) m.id: m};
+      return attendanceRepo.getAttendance().map((attendanceRecords) {
+        final meetings = planningRepo.getMeetingsSync();
+        final meetingMap = {for (var m in meetings) m.id: m};
 
-    final absences = <Map<String, dynamic>>[];
-    String? lastPresenceDate;
-    int consecutiveAbsences = 0;
+        final absences = <Map<String, dynamic>>[];
+        String? lastPresenceDate;
+        int consecutiveAbsences = 0;
 
-    final sortedRecords = attendanceRecords.toList()
-      ..sort((a, b) {
-        final aDate = DateTime.tryParse(a['date']?.toString() ?? '') ?? DateTime.now();
-        final bDate = DateTime.tryParse(b['date']?.toString() ?? '') ?? DateTime.now();
-        return bDate.compareTo(aDate);
-      });
+        final sortedRecords = attendanceRecords.toList()
+          ..sort((a, b) {
+            final aDate =
+                DateTime.tryParse(a['date']?.toString() ?? '') ??
+                DateTime.now();
+            final bDate =
+                DateTime.tryParse(b['date']?.toString() ?? '') ??
+                DateTime.now();
+            return bDate.compareTo(aDate);
+          });
 
-    bool countingConsecutive = true;
+        bool countingConsecutive = true;
 
-    for (final record in sortedRecords) {
-      final presenceMap = Map<String, dynamic>.from(record['presence'] as Map? ?? {});
-      final studentStatus = presenceMap[studentId]?.toString();
+        for (final record in sortedRecords) {
+          final presenceMap = Map<String, dynamic>.from(
+            record['presence'] as Map? ?? {},
+          );
+          final studentStatus = presenceMap[studentId]?.toString();
 
-      if (studentStatus == null) continue;
+          if (studentStatus == null) continue;
 
-      if (studentStatus == 'Assente') {
-        final meeting = meetingMap[record['id']];
-        final date = DateTime.tryParse(record['date']?.toString() ?? '') ?? DateTime.now();
+          if (studentStatus == 'Assente') {
+            final meeting = meetingMap[record['id']];
+            final date =
+                DateTime.tryParse(record['date']?.toString() ?? '') ??
+                DateTime.now();
 
-        absences.add({
-          'date': date,
-          'meetingTitle': meeting?.title ?? 'Riunione sconosciuta',
-          'meetingActivity': meeting?.activity ?? '',
-          'isReunion': meeting?.isReunion ?? false,
-        });
+            absences.add({
+              'date': date,
+              'meetingTitle': meeting?.title ?? 'Riunione sconosciuta',
+              'meetingActivity': meeting?.activity ?? '',
+              'isReunion': meeting?.isReunion ?? false,
+            });
 
-        if (countingConsecutive) {
-          consecutiveAbsences++;
-        }
-      } else if (studentStatus == 'Presente') {
-        if (lastPresenceDate == null) {
-          final date = DateTime.tryParse(record['date']?.toString() ?? '');
-          if (date != null) {
-            lastPresenceDate = DateFormat('dd/MM/yyyy').format(date);
+            if (countingConsecutive) {
+              consecutiveAbsences++;
+            }
+          } else if (studentStatus == 'Presente') {
+            if (lastPresenceDate == null) {
+              final date = DateTime.tryParse(record['date']?.toString() ?? '');
+              if (date != null) {
+                lastPresenceDate = DateFormat('dd/MM/yyyy').format(date);
+              }
+            }
+            countingConsecutive = false;
           }
         }
-        countingConsecutive = false;
-      }
-    }
 
-    return {
-      'absences': absences,
-      'lastPresenceDate': lastPresenceDate,
-      'consecutiveAbsences': consecutiveAbsences,
-    };
-  });
-});
+        return {
+          'absences': absences,
+          'lastPresenceDate': lastPresenceDate,
+          'consecutiveAbsences': consecutiveAbsences,
+        };
+      });
+    });
 
 /// Dashboard riassuntiva completa per un singolo studente: mostra in cards
 /// verticali i dati personali, i genitori (con azioni telefono/WhatsApp),
@@ -101,10 +111,7 @@ final _studentAbsencesProvider = StreamProvider.autoDispose
 class StudentQuickViewPage extends ConsumerStatefulWidget {
   final Student student;
 
-  const StudentQuickViewPage({
-    super.key,
-    required this.student,
-  });
+  const StudentQuickViewPage({super.key, required this.student});
 
   @override
   ConsumerState<StudentQuickViewPage> createState() =>
@@ -135,7 +142,9 @@ class _StudentQuickViewPageState extends ConsumerState<StudentQuickViewPage> {
     return Scaffold(
       backgroundColor: isDark ? colorScheme.surface : Colors.grey.shade50,
       appBar: AppBar(
-        backgroundColor: isDark ? colorScheme.primaryContainer : const Color(0xFF174A7E),
+        backgroundColor: isDark
+            ? colorScheme.primaryContainer
+            : const Color(0xFF174A7E),
         foregroundColor: isDark ? colorScheme.onPrimaryContainer : Colors.white,
         title: const Text('Scheda Ragazzo'),
       ),
@@ -144,19 +153,43 @@ class _StudentQuickViewPageState extends ConsumerState<StudentQuickViewPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _HeaderCard(student: _student, isDark: isDark, colorScheme: colorScheme),
+            _HeaderCard(
+              student: _student,
+              isDark: isDark,
+              colorScheme: colorScheme,
+            ),
             const SizedBox(height: 16),
             StudentHistoryCard(student: _student),
             const SizedBox(height: 16),
-            _PersonalInfoCard(student: _student, isDark: isDark, colorScheme: colorScheme),
+            _PersonalInfoCard(
+              student: _student,
+              isDark: isDark,
+              colorScheme: colorScheme,
+            ),
             const SizedBox(height: 16),
-            _ConsensoContributoCard(student: _student, isDark: isDark, colorScheme: colorScheme),
+            _ConsensoContributoCard(
+              student: _student,
+              isDark: isDark,
+              colorScheme: colorScheme,
+            ),
             const SizedBox(height: 16),
-            _ParentsCard(student: _student, isDark: isDark, colorScheme: colorScheme),
+            _ParentsCard(
+              student: _student,
+              isDark: isDark,
+              colorScheme: colorScheme,
+            ),
             const SizedBox(height: 16),
-            _AllergiesCard(student: _student, isDark: isDark, colorScheme: colorScheme),
+            _AllergiesCard(
+              student: _student,
+              isDark: isDark,
+              colorScheme: colorScheme,
+            ),
             const SizedBox(height: 16),
-            _DocumentsCard(studentId: _student.id, isDark: isDark, colorScheme: colorScheme),
+            _DocumentsCard(
+              studentId: _student.id,
+              isDark: isDark,
+              colorScheme: colorScheme,
+            ),
             const SizedBox(height: 16),
             AttachmentsSection(
               parentId: _student.id,
@@ -173,11 +206,23 @@ class _StudentQuickViewPageState extends ConsumerState<StudentQuickViewPage> {
                   : null,
             ),
             const SizedBox(height: 16),
-            _DailyAnnotationsCard(studentId: _student.id, isDark: isDark, colorScheme: colorScheme),
+            _DailyAnnotationsCard(
+              studentId: _student.id,
+              isDark: isDark,
+              colorScheme: colorScheme,
+            ),
             const SizedBox(height: 16),
-            _ContactNotesCard(student: _student, isDark: isDark, colorScheme: colorScheme),
+            _ContactNotesCard(
+              student: _student,
+              isDark: isDark,
+              colorScheme: colorScheme,
+            ),
             const SizedBox(height: 16),
-            _AbsencesCard(studentId: _student.id, isDark: isDark, colorScheme: colorScheme),
+            _AbsencesCard(
+              studentId: _student.id,
+              isDark: isDark,
+              colorScheme: colorScheme,
+            ),
           ],
         ),
       ),
@@ -284,7 +329,9 @@ class _HeaderCard extends StatelessWidget {
             child: Text(
               student.name.isNotEmpty ? student.name[0] : '?',
               style: TextStyle(
-                color: isDark ? colorScheme.primaryContainer : const Color(0xFF174A7E),
+                color: isDark
+                    ? colorScheme.primaryContainer
+                    : const Color(0xFF174A7E),
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
@@ -298,12 +345,14 @@ class _HeaderCard extends StatelessWidget {
                 Text(
                   '${student.surname} ${student.name}',
                   style: TextStyle(
-                    color: isDark ? colorScheme.onPrimaryContainer : Colors.white,
+                    color: isDark
+                        ? colorScheme.onPrimaryContainer
+                        : Colors.white,
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                      Text(
+                Text(
                   DateFormat('dd/MM/yyyy').format(student.birthDate),
                   style: TextStyle(
                     color: isDark
@@ -379,7 +428,8 @@ class _ConsensoContributoCard extends ConsumerStatefulWidget {
       _ConsensoContributoCardState();
 }
 
-class _ConsensoContributoCardState extends ConsumerState<_ConsensoContributoCard> {
+class _ConsensoContributoCardState
+    extends ConsumerState<_ConsensoContributoCard> {
   late Student _student;
 
   @override
@@ -422,13 +472,23 @@ class _ConsensoContributoCardState extends ConsumerState<_ConsensoContributoCard
     await ConsensiService.registraScheda(_student);
     final firma = DateTime.now();
     final mesi = ConsensiService.durataMesiDaConfig();
-    setState(() => _student = _student.copyWith(
-          consensoPrivacyFirmato: true,
-          dataFirmaConsenso: firma,
-          dataScadenzaTrattamento:
-              DateTime(firma.year, firma.month + mesi, firma.day, 23, 59, 59),
-        ));
-    _snack('Scheda firmata registrata per ${_student.name} ${_student.surname}.');
+    setState(
+      () => _student = _student.copyWith(
+        consensoPrivacyFirmato: true,
+        dataFirmaConsenso: firma,
+        dataScadenzaTrattamento: DateTime(
+          firma.year,
+          firma.month + mesi,
+          firma.day,
+          23,
+          59,
+          59,
+        ),
+      ),
+    );
+    _snack(
+      'Scheda firmata registrata per ${_student.name} ${_student.surname}.',
+    );
   }
 
   Future<void> _revoca() async {
@@ -459,11 +519,13 @@ class _ConsensoContributoCardState extends ConsumerState<_ConsensoContributoCard
     );
     if (conferma != true) return;
     await ConsensiService.revoca(_student);
-    setState(() => _student = _student.copyWith(
-          consensoPrivacyFirmato: false,
-          dataFirmaConsenso: null,
-          dataScadenzaTrattamento: null,
-        ));
+    setState(
+      () => _student = _student.copyWith(
+        consensoPrivacyFirmato: false,
+        dataFirmaConsenso: null,
+        dataScadenzaTrattamento: null,
+      ),
+    );
     _snack('Firma revocata per ${_student.name} ${_student.surname}.');
   }
 
@@ -490,7 +552,10 @@ class _ConsensoContributoCardState extends ConsumerState<_ConsensoContributoCard
                 dense: true,
                 contentPadding: EdgeInsets.zero,
                 controlAffinity: ListTileControlAffinity.leading,
-                title: const Text('Contributo versato', style: TextStyle(fontSize: 14)),
+                title: const Text(
+                  'Contributo versato',
+                  style: TextStyle(fontSize: 14),
+                ),
                 value: versato,
                 onChanged: (v) => setDialogState(() => versato = v ?? false),
               ),
@@ -498,7 +563,9 @@ class _ConsensoContributoCardState extends ConsumerState<_ConsensoContributoCard
                 const SizedBox(height: 8),
                 TextField(
                   controller: ctrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: const InputDecoration(
                     labelText: 'Importo (€)',
                     border: OutlineInputBorder(),
@@ -526,21 +593,21 @@ class _ConsensoContributoCardState extends ConsumerState<_ConsensoContributoCard
             ),
             FilledButton(
               onPressed: () async {
-                final euros = double.tryParse(
-                      ctrl.text.trim().replaceAll(',', '.'),
-                    ) ??
-                    0;
+                final euros =
+                    double.tryParse(ctrl.text.trim().replaceAll(',', '.')) ?? 0;
                 await ConsensiService.aggiornaContributo(
                   _student,
                   versato: versato,
                   euros: euros,
                   anno: anno ?? '',
                 );
-                setState(() => _student = _student.copyWith(
-                      contributoVersato: versato,
-                      contributoEuros: versato ? euros : 0,
-                      annoContributo: anno ?? '',
-                    ));
+                setState(
+                  () => _student = _student.copyWith(
+                    contributoVersato: versato,
+                    contributoEuros: versato ? euros : 0,
+                    annoContributo: anno ?? '',
+                  ),
+                );
                 if (ctx.mounted) Navigator.pop(ctx);
                 _snack('Contributo aggiornato.');
               },
@@ -619,7 +686,7 @@ class _ConsensoContributoCardState extends ConsumerState<_ConsensoContributoCard
         Text(
           _student.contributoVersato
               ? 'Contributo versato: ${_student.contributoEuros.toStringAsFixed(2)} €'
-                  '${_student.annoContributo.isNotEmpty ? ' · ${_student.annoContributo}' : ''}'
+                    '${_student.annoContributo.isNotEmpty ? ' · ${_student.annoContributo}' : ''}'
               : 'Contributo volontario: non versato',
           style: TextStyle(
             fontSize: 12.5,
@@ -700,13 +767,14 @@ class _ParentsCard extends StatelessWidget {
                   fontSize: 14,
                 ),
               ),
-              _InfoRow('Nome', '${student.motherName} ${student.motherSurname}'),
+              _InfoRow(
+                'Nome',
+                '${student.motherName} ${student.motherSurname}',
+              ),
               if (student.motherPhone.isNotEmpty)
                 Row(
                   children: [
-                    Expanded(
-                      child: _InfoRow('Telefono', student.motherPhone),
-                    ),
+                    Expanded(child: _InfoRow('Telefono', student.motherPhone)),
                     IconButton(
                       icon: Icon(Icons.phone, color: actionColor),
                       onPressed: () => _call(student.motherPhone),
@@ -732,13 +800,14 @@ class _ParentsCard extends StatelessWidget {
                   fontSize: 14,
                 ),
               ),
-              _InfoRow('Nome', '${student.fatherName} ${student.fatherSurname}'),
+              _InfoRow(
+                'Nome',
+                '${student.fatherName} ${student.fatherSurname}',
+              ),
               if (student.fatherPhone.isNotEmpty)
                 Row(
                   children: [
-                    Expanded(
-                      child: _InfoRow('Telefono', student.fatherPhone),
-                    ),
+                    Expanded(child: _InfoRow('Telefono', student.fatherPhone)),
                     IconButton(
                       icon: Icon(Icons.phone, color: actionColor),
                       onPressed: () => _call(student.fatherPhone),
@@ -784,7 +853,8 @@ class _AllergiesCard extends StatelessWidget {
             style: TextStyle(color: emptyColor, fontStyle: FontStyle.italic),
           ),
         const SizedBox(height: 8),
-        if (student.autonomousExits != null && student.autonomousExits!.isNotEmpty)
+        if (student.autonomousExits != null &&
+            student.autonomousExits!.isNotEmpty)
           _InfoRow('Uscite autonome', _formatExits(student.autonomousExits!))
         else
           Text(
@@ -830,7 +900,10 @@ class _DocumentsCard extends ConsumerWidget {
             if (documents.isEmpty) {
               return Text(
                 'Nessun documento richiesto',
-                style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, fontStyle: FontStyle.italic),
+                style: TextStyle(
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                  fontStyle: FontStyle.italic,
+                ),
               );
             }
 
@@ -838,21 +911,26 @@ class _DocumentsCard extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: documents.map((doc) {
                 final docId = doc['id'].toString();
-                final deliveriesAsync = ref.watch(documentDeliveriesProvider(docId));
+                final deliveriesAsync = ref.watch(
+                  documentDeliveriesProvider(docId),
+                );
 
                 return deliveriesAsync.when(
                   loading: () => const SizedBox(height: 30),
                   error: (_, _) => const SizedBox(height: 30),
                   data: (deliveries) {
                     final delivery = deliveries[studentId];
-                    final isReceived = delivery != null && delivery['receivedAt'] != null;
+                    final isReceived =
+                        delivery != null && delivery['receivedAt'] != null;
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Row(
                         children: [
                           Icon(
-                            isReceived ? Icons.check_circle_rounded : Icons.pending_rounded,
+                            isReceived
+                                ? Icons.check_circle_rounded
+                                : Icons.pending_rounded,
                             color: isReceived ? Colors.green : Colors.orange,
                             size: 20,
                           ),
@@ -862,23 +940,36 @@ class _DocumentsCard extends ConsumerWidget {
                               doc['title']?.toString() ?? 'Documento',
                               style: TextStyle(
                                 color: isReceived
-                                    ? (isDark ? Colors.grey.shade400 : Colors.grey.shade700)
-                                    : (isDark ? Colors.orange.shade200 : Colors.orange.shade800),
-                                decoration: isReceived ? TextDecoration.lineThrough : null,
+                                    ? (isDark
+                                          ? Colors.grey.shade400
+                                          : Colors.grey.shade700)
+                                    : (isDark
+                                          ? Colors.orange.shade200
+                                          : Colors.orange.shade800),
+                                decoration: isReceived
+                                    ? TextDecoration.lineThrough
+                                    : null,
                               ),
                             ),
                           ),
                           if (!isReceived)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
-                                color: isDark ? Colors.orange.shade900 : Colors.orange.shade100,
+                                color: isDark
+                                    ? Colors.orange.shade900
+                                    : Colors.orange.shade100,
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
                                 'Da consegnare',
                                 style: TextStyle(
-                                  color: isDark ? Colors.orange.shade200 : Colors.orange.shade800,
+                                  color: isDark
+                                      ? Colors.orange.shade200
+                                      : Colors.orange.shade800,
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -939,12 +1030,18 @@ class _NotesCard extends StatelessWidget {
         if (student.notes != null && student.notes!.isNotEmpty)
           Text(
             student.notes!,
-            style: TextStyle(fontSize: 14, color: isDark ? colorScheme.onSurface : null),
+            style: TextStyle(
+              fontSize: 14,
+              color: isDark ? colorScheme.onSurface : null,
+            ),
           )
         else
           Text(
             'Nessuna nota registrata',
-            style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, fontStyle: FontStyle.italic),
+            style: TextStyle(
+              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+              fontStyle: FontStyle.italic,
+            ),
           ),
       ],
     );
@@ -974,7 +1071,11 @@ class _DailyAnnotationsCard extends ConsumerWidget {
       icon: Icons.auto_stories_rounded,
       color: Colors.indigo,
       trailing: IconButton(
-        icon: const Icon(Icons.add_circle_outline, size: 22, color: Colors.indigo),
+        icon: const Icon(
+          Icons.add_circle_outline,
+          size: 22,
+          color: Colors.indigo,
+        ),
         onPressed: () => _showAddEditDialog(context, ref, null, null),
         tooltip: 'Aggiungi annotazione',
       ),
@@ -986,7 +1087,10 @@ class _DailyAnnotationsCard extends ConsumerWidget {
             if (notes.isEmpty) {
               return Text(
                 'Nessuna annotazione',
-                style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, fontStyle: FontStyle.italic),
+                style: TextStyle(
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                  fontStyle: FontStyle.italic,
+                ),
               );
             }
             final meetings = PlanningRepository().getMeetingsSync();
@@ -1020,7 +1124,9 @@ class _DailyAnnotationsCard extends ConsumerWidget {
                           Icon(
                             Icons.calendar_today,
                             size: 14,
-                            color: isDark ? Colors.indigo.shade200 : Colors.indigo.shade300,
+                            color: isDark
+                                ? Colors.indigo.shade200
+                                : Colors.indigo.shade300,
                           ),
                           const SizedBox(width: 6),
                           Expanded(
@@ -1029,7 +1135,9 @@ class _DailyAnnotationsCard extends ConsumerWidget {
                               style: TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 13,
-                                color: isDark ? Colors.indigo.shade200 : Colors.indigo.shade700,
+                                color: isDark
+                                    ? Colors.indigo.shade200
+                                    : Colors.indigo.shade700,
                               ),
                             ),
                           ),
@@ -1038,7 +1146,12 @@ class _DailyAnnotationsCard extends ConsumerWidget {
                             constraints: const BoxConstraints(),
                             onSelected: (value) {
                               if (value == 'edit') {
-                                _showAddEditDialog(context, ref, note, meetingTitle);
+                                _showAddEditDialog(
+                                  context,
+                                  ref,
+                                  note,
+                                  meetingTitle,
+                                );
                               } else if (value == 'delete') {
                                 _showDeleteConfirm(context, ref, note);
                               }
@@ -1058,9 +1171,16 @@ class _DailyAnnotationsCard extends ConsumerWidget {
                                 value: 'delete',
                                 child: Row(
                                   children: [
-                                    Icon(Icons.delete, size: 18, color: Colors.red),
+                                    Icon(
+                                      Icons.delete,
+                                      size: 18,
+                                      color: Colors.red,
+                                    ),
                                     SizedBox(width: 8),
-                                    Text('Elimina', style: TextStyle(color: Colors.red)),
+                                    Text(
+                                      'Elimina',
+                                      style: TextStyle(color: Colors.red),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -1072,14 +1192,19 @@ class _DailyAnnotationsCard extends ConsumerWidget {
                       const SizedBox(height: 6),
                       Text(
                         note.text,
-                        style: TextStyle(fontSize: 13, color: isDark ? colorScheme.onSurface : null),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? colorScheme.onSurface : null,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '${DateFormat('dd/MM/yy HH:mm').format(note.createdAt)}${note.updatedAt != note.createdAt ? ' (modificato)' : ''}',
                         style: TextStyle(
                           fontSize: 11,
-                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
+                          color: isDark
+                              ? Colors.grey.shade400
+                              : Colors.grey.shade500,
                         ),
                       ),
                     ],
@@ -1113,31 +1238,55 @@ class _DailyAnnotationsCard extends ConsumerWidget {
           final dialogIsDark = dialogTheme.brightness == Brightness.dark;
           final dialogColorScheme = dialogTheme.colorScheme;
           return AlertDialog(
-            title: Text(existing != null ? 'Modifica annotazione' : 'Nuova annotazione'),
+            title: Text(
+              existing != null ? 'Modifica annotazione' : 'Nuova annotazione',
+            ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Giorno di catechesi:', style: TextStyle(fontSize: 13, color: dialogIsDark ? dialogColorScheme.onSurface : null)),
+                Text(
+                  'Giorno di catechesi:',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: dialogIsDark ? dialogColorScheme.onSurface : null,
+                  ),
+                ),
                 const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
-                    border: Border.all(color: dialogIsDark ? dialogColorScheme.outline : Colors.grey.shade400),
+                    border: Border.all(
+                      color: dialogIsDark
+                          ? dialogColorScheme.outline
+                          : Colors.grey.shade400,
+                    ),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       value: selectedMeetingId,
-                      hint: Text('Seleziona un giorno...', style: TextStyle(color: dialogIsDark ? Colors.grey.shade400 : null)),
+                      hint: Text(
+                        'Seleziona un giorno...',
+                        style: TextStyle(
+                          color: dialogIsDark ? Colors.grey.shade400 : null,
+                        ),
+                      ),
                       isExpanded: true,
-                      dropdownColor: dialogIsDark ? dialogColorScheme.surfaceContainer : null,
+                      dropdownColor: dialogIsDark
+                          ? dialogColorScheme.surfaceContainer
+                          : null,
                       items: meetings.map((m) {
                         return DropdownMenuItem(
                           value: m.id,
                           child: Text(
                             '${DateFormat('dd/MM/yyyy').format(m.date)} - ${m.title}',
-                            style: TextStyle(fontSize: 13, color: dialogIsDark ? dialogColorScheme.onSurface : null),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: dialogIsDark
+                                  ? dialogColorScheme.onSurface
+                                  : null,
+                            ),
                           ),
                         );
                       }).toList(),
@@ -1154,7 +1303,9 @@ class _DailyAnnotationsCard extends ConsumerWidget {
                   decoration: InputDecoration(
                     hintText: 'Scrivi annotazione...',
                     border: const OutlineInputBorder(),
-                    hintStyle: TextStyle(color: dialogIsDark ? Colors.grey.shade400 : null),
+                    hintStyle: TextStyle(
+                      color: dialogIsDark ? Colors.grey.shade400 : null,
+                    ),
                   ),
                 ),
               ],
@@ -1254,12 +1405,15 @@ class _AbsencesCard extends ConsumerWidget {
 
     final records = <Map<String, dynamic>>[];
     for (final record in allAttendance) {
-      final presenceMap = Map<String, dynamic>.from(record['presence'] as Map? ?? {});
+      final presenceMap = Map<String, dynamic>.from(
+        record['presence'] as Map? ?? {},
+      );
       final status = presenceMap[studentId]?.toString();
       if (status == null) continue;
 
       final meeting = meetingMap[record['id']];
-      final date = DateTime.tryParse(record['date']?.toString() ?? '') ?? DateTime.now();
+      final date =
+          DateTime.tryParse(record['date']?.toString() ?? '') ?? DateTime.now();
 
       records.add({
         'date': date,
@@ -1269,7 +1423,9 @@ class _AbsencesCard extends ConsumerWidget {
         'isReunion': meeting?.isReunion ?? false,
       });
     }
-    records.sort((a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
+    records.sort(
+      (a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime),
+    );
 
     showModalBottomSheet(
       context: context,
@@ -1297,7 +1453,9 @@ class _AbsencesCard extends ConsumerWidget {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: sheetIsDark ? Colors.grey.shade600 : Colors.grey.shade300,
+                      color: sheetIsDark
+                          ? Colors.grey.shade600
+                          : Colors.grey.shade300,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -1308,7 +1466,9 @@ class _AbsencesCard extends ConsumerWidget {
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: sheetIsDark ? sheetColorScheme.primary : const Color(0xFF174A7E),
+                    color: sheetIsDark
+                        ? sheetColorScheme.primary
+                        : const Color(0xFF174A7E),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -1317,7 +1477,11 @@ class _AbsencesCard extends ConsumerWidget {
                       ? Center(
                           child: Text(
                             'Nessuna presenza registrata',
-                            style: TextStyle(color: sheetIsDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                            style: TextStyle(
+                              color: sheetIsDark
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
+                            ),
                           ),
                         )
                       : ListView.builder(
@@ -1336,13 +1500,23 @@ class _AbsencesCard extends ConsumerWidget {
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
                                 color: isPresent
-                                    ? (sheetIsDark ? Colors.green.withValues(alpha: 0.15) : Colors.green.shade50)
-                                    : (sheetIsDark ? Colors.red.withValues(alpha: 0.15) : Colors.red.shade50),
+                                    ? (sheetIsDark
+                                          ? Colors.green.withValues(alpha: 0.15)
+                                          : Colors.green.shade50)
+                                    : (sheetIsDark
+                                          ? Colors.red.withValues(alpha: 0.15)
+                                          : Colors.red.shade50),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
                                   color: isPresent
-                                      ? (sheetIsDark ? Colors.green.withValues(alpha: 0.3) : Colors.green.shade200)
-                                      : (sheetIsDark ? Colors.red.withValues(alpha: 0.3) : Colors.red.shade200),
+                                      ? (sheetIsDark
+                                            ? Colors.green.withValues(
+                                                alpha: 0.3,
+                                              )
+                                            : Colors.green.shade200)
+                                      : (sheetIsDark
+                                            ? Colors.red.withValues(alpha: 0.3)
+                                            : Colors.red.shade200),
                                 ),
                               ),
                               child: Row(
@@ -1356,86 +1530,114 @@ class _AbsencesCard extends ConsumerWidget {
                                           : Colors.red,
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                  child: Center(
-                                    child: Text(
-                                      isPresent ? 'P' : 'A',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
+                                    child: Center(
+                                      child: Text(
+                                        isPresent ? 'P' : 'A',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Text(
-                                            DateFormat('dd/MM/yyyy').format(date),
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 14,
-                                              color: isPresent
-                                                  ? (sheetIsDark ? Colors.green.shade200 : Colors.green.shade900)
-                                                  : (sheetIsDark ? Colors.red.shade200 : Colors.red.shade900),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          if (isReunion)
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: sheetIsDark ? Colors.orange.shade800 : Colors.orange.shade100,
-                                                borderRadius: BorderRadius.circular(4),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Text(
+                                              DateFormat(
+                                                'dd/MM/yyyy',
+                                              ).format(date),
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                                color: isPresent
+                                                    ? (sheetIsDark
+                                                          ? Colors
+                                                                .green
+                                                                .shade200
+                                                          : Colors
+                                                                .green
+                                                                .shade900)
+                                                    : (sheetIsDark
+                                                          ? Colors.red.shade200
+                                                          : Colors
+                                                                .red
+                                                                .shade900),
                                               ),
-                                              child: Text(
-                                                'Riunione',
-                                                style: TextStyle(
-                                                  fontSize: 9,
-                                                  color: sheetIsDark ? Colors.orange.shade200 : Colors.orange.shade900,
-                                                  fontWeight: FontWeight.w500,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            if (isReunion)
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 2,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: sheetIsDark
+                                                      ? Colors.orange.shade800
+                                                      : Colors.orange.shade100,
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  'Riunione',
+                                                  style: TextStyle(
+                                                    fontSize: 9,
+                                                    color: sheetIsDark
+                                                        ? Colors.orange.shade200
+                                                        : Colors
+                                                              .orange
+                                                              .shade900,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
                                                 ),
                                               ),
-                                            ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        title,
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 13,
-                                          color: sheetIsDark ? sheetColorScheme.onSurface : null,
+                                          ],
                                         ),
-                                      ),
-                                      if (activity.isNotEmpty)
+                                        const SizedBox(height: 2),
                                         Text(
-                                          activity,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
+                                          title,
                                           style: TextStyle(
-                                            color: sheetIsDark ? Colors.grey.shade400 : Colors.grey.shade700,
-                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 13,
+                                            color: sheetIsDark
+                                                ? sheetColorScheme.onSurface
+                                                : null,
                                           ),
                                         ),
-                                    ],
+                                        if (activity.isNotEmpty)
+                                          Text(
+                                            activity,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: sheetIsDark
+                                                  ? Colors.grey.shade400
+                                                  : Colors.grey.shade700,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
+                                ],
+                              ),
+                            );
+                          },
+                        ),
                 ),
-              ),
-            );
-        },
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1450,15 +1652,19 @@ class _AbsencesCard extends ConsumerWidget {
         title: 'assenze'.toUpperCase(),
         icon: Icons.event_busy_rounded,
         color: Colors.red,
-        trailing: Icon(Icons.chevron_right, color: isDark ? Colors.grey.shade500 : Colors.grey.shade400, size: 20),
+        trailing: Icon(
+          Icons.chevron_right,
+          color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+          size: 20,
+        ),
         children: [
           dataAsync.when(
-            loading: () => const Center(
-              child: CircularProgressIndicator(),
-            ),
+            loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Text(
               'Errore nel caricamento assenze: $e',
-              style: TextStyle(color: isDark ? Colors.red.shade200 : Colors.red.shade700),
+              style: TextStyle(
+                color: isDark ? Colors.red.shade200 : Colors.red.shade700,
+              ),
             ),
             data: (data) {
               final absences = data['absences'] as List<Map<String, dynamic>>;
@@ -1474,7 +1680,9 @@ class _AbsencesCard extends ConsumerWidget {
                         icon: Icons.check_circle_outline,
                         label: 'Ultima presenza',
                         value: lastPresenceDate ?? 'Mai',
-                        valueColor: lastPresenceDate != null ? Colors.green : Colors.grey,
+                        valueColor: lastPresenceDate != null
+                            ? Colors.green
+                            : Colors.grey,
                         isDark: isDark,
                       ),
                       const SizedBox(width: 12),
@@ -1482,7 +1690,11 @@ class _AbsencesCard extends ConsumerWidget {
                         icon: Icons.warning_amber_rounded,
                         label: 'Assenze consecutive',
                         value: '$consecutiveAbsences',
-                        valueColor: consecutiveAbsences >= 2 ? Colors.red : (consecutiveAbsences > 0 ? Colors.orange : Colors.green),
+                        valueColor: consecutiveAbsences >= 2
+                            ? Colors.red
+                            : (consecutiveAbsences > 0
+                                  ? Colors.orange
+                                  : Colors.green),
                         isDark: isDark,
                       ),
                     ],
@@ -1493,14 +1705,21 @@ class _AbsencesCard extends ConsumerWidget {
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
                         'Nessuna assenza registrata',
-                        style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, fontSize: 13),
+                        style: TextStyle(
+                          color: isDark
+                              ? Colors.grey.shade400
+                              : Colors.grey.shade600,
+                          fontSize: 13,
+                        ),
                       ),
                     )
                   else ...[
                     Text(
                       'Tocca per vedere lo storico completo',
                       style: TextStyle(
-                        color: isDark ? Colors.red.shade300 : Colors.red.shade400,
+                        color: isDark
+                            ? Colors.red.shade300
+                            : Colors.red.shade400,
                         fontSize: 12,
                         fontStyle: FontStyle.italic,
                       ),
@@ -1514,13 +1733,26 @@ class _AbsencesCard extends ConsumerWidget {
                         margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: isDark ? Colors.red.withValues(alpha: 0.15) : Colors.red.shade50,
+                          color: isDark
+                              ? Colors.red.withValues(alpha: 0.15)
+                              : Colors.red.shade50,
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: isDark ? Colors.red.withValues(alpha: 0.3) : Colors.red.shade200, width: 1),
+                          border: Border.all(
+                            color: isDark
+                                ? Colors.red.withValues(alpha: 0.3)
+                                : Colors.red.shade200,
+                            width: 1,
+                          ),
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.calendar_today, size: 14, color: isDark ? Colors.red.shade200 : Colors.red.shade700),
+                            Icon(
+                              Icons.calendar_today,
+                              size: 14,
+                              color: isDark
+                                  ? Colors.red.shade200
+                                  : Colors.red.shade700,
+                            ),
                             const SizedBox(width: 6),
                             Expanded(
                               child: Column(
@@ -1530,13 +1762,20 @@ class _AbsencesCard extends ConsumerWidget {
                                     DateFormat('dd/MM/yyyy').format(date),
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      color: isDark ? Colors.red.shade200 : Colors.red.shade900,
+                                      color: isDark
+                                          ? Colors.red.shade200
+                                          : Colors.red.shade900,
                                       fontSize: 13,
                                     ),
                                   ),
                                   Text(
                                     title,
-                                    style: TextStyle(fontSize: 12, color: isDark ? colorScheme.onSurface : null),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isDark
+                                          ? colorScheme.onSurface
+                                          : null,
+                                    ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -1553,7 +1792,9 @@ class _AbsencesCard extends ConsumerWidget {
                         child: Text(
                           '+ ${absences.length - 3} altre assenze',
                           style: TextStyle(
-                            color: isDark ? Colors.red.shade300 : Colors.red.shade600,
+                            color: isDark
+                                ? Colors.red.shade300
+                                : Colors.red.shade600,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
@@ -1624,48 +1865,61 @@ class _ContactNotesCard extends ConsumerWidget {
             style: TextStyle(color: emptyColor, fontStyle: FontStyle.italic),
           )
         else
-          ...recentNotes.map((note) => Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: _mediumColor(note.medium).withValues(alpha: isDark ? 0.15 : 0.05),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                      color: _mediumColor(note.medium).withValues(alpha: isDark ? 0.3 : 0.2)),
+          ...recentNotes.map(
+            (note) => Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: _mediumColor(
+                  note.medium,
+                ).withValues(alpha: isDark ? 0.15 : 0.05),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: _mediumColor(
+                    note.medium,
+                  ).withValues(alpha: isDark ? 0.3 : 0.2),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(_mediumIcon(note.medium),
-                            size: 16, color: _mediumColor(note.medium)),
-                        const SizedBox(width: 6),
-                        Text(
-                          ContactNote.mediumLabel(note.medium),
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                            color: _mediumColor(note.medium),
-                          ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        _mediumIcon(note.medium),
+                        size: 16,
+                        color: _mediumColor(note.medium),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        ContactNote.mediumLabel(note.medium),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: _mediumColor(note.medium),
                         ),
-                        const Spacer(),
-                        Text(
-                          DateFormat('dd/MM/yy HH:mm').format(note.dateTime),
-                          style: TextStyle(fontSize: 11, color: emptyColor),
-                        ),
-                      ],
+                      ),
+                      const Spacer(),
+                      Text(
+                        DateFormat('dd/MM/yy HH:mm').format(note.dateTime),
+                        style: TextStyle(fontSize: 11, color: emptyColor),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    note.notes,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDark ? colorScheme.onSurface : null,
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      note.notes,
-                      style: TextStyle(fontSize: 13, color: isDark ? colorScheme.onSurface : null),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              )),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ),
         if (notes.length > 3)
           Padding(
             padding: const EdgeInsets.only(top: 4),
@@ -1686,8 +1940,7 @@ class _ContactNotesCard extends ConsumerWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) =>
-                      StudentContactNotesPage(student: student),
+                  builder: (_) => StudentContactNotesPage(student: student),
                 ),
               );
             },
@@ -1764,7 +2017,10 @@ class _InfoCard extends StatelessWidget {
               ],
             ),
           ),
-          Divider(height: 1, color: isDark ? colorScheme.outline.withValues(alpha: 0.3) : null),
+          Divider(
+            height: 1,
+            color: isDark ? colorScheme.outline.withValues(alpha: 0.3) : null,
+          ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -1810,7 +2066,9 @@ class _InfoRow extends StatelessWidget {
             child: Text(
               value,
               style: TextStyle(
-                color: isDark ? theme.colorScheme.onSurface : Colors.grey.shade800,
+                color: isDark
+                    ? theme.colorScheme.onSurface
+                    : Colors.grey.shade800,
                 fontSize: 14,
                 fontWeight: isPhone ? FontWeight.bold : FontWeight.normal,
               ),
@@ -1857,7 +2115,12 @@ class _StatBadge extends StatelessWidget {
                 children: [
                   Text(
                     label,
-                    style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
+                    ),
                   ),
                   Text(
                     value,

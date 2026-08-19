@@ -110,7 +110,8 @@ class _GuidePageState extends ConsumerState<GuidePage> {
                 child: PageView.builder(
                   controller: _pageController,
                   itemCount: _steps.length,
-                  onPageChanged: (index) => setState(() => _currentIndex = index),
+                  onPageChanged: (index) =>
+                      setState(() => _currentIndex = index),
                   itemBuilder: (context, index) {
                     return _GuideStepView(
                       step: _steps[index],
@@ -222,7 +223,9 @@ class _GuideStepView extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
+                  color: isDark
+                      ? colorScheme.onSurface
+                      : const Color(0xFF174A7E),
                 ),
               ),
               const SizedBox(height: 12),
@@ -301,7 +304,10 @@ class _GuideButton extends StatelessWidget {
           ),
         ),
         icon: Icon(icon, size: 22),
-        label: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        label: Text(
+          label,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }

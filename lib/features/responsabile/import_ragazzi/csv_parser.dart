@@ -136,11 +136,13 @@ class CsvParser {
     for (var r = 1; r < rows.length; r++) {
       final current = rows[r];
       if (current.length != headers.length) {
-        errors.add(CsvRowError(
-          r + 1,
-          'Riga ${r + 1}: numero di colonne (${current.length}) diverso dalle '
-          'intestazioni (${headers.length}).',
-        ));
+        errors.add(
+          CsvRowError(
+            r + 1,
+            'Riga ${r + 1}: numero di colonne (${current.length}) diverso dalle '
+            'intestazioni (${headers.length}).',
+          ),
+        );
       } else {
         dataRows.add(current);
       }

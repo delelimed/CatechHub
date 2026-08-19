@@ -128,12 +128,13 @@ class _IscrizioniPageState extends ConsumerState<IscrizioniPage> {
       return;
     }
     final targetAnno = PassaggioAnnoService.annoSuccessivo(currentAnno);
-    final percorsi = classes
-        .map((c) => c.percorso)
-        .where((p) => p.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
+    final percorsi =
+        classes
+            .map((c) => c.percorso)
+            .where((p) => p.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
     final selected = <String>{};
     var archiviaRitirati = true;
 
@@ -159,9 +160,10 @@ class _IscrizioniPageState extends ConsumerState<IscrizioniPage> {
                     style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
                   )
                 else ...[
-                  const Text('Percorsi da promuovere:',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 12)),
+                  const Text(
+                    'Percorsi da promuovere:',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
                   for (final p in percorsi)
                     CheckboxListTile(
                       dense: true,
@@ -180,12 +182,15 @@ class _IscrizioniPageState extends ConsumerState<IscrizioniPage> {
                 CheckboxListTile(
                   dense: true,
                   controlAffinity: ListTileControlAffinity.leading,
-                  title: const Text('Escludi ragazzi FERMI/RITIRATI',
-                      style: TextStyle(fontSize: 13)),
+                  title: const Text(
+                    'Escludi ragazzi FERMI/RITIRATI',
+                    style: TextStyle(fontSize: 13),
+                  ),
                   subtitle: const Text(
-                      'Gli studenti con percorso FERMO o RITIRATO non '
-                      'vengono promossi.',
-                      style: TextStyle(fontSize: 11)),
+                    'Gli studenti con percorso FERMO o RITIRATO non '
+                    'vengono promossi.',
+                    style: TextStyle(fontSize: 11),
+                  ),
                   value: archiviaRitirati,
                   onChanged: (v) =>
                       setState(() => archiviaRitirati = v ?? true),
@@ -261,8 +266,9 @@ class _IscrizioniPageState extends ConsumerState<IscrizioniPage> {
 
   Widget _summaryCard(List<SchoolClass> active) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surface =
-        isDark ? Theme.of(context).colorScheme.surfaceContainer : Colors.white;
+    final surface = isDark
+        ? Theme.of(context).colorScheme.surfaceContainer
+        : Colors.white;
     final totRagazzi = active.fold<int>(0, (s, c) => s + c.studentIds.length);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
@@ -270,7 +276,8 @@ class _IscrizioniPageState extends ConsumerState<IscrizioniPage> {
         color: surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-            color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+          color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+        ),
       ),
       child: Row(
         children: [
@@ -305,14 +312,19 @@ class _IscrizioniPageState extends ConsumerState<IscrizioniPage> {
         children: [
           Icon(icon, size: 22, color: Theme.of(context).colorScheme.primary),
           const SizedBox(height: 4),
-          Text(value,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          Text(label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                  fontSize: 10.5,
-                  color: isDark ? Colors.grey.shade400 : Colors.black54)),
+          Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 10.5,
+              color: isDark ? Colors.grey.shade400 : Colors.black54,
+            ),
+          ),
         ],
       ),
     );
@@ -343,8 +355,11 @@ class _IscrizioniPageState extends ConsumerState<IscrizioniPage> {
         children: [
           Row(
             children: [
-              const Icon(Icons.trending_up_rounded,
-                  color: Colors.white, size: 30),
+              const Icon(
+                Icons.trending_up_rounded,
+                color: Colors.white,
+                size: 30,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -353,14 +368,18 @@ class _IscrizioniPageState extends ConsumerState<IscrizioniPage> {
                     Text(
                       'Anno ${currentAnno.isEmpty ? '?' : currentAnno}',
                       style: const TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold),
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Promuovi le classi al prossimo anno catechistico o '
                       'concludi l\'anno e archivia nello storico.',
-                      style:
-                          const TextStyle(color: Colors.white70, fontSize: 12),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
@@ -459,7 +478,8 @@ class _IscrizioniPageState extends ConsumerState<IscrizioniPage> {
             : Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-            color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+          color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -470,8 +490,10 @@ class _IscrizioniPageState extends ConsumerState<IscrizioniPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(c.name,
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Text(
+                      c.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     Text(
                       '${c.studentIds.length} ragazzi iscritti',
                       style: TextStyle(
@@ -514,11 +536,16 @@ class _IscrizioniPageState extends ConsumerState<IscrizioniPage> {
                                 ? 'Iscr. ${s.annoIscrizione} · ${s.statoPercorso}'
                                 : s.statoPercorso,
                             style: TextStyle(
-                                fontSize: 11, color: Colors.grey.shade600),
+                              fontSize: 11,
+                              color: Colors.grey.shade600,
+                            ),
                           ),
                           trailing: IconButton(
                             tooltip: 'Passa a un\'altra classe',
-                            icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                            icon: const Icon(
+                              Icons.swap_horiz_rounded,
+                              size: 18,
+                            ),
                             onPressed: () => _moveStudentDialog(c, s, classes),
                           ),
                         ),

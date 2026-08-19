@@ -1,7 +1,6 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:io';
 
-import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
@@ -11,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../shared/widgets/app_scaffold.dart';
+import '../../core/services/crypto_utils.dart';
 import '../../core/services/update_service.dart';
 
 class UpdatePage extends ConsumerStatefulWidget {
@@ -86,9 +86,13 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
             if (name.isEmpty) continue;
             // Asset convenzione: "<app>.apk.sha256" contenente "<hex>  <file>".
             if (name.endsWith('.apk.sha256')) {
-              apkDigestUrl = asset['browser_download_url'] as String? ?? asset['url'] as String?;
+              apkDigestUrl =
+                  asset['browser_download_url'] as String? ??
+                  asset['url'] as String?;
             } else if (name.endsWith('.apk') && apkUrl == null) {
-              apkUrl = asset['browser_download_url'] as String? ?? asset['url'] as String?;
+              apkUrl =
+                  asset['browser_download_url'] as String? ??
+                  asset['url'] as String?;
             }
           }
 
@@ -182,9 +186,9 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
       expectedDigest = match.group(1)!.toLowerCase();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Errore verifica integrità: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Errore verifica integrità: $e')));
       return;
     }
 
@@ -213,7 +217,9 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
     if (directory != null) {
       apkDir = Directory('${directory.path}/apk_updates');
     } else {
-      apkDir = Directory('${(await getApplicationDocumentsDirectory()).path}/apk_updates');
+      apkDir = Directory(
+        '${(await getApplicationDocumentsDirectory()).path}/apk_updates',
+      );
     }
     if (!await apkDir.exists()) {
       await apkDir.create(recursive: true);
@@ -243,10 +249,14 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
       try {
         final request = http.Request('GET', Uri.parse(apkUrl));
         request.headers['Accept'] = 'application/octet-stream';
-        final streamedResponse = await client.send(request).timeout(const Duration(seconds: 60));
+        final streamedResponse = await client
+            .send(request)
+            .timeout(const Duration(seconds: 60));
 
         if (streamedResponse.statusCode != 200) {
-          throw Exception('Download fallito (HTTP ${streamedResponse.statusCode})');
+          throw Exception(
+            'Download fallito (HTTP ${streamedResponse.statusCode})',
+          );
         }
 
         final contentLength = streamedResponse.contentLength ?? -1;
@@ -286,10 +296,12 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
         // release: se non corrisponde, l'APK non è autentico e NON si installa.
         // `expectedDigest` è garantito non-null: senza digest si torna prima.
         final bytes = await file.readAsBytes();
-        final actualDigest = sha256.convert(bytes).toString();
+        final actualDigest = sha256HexBytesSync(bytes);
         if (actualDigest != expectedDigest) {
           await file.delete();
-          throw Exception('Verifica integrità APK fallita: il digest non corrisponde.');
+          throw Exception(
+            'Verifica integrità APK fallita: il digest non corrisponde.',
+          );
         }
 
         final raf = await file.open(mode: FileMode.read);
@@ -317,9 +329,9 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
         await UpdateService.installApk(path);
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Errore installazione: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Errore installazione: $e')));
         }
       }
     } catch (e) {
@@ -327,9 +339,9 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
         _isDownloading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Errore download: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Errore download: $e')));
       }
     }
   }
@@ -348,7 +360,11 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
     );
   }
 
-  Widget _buildContent(BuildContext context, bool isDark, ColorScheme colorScheme) {
+  Widget _buildContent(
+    BuildContext context,
+    bool isDark,
+    ColorScheme colorScheme,
+  ) {
     if (_isLoading) return _LoadingSkeleton();
 
     if (_errorMessage != null) {
@@ -494,7 +510,9 @@ class _ShimmerCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
       ),
       child: Center(
-        child: CircularProgressIndicator(color: isDark ? colorScheme.onSurface : Colors.grey.shade400),
+        child: CircularProgressIndicator(
+          color: isDark ? colorScheme.onSurface : Colors.grey.shade400,
+        ),
       ),
     );
   }
@@ -564,7 +582,9 @@ class _StatusCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
+                  color: isDark
+                      ? colorScheme.onSurface
+                      : const Color(0xFF174A7E),
                 ),
               ),
               const SizedBox(height: 8),
@@ -584,8 +604,12 @@ class _StatusCard extends StatelessWidget {
                   child: ElevatedButton.icon(
                     onPressed: onRetry,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-                      foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
+                      backgroundColor: isDark
+                          ? colorScheme.primary
+                          : const Color(0xFF174A7E),
+                      foregroundColor: isDark
+                          ? colorScheme.onPrimary
+                          : Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
@@ -631,10 +655,7 @@ class _UpdateHeroCard extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            const Color(0xFF174A7E),
-            const Color(0xFF2E5A8F),
-          ],
+          colors: [const Color(0xFF174A7E), const Color(0xFF2E5A8F)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -709,7 +730,11 @@ class _UpdateHeroCard extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              Icon(Icons.calendar_today_rounded, size: 14, color: Colors.white.withValues(alpha: 0.6)),
+              Icon(
+                Icons.calendar_today_rounded,
+                size: 14,
+                color: Colors.white.withValues(alpha: 0.6),
+              ),
               const SizedBox(width: 6),
               Text(
                 'Pubblicata il ${_formatDate(publishedAt)}',
@@ -769,7 +794,9 @@ class _VersionBadge extends StatelessWidget {
           Text(
             version,
             style: TextStyle(
-              color: highlighted ? Colors.white : Colors.white.withValues(alpha: 0.7),
+              color: highlighted
+                  ? Colors.white
+                  : Colors.white.withValues(alpha: 0.7),
               fontSize: 22,
               fontWeight: highlighted ? FontWeight.bold : FontWeight.w600,
             ),
@@ -835,7 +862,9 @@ class _ChangelogCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
+                  color: isDark
+                      ? colorScheme.onSurface
+                      : const Color(0xFF174A7E),
                 ),
               ),
             ],
@@ -940,43 +969,47 @@ class _ChangelogSection extends StatelessWidget {
                 style: TextStyle(
                   fontSize: section.isSub ? 14 : 15,
                   fontWeight: FontWeight.bold,
-                  color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
+                  color: isDark
+                      ? colorScheme.onSurface
+                      : const Color(0xFF174A7E),
                 ),
               ),
             ],
           ),
           if (section.items.isNotEmpty) ...[
             const SizedBox(height: 8),
-              ...section.items.map(
-                (item) => Padding(
-                  padding: const EdgeInsets.only(left: 24, bottom: 4),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '•',
+            ...section.items.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(left: 24, bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '•',
+                      style: TextStyle(
+                        color: isDark
+                            ? colorScheme.primary.withValues(alpha: 0.5)
+                            : const Color(0xFF174A7E).withValues(alpha: 0.5),
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        item,
                         style: TextStyle(
                           color: isDark
-                              ? colorScheme.primary.withValues(alpha: 0.5)
-                              : const Color(0xFF174A7E).withValues(alpha: 0.5),
-                          fontSize: 14,
+                              ? Colors.grey.shade400
+                              : Colors.grey.shade700,
+                          fontSize: 13,
+                          height: 1.4,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          item,
-                          style: TextStyle(
-                            color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
-                            fontSize: 13,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
+            ),
           ],
         ],
       ),
@@ -985,11 +1018,21 @@ class _ChangelogSection extends StatelessWidget {
 
   IconData _iconForSection(String title) {
     final t = title.toLowerCase();
-    if (t.contains('nuov') || t.contains('aggiunt')) return Icons.add_circle_rounded;
-    if (t.contains('miglior') || t.contains('ottimiz')) return Icons.trending_up_rounded;
-    if (t.contains('bug') || t.contains('fix') || t.contains('correz')) return Icons.bug_report_rounded;
-    if (t.contains('rimoss') || t.contains('elimin')) return Icons.remove_circle_rounded;
-    if (t.contains('sicur') || t.contains('security')) return Icons.shield_rounded;
+    if (t.contains('nuov') || t.contains('aggiunt')) {
+      return Icons.add_circle_rounded;
+    }
+    if (t.contains('miglior') || t.contains('ottimiz')) {
+      return Icons.trending_up_rounded;
+    }
+    if (t.contains('bug') || t.contains('fix') || t.contains('correz')) {
+      return Icons.bug_report_rounded;
+    }
+    if (t.contains('rimoss') || t.contains('elimin')) {
+      return Icons.remove_circle_rounded;
+    }
+    if (t.contains('sicur') || t.contains('security')) {
+      return Icons.shield_rounded;
+    }
     return Icons.circle_rounded;
   }
 }
@@ -1044,15 +1087,21 @@ class _DownloadProgressCard extends StatelessWidget {
                     CircularProgressIndicator(
                       value: progress,
                       strokeWidth: 4,
-                      backgroundColor: isDark ? colorScheme.surfaceContainerHighest : Colors.grey.shade200,
-                      valueColor: AlwaysStoppedAnimation<Color>(isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+                      backgroundColor: isDark
+                          ? colorScheme.surfaceContainerHighest
+                          : Colors.grey.shade200,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                      ),
                     ),
                     Text(
                       '${(progress * 100).toInt()}%',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                        color: isDark
+                            ? colorScheme.primary
+                            : const Color(0xFF174A7E),
                       ),
                     ),
                   ],
@@ -1067,7 +1116,9 @@ class _DownloadProgressCard extends StatelessWidget {
                       'Download in corso...',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                        color: isDark
+                            ? colorScheme.primary
+                            : const Color(0xFF174A7E),
                         fontSize: 15,
                       ),
                     ),
@@ -1077,8 +1128,14 @@ class _DownloadProgressCard extends StatelessWidget {
                       child: LinearProgressIndicator(
                         value: progress,
                         minHeight: 8,
-                        backgroundColor: isDark ? colorScheme.surfaceContainerHighest : Colors.grey.shade200,
-                        valueColor: AlwaysStoppedAnimation<Color>(isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+                        backgroundColor: isDark
+                            ? colorScheme.surfaceContainerHighest
+                            : Colors.grey.shade200,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          isDark
+                              ? colorScheme.primary
+                              : const Color(0xFF174A7E),
+                        ),
                       ),
                     ),
                   ],
@@ -1115,10 +1172,7 @@ class _ActionButtons extends StatelessWidget {
   final VoidCallback onDownload;
   final String githubUrl;
 
-  const _ActionButtons({
-    required this.onDownload,
-    required this.githubUrl,
-  });
+  const _ActionButtons({required this.onDownload, required this.githubUrl});
 
   @override
   Widget build(BuildContext context) {
@@ -1132,22 +1186,23 @@ class _ActionButtons extends StatelessWidget {
           child: ElevatedButton.icon(
             onPressed: onDownload,
             style: ElevatedButton.styleFrom(
-              backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+              backgroundColor: isDark
+                  ? colorScheme.primary
+                  : const Color(0xFF174A7E),
               foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 18),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(18),
               ),
               elevation: 4,
-              shadowColor: (isDark ? colorScheme.primary : const Color(0xFF174A7E)).withValues(alpha: 0.3),
+              shadowColor:
+                  (isDark ? colorScheme.primary : const Color(0xFF174A7E))
+                      .withValues(alpha: 0.3),
             ),
             icon: const Icon(Icons.download_rounded, size: 22),
             label: const Text(
               'Scarica e installa',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ),
         ),
@@ -1160,8 +1215,13 @@ class _ActionButtons extends StatelessWidget {
               await launchUrl(uri, mode: LaunchMode.externalApplication);
             },
             style: OutlinedButton.styleFrom(
-              foregroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-              side: BorderSide(color: isDark ? colorScheme.primary : const Color(0xFF174A7E), width: 1.5),
+              foregroundColor: isDark
+                  ? colorScheme.primary
+                  : const Color(0xFF174A7E),
+              side: BorderSide(
+                color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                width: 1.5,
+              ),
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(18),
@@ -1170,10 +1230,7 @@ class _ActionButtons extends StatelessWidget {
             icon: const Icon(Icons.open_in_new_rounded, size: 20),
             label: const Text(
               'Visualizza su GitHub',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
             ),
           ),
         ),

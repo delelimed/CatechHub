@@ -18,18 +18,25 @@ import 'package:CatechHub/features/sync/p2p/p2p_security_service.dart';
 void main() {
   group('Finestre temporali (sessionKeyRotation)', () {
     test('la rotazione è impostata a 30 minuti', () {
-      expect(P2PSecurityService.sessionKeyRotation, const Duration(minutes: 30));
+      expect(
+        P2PSecurityService.sessionKeyRotation,
+        const Duration(minutes: 30),
+      );
     });
 
     test('sessionWindowIndex è deterministico nella stessa finestra', () {
       final base = DateTime.utc(2026, 7, 1, 12, 0);
       expect(
         P2PSecurityService.sessionWindowIndex(base),
-        P2PSecurityService.sessionWindowIndex(base.add(const Duration(seconds: 29))),
+        P2PSecurityService.sessionWindowIndex(
+          base.add(const Duration(seconds: 29)),
+        ),
       );
       expect(
         P2PSecurityService.sessionWindowIndex(base),
-        P2PSecurityService.sessionWindowIndex(base.add(const Duration(minutes: 29, seconds: 59))),
+        P2PSecurityService.sessionWindowIndex(
+          base.add(const Duration(minutes: 29, seconds: 59)),
+        ),
       );
     });
 
@@ -43,10 +50,7 @@ void main() {
 
     test('previousWindowIndex restituisce la finestra precedente', () {
       final w = P2PSecurityService.sessionWindowIndex();
-      expect(
-        P2PSecurityService.previousWindowIndex(w),
-        w - 1,
-      );
+      expect(P2PSecurityService.previousWindowIndex(w), w - 1);
     });
   });
 
@@ -93,7 +97,9 @@ void main() {
     test('finestre diverse → chiavi diverse (rotazione)', () async {
       final currentWindow = P2PSecurityService.sessionWindowIndex();
       final startCurrent = P2PSecurityService.sessionWindowStart(currentWindow);
-      final startNext = P2PSecurityService.sessionWindowStart(currentWindow + 1);
+      final startNext = P2PSecurityService.sessionWindowStart(
+        currentWindow + 1,
+      );
 
       final kCurrent = await P2PSecurityService.deriveRotatingSessionKey(
         sharedSecretBytes: shared,
@@ -107,10 +113,7 @@ void main() {
         remoteDeviceId: deviceB,
         at: startNext,
       );
-      expect(
-        await kCurrent.extractBytes(),
-        isNot(await kNext.extractBytes()),
-      );
+      expect(await kCurrent.extractBytes(), isNot(await kNext.extractBytes()));
     });
 
     test('un sessionNonce diverso cambia la chiave', () async {
@@ -168,46 +171,55 @@ void main() {
       expect(plain, 'dati sensibili');
     });
 
-    test('la chiave della finestra successiva NON decifra il vecchio blob', () async {
-      final currentWindow = P2PSecurityService.sessionWindowIndex();
-      final keyCurrent = await keyForWindow(currentWindow);
-      final keyNext = await keyForWindow(currentWindow + 1);
+    test(
+      'la chiave della finestra successiva NON decifra il vecchio blob',
+      () async {
+        final currentWindow = P2PSecurityService.sessionWindowIndex();
+        final keyCurrent = await keyForWindow(currentWindow);
+        final keyNext = await keyForWindow(currentWindow + 1);
 
-      final payload = await service.encryptPayload('dati sensibili', keyCurrent);
-      final decoded = P2PEncryptedPayload.decode(payload.encode());
+        final payload = await service.encryptPayload(
+          'dati sensibili',
+          keyCurrent,
+        );
+        final decoded = P2PEncryptedPayload.decode(payload.encode());
 
-      // Dopo la rotazione il blob cifrato con la chiave precedente non è più
-      // decifrabile con quella nuova (chiave a breve scadenza).
-      expect(
-        () => service.decryptPayload(decoded, keyNext),
-        throwsA(anything),
-      );
-    });
+        // Dopo la rotazione il blob cifrato con la chiave precedente non è più
+        // decifrabile con quella nuova (chiave a breve scadenza).
+        expect(
+          () => service.decryptPayload(decoded, keyNext),
+          throwsA(anything),
+        );
+      },
+    );
 
-    test('entrambi i peer possono decifrare con la chiave della finestra corrente', () async {
-      final window = P2PSecurityService.sessionWindowIndex();
+    test(
+      'entrambi i peer possono decifrare con la chiave della finestra corrente',
+      () async {
+        final window = P2PSecurityService.sessionWindowIndex();
 
-      // Peer A (mittente) cifra con la propria derivazione.
-      final keyA = await P2PSecurityService.deriveRotatingSessionKey(
-        sharedSecretBytes: shared,
-        localDeviceId: deviceA,
-        remoteDeviceId: deviceB,
-        sessionNonce: sessionNonce,
-        at: P2PSecurityService.sessionWindowStart(window),
-      );
-      final payload = await service.encryptPayload('segreto classe', keyA);
+        // Peer A (mittente) cifra con la propria derivazione.
+        final keyA = await P2PSecurityService.deriveRotatingSessionKey(
+          sharedSecretBytes: shared,
+          localDeviceId: deviceA,
+          remoteDeviceId: deviceB,
+          sessionNonce: sessionNonce,
+          at: P2PSecurityService.sessionWindowStart(window),
+        );
+        final payload = await service.encryptPayload('segreto classe', keyA);
 
-      // Peer B (destinatario) decifra con la propria derivazione (stessa
-      // finestra → stessa chiave, nessun handshake aggiuntivo).
-      final keyB = await P2PSecurityService.deriveRotatingSessionKey(
-        sharedSecretBytes: shared,
-        localDeviceId: deviceB,
-        remoteDeviceId: deviceA,
-        sessionNonce: sessionNonce,
-        at: P2PSecurityService.sessionWindowStart(window),
-      );
-      final decoded = P2PEncryptedPayload.decode(payload.encode());
-      expect(await service.decryptPayload(decoded, keyB), 'segreto classe');
-    });
+        // Peer B (destinatario) decifra con la propria derivazione (stessa
+        // finestra → stessa chiave, nessun handshake aggiuntivo).
+        final keyB = await P2PSecurityService.deriveRotatingSessionKey(
+          sharedSecretBytes: shared,
+          localDeviceId: deviceB,
+          remoteDeviceId: deviceA,
+          sessionNonce: sessionNonce,
+          at: P2PSecurityService.sessionWindowStart(window),
+        );
+        final decoded = P2PEncryptedPayload.decode(payload.encode());
+        expect(await service.decryptPayload(decoded, keyB), 'segreto classe');
+      },
+    );
   });
 }

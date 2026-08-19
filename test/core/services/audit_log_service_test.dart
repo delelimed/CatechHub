@@ -48,27 +48,28 @@ void main() {
 
     test('verify rileva la manomissione di un campo', () async {
       final signed = await AuditLogService.sign(_makeLog());
-      final tampered = signed.copyWith(
-        affectedEntityId: 'ragazzo_MANOMESSO',
-      );
+      final tampered = signed.copyWith(affectedEntityId: 'ragazzo_MANOMESSO');
       expect(await AuditLogService.verify(tampered), isFalse);
     });
 
-    test('verifica stabile: la stessa log firmata due volte verifica', () async {
-      final signed1 = await AuditLogService.sign(_makeLog());
-      final signed2 = await AuditLogService.sign(
-        AuditLog(
-          logId: signed1.logId,
-          timestamp: signed1.timestamp,
-          actionType: signed1.actionType,
-          executedByCatechistId: signed1.executedByCatechistId,
-          executedByCatechistName: signed1.executedByCatechistName,
-          affectedEntityType: signed1.affectedEntityType,
-          affectedEntityId: signed1.affectedEntityId,
-        ),
-      );
-      expect(signed1.signature, signed2.signature);
-    });
+    test(
+      'verifica stabile: la stessa log firmata due volte verifica',
+      () async {
+        final signed1 = await AuditLogService.sign(_makeLog());
+        final signed2 = await AuditLogService.sign(
+          AuditLog(
+            logId: signed1.logId,
+            timestamp: signed1.timestamp,
+            actionType: signed1.actionType,
+            executedByCatechistId: signed1.executedByCatechistId,
+            executedByCatechistName: signed1.executedByCatechistName,
+            affectedEntityType: signed1.affectedEntityType,
+            affectedEntityId: signed1.affectedEntityId,
+          ),
+        );
+        expect(signed1.signature, signed2.signature);
+      },
+    );
 
     test('buildPayload è canonico e deterministico', () {
       final payload = AuditLogService.buildPayload(_makeLog());

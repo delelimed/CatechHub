@@ -53,8 +53,7 @@ class AssociateDeviceScreen extends ConsumerStatefulWidget {
       _AssociateDeviceScreenState();
 }
 
-class _AssociateDeviceScreenState
-    extends ConsumerState<AssociateDeviceScreen> {
+class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
   final P2PSecurityService _security = P2PSecurityService();
 
   bool get _isClassCreator {
@@ -68,7 +67,8 @@ class _AssociateDeviceScreenState
             .map((e) => e.toString())
             .toList();
         if (ids.contains(uid)) {
-          final creatorCatechistId = data['creatorCatechistId'] as String? ?? '';
+          final creatorCatechistId =
+              data['creatorCatechistId'] as String? ?? '';
           if (creatorCatechistId.isEmpty) return true;
           return creatorCatechistId == localCatechistId;
         }
@@ -160,9 +160,15 @@ class _AssociateDeviceScreenState
       final current = ref.read(currentClassProvider);
       final classes = ref.read(myClassesProvider);
       final valid =
-          current != null && current.isNotEmpty && classes.any((c) => c.id == current);
-      final initial = valid ? current : (classes.isNotEmpty ? classes.first.id : null);
-      setState(() => _selectedSharedClassIds = initial != null ? {initial} : {});
+          current != null &&
+          current.isNotEmpty &&
+          classes.any((c) => c.id == current);
+      final initial = valid
+          ? current
+          : (classes.isNotEmpty ? classes.first.id : null);
+      setState(
+        () => _selectedSharedClassIds = initial != null ? {initial} : {},
+      );
       ref
           .read(nearbySyncServiceProvider)
           .setAssociationSharedClasses(_selectedSharedClassIds);
@@ -178,7 +184,9 @@ class _AssociateDeviceScreenState
         _selectedSharedClassIds.add(classId);
       }
     });
-    ref.read(nearbySyncServiceProvider).setAssociationSharedClasses(_selectedSharedClassIds);
+    ref
+        .read(nearbySyncServiceProvider)
+        .setAssociationSharedClasses(_selectedSharedClassIds);
   }
 
   void _chooseShowQrFirst() {
@@ -207,7 +215,9 @@ class _AssociateDeviceScreenState
   /// servizio P2P, così da includerli nell'handshake per configurare
   /// l'account del dispositivo ricevente.
   void _applyRemoteProfile() {
-    ref.read(nearbySyncServiceProvider).setAssociationRemoteProfile(
+    ref
+        .read(nearbySyncServiceProvider)
+        .setAssociationRemoteProfile(
           firstName: _remoteFirstNameController.text,
           lastName: _remoteLastNameController.text,
           phoneNumber: _remotePhoneController.text,
@@ -270,7 +280,9 @@ class _AssociateDeviceScreenState
     _pairingComplete = false;
     _isPairing = false;
     _watchP2pState();
-    ref.read(nearbySyncServiceProvider).startPairingDiscoverOnly(targetEndpoint);
+    ref
+        .read(nearbySyncServiceProvider)
+        .startPairingDiscoverOnly(targetEndpoint);
   }
 
   void _startP2pAdvertiseOnly() {
@@ -350,7 +362,10 @@ class _AssociateDeviceScreenState
   }
 
   void _onConnectionReceivedByQrHost() {
-    addLog('INFO', 'Connessione ricevuta! Passo alla scansione del QR partner.');
+    addLog(
+      'INFO',
+      'Connessione ricevuta! Passo alla scansione del QR partner.',
+    );
     setState(() {
       _successMessage = 'Dispositivo connesso! Ora inquadra il QR del partner.';
       _currentStep = _AssociationStep.scanSecondQr;
@@ -359,7 +374,10 @@ class _AssociateDeviceScreenState
   }
 
   void _onConnectedByScanner() {
-    addLog('INFO', 'Connessione stabilita! Mostro il mio QR per lo scambio chiavi.');
+    addLog(
+      'INFO',
+      'Connessione stabilita! Mostro il mio QR per lo scambio chiavi.',
+    );
     setState(() {
       _successMessage = 'Connesso! Mostra questo QR al partner.';
       _currentStep = _AssociationStep.showSecondQr;
@@ -370,6 +388,31 @@ class _AssociateDeviceScreenState
     for (final barcode in capture.barcodes) {
       final raw = barcode.rawValue;
       if (raw == null || raw.isEmpty) continue;
+
+      // QR della Catena di Fiducia (trust/approvazione del Responsabile):
+      // non è un QR di associazione. Guida l'utente verso la schermata
+      // corretta invece di mostrare il generico "QR code non valido".
+      final qrType = P2PSecurityService.classifyQrPayload(raw);
+      if (qrType == P2PQrType.trust) {
+        setState(
+          () => _errorMessage =
+              'Questo è il QR di fiducia del Responsabile: si importa da '
+              '"Catena di fiducia" → "Scansiona QR di fiducia", non qui. '
+              'Per associare il dispositivo usa il QR mostrato dall\'altro '
+              'dispositivo.',
+        );
+        return;
+      }
+      if (qrType == P2PQrType.approval) {
+        setState(
+          () => _errorMessage =
+              'Questo è un QR di approvazione del Responsabile: si riceve da '
+              '"Catena di fiducia" → "Ricevi approvazione", non qui. Per '
+              'associare il dispositivo usa il QR mostrato dall\'altro '
+              'dispositivo.',
+        );
+        return;
+      }
 
       final remoteIdentity = P2PSecurityService.parseQrPayload(raw);
       if (remoteIdentity == null) {
@@ -382,8 +425,9 @@ class _AssociateDeviceScreenState
         return;
       }
 
-      final remoteWithConn =
-          P2PIdentityWithConnection.fromIdentity(remoteIdentity);
+      final remoteWithConn = P2PIdentityWithConnection.fromIdentity(
+        remoteIdentity,
+      );
 
       if (mounted) {
         setState(() {
@@ -401,9 +445,11 @@ class _AssociateDeviceScreenState
     }
   }
 
-  Future<void> _onFirstQrScanned(
-      P2PIdentityWithConnection remote) async {
-    addLog('INFO', 'Primo QR scansionato: ${remote.username} (${remote.deviceId})');
+  Future<void> _onFirstQrScanned(P2PIdentityWithConnection remote) async {
+    addLog(
+      'INFO',
+      'Primo QR scansionato: ${remote.username} (${remote.deviceId})',
+    );
 
     _stopScanner();
 
@@ -416,8 +462,9 @@ class _AssociateDeviceScreenState
     }
 
     final remotePublicKey = remote.publicKeyBase64;
-    final sharedSecret =
-        await _security.computeStaticSharedSecret(remotePublicKey);
+    final sharedSecret = await _security.computeStaticSharedSecret(
+      remotePublicKey,
+    );
 
     final service = ref.read(nearbySyncServiceProvider);
     await service.storePendingAssociation(
@@ -430,18 +477,18 @@ class _AssociateDeviceScreenState
 
     if (mounted) {
       setState(() {
-        _successMessage =
-            'QR scansionato! Mi connetto a ${remote.username}...';
+        _successMessage = 'QR scansionato! Mi connetto a ${remote.username}...';
       });
     }
 
     _startDiscoverOnly(remote.connectionEndpoint);
   }
 
-  Future<void> _onSecondQrScanned(
-      P2PIdentityWithConnection remote) async {
-    addLog('INFO',
-        'Secondo QR scansionato: ${remote.username} (${remote.deviceId})');
+  Future<void> _onSecondQrScanned(P2PIdentityWithConnection remote) async {
+    addLog(
+      'INFO',
+      'Secondo QR scansionato: ${remote.username} (${remote.deviceId})',
+    );
 
     _stopScanner();
 
@@ -454,8 +501,9 @@ class _AssociateDeviceScreenState
     }
 
     final remotePublicKey = remote.publicKeyBase64;
-    final sharedSecret =
-        await _security.computeStaticSharedSecret(remotePublicKey);
+    final sharedSecret = await _security.computeStaticSharedSecret(
+      remotePublicKey,
+    );
 
     final service = ref.read(nearbySyncServiceProvider);
     await service.storePendingAssociation(
@@ -498,8 +546,10 @@ class _AssociateDeviceScreenState
               ),
               const SizedBox(height: 20),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(12),
@@ -529,8 +579,10 @@ class _AssociateDeviceScreenState
                 Navigator.of(ctx).pop();
                 _rejectPairing();
               },
-              child: const Text('Codici DIVERSI, Annulla',
-                  style: TextStyle(color: Colors.red)),
+              child: const Text(
+                'Codici DIVERSI, Annulla',
+                style: TextStyle(color: Colors.red),
+              ),
             ),
             FilledButton(
               onPressed: () {
@@ -549,7 +601,10 @@ class _AssociateDeviceScreenState
     final service = ref.read(nearbySyncServiceProvider);
 
     if (service.currentState.status != P2PSyncStatus.pairingVerification) {
-      addLog('WARN', 'confirmPairingCodeAndSync chiamato fuori da pairingVerification');
+      addLog(
+        'WARN',
+        'confirmPairingCodeAndSync chiamato fuori da pairingVerification',
+      );
       return;
     }
 
@@ -646,15 +701,19 @@ class _AssociateDeviceScreenState
                         RadioListTile<String>(
                           value: localId,
                           title: const Text('Questo dispositivo'),
-                          subtitle: Text('Identità: $localId',
-                              style: const TextStyle(fontSize: 11)),
+                          subtitle: Text(
+                            'Identità: $localId',
+                            style: const TextStyle(fontSize: 11),
+                          ),
                           contentPadding: EdgeInsets.zero,
                         ),
                         RadioListTile<String>(
                           value: remoteId,
                           title: Text(remoteName),
-                          subtitle: Text('Identità: $remoteId',
-                              style: const TextStyle(fontSize: 11)),
+                          subtitle: Text(
+                            'Identità: $remoteId',
+                            style: const TextStyle(fontSize: 11),
+                          ),
                           contentPadding: EdgeInsets.zero,
                         ),
                       ],
@@ -741,8 +800,10 @@ class _AssociateDeviceScreenState
             ids.add(remoteDeviceId);
             data['catechistIds'] = ids;
             box.put(key, data);
-            addLog('INFO',
-                'Aggiunto catechista remoto ${_remoteIdentity!.username} alla classe ${data['name']}');
+            addLog(
+              'INFO',
+              'Aggiunto catechista remoto ${_remoteIdentity!.username} alla classe ${data['name']}',
+            );
           }
         }
       }
@@ -756,8 +817,10 @@ class _AssociateDeviceScreenState
           ids.add(localId);
           data['catechistIds'] = ids;
           box.put(key, data);
-          addLog('INFO',
-              'Aggiunto catechista locale alla classe ${data['name']}');
+          addLog(
+            'INFO',
+            'Aggiunto catechista locale alla classe ${data['name']}',
+          );
         }
       }
     } catch (e) {
@@ -778,8 +841,10 @@ class _AssociateDeviceScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Associa Dispositivo',
-            style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Associa Dispositivo',
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: colorScheme.primary,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -863,12 +928,14 @@ class _AssociateDeviceScreenState
                     child: Center(
                       child: isActive
                           ? Icon(Icons.check, color: Colors.white, size: 16)
-                          : Text('${i + 1}',
+                          : Text(
+                              '${i + 1}',
                               style: TextStyle(
                                 color: Colors.grey[600],
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                              )),
+                              ),
+                            ),
                     ),
                   ),
                   if (i < steps.length - 1)
@@ -930,7 +997,11 @@ class _AssociateDeviceScreenState
           children: [
             Row(
               children: [
-                Icon(Icons.person_outline, color: colorScheme.primary, size: 24),
+                Icon(
+                  Icons.person_outline,
+                  color: colorScheme.primary,
+                  size: 24,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'Associazione dispositivo',
@@ -964,7 +1035,8 @@ class _AssociateDeviceScreenState
                     RadioListTile<P2PSyncRole>(
                       title: const Text('Altro Catechista'),
                       subtitle: const Text(
-                          'Richiede conferma prima di sincronizzare'),
+                        'Richiede conferma prima di sincronizzare',
+                      ),
                       secondary: const Icon(Icons.how_to_reg),
                       value: P2PSyncRole.altroCatechista,
                       contentPadding: EdgeInsets.zero,
@@ -1020,8 +1092,7 @@ class _AssociateDeviceScreenState
 
   /// Modulo dati anagrafici dell'altro catechista: nome, cognome e numero
   /// che configureranno l'account del dispositivo ricevente.
-  Widget _buildRemoteProfileForm(
-      ThemeData theme, ColorScheme colorScheme) {
+  Widget _buildRemoteProfileForm(ThemeData theme, ColorScheme colorScheme) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(top: 4),
@@ -1029,17 +1100,14 @@ class _AssociateDeviceScreenState
       decoration: BoxDecoration(
         color: colorScheme.primary.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: colorScheme.primary.withValues(alpha: 0.25),
-        ),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.badge_outlined,
-                  size: 18, color: colorScheme.primary),
+              Icon(Icons.badge_outlined, size: 18, color: colorScheme.primary),
               const SizedBox(width: 6),
               Text(
                 'Dati dell\'altro catechista',
@@ -1094,10 +1162,7 @@ class _AssociateDeviceScreenState
           const SizedBox(height: 4),
           Text(
             'I dati vengono inviati in modo sicuro al dispositivo del collega.',
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey.shade500,
-            ),
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
           ),
         ],
       ),
@@ -1106,8 +1171,7 @@ class _AssociateDeviceScreenState
 
   /// Selettore delle classi da condividere con l'altro catechista.
   /// Solo le classi selezionate verranno sincronizzate con il dispositivo remoto.
-  Widget _buildSharedClassSelector(
-      ThemeData theme, ColorScheme colorScheme) {
+  Widget _buildSharedClassSelector(ThemeData theme, ColorScheme colorScheme) {
     final myClasses = ref.watch(myClassesProvider);
 
     return Container(
@@ -1117,17 +1181,18 @@ class _AssociateDeviceScreenState
       decoration: BoxDecoration(
         color: colorScheme.primary.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: colorScheme.primary.withValues(alpha: 0.25),
-        ),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.filter_alt_rounded,
-                  size: 18, color: colorScheme.primary),
+              Icon(
+                Icons.filter_alt_rounded,
+                size: 18,
+                color: colorScheme.primary,
+              ),
               const SizedBox(width: 6),
               Text(
                 'Classi da sincronizzare',
@@ -1153,26 +1218,27 @@ class _AssociateDeviceScreenState
           if (myClasses.isEmpty)
             Text(
               'Non fai parte di nessun gruppo.',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade500,
-              ),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
             )
           else
             Column(
-              children: myClasses.map((c) => CheckboxListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                    controlAffinity: ListTileControlAffinity.leading,
-                    value: _selectedSharedClassIds.contains(c.id),
-                    onChanged: (_) => _toggleSharedClass(c.id),
-                    title: Text(
-                      c.name,
-                      style: const TextStyle(fontSize: 14),
-                      overflow: TextOverflow.ellipsis,
+              children: myClasses
+                  .map(
+                    (c) => CheckboxListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      value: _selectedSharedClassIds.contains(c.id),
+                      onChanged: (_) => _toggleSharedClass(c.id),
+                      title: Text(
+                        c.name,
+                        style: const TextStyle(fontSize: 14),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  )).toList(),
+                  )
+                  .toList(),
             ),
         ],
       ),
@@ -1224,11 +1290,15 @@ class _AssociateDeviceScreenState
             ),
             child: Column(
               children: [
-                Text('Utente: ${_localIdentity!.username}',
-                    style: const TextStyle(fontSize: 13)),
+                Text(
+                  'Utente: ${_localIdentity!.username}',
+                  style: const TextStyle(fontSize: 13),
+                ),
                 const SizedBox(height: 4),
-                Text('Dispositivo: ${_localIdentity!.deviceName}',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                Text(
+                  'Dispositivo: ${_localIdentity!.deviceName}',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
               ],
             ),
           ),
@@ -1302,15 +1372,22 @@ class _AssociateDeviceScreenState
               ),
               child: Column(
                 children: [
-                  Text('QR scansionato!',
-                      style: TextStyle(
-                          color: Colors.green[700],
-                          fontWeight: FontWeight.bold)),
+                  Text(
+                    'QR scansionato!',
+                    style: TextStyle(
+                      color: Colors.green[700],
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const SizedBox(height: 4),
-                  Text('Utente: ${_remoteIdentity!.username}',
-                      style: const TextStyle(fontSize: 13)),
-                  Text('Dispositivo: ${_remoteIdentity!.deviceName}',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                  Text(
+                    'Utente: ${_remoteIdentity!.username}',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  Text(
+                    'Dispositivo: ${_remoteIdentity!.deviceName}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
                 ],
               ),
             ),
@@ -1413,8 +1490,10 @@ class _AssociateDeviceScreenState
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.green[200]!),
               ),
-              child: Text('QR ricevuto: ${_remoteIdentity!.username}',
-                  style: TextStyle(color: Colors.green[700])),
+              child: Text(
+                'QR ricevuto: ${_remoteIdentity!.username}',
+                style: TextStyle(color: Colors.green[700]),
+              ),
             ),
           ),
       ],
@@ -1422,7 +1501,9 @@ class _AssociateDeviceScreenState
   }
 
   Widget _buildPairingVerificationStep(
-      ThemeData theme, ColorScheme colorScheme) {
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_pairingCode != null && !_pairingDialogShown) {
         _pairingDialogShown = true;
@@ -1449,8 +1530,10 @@ class _AssociateDeviceScreenState
             if (_pairingCode != null) ...[
               const SizedBox(height: 20),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 20,
+                ),
                 decoration: BoxDecoration(
                   color: colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(16),
@@ -1496,7 +1579,7 @@ class _AssociateDeviceScreenState
             Text(
               _isOnboarding
                   ? 'Sto scaricando i dati della classe dal dispositivo\n'
-                      'e li decodifico con la chiave pubblica.'
+                        'e li decodifico con la chiave pubblica.'
                   : 'Sto registrando il nuovo catechista nella classe.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey[600], fontSize: 14),
@@ -1513,8 +1596,11 @@ class _AssociateDeviceScreenState
         padding: const EdgeInsets.all(32),
         child: Column(
           children: [
-            Icon(Icons.check_circle_outline,
-                size: 72, color: Colors.green[400]),
+            Icon(
+              Icons.check_circle_outline,
+              size: 72,
+              color: Colors.green[400],
+            ),
             const SizedBox(height: 16),
             Text(
               'Associazione completata!',
@@ -1528,9 +1614,10 @@ class _AssociateDeviceScreenState
               Text(
                 _remoteIdentity!.username,
                 style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[800]),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[800],
+                ),
               ),
               const SizedBox(height: 4),
               Text(
@@ -1542,9 +1629,9 @@ class _AssociateDeviceScreenState
             Text(
               _isOnboarding
                   ? 'Dati della classe scaricati e decodificati.\n'
-                      'Ora puoi accedere a tutti i dati.'
+                        'Ora puoi accedere a tutti i dati.'
                   : 'Nuovo catechista registrato nella classe.\n'
-                      'La sincronizzazione continua è attiva.',
+                        'La sincronizzazione continua è attiva.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey[600], fontSize: 14),
             ),
@@ -1626,7 +1713,10 @@ class _AssociateDeviceScreenState
   }
 
   Widget _buildMessageBanner(
-      ThemeData theme, String message, {required bool isError}) {
+    ThemeData theme,
+    String message, {
+    required bool isError,
+  }) {
     final color = isError ? theme.colorScheme.error : Colors.green[700]!;
     final bgColor = isError
         ? theme.colorScheme.errorContainer
@@ -1652,10 +1742,7 @@ class _AssociateDeviceScreenState
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              message,
-              style: TextStyle(color: color, fontSize: 13),
-            ),
+            child: Text(message, style: TextStyle(color: color, fontSize: 13)),
           ),
           IconButton(
             icon: const Icon(Icons.close, size: 18),

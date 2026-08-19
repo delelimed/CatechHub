@@ -36,36 +36,78 @@ enum ImportField {
 
   /// Alias delle intestazioni riconosciuti in automatico (normalizzati).
   List<String> get aliases => switch (this) {
-        ImportField.nome => const ['nome', 'name', 'firstname', 'nome ragazzo'],
-        ImportField.cognome =>
-          const ['cognome', 'surname', 'lastname', 'cognome ragazzo'],
-        ImportField.dataNascita =>
-          const ['data nascita', 'datanascita', 'birthdate', 'data di nascita'],
-        ImportField.madreNome =>
-          const ['nome madre', 'nomemadre', 'madre nome', 'mothername'],
-        ImportField.madreCognome =>
-          const ['cognome madre', 'cognomemadre', 'madre cognome', 'mothersurname'],
-        ImportField.padreNome =>
-          const ['nome padre', 'nomepadre', 'padre nome', 'fathername'],
-        ImportField.padreCognome =>
-          const ['cognome padre', 'cognomepadre', 'padre cognome', 'fathersurname'],
-        ImportField.telefonoMadre =>
-          const ['telefono madre', 'telefonomadre', 'madre telefono', 'motherphone'],
-        ImportField.telefonoPadre =>
-          const ['telefono padre', 'telefonopadre', 'padre telefono', 'fatherphone'],
-        ImportField.emailGenitore =>
-          const ['email genitore', 'emailgenitore', 'email', 'parentemail', 'e-mail'],
-        ImportField.noteMediche => const [
-            'note mediche',
-            'notemediche',
-            'note mediche / allergie',
-            'note mediche allergie',
-            'allergie',
-            'note allergie',
-            'noteallergiesalute',
-          ],
-        ImportField.noteLibere => const ['note', 'note libere', 'notelibere', 'notes'],
-      };
+    ImportField.nome => const ['nome', 'name', 'firstname', 'nome ragazzo'],
+    ImportField.cognome => const [
+      'cognome',
+      'surname',
+      'lastname',
+      'cognome ragazzo',
+    ],
+    ImportField.dataNascita => const [
+      'data nascita',
+      'datanascita',
+      'birthdate',
+      'data di nascita',
+    ],
+    ImportField.madreNome => const [
+      'nome madre',
+      'nomemadre',
+      'madre nome',
+      'mothername',
+    ],
+    ImportField.madreCognome => const [
+      'cognome madre',
+      'cognomemadre',
+      'madre cognome',
+      'mothersurname',
+    ],
+    ImportField.padreNome => const [
+      'nome padre',
+      'nomepadre',
+      'padre nome',
+      'fathername',
+    ],
+    ImportField.padreCognome => const [
+      'cognome padre',
+      'cognomepadre',
+      'padre cognome',
+      'fathersurname',
+    ],
+    ImportField.telefonoMadre => const [
+      'telefono madre',
+      'telefonomadre',
+      'madre telefono',
+      'motherphone',
+    ],
+    ImportField.telefonoPadre => const [
+      'telefono padre',
+      'telefonopadre',
+      'padre telefono',
+      'fatherphone',
+    ],
+    ImportField.emailGenitore => const [
+      'email genitore',
+      'emailgenitore',
+      'email',
+      'parentemail',
+      'e-mail',
+    ],
+    ImportField.noteMediche => const [
+      'note mediche',
+      'notemediche',
+      'note mediche / allergie',
+      'note mediche allergie',
+      'allergie',
+      'note allergie',
+      'noteallergiesalute',
+    ],
+    ImportField.noteLibere => const [
+      'note',
+      'note libere',
+      'notelibere',
+      'notes',
+    ],
+  };
 }
 
 /// Intestazioni del template di esempio.

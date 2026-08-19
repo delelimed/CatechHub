@@ -12,6 +12,7 @@
 /// Dipende da [authStateProvider] per i dati dell'account e da
 /// [privacySettingsProvider] per verificare se il feedback remoto è abilitato.
 library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -42,7 +43,10 @@ class SettingsPage extends ConsumerWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: const Text(
           'Soglia assenze',
-          style: TextStyle(color: Color(0xFF174A7E), fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Color(0xFF174A7E),
+            fontWeight: FontWeight.bold,
+          ),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -94,12 +98,16 @@ class SettingsPage extends ConsumerWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF174A7E),
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             onPressed: () async {
               final v = int.tryParse(controller.text);
               if (v != null && v >= 1) {
-                await ref.read(privacySettingsProvider.notifier).setAbsenceThreshold(v);
+                await ref
+                    .read(privacySettingsProvider.notifier)
+                    .setAbsenceThreshold(v);
                 if (ctx.mounted) Navigator.of(ctx).pop();
               }
             },
@@ -121,21 +129,26 @@ class SettingsPage extends ConsumerWidget {
           ? config.annoCatechisticoCorrente
           : currentCatechisticYear(),
     );
-    final sogliaCtrl =
-        TextEditingController(text: config.sogliaAssenzeConsecutive.toString());
-    final durataCtrl =
-        TextEditingController(text: config.durataValiditaConsensoMesi.toString());
+    final sogliaCtrl = TextEditingController(
+      text: config.sogliaAssenzeConsecutive.toString(),
+    );
+    final durataCtrl = TextEditingController(
+      text: config.durataValiditaConsensoMesi.toString(),
+    );
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
           title: const Text(
             'Configura parrocchia',
             style: TextStyle(
-                color: Color(0xFF174A7E), fontWeight: FontWeight.bold),
+              color: Color(0xFF174A7E),
+              fontWeight: FontWeight.bold,
+            ),
           ),
           content: SingleChildScrollView(
             child: Column(
@@ -206,24 +219,25 @@ class SettingsPage extends ConsumerWidget {
               onPressed: () async {
                 final soglia = int.tryParse(sogliaCtrl.text.trim());
                 final durata = int.tryParse(durataCtrl.text.trim());
-                await repo.save(config.copyWith(
-                  nomeParrocchia: nomeCtrl.text.trim(),
-                  diocesi: diocesiCtrl.text.trim(),
-                  annoCatechisticoCorrente: annoCtrl.text.trim(),
-                  durataValiditaConsensoMesi:
-                      (durata != null && durata > 0)
-                          ? durata
-                          : config.durataValiditaConsensoMesi,
-                  sogliaAssenzeConsecutive:
-                      (soglia != null && soglia >= 2)
-                          ? soglia
-                          : config.sogliaAssenzeConsecutive,
-                ));
+                await repo.save(
+                  config.copyWith(
+                    nomeParrocchia: nomeCtrl.text.trim(),
+                    diocesi: diocesiCtrl.text.trim(),
+                    annoCatechisticoCorrente: annoCtrl.text.trim(),
+                    durataValiditaConsensoMesi: (durata != null && durata > 0)
+                        ? durata
+                        : config.durataValiditaConsensoMesi,
+                    sogliaAssenzeConsecutive: (soglia != null && soglia >= 2)
+                        ? soglia
+                        : config.sogliaAssenzeConsecutive,
+                  ),
+                );
                 if (ctx.mounted) Navigator.pop(ctx);
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                      content: Text('Configurazione parrocchia salvata.')),
+                    content: Text('Configurazione parrocchia salvata.'),
+                  ),
                 );
               },
               child: const Text('Salva'),
@@ -242,10 +256,15 @@ class SettingsPage extends ConsumerWidget {
           final isEnabled = MeetingNotificationService.areNotificationsEnabled;
           final currentTime = MeetingNotificationService.notificationTime;
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
             title: const Text(
               'Notifiche incontri',
-              style: TextStyle(color: Color(0xFF174A7E), fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Color(0xFF174A7E),
+                fontWeight: FontWeight.bold,
+              ),
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -257,7 +276,9 @@ class SettingsPage extends ConsumerWidget {
                 const SizedBox(height: 20),
                 SwitchListTile(
                   title: const Text('Attiva notifiche'),
-                  subtitle: const Text('Ricevi promemoria per incontri e riunioni'),
+                  subtitle: const Text(
+                    'Ricevi promemoria per incontri e riunioni',
+                  ),
                   value: isEnabled,
                   activeThumbColor: const Color(0xFF174A7E),
                   onChanged: (value) async {
@@ -277,7 +298,10 @@ class SettingsPage extends ConsumerWidget {
                         color: Color(0xFF174A7E),
                       ),
                     ),
-                    trailing: const Icon(Icons.access_time_rounded, color: Color(0xFF174A7E)),
+                    trailing: const Icon(
+                      Icons.access_time_rounded,
+                      color: Color(0xFF174A7E),
+                    ),
                     onTap: () async {
                       final TimeOfDay? picked = await showTimePicker(
                         context: context,
@@ -289,7 +313,9 @@ class SettingsPage extends ConsumerWidget {
                       if (picked != null && ctx.mounted) {
                         final formattedTime =
                             '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
-                        await MeetingNotificationService.setNotificationTime(formattedTime);
+                        await MeetingNotificationService.setNotificationTime(
+                          formattedTime,
+                        );
                         setState(() {});
                       }
                     },
@@ -371,7 +397,8 @@ class SettingsPage extends ConsumerWidget {
                   _SettingsItem(
                     icon: Icons.swap_horiz_rounded,
                     title: 'Supplenze',
-                    subtitle: 'Delega temporanea del registro a un altro catechista',
+                    subtitle:
+                        'Delega temporanea del registro a un altro catechista',
                     color: const Color(0xFF174A7E),
                     onTap: () => context.push('/substitutes'),
                   ),
@@ -382,7 +409,8 @@ class SettingsPage extends ConsumerWidget {
                 _SettingsItem(
                   icon: Icons.warning_amber_rounded,
                   title: 'Soglia assenze',
-                  subtitle: 'Minimo assenze per la dashboard: ${privacy.absenceThreshold}',
+                  subtitle:
+                      'Minimo assenze per la dashboard: ${privacy.absenceThreshold}',
                   color: Colors.red,
                   onTap: () => _showAbsenceThresholdDialog(context, ref),
                 ),
@@ -396,7 +424,8 @@ class SettingsPage extends ConsumerWidget {
                 _SettingsItem(
                   icon: Icons.notifications_active_rounded,
                   title: 'Notifiche incontri',
-                  subtitle: 'Ricevi un promemoria il giorno prima di incontri e riunioni',
+                  subtitle:
+                      'Ricevi un promemoria il giorno prima di incontri e riunioni',
                   color: Colors.blue,
                   onTap: () => _showNotificationSettingsDialog(context, ref),
                 ),
@@ -425,7 +454,8 @@ class SettingsPage extends ConsumerWidget {
                 _SettingsItem(
                   icon: Icons.verified_user_rounded,
                   title: 'Catena di fiducia',
-                  subtitle: 'Approva i dispositivi abilitati alla sync e gestisci il QR di fiducia',
+                  subtitle:
+                      'Approva i dispositivi abilitati alla sync e gestisci il QR di fiducia',
                   color: Colors.teal,
                   onTap: () => context.push('/settings/approval-center'),
                 ),
@@ -435,7 +465,8 @@ class SettingsPage extends ConsumerWidget {
                 _SettingsItem(
                   icon: Icons.gavel_rounded,
                   title: 'Registro Trattamenti',
-                  subtitle: 'Registro GDPR (Art. 30) con verifica integrità firme',
+                  subtitle:
+                      'Registro GDPR (Art. 30) con verifica integrità firme',
                   color: Colors.teal,
                   onTap: () => context.push('/parrocchia/audit'),
                 ),
@@ -445,7 +476,8 @@ class SettingsPage extends ConsumerWidget {
                 _SettingsItem(
                   icon: Icons.history_rounded,
                   title: 'Archivio storico',
-                  subtitle: 'Progresso dei ragazzi negli anni e chiusura anno catechistico',
+                  subtitle:
+                      'Progresso dei ragazzi negli anni e chiusura anno catechistico',
                   color: const Color(0xFF174A7E),
                   onTap: () => context.push('/parrocchia/archivio'),
                 ),
@@ -465,7 +497,8 @@ class SettingsPage extends ConsumerWidget {
                 _SettingsItem(
                   icon: Icons.tune_rounded,
                   title: 'Configura parrocchia',
-                  subtitle: 'Nome parrocchia, diocesi, anno catechistico, soglia assenze',
+                  subtitle:
+                      'Nome parrocchia, diocesi, anno catechistico, soglia assenze',
                   color: const Color(0xFF174A7E),
                   onTap: () => _showParishConfigDialog(context, ref),
                 ),
@@ -483,7 +516,8 @@ class SettingsPage extends ConsumerWidget {
               _SettingsItem(
                 icon: Icons.tour_rounded,
                 title: 'Guida alle funzioni',
-                subtitle: 'Rivedi la guida all\'uso dell\'app in qualsiasi momento',
+                subtitle:
+                    'Rivedi la guida all\'uso dell\'app in qualsiasi momento',
                 color: Colors.blue,
                 onTap: () => context.push('/guide?mode=review'),
               ),
@@ -525,7 +559,8 @@ class SettingsPage extends ConsumerWidget {
               _SettingsItem(
                 icon: Icons.delete_forever_rounded,
                 title: 'Cancella dati salvati',
-                subtitle: 'Elimina selettivamente anagrafiche, presenze, documenti, calendario, catechesi o allegati. La cancellazione totale avviene con conferma dopo 24 ore',
+                subtitle:
+                    'Elimina selettivamente anagrafiche, presenze, documenti, calendario, catechesi o allegati. La cancellazione totale avviene con conferma dopo 24 ore',
                 color: Colors.red,
                 isDestructive: true,
                 onTap: () => context.push('/delete-data'),
@@ -544,7 +579,8 @@ class SettingsPage extends ConsumerWidget {
                 _SettingsItem(
                   icon: Icons.meeting_room_rounded,
                   title: 'Aule e orari',
-                  subtitle: 'Consultazione in sola lettura della logistica parrocchiale',
+                  subtitle:
+                      'Consultazione in sola lettura della logistica parrocchiale',
                   color: const Color(0xFF00695C),
                   onTap: () => context.push('/parrocchia/logistica'),
                 ),
@@ -612,11 +648,7 @@ class SettingsPage extends ConsumerWidget {
                   final shareText =
                       'Ehi! Prova CatechHub — il registro smart per i catechisti. Scopri di più su GitHub: https://github.com/delelimed/CatechHub';
 
-                  SharePlus.instance.share(
-                    ShareParams(
-                      text: shareText,
-                    ),
-                  );
+                  SharePlus.instance.share(ShareParams(text: shareText));
                 },
               ),
 
@@ -681,7 +713,9 @@ class _ThemeSelectorItem extends ConsumerWidget {
     final iconColor = isDark ? colorScheme.primary : const Color(0xFF174A7E);
     final titleColor = isDark ? colorScheme.onSurface : const Color(0xFF1A1A1A);
     final subtitleColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
-    final borderColor = isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.transparent;
+    final borderColor = isDark
+        ? colorScheme.outline.withValues(alpha: 0.2)
+        : Colors.transparent;
     final shadowColor = isDark
         ? Colors.black.withValues(alpha: 0.4)
         : Colors.black.withValues(alpha: 0.04);
@@ -785,11 +819,15 @@ class _ThemeSelectorItem extends ConsumerWidget {
                   style: TextStyle(
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                     color: isSelected
-                        ? (isDark ? colorScheme.primary : const Color(0xFF174A7E))
+                        ? (isDark
+                              ? colorScheme.primary
+                              : const Color(0xFF174A7E))
                         : colorScheme.onSurface,
                   ),
                 ),
-                activeColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                activeColor: isDark
+                    ? colorScheme.primary
+                    : const Color(0xFF174A7E),
               );
             }).toList(),
           ),
@@ -989,7 +1027,9 @@ class _SettingsItem extends StatelessWidget {
     final titleColor = isDark ? colorScheme.onSurface : const Color(0xFF1A1A1A);
     final subtitleColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
     final iconColor = isDestructive ? Colors.red : color;
-    final borderColor = isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.transparent;
+    final borderColor = isDark
+        ? colorScheme.outline.withValues(alpha: 0.2)
+        : Colors.transparent;
     final shadowColor = isDark
         ? Colors.black.withValues(alpha: 0.4)
         : Colors.black.withValues(alpha: 0.04);
@@ -1048,7 +1088,10 @@ class _SettingsItem extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Icon(Icons.chevron_right_rounded, color: isDark ? Colors.grey.shade500 : Colors.grey.shade400),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+            ),
           ],
         ),
       ),

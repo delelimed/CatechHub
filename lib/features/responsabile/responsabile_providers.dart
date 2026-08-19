@@ -43,5 +43,5 @@ final parrocchiaStudentsProvider = StreamProvider((ref) {
 /// Stream degli studenti iscritti a una specifica classe.
 final studentsOfClassProvider = StreamProvider.autoDispose
     .family<List<Student>, String>((ref, classId) {
-  return StudentsRepository().getStudentsByClass(classId);
-});
+      return StudentsRepository().getStudentsByClass(classId);
+    });

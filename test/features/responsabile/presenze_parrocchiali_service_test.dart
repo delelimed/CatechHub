@@ -54,12 +54,14 @@ void main() {
   });
 
   Future<void> setup() async {
-    await ClassesRepository().addClass(SchoolClass(
-      id: 'class_al_1',
-      name: 'Prima Comunione',
-      studentIds: ['al_1', 'al_2'],
-      catechistIds: [],
-    ));
+    await ClassesRepository().addClass(
+      SchoolClass(
+        id: 'class_al_1',
+        name: 'Prima Comunione',
+        studentIds: ['al_1', 'al_2'],
+        catechistIds: [],
+      ),
+    );
     final repo = StudentsRepository();
     await repo.addStudent(_student('al_1', 'Anna', 'Rossi'));
     await repo.addStudent(_student('al_2', 'Luca', 'Bianchi'));
@@ -74,28 +76,34 @@ void main() {
         'presence': {'al_1': 'Presente', 'al_2': 'Assente'},
       });
 
-      final alerts = PresenzeParrocchialiService().rilevaIstanza(threshold: 3);
+      final alerts = await PresenzeParrocchialiService().rilevaIstanza(
+        threshold: 3,
+      );
       expect(alerts, isEmpty);
     });
 
-    test('segnala il ragazzo con N assenze consecutive partendo dalla più recente',
-        () async {
-      await setup();
-      final attendance = LocalDatabase.attendance();
-      for (var i = 1; i <= 4; i++) {
-        await attendance.put('m$i', {
-          'classId': 'class_al_1',
-          'date': '2026-10-0$i',
-          'presence': {'al_2': (i <= 2) ? 'Presente' : 'Assente'},
-        });
-      }
+    test(
+      'segnala il ragazzo con N assenze consecutive partendo dalla più recente',
+      () async {
+        await setup();
+        final attendance = LocalDatabase.attendance();
+        for (var i = 1; i <= 4; i++) {
+          await attendance.put('m$i', {
+            'classId': 'class_al_1',
+            'date': '2026-10-0$i',
+            'presence': {'al_2': (i <= 2) ? 'Presente' : 'Assente'},
+          });
+        }
 
-      final alerts = PresenzeParrocchialiService().rilevaIstanza(threshold: 2);
-      expect(alerts, isNotEmpty);
-      final hit = alerts.firstWhere((a) => a.studentId == 'al_2');
-      expect(hit.assenzeConsecutive, 2);
-      expect(hit.totaleAssenze, 2);
-      expect(hit.className, 'Prima Comunione');
-    });
+        final alerts = await PresenzeParrocchialiService().rilevaIstanza(
+          threshold: 2,
+        );
+        expect(alerts, isNotEmpty);
+        final hit = alerts.firstWhere((a) => a.studentId == 'al_2');
+        expect(hit.assenzeConsecutive, 2);
+        expect(hit.totaleAssenze, 2);
+        expect(hit.className, 'Prima Comunione');
+      },
+    );
   });
 }

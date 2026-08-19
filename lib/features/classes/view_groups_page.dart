@@ -34,14 +34,15 @@ class ViewGroupsPage extends ConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.groups_outlined, size: 70, color: Colors.grey.shade400),
+                  Icon(
+                    Icons.groups_outlined,
+                    size: 70,
+                    color: Colors.grey.shade400,
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'Non fai parte di nessun gruppo',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 24),
                   _buildCreateButton(context, ref, isDark, colorScheme),
@@ -55,30 +56,36 @@ class ViewGroupsPage extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              ...myClasses.map((c) => _GroupCard(
-                schoolClass: c,
-                isActive: c.id == activeGroupId,
-                onTap: () async {
-                  await ref.read(currentClassProvider.notifier).setClass(c.id);
-                  if (context.mounted) context.push('/settings/class-switcher');
-                },
-                onDelete: () async {
-                  try {
-                    await ref.read(classesRepoProvider).deleteClass(c.id);
-                    // Se si eliminava la classe aperta, pulisce la selezione
-                    await clearCurrentClassIfDeleted(ref, c.id);
-                  } catch (e) {
+              ...myClasses.map(
+                (c) => _GroupCard(
+                  schoolClass: c,
+                  isActive: c.id == activeGroupId,
+                  onTap: () async {
+                    await ref
+                        .read(currentClassProvider.notifier)
+                        .setClass(c.id);
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Errore durante l\'eliminazione: $e'),
-                          backgroundColor: Colors.red.shade700,
-                        ),
-                      );
+                      context.push('/settings/class-switcher');
                     }
-                  }
-                },
-              )),
+                  },
+                  onDelete: () async {
+                    try {
+                      await ref.read(classesRepoProvider).deleteClass(c.id);
+                      // Se si eliminava la classe aperta, pulisce la selezione
+                      await clearCurrentClassIfDeleted(ref, c.id);
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Errore durante l\'eliminazione: $e'),
+                            backgroundColor: Colors.red.shade700,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                ),
+              ),
               const SizedBox(height: 24),
               _buildCreateButton(context, ref, isDark, colorScheme),
               const SizedBox(height: 12),
@@ -107,14 +114,22 @@ class ViewGroupsPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildCreateButton(BuildContext context, WidgetRef ref, bool isDark, ColorScheme colorScheme) {
+  Widget _buildCreateButton(
+    BuildContext context,
+    WidgetRef ref,
+    bool isDark,
+    ColorScheme colorScheme,
+  ) {
     return Center(
       child: ElevatedButton.icon(
-        onPressed: () => _showCreateClassDialog(context, ref, isDark, colorScheme),
+        onPressed: () =>
+            _showCreateClassDialog(context, ref, isDark, colorScheme),
         icon: const Icon(Icons.add),
         label: const Text('Crea nuovo gruppo'),
         style: ElevatedButton.styleFrom(
-          backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+          backgroundColor: isDark
+              ? colorScheme.primary
+              : const Color(0xFF174A7E),
           foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(
@@ -125,7 +140,12 @@ class ViewGroupsPage extends ConsumerWidget {
     );
   }
 
-  void _showCreateClassDialog(BuildContext context, WidgetRef ref, bool isDark, ColorScheme colorScheme) {
+  void _showCreateClassDialog(
+    BuildContext context,
+    WidgetRef ref,
+    bool isDark,
+    ColorScheme colorScheme,
+  ) {
     final controller = TextEditingController();
 
     showDialog(
@@ -135,7 +155,10 @@ class ViewGroupsPage extends ConsumerWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: const Text(
           'Nuovo gruppo',
-          style: TextStyle(color: Color(0xFF174A7E), fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Color(0xFF174A7E),
+            fontWeight: FontWeight.bold,
+          ),
         ),
         content: TextField(
           controller: controller,
@@ -153,7 +176,9 @@ class ViewGroupsPage extends ConsumerWidget {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+              backgroundColor: isDark
+                  ? colorScheme.primary
+                  : const Color(0xFF174A7E),
               foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -164,14 +189,16 @@ class ViewGroupsPage extends ConsumerWidget {
               if (name.isEmpty) return;
               Navigator.of(ctx).pop();
               try {
-                await ref.read(classesRepoProvider).addClass(
-                  SchoolClass(
-                    id: '',
-                    name: name,
-                    studentIds: [],
-                    catechistIds: [AuthService.localUserId],
-                  ),
-                );
+                await ref
+                    .read(classesRepoProvider)
+                    .addClass(
+                      SchoolClass(
+                        id: '',
+                        name: name,
+                        studentIds: [],
+                        catechistIds: [AuthService.localUserId],
+                      ),
+                    );
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -217,7 +244,9 @@ class _ActionCard extends StatelessWidget {
     final iconBgColor = color.withValues(alpha: isDark ? 0.2 : 0.10);
     final titleColor = isDark ? colorScheme.onSurface : const Color(0xFF1A1A1A);
     final subtitleColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
-    final borderColor = isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.transparent;
+    final borderColor = isDark
+        ? colorScheme.outline.withValues(alpha: 0.2)
+        : Colors.transparent;
     final shadowColor = isDark
         ? Colors.black.withValues(alpha: 0.4)
         : Colors.black.withValues(alpha: 0.04);
@@ -293,7 +322,12 @@ class _GroupCard extends StatelessWidget {
   final VoidCallback? onDelete;
   final VoidCallback? onTap;
 
-  const _GroupCard({required this.schoolClass, this.isActive = false, this.onDelete, this.onTap});
+  const _GroupCard({
+    required this.schoolClass,
+    this.isActive = false,
+    this.onDelete,
+    this.onTap,
+  });
 
   void _showDeleteConfirmation(BuildContext context) {
     showDialog(
@@ -336,7 +370,9 @@ class _GroupCard extends StatelessWidget {
     final shadowColor = isDark
         ? Colors.black.withValues(alpha: 0.4)
         : Colors.black.withValues(alpha: 0.04);
-    final borderColor = isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.blue.shade100;
+    final borderColor = isDark
+        ? colorScheme.outline.withValues(alpha: 0.2)
+        : Colors.blue.shade100;
 
     return InkWell(
       borderRadius: BorderRadius.circular(22),
@@ -344,91 +380,90 @@ class _GroupCard extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: borderColor),
-        boxShadow: [
-          BoxShadow(
-            color: shadowColor,
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-              borderRadius: BorderRadius.circular(14),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: borderColor),
+          boxShadow: [
+            BoxShadow(
+              color: shadowColor,
+              blurRadius: 12,
+              offset: const Offset(0, 6),
             ),
-            child: Icon(
-              Icons.groups_rounded,
-              color: isDark ? colorScheme.onPrimary : Colors.white,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  schoolClass.name,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Icon(Icons.people, size: 14, color: Colors.grey.shade500),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${schoolClass.studentIds.length} ragazzi',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? Colors.grey.shade400 : Colors.grey,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Icon(Icons.school, size: 14, color: Colors.grey.shade500),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${schoolClass.catechistIds.length} catechisti',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? Colors.grey.shade400 : Colors.grey,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          if (onDelete != null && !isActive)
-            PopupMenuButton<String>(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                borderRadius: BorderRadius.circular(14),
               ),
-              onSelected: (value) {
-                if (value == 'delete') {
-                  _showDeleteConfirmation(context);
-                }
-              },
-              itemBuilder: (_) => [
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Text('Elimina'),
-                ),
-              ],
+              child: Icon(
+                Icons.groups_rounded,
+                color: isDark ? colorScheme.onPrimary : Colors.white,
+              ),
             ),
-        ],
-      ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    schoolClass.name,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark
+                          ? colorScheme.onSurface
+                          : const Color(0xFF174A7E),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(Icons.people, size: 14, color: Colors.grey.shade500),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${schoolClass.studentIds.length} ragazzi',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? Colors.grey.shade400 : Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Icon(Icons.school, size: 14, color: Colors.grey.shade500),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${schoolClass.catechistIds.length} catechisti',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? Colors.grey.shade400 : Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            if (onDelete != null && !isActive)
+              PopupMenuButton<String>(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                onSelected: (value) {
+                  if (value == 'delete') {
+                    _showDeleteConfirmation(context);
+                  }
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'delete', child: Text('Elimina')),
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }

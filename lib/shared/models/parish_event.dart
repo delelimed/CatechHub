@@ -54,8 +54,8 @@ class ParishEvent {
     this.createdBy = '',
     DateTime? createdAt,
     DateTime? updatedAt,
-  })  : createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now();
+  }) : createdAt = createdAt ?? DateTime.now(),
+       updatedAt = updatedAt ?? DateTime.now();
 
   ParishEvent copyWith({
     String? title,
@@ -80,31 +80,31 @@ class ParishEvent {
   }
 
   Map<String, dynamic> toMap() => {
-        'title': title,
-        'date': date.toIso8601String(),
-        'time': time,
-        'location': location,
-        'notes': notes,
-        'createdBy': createdBy,
-        'createdAt': createdAt.toUtc().toIso8601String(),
-        'updatedAt': updatedAt.toUtc().toIso8601String(),
-      };
+    'title': title,
+    'date': date.toIso8601String(),
+    'time': time,
+    'location': location,
+    'notes': notes,
+    'createdBy': createdBy,
+    'createdAt': createdAt.toUtc().toIso8601String(),
+    'updatedAt': updatedAt.toUtc().toIso8601String(),
+  };
 
   factory ParishEvent.fromMap(String id, Map<String, dynamic> data) =>
       ParishEvent(
         id: id,
         title: data['title']?.toString() ?? '',
-        date: DateTime.tryParse(data['date']?.toString() ?? '') ??
-            DateTime.now(),
+        date:
+            DateTime.tryParse(data['date']?.toString() ?? '') ?? DateTime.now(),
         time: data['time']?.toString(),
         location: data['location']?.toString(),
         notes: data['notes']?.toString() ?? '',
         createdBy: data['createdBy']?.toString() ?? '',
         createdAt:
             DateTime.tryParse(data['createdAt']?.toString() ?? '')?.toUtc() ??
-                DateTime.now().toUtc(),
+            DateTime.now().toUtc(),
         updatedAt:
             DateTime.tryParse(data['updatedAt']?.toString() ?? '')?.toUtc() ??
-                DateTime.now().toUtc(),
+            DateTime.now().toUtc(),
       );
 }

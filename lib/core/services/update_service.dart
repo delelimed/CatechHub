@@ -1,4 +1,4 @@
-﻿// ══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
 // update_service.dart — CatechHub (controllo aggiornamenti da GitHub)
 //
 // Verifica periodicamente la disponibilità di nuove versioni dell'app
@@ -33,7 +33,6 @@
 import 'dart:convert';
 import 'dart:io' show HttpClient, SecurityContext, X509Certificate;
 
-import 'package:crypto/crypto.dart' show sha256;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -42,6 +41,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/io_client.dart';
 import 'package:go_router/go_router.dart';
+
+import 'crypto_utils.dart';
 
 /// GlobalKey per la navigazione dalle notifiche.
 /// Inizializzato in main.dart e usato per navigare a /updates
@@ -89,8 +90,7 @@ Uint8List _pemDerBytes(String pem) {
 bool _checkPinnedCertificate(X509Certificate cert) {
   try {
     final derBytes = _pemDerBytes(cert.pem);
-    final hash = sha256.convert(derBytes);
-    final fingerprint = base64Encode(hash.bytes);
+    final fingerprint = base64Encode(sha256BytesSync(derBytes));
     return _pinnedGitHubFingerprints.any((f) => f == fingerprint);
   } catch (_) {
     return false;
@@ -128,7 +128,9 @@ class UpdateService {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
-  static void setNavigatorKey(GlobalKey<NavigatorState> key) { navigatorKey = key; }
+  static void setNavigatorKey(GlobalKey<NavigatorState> key) {
+    navigatorKey = key;
+  }
 
   /// Client HTTP (package:http) con certificate pinning per i domini GitHub
   /// usati dall'aggiornamento (API, download APK, digest). Restituisce `null`
@@ -143,24 +145,31 @@ class UpdateService {
 
   /// Inizializza il plugin notifiche con callback di navigazione.
   static Future<void> initNotifications() async {
-    const androidSettings = AndroidInitializationSettings('@mipmap/launcher_icon');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/launcher_icon',
+    );
     const settings = InitializationSettings(android: androidSettings);
     await _notificationsPlugin.initialize(
       settings: settings,
       onDidReceiveNotificationResponse: (response) async {
-        if (response.payload == 'update_available' && navigatorKey?.currentContext != null) {
+        if (response.payload == 'update_available' &&
+            navigatorKey?.currentContext != null) {
           GoRouter.of(navigatorKey!.currentContext!).go('/updates');
         }
       },
     );
   }
 
-  static Future<PermissionStatus> notificationPermissionStatus() => Permission.notification.status;
-  static Future<PermissionStatus> requestNotificationPermission() => Permission.notification.request();
+  static Future<PermissionStatus> notificationPermissionStatus() =>
+      Permission.notification.status;
+  static Future<PermissionStatus> requestNotificationPermission() =>
+      Permission.notification.request();
   static Future<bool> isNotificationPermissionGranted() async {
     final status = await notificationPermissionStatus();
-    return status == PermissionStatus.granted || status == PermissionStatus.limited;
+    return status == PermissionStatus.granted ||
+        status == PermissionStatus.limited;
   }
+
   static Future<bool> openNotificationSettings() => openAppSettings();
 
   /// Controlla se esiste una release più recente su GitHub.
@@ -172,8 +181,10 @@ class UpdateService {
       if (pinnedClient == null) {
         // Nessun fingerprint di pinning configurato: non ci colleghiamo.
         if (kDebugMode) {
-      debugPrint('Controllo aggiornamenti saltato: pinning non configurato');
-    }
+          debugPrint(
+            'Controllo aggiornamenti saltato: pinning non configurato',
+          );
+        }
         return;
       }
       final packageInfo = await PackageInfo.fromPlatform();
@@ -181,7 +192,9 @@ class UpdateService {
       final httpClient = IOClient(pinnedClient);
       final response = await httpClient
           .get(
-            Uri.parse('https://api.github.com/repos/delelimed/CatechHub/releases/latest'),
+            Uri.parse(
+              'https://api.github.com/repos/delelimed/CatechHub/releases/latest',
+            ),
             headers: {'Accept': 'application/vnd.github.v3+json'},
           )
           .timeout(const Duration(seconds: 15));
@@ -196,7 +209,8 @@ class UpdateService {
     }
   }
 
-  static bool _isVersionNewer(String current, String latest) => isVersionNewerStatic(current, latest);
+  static bool _isVersionNewer(String current, String latest) =>
+      isVersionNewerStatic(current, latest);
 
   /// Confronto semantico tra due versioni (es. "1.0.3" < "1.1.0").
   static bool isVersionNewerStatic(String current, String latest) {
@@ -216,15 +230,18 @@ class UpdateService {
     return false;
   }
 
-static Future<void> _showUpdateNotification(String version) async {
+  static Future<void> _showUpdateNotification(String version) async {
     const androidDetails = AndroidNotificationDetails(
-      'update_channel_id', 'Aggiornamenti App',
+      'update_channel_id',
+      'Aggiornamenti App',
       channelDescription: 'Notifiche per i nuovi aggiornamenti di CatechHub',
-      importance: Importance.max, priority: Priority.high,
+      importance: Importance.max,
+      priority: Priority.high,
       icon: '@mipmap/launcher_icon',
     );
     await _notificationsPlugin.show(
-      id: 0, title: 'Aggiornamento disponibile',
+      id: 0,
+      title: 'Aggiornamento disponibile',
       body: 'Versione $version. Tocca per aprire la pagina Aggiornamenti.',
       notificationDetails: const NotificationDetails(android: androidDetails),
       payload: 'update_available',

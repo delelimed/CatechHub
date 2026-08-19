@@ -946,7 +946,7 @@ class P2PSyncService {
     var sentAny = false;
     for (final endpointId in _connectedEndpoints.toList()) {
       final scope = await _currentSyncScope(endpointId);
-      final modified = engine.extractModifiedRecords(lastSync, scope);
+      final modified = await engine.extractModifiedRecords(lastSync, scope);
       if (modified.isEmpty) continue;
       addLog(
         'INFO',
@@ -1031,9 +1031,9 @@ class P2PSyncService {
     addLog(
       'INFO',
       'Profilo remoto associazione configurato '
-      '(nome: ${(_associationRemoteProfile['firstName'] ?? '').isNotEmpty}, '
-      'cognome: ${(_associationRemoteProfile['lastName'] ?? '').isNotEmpty}, '
-      'telefono: ${(_associationRemoteProfile['phoneNumber'] ?? '').isNotEmpty})',
+          '(nome: ${(_associationRemoteProfile['firstName'] ?? '').isNotEmpty}, '
+          'cognome: ${(_associationRemoteProfile['lastName'] ?? '').isNotEmpty}, '
+          'telefono: ${(_associationRemoteProfile['phoneNumber'] ?? '').isNotEmpty})',
     );
   }
 
@@ -1587,8 +1587,7 @@ class P2PSyncService {
   bool _needsSessionPermission(P2PDeviceAssociation assoc) {
     final localRole = _state.role;
     final isLocalOther = localRole == P2PSyncRole.altroCatechista;
-    final isRemoteOther =
-        assoc.remoteRole == P2PSyncRole.altroCatechista.name;
+    final isRemoteOther = assoc.remoteRole == P2PSyncRole.altroCatechista.name;
     if (!isLocalOther && !isRemoteOther) {
       // Entrambi "Mio Dispositivo": stessa persona, sync automatica.
       return false;
@@ -1864,10 +1863,7 @@ class P2PSyncService {
         'supportsClassChannel': true,
         'supportsParishChannel': true,
       });
-      addLog(
-        'DEBUG',
-        'Invio handshake a $endpointId',
-      );
+      addLog('DEBUG', 'Invio handshake a $endpointId');
       await _sendPayload(endpointId, handshakeMsg);
       _updateState(_state.copyWith(status: P2PSyncStatus.handshakeSent));
       addLog('DEBUG', 'Handshake inviato a $endpointId');
@@ -1938,10 +1934,7 @@ class P2PSyncService {
   ) async {
     final senderId = message['senderId'] as String?;
     if (senderId == null) return;
-    addLog(
-      'DEBUG',
-      'Identità ricevuta da $senderId',
-    );
+    addLog('DEBUG', 'Identità ricevuta da $senderId');
 
     final remoteCatechistId = message['catechistId'] as String?;
     if (remoteCatechistId != null && remoteCatechistId.isNotEmpty) {
@@ -2117,8 +2110,10 @@ class P2PSyncService {
       for (final entry in keys) {
         try {
           final encrypted = P2PEncryptedPayload.decode(rawMessage);
-          final decrypted =
-              await _security.decryptPayload(encrypted, entry.key);
+          final decrypted = await _security.decryptPayload(
+            encrypted,
+            entry.key,
+          );
           final wrapper = jsonDecode(decrypted);
           if (wrapper is Map<String, dynamic>) {
             final senderId = wrapper['senderId'] as String?;
@@ -2286,8 +2281,9 @@ class P2PSyncService {
         final localEphemeral = await _security.generateEphemeralKeyPair();
         _endpointLocalEphemeral[endpointId] = localEphemeral;
         final localEphemeralPub = await localEphemeral.extractPublicKey();
-        _endpointLocalEphemeralPub[endpointId] =
-            base64Encode(localEphemeralPub.bytes);
+        _endpointLocalEphemeralPub[endpointId] = base64Encode(
+          localEphemeralPub.bytes,
+        );
       }
 
       if (remoteCatechistId != null && remoteCatechistId.isNotEmpty) {
@@ -2366,7 +2362,7 @@ class P2PSyncService {
       addLog(
         'ERROR',
         'Catena di fiducia: $remoteName ($remoteId) non è stato approvato '
-        'dal Responsabile. Sincronizzazione rifiutata.',
+            'dal Responsabile. Sincronizzazione rifiutata.',
       );
       try {
         await _nearby.disconnectFromEndpoint(endpointId);
@@ -2464,8 +2460,9 @@ class P2PSyncService {
       final localEphemeral = await _security.generateEphemeralKeyPair();
       _endpointLocalEphemeral[endpointId] = localEphemeral;
       final localEphemeralPub = await localEphemeral.extractPublicKey();
-      _endpointLocalEphemeralPub[endpointId] =
-          base64Encode(localEphemeralPub.bytes);
+      _endpointLocalEphemeralPub[endpointId] = base64Encode(
+        localEphemeralPub.bytes,
+      );
     }
 
     final localIdentity = await _security.getLocalIdentity();
@@ -2606,7 +2603,7 @@ class P2PSyncService {
         addLog(
           'WARN',
           'M6: handshake ACK scaduto per $endpointId (età: ${ackAge.abs()}s), '
-          'disconnessione',
+              'disconnessione',
         );
         try {
           await _nearby.disconnectFromEndpoint(endpointId);
@@ -2646,8 +2643,9 @@ class P2PSyncService {
         final localEphemeral = await _security.generateEphemeralKeyPair();
         _endpointLocalEphemeral[endpointId] = localEphemeral;
         final localEphemeralPub = await localEphemeral.extractPublicKey();
-        _endpointLocalEphemeralPub[endpointId] =
-            base64Encode(localEphemeralPub.bytes);
+        _endpointLocalEphemeralPub[endpointId] = base64Encode(
+          localEphemeralPub.bytes,
+        );
       }
 
       final ackRemoteCatechistId = message['catechistId'] as String?;
@@ -2769,8 +2767,9 @@ class P2PSyncService {
       final localEphemeral = await _security.generateEphemeralKeyPair();
       _endpointLocalEphemeral[endpointId] = localEphemeral;
       final localEphemeralPub = await localEphemeral.extractPublicKey();
-      _endpointLocalEphemeralPub[endpointId] =
-          base64Encode(localEphemeralPub.bytes);
+      _endpointLocalEphemeralPub[endpointId] = base64Encode(
+        localEphemeralPub.bytes,
+      );
     }
 
     if (!_state.isPairingMode) {
@@ -2853,8 +2852,9 @@ class P2PSyncService {
     try {
       final rawCert = message['approvalCert'];
       if (rawCert is! Map) return;
-      final cert =
-          AssociatedDevice.fromJson(Map<String, dynamic>.from(rawCert));
+      final cert = AssociatedDevice.fromJson(
+        Map<String, dynamic>.from(rawCert),
+      );
       if (!cert.isApproved) return;
 
       final assoc = await _security.getAssociation(remoteId);
@@ -2877,18 +2877,18 @@ class P2PSyncService {
       //      (un dispositivo rogue non può impersonare un catechista membro).
       if (valid) {
         final certMatchesDevice =
-            cert.publicKey.isNotEmpty && cert.publicKey == assoc.publicKeyBase64;
+            cert.publicKey.isNotEmpty &&
+            cert.publicKey == assoc.publicKeyBase64;
         final claimedCat = message['catechistId'] as String?;
         final certCat = cert.catechistId;
-        final identityMatches = claimedCat == null ||
-            claimedCat.isEmpty ||
-            certCat == claimedCat;
+        final identityMatches =
+            claimedCat == null || claimedCat.isEmpty || certCat == claimedCat;
         if (!certMatchesDevice || !identityMatches) {
           addLog(
             'WARN',
             'H3: certificato non vincolato all\'identità dichiarata per '
-            '$remoteId (device key match=$certMatchesDevice, '
-            'catechistId match=$identityMatches). Approvazione non elevata.',
+                '$remoteId (device key match=$certMatchesDevice, '
+                'catechistId match=$identityMatches). Approvazione non elevata.',
           );
           valid = false;
         }
@@ -2910,9 +2910,7 @@ class P2PSyncService {
       await _security.saveAssociation(updated);
 
       addLog(
-        valid
-            ? 'INFO'
-            : 'WARN',
+        valid ? 'INFO' : 'WARN',
         valid
             ? 'Certificato di approvazione verificato e allegato per $remoteId'
             : 'Certificato di approvazione ricevuto per $remoteId (trust root parrocchia non disponibile, verifica differita)',
@@ -3019,6 +3017,32 @@ class P2PSyncService {
       _pendingHandshakeRemoteCatechistId = hs.remoteCatechistId;
     }
     _pendingHandshakeData.remove(endpointId);
+
+    // FIX: sul dispositivo che ha scansionato per primo il QR, l'identità
+    // remota è disponibile solo come associazione pendente: senza questo
+    // passaggio confirmPairingCode() fallisce con "identità remota persa".
+    if (_pendingHandshakeIdentity == null) {
+      final pending = _pendingAssociations[remoteId];
+      if (pending != null) {
+        _pendingHandshakeIdentity = P2PIdentity(
+          deviceId: pending.deviceId,
+          deviceName: pending.deviceName,
+          username: '',
+          publicKeyBase64: pending.publicKeyBase64,
+          fingerprint: pending.fingerprint,
+          connectionEndpoint: '',
+        );
+        addLog(
+          'DEBUG',
+          'Identità remota ricostruita dall\'associazione pendente per $remoteId',
+        );
+      } else {
+        addLog(
+          'WARN',
+          'Nessuna identità remota disponibile per $remoteId prima della verifica',
+        );
+      }
+    }
 
     String? code;
     if (_state.pairingCode != null &&
@@ -3390,8 +3414,8 @@ class P2PSyncService {
   Future<void> _performBidirectionalSync(String endpointId) async {
     // Consenso per-sessione (kill-switch): nessun sync verso un "Altro
     // Catechista" senza il consenso esplicito dell'utente in questa sessione.
-    final deviceId = _endpointConnIdMap[endpointId] ??
-        _nearbyEndpointToDevice[endpointId];
+    final deviceId =
+        _endpointConnIdMap[endpointId] ?? _nearbyEndpointToDevice[endpointId];
     if (deviceId != null) {
       final assoc = await _security.getAssociation(deviceId);
       if (assoc != null &&
@@ -3431,15 +3455,17 @@ class P2PSyncService {
       final engine = HiveSyncEngine();
       final lastSync = await engine.getLastSyncTimestamp();
       final sendScope = await _currentSyncScope(endpointId);
-      var localIndex = engine.buildLocalIndex(sendScope);
+      var localIndex = await engine.buildLocalIndex(sendScope);
       // H5 — non pubblicare nell'indice gli studenti tombstoned, così il peer
       // non li richiede nemmeno.
       final tombstoned = _tombstonedEntityIds();
       if (tombstoned.isNotEmpty) {
         localIndex = localIndex
-            .where((e) =>
-                !(e.boxName == LocalDatabase.studentsBox &&
-                    tombstoned.contains(e.id)))
+            .where(
+              (e) =>
+                  !(e.boxName == LocalDatabase.studentsBox &&
+                      tombstoned.contains(e.id)),
+            )
             .toList();
       }
       addLog(
@@ -3535,7 +3561,7 @@ class P2PSyncService {
     addLog(
       'INFO',
       'Configuro account del dispositivo ricevente con il profilo '
-      'fornito dal mittente: $firstName $lastName',
+          'fornito dal mittente: $firstName $lastName',
     );
 
     final ok = await auth.setupInitialProfile(
@@ -3548,7 +3574,10 @@ class P2PSyncService {
     if (ok) {
       addLog('INFO', 'Account configurato con i dati del mittente');
     } else {
-      addLog('WARN', 'Impossibile configurare l\'account con il profilo remoto');
+      addLog(
+        'WARN',
+        'Impossibile configurare l\'account con il profilo remoto',
+      );
     }
     _pendingHandshakeRemoteProfile = null;
   }
@@ -3687,7 +3716,11 @@ class P2PSyncService {
     return local ?? remote ?? '';
   }
 
-  Future<SecretKeyData> _deriveSessionKey(String deviceId, {DateTime? at, String? endpointId}) async {
+  Future<SecretKeyData> _deriveSessionKey(
+    String deviceId, {
+    DateTime? at,
+    String? endpointId,
+  }) async {
     final assoc = await _security.getAssociation(deviceId);
     if (assoc == null) {
       throw Exception('Associazione non trovata per $deviceId');
@@ -3701,10 +3734,12 @@ class P2PSyncService {
       isInitiator: isInitiator,
       sessionNonce: _getCombinedSessionNonce(),
       at: at,
-      localEphemeralKeyPair:
-          endpointId != null ? _endpointLocalEphemeral[endpointId] : null,
-      remoteEphemeralPublicKeyBase64:
-          endpointId != null ? _endpointRemoteEphemeralPub[endpointId] : null,
+      localEphemeralKeyPair: endpointId != null
+          ? _endpointLocalEphemeral[endpointId]
+          : null,
+      remoteEphemeralPublicKeyBase64: endpointId != null
+          ? _endpointRemoteEphemeralPub[endpointId]
+          : null,
     );
     var sessionKey = session.sessionKey;
     // M5: quando entrambi i peer hanno scambiato la chiave per-associazione
@@ -3739,11 +3774,13 @@ class P2PSyncService {
     };
 
     final existing = _endpointSessionKeys[endpointId];
-    if (existing != null && existing.any((k) => k.windowIndex == currentWindow)) {
+    if (existing != null &&
+        existing.any((k) => k.windowIndex == currentWindow)) {
       final stale = existing.where((k) => !keepWindows.contains(k.windowIndex));
       if (stale.isNotEmpty) {
-        _endpointSessionKeys[endpointId] =
-            existing.where((k) => keepWindows.contains(k.windowIndex)).toList();
+        _endpointSessionKeys[endpointId] = existing
+            .where((k) => keepWindows.contains(k.windowIndex))
+            .toList();
       }
       return;
     }
@@ -3786,7 +3823,11 @@ class P2PSyncService {
         keys.add(
           _EndpointSessionKey(
             windowIndex: window,
-            key: await _deriveSessionKey(deviceId, at: windowStart, endpointId: endpointId),
+            key: await _deriveSessionKey(
+              deviceId,
+              at: windowStart,
+              endpointId: endpointId,
+            ),
           ),
         );
       }
@@ -3815,8 +3856,7 @@ class P2PSyncService {
       final oldCurrent = keys
           .where((k) => k.windowIndex == currentWindow)
           .toList();
-      final others =
-          keys.where((k) => k.windowIndex != currentWindow).toList();
+      final others = keys.where((k) => k.windowIndex != currentWindow).toList();
       _endpointSessionKeys[endpointId] = [
         _EndpointSessionKey(windowIndex: currentWindow, key: upgraded),
         ...others,
@@ -3925,14 +3965,16 @@ class P2PSyncService {
       phase.indexSent = true;
       final engine = HiveSyncEngine();
       final sendScope = await _currentSyncScope(endpointId);
-      var localIndex = engine.buildLocalIndex(sendScope);
+      var localIndex = await engine.buildLocalIndex(sendScope);
       // H5 — non pubblicare nell'indice gli studenti tombstoned.
       final tombstoned = _tombstonedEntityIds();
       if (tombstoned.isNotEmpty) {
         localIndex = localIndex
-            .where((e) =>
-                !(e.boxName == LocalDatabase.studentsBox &&
-                    tombstoned.contains(e.id)))
+            .where(
+              (e) =>
+                  !(e.boxName == LocalDatabase.studentsBox &&
+                      tombstoned.contains(e.id)),
+            )
             .toList();
       }
 
@@ -3955,7 +3997,7 @@ class P2PSyncService {
         'Indice remoto ricevuto: ${remoteIndex.length} record, locale: ${localIndex.length}',
       );
 
-      final neededFromRemote = engine.computeNeededRecords(remoteIndex);
+      final neededFromRemote = await engine.computeNeededRecords(remoteIndex);
       final neededFromLocal = engine.computeNeededRecordsFromLocal(
         localIndex,
         remoteIndex,
@@ -3986,7 +4028,10 @@ class P2PSyncService {
       }
 
       if (neededFromLocal.isNotEmpty) {
-        final localRecords = engine.fetchRecords(neededFromLocal, sendScope);
+        final localRecords = await engine.fetchRecords(
+          neededFromLocal,
+          sendScope,
+        );
         addLog('INFO', 'Invio ${localRecords.length} record al remoto');
         _updateState(_state.copyWith(sentRecordsCount: localRecords.length));
         final attachmentBytes = await _collectAttachmentBytes(localRecords);
@@ -4068,7 +4113,7 @@ class P2PSyncService {
         return;
       }
 
-      final records = engine.fetchRecords(keys, sendScope);
+      final records = await engine.fetchRecords(keys, sendScope);
       addLog('INFO', 'Invio ${records.length} record richiesti');
       _updateState(
         _state.copyWith(
@@ -4110,12 +4155,18 @@ class P2PSyncService {
       try {
         final engine = HiveSyncEngine();
         final receiveScope = await _currentReceiveScope(endpointId);
-        final records =
-            await _deserializeChannelRecords(endpointId, message['records']);
+        final records = await _deserializeChannelRecords(
+          endpointId,
+          message['records'],
+        );
         // Diritto all'Oblio: ignora record di entita' Tombstoned.
         final tombstoned = _tombstonedEntityIds();
         final filtered = records
-            .where((r) => !(r.boxName == LocalDatabase.studentsBox && tombstoned.contains(r.id)))
+            .where(
+              (r) =>
+                  !(r.boxName == LocalDatabase.studentsBox &&
+                      tombstoned.contains(r.id)),
+            )
             .toList();
         if (records.isNotEmpty) {
           final secretKey = await _secretKeyForEndpoint(endpointId);
@@ -4146,8 +4197,10 @@ class P2PSyncService {
     try {
       final engine = HiveSyncEngine();
       final receiveScope = await _currentReceiveScope(endpointId);
-      final records =
-          await _deserializeChannelRecords(endpointId, message['records']);
+      final records = await _deserializeChannelRecords(
+        endpointId,
+        message['records'],
+      );
       addLog(
         'DEBUG',
         'Dati sync ricevuti: ${records.length} record da applicare',
@@ -4156,9 +4209,11 @@ class P2PSyncService {
       // Diritto all'Oblio: ignora i record delle entità eliminate.
       final tombstoned = _tombstonedEntityIds();
       final filtered = records
-          .where((r) =>
-              !(r.boxName == LocalDatabase.studentsBox &&
-                  tombstoned.contains(r.id)))
+          .where(
+            (r) =>
+                !(r.boxName == LocalDatabase.studentsBox &&
+                    tombstoned.contains(r.id)),
+          )
           .toList();
 
       final secretKey = await _secretKeyForEndpoint(endpointId);
@@ -4449,8 +4504,10 @@ class P2PSyncService {
     //
     // Per "Altro Catechista" l'anagrafica diversa è attesa e NON blocca.
     if (isSamePersonPair && _hasCatechistIdentity(localCatechistId)) {
-      final remoteAnagraficaKey =
-          AuthService.anagraficaKey(remoteIdentity.firstName, remoteIdentity.lastName);
+      final remoteAnagraficaKey = AuthService.anagraficaKey(
+        remoteIdentity.firstName,
+        remoteIdentity.lastName,
+      );
       if (remoteAnagraficaKey.isNotEmpty &&
           remoteAnagraficaKey != AuthService.getLocalAnagraficaKey()) {
         addLog(
@@ -4842,8 +4899,9 @@ class P2PSyncService {
       if (classId != null && classId.isNotEmpty) {
         final raw = LocalDatabase.classes().get(classId);
         if (raw != null) {
-          final code2 =
-              LocalDatabase.toStringDynamicMap(raw)['uniqueCode']?.toString();
+          final code2 = LocalDatabase.toStringDynamicMap(
+            raw,
+          )['uniqueCode']?.toString();
           if (code2 != null && code2.isNotEmpty) return code2;
         }
       }
@@ -4853,7 +4911,8 @@ class P2PSyncService {
 
   /// Risolve classId + nome dal codice univoco di una classe.
   ({String classId, String name})? _classInfoByUniqueCode(
-      String classUniqueCode) {
+    String classUniqueCode,
+  ) {
     try {
       final box = LocalDatabase.classes();
       for (final key in box.keys) {
@@ -4901,8 +4960,8 @@ class P2PSyncService {
   /// verificare i timestamp firmati ricevuti (SignedLww). Null se il peer
   /// non è associato.
   Future<String?> _secretKeyForEndpoint(String endpointId) async {
-    final deviceId = _endpointConnIdMap[endpointId] ??
-        _nearbyEndpointToDevice[endpointId];
+    final deviceId =
+        _endpointConnIdMap[endpointId] ?? _nearbyEndpointToDevice[endpointId];
     if (deviceId == null) return null;
     try {
       return await _security.getSharedSecret(deviceId);
@@ -4920,8 +4979,8 @@ class P2PSyncService {
     List<SyncRecord> records,
   ) async {
     if (endpointId == null || records.isEmpty) return records;
-    final deviceId = _endpointConnIdMap[endpointId] ??
-        _nearbyEndpointToDevice[endpointId];
+    final deviceId =
+        _endpointConnIdMap[endpointId] ?? _nearbyEndpointToDevice[endpointId];
     if (deviceId == null) return records;
     String? secretKey;
     try {
@@ -4944,7 +5003,8 @@ class P2PSyncService {
     String? endpointId,
   }) async {
     final targetEndpoint = endpointId;
-    final classChannelEnabled = targetEndpoint != null &&
+    final classChannelEnabled =
+        targetEndpoint != null &&
         _endpointSupportsClassChannel[targetEndpoint] == true;
 
     // Diritto all'Oblio (H5): mai inviare dati di studenti eliminati tramite
@@ -4953,9 +5013,11 @@ class P2PSyncService {
     if (tombstoned.isNotEmpty) {
       final before = records.length;
       records = records
-          .where((r) =>
-              !(r.boxName == LocalDatabase.studentsBox &&
-                  tombstoned.contains(r.id)))
+          .where(
+            (r) =>
+                !(r.boxName == LocalDatabase.studentsBox &&
+                    tombstoned.contains(r.id)),
+          )
           .toList();
       if (records.length != before) {
         addLog(
@@ -4977,13 +5039,14 @@ class P2PSyncService {
       // chiaro: un peer che farebbe da relay non deve poter leggere i dati di
       // una classe di cui non è membro.
       final engine = HiveSyncEngine();
-      final scopedOut =
-          signed.where((r) => _recordClassUniqueCode(r) != null).length;
+      final scopedOut = signed
+          .where((r) => _recordClassUniqueCode(r) != null)
+          .length;
       if (scopedOut > 0) {
         addLog(
           'WARN',
           'H4: $scopedOut record di classe omessi (peer senza canale classe, '
-          'niente fallback in chiaro)',
+              'niente fallback in chiaro)',
         );
       }
       final plain = signed
@@ -5009,13 +5072,13 @@ class P2PSyncService {
       final classInfo = _classInfoByUniqueCode(code);
       if (classInfo != null &&
           ClassChannelService.getKeyByUniqueCode(code) == null) {
-        ClassChannelService.getOrCreateKey(
+        await ClassChannelService.getOrCreateKey(
           classId: classInfo.classId,
           classUniqueCode: code,
           className: classInfo.name,
         );
       }
-      final blob = ClassChannelService.encryptRecords(code, entry.value);
+      final blob = await ClassChannelService.encryptRecords(code, entry.value);
       if (blob == null) {
         // H4: mai inviare record di classe in chiaro. Se la cifratura per
         // classe non è disponibile, i record vengono OMESSI (il ricevente li
@@ -5023,7 +5086,7 @@ class P2PSyncService {
         addLog(
           'WARN',
           'H4: cifratura classe $code non disponibile, ${entry.value.length} '
-          'record omessi (no plaintext fallback)',
+              'record omessi (no plaintext fallback)',
         );
         continue;
       }
@@ -5040,10 +5103,7 @@ class P2PSyncService {
       return {'records': <dynamic>[]};
     }
     return {
-      'records': {
-        'enc': enc,
-        'plain': plain,
-      },
+      'records': {'enc': enc, 'plain': plain},
     };
   }
 
@@ -5063,9 +5123,9 @@ class P2PSyncService {
     final map = Map<String, dynamic>.from(recordsField);
     final results = <SyncRecord>[];
 
-    results.addAll(engine.deserializeRecords(
-      map['plain'] as List<dynamic>? ?? const [],
-    ));
+    results.addAll(
+      engine.deserializeRecords(map['plain'] as List<dynamic>? ?? const []),
+    );
 
     final enc = map['enc'] as Map<String, dynamic>? ?? {};
     for (final entry in enc.entries) {
@@ -5076,7 +5136,7 @@ class P2PSyncService {
       final keyData = blob['key'];
       if (keyData is Map) {
         final keyMap = Map<String, dynamic>.from(keyData);
-        ClassChannelService.storeKey(
+        await ClassChannelService.storeKey(
           classId: keyMap['classId']?.toString() ?? '',
           classUniqueCode: code,
           className: keyMap['className']?.toString() ?? '',
@@ -5086,7 +5146,7 @@ class P2PSyncService {
         blob.remove('key');
       }
 
-      final decrypted = ClassChannelService.decryptRecords(code, blob);
+      final decrypted = await ClassChannelService.decryptRecords(code, blob);
       if (decrypted != null) {
         results.addAll(engine.deserializeRecords(decrypted));
       } else {
@@ -5100,12 +5160,13 @@ class P2PSyncService {
 
   /// Applica gli eventuali blob cifrati "relay" della classe [classUniqueCode]
   /// una volta ottenuto il titolo. Usato dopo l'import di un grant QR.
-  Future<void> tryApplyRelayedCiphertext(
-    String classUniqueCode,
-  ) async {
+  Future<void> tryApplyRelayedCiphertext(String classUniqueCode) async {
     final blob = ClassChannelService.takeRelayedCiphertext(classUniqueCode);
     if (blob == null) return;
-    final decrypted = ClassChannelService.decryptRecords(classUniqueCode, blob);
+    final decrypted = await ClassChannelService.decryptRecords(
+      classUniqueCode,
+      blob,
+    );
     if (decrypted == null) {
       addLog(
         'WARN',
@@ -5120,7 +5181,7 @@ class P2PSyncService {
       addLog(
         'INFO',
         'Applicati ${result.receivedRecords} record relayed della classe '
-        '$classUniqueCode dopo acquisizione titolo',
+            '$classUniqueCode dopo acquisizione titolo',
       );
     } catch (e) {
       addLog('ERROR', 'Errore applicazione record relayed: $e');
@@ -5204,8 +5265,7 @@ class P2PSyncService {
     }
 
     final identity = await _security.getLocalIdentity();
-    final base = tombstone.toMap()
-      ..['signerDeviceId'] = identity.deviceId;
+    final base = tombstone.toMap()..['signerDeviceId'] = identity.deviceId;
 
     for (final endpointId in endpoints) {
       final remoteId = _endpointConnIdMap[endpointId];
@@ -5213,10 +5273,13 @@ class P2PSyncService {
       try {
         final assoc = await _security.getAssociation(remoteId);
         if (assoc == null || assoc.publicKeyBase64.isEmpty) continue;
-        final secret =
-            await _security.computeStaticSharedSecret(assoc.publicKeyBase64);
-        final signedPayload =
-            jsonEncode({'type': 'p2p_tombstone', 'tombstone': TombstoneService.withSignature(base, secret)});
+        final secret = await _security.computeStaticSharedSecret(
+          assoc.publicKeyBase64,
+        );
+        final signedPayload = jsonEncode({
+          'type': 'p2p_tombstone',
+          'tombstone': TombstoneService.withSignature(base, secret),
+        });
         await _sendEncryptedPayload(endpointId, signedPayload);
         addLog(
           'INFO',
@@ -5239,8 +5302,9 @@ class P2PSyncService {
     try {
       final assoc = await _security.getAssociation(remoteId);
       if (assoc == null || assoc.publicKeyBase64.isEmpty) return;
-      final secret =
-          await _security.computeStaticSharedSecret(assoc.publicKeyBase64);
+      final secret = await _security.computeStaticSharedSecret(
+        assoc.publicKeyBase64,
+      );
       final identity = await _security.getLocalIdentity();
       final repo = TombstoneRepository();
       final tombstones = repo.getAll();
@@ -5298,8 +5362,9 @@ class P2PSyncService {
     try {
       final payload = message['payload'];
       if (payload is! Map) return;
-      final valid =
-          await _security.verifyRevocationList(Map<String, dynamic>.from(payload));
+      final valid = await _security.verifyRevocationList(
+        Map<String, dynamic>.from(payload),
+      );
       if (!valid) {
         addLog(
           'WARN',
@@ -5327,8 +5392,9 @@ class P2PSyncService {
     try {
       final box = LocalDatabase.tombstones();
       return box.keys
-          .map((key) =>
-              LocalDatabase.toStringDynamicMap(box.get(key))['entityId'])
+          .map(
+            (key) => LocalDatabase.toStringDynamicMap(box.get(key))['entityId'],
+          )
           .whereType<String>()
           .toSet();
     } catch (_) {
@@ -5351,13 +5417,20 @@ class P2PSyncService {
     try {
       final assoc = await _security.getAssociation(remoteId);
       if (assoc == null || assoc.publicKeyBase64.isEmpty) {
-        addLog('WARN', 'Tombstone ignorato: nessuna associazione per $remoteId');
+        addLog(
+          'WARN',
+          'Tombstone ignorato: nessuna associazione per $remoteId',
+        );
         return;
       }
-      final secret =
-          await _security.computeStaticSharedSecret(assoc.publicKeyBase64);
+      final secret = await _security.computeStaticSharedSecret(
+        assoc.publicKeyBase64,
+      );
       if (!TombstoneService.verify(ts, secret)) {
-        addLog('WARN', 'Tombstone con firma non valida da $remoteId — ignorato');
+        addLog(
+          'WARN',
+          'Tombstone con firma non valida da $remoteId — ignorato',
+        );
         return;
       }
 
@@ -5374,7 +5447,7 @@ class P2PSyncService {
         addLog(
           'WARN',
           'Tombstone da dispositivo non approvato ($remoteId) in modalità '
-          'Responsabile — ignorato',
+              'Responsabile — ignorato',
         );
         return;
       }
@@ -5383,7 +5456,7 @@ class P2PSyncService {
       addLog(
         applied ? 'INFO' : 'WARN',
         'Tombstone ${applied ? 'applicato' : 'non applicato'} '
-            '(entity ${ts['entityId']}) da $remoteId',
+        '(entity ${ts['entityId']}) da $remoteId',
       );
     } catch (e) {
       addLog('ERROR', 'Errore gestione tombstone: $e');

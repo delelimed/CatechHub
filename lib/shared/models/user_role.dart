@@ -32,9 +32,9 @@ enum UserRole {
 
   /// Etichetta localizzata mostrata nelle UI.
   String get label => switch (this) {
-        UserRole.catechista => 'Catechista',
-        UserRole.responsabile => 'Responsabile Catechistico',
-      };
+    UserRole.catechista => 'Catechista',
+    UserRole.responsabile => 'Responsabile Catechistico',
+  };
 
   static UserRole fromStorageKey(String? value) {
     return UserRole.values.firstWhere(
@@ -104,8 +104,7 @@ class RolePermissions {
       RolePermission.manageAuditLog ||
       RolePermission.rightToOblivion ||
       RolePermission.gdprExport ||
-      RolePermission.manageParishConfig =>
-        role == UserRole.responsabile,
+      RolePermission.manageParishConfig => role == UserRole.responsabile,
     };
   }
 
@@ -115,7 +114,7 @@ class RolePermissions {
 
   /// Elenco dei permessi detenuti dal ruolo (per UI dinamica).
   static Set<RolePermission> permissionsOf(UserRole role) => {
-        for (final p in RolePermission.values)
-          if (can(role, p)) p,
-      };
+    for (final p in RolePermission.values)
+      if (can(role, p)) p,
+  };
 }

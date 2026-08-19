@@ -214,26 +214,19 @@ class AppScaffold extends StatelessWidget {
 
     // Colori adattivi per il tema
     final scaffoldBg = isDark
-        ? colorScheme.surfaceContainerLowest // #121A24 per AMOLED
+        ? colorScheme
+              .surfaceContainerLowest // #121A24 per AMOLED
         : const Color(0xFFF5F8FC);
-    final topBarBg = isDark
-        ? colorScheme.surfaceContainer
-        : Colors.white;
-    final pageBodyBg = isDark
-        ? colorScheme.surfaceContainer
-        : Colors.white;
-    final navBarBg = isDark
-        ? colorScheme.surfaceContainer
-        : Colors.white;
+    final topBarBg = isDark ? colorScheme.surfaceContainer : Colors.white;
+    final pageBodyBg = isDark ? colorScheme.surfaceContainer : Colors.white;
+    final navBarBg = isDark ? colorScheme.surfaceContainer : Colors.white;
     final churchIconBg = isDark
         ? colorScheme.primaryContainer.withValues(alpha: 0.3)
         : const Color(0xFFEAF2FF);
     final churchIconColor = isDark
         ? colorScheme.primary
         : const Color(0xFF174A7E);
-    final titleColor = isDark
-        ? colorScheme.onSurface
-        : const Color(0xFF174A7E);
+    final titleColor = isDark ? colorScheme.onSurface : const Color(0xFF174A7E);
     final backIconColor = isDark
         ? colorScheme.onSurface
         : const Color(0xFF174A7E);
@@ -265,10 +258,7 @@ class AppScaffold extends StatelessWidget {
                 margin: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF174A7E),
-                      Color(0xFF2368B1),
-                    ],
+                    colors: [Color(0xFF174A7E), Color(0xFF2368B1)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -423,7 +413,9 @@ class AppScaffold extends StatelessWidget {
                   data: NavigationBarThemeData(
                     labelTextStyle: WidgetStatePropertyAll(
                       TextStyle(
-                        fontSize: MediaQuery.of(context).size.width < 360 ? 10 : 11,
+                        fontSize: MediaQuery.of(context).size.width < 360
+                            ? 10
+                            : 11,
                         fontWeight: FontWeight.w600,
                         overflow: TextOverflow.clip,
                       ),
@@ -433,8 +425,9 @@ class AppScaffold extends StatelessWidget {
                     height: 72,
                     backgroundColor: navBarBg,
                     selectedIndex: currentIndex,
-                    indicatorColor:
-                        theme.colorScheme.primary.withValues(alpha: 0.15),
+                    indicatorColor: theme.colorScheme.primary.withValues(
+                      alpha: 0.15,
+                    ),
                     onDestinationSelected: (index) {
                       context.go(_routeFromIndex(index));
                     },

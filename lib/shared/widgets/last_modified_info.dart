@@ -49,10 +49,7 @@ class LastModifiedInfo extends StatelessWidget {
         if (createdAt != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 2),
-            child: Text(
-              'Creata: ${_format(createdAt!)}',
-              style: muted,
-            ),
+            child: Text('Creata: ${_format(createdAt!)}', style: muted),
           ),
         Text(
           'Ultima modifica: ${_format(updatedAt)}${lastModifiedBy.isNotEmpty ? ' da $lastModifiedBy' : ''}',

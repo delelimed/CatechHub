@@ -26,10 +26,10 @@ enum AppMode {
 
   /// Etichetta leggibile per le UI.
   String get label => switch (this) {
-        AppMode.normal => 'Modalità Normale',
-        AppMode.associato => 'Modalità Associato',
-        AppMode.responsabile => 'Modalità Responsabile',
-      };
+    AppMode.normal => 'Modalità Normale',
+    AppMode.associato => 'Modalità Associato',
+    AppMode.responsabile => 'Modalità Responsabile',
+  };
 }
 
 /// Helper sulla modalità operativa corrente (persistita nel box auth).

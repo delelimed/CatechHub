@@ -31,11 +31,7 @@ class AvvisoTemplate {
   }
 
   Map<String, dynamic> toMap() {
-    return {
-      'classUniqueCode': classUniqueCode,
-      'title': title,
-      'text': text,
-    };
+    return {'classUniqueCode': classUniqueCode, 'title': title, 'text': text};
   }
 
   AvvisoTemplate copyWith({

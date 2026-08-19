@@ -94,12 +94,15 @@ class Attachment {
       name: data['name'] ?? '',
       mimeType: data['mimeType'] ?? 'application/octet-stream',
       size: data['size'] ?? 0,
-      createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ??
+      createdAt:
+          DateTime.tryParse(data['createdAt']?.toString() ?? '') ??
           DateTime.now(),
       fileHash: data['fileHash'] ?? '',
       classUniqueCode: data['classUniqueCode'],
       description: data['description'],
-      updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(data['updatedAt']?.toString() ?? '') ??
+          DateTime.now(),
       lastModifiedBy: data['lastModifiedBy'] ?? '',
     );
   }

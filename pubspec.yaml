@@ -44,8 +44,6 @@ dependencies:
   hive_flutter: ^1.1.0
   flutter_secure_storage: ^11.0.0
   shared_preferences: ^2.3.0
-  crypto: ^3.0.3
-  pointycastle: ^4.0.0
   cryptography: ^2.7.0
   freerasp: ^8.0.0
 
@@ -78,8 +76,6 @@ dependencies:
   path_provider: ^2.1.0
   image: ^4.9.0
   share_plus: ^13.2.0
-  license_checker: 1.6.2
-  state_notifier: ^1.0.0
   xml: ^7.0.1
 
 

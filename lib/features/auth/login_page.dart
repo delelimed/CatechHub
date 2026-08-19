@@ -120,7 +120,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   bool _checkedLockScreen = false;
   String? _errorMessage;
 
-  int _setupStep = 0; // 0: nome/cognome, 1: crea/unisciti, 2: nome gruppo (solo se crea)
+  int _setupStep =
+      0; // 0: nome/cognome, 1: crea/unisciti, 2: nome gruppo (solo se crea)
 
   @override
   void initState() {
@@ -131,8 +132,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       final authService = ref.read(authServiceProvider);
       final isConfigured = authService.isProfileConfigured;
       if (kDebugMode) {
-      debugPrint('Login initState - Profilo configurato: $isConfigured');
-    }
+        debugPrint('Login initState - Profilo configurato: $isConfigured');
+      }
 
       if (!isConfigured) {
         if (mounted) setState(() => _isFirstSetup = true);
@@ -142,8 +143,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       // Profilo esiste: verifica se il dispositivo ha lockscreen attivo
       final hasLock = await authService.hasSecureLockScreen();
       if (kDebugMode) {
-      debugPrint('Login initState - Lockscreen attivo: $hasLock');
-    }
+        debugPrint('Login initState - Lockscreen attivo: $hasLock');
+      }
 
       if (mounted) {
         setState(() {
@@ -377,11 +378,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     if (_isFirstSetup) ...[
-                                      _buildFirstSetupForm(isLoading, isLandscape),
+                                      _buildFirstSetupForm(
+                                        isLoading,
+                                        isLandscape,
+                                      ),
                                     ] else if (!_checkedLockScreen) ...[
                                       _buildCheckingLockScreen(),
                                     ] else if (!_hasSecureLockScreen) ...[
-                                      HardLockScreen(onRetry: _recheckLockScreen),
+                                      HardLockScreen(
+                                        onRetry: _recheckLockScreen,
+                                      ),
                                     ] else ...[
                                       _buildUnlockForm(isLoading, isLandscape),
                                     ],
@@ -568,9 +574,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             const SizedBox(height: 16),
           ],
           if (_setupStep == 0) ...[
-            _buildTextField(_firstNameController, 'Nome', Icons.person, isLandscape),
+            _buildTextField(
+              _firstNameController,
+              'Nome',
+              Icons.person,
+              isLandscape,
+            ),
             const SizedBox(height: 12),
-            _buildTextField(_lastNameController, 'Cognome', Icons.person_outline, isLandscape),
+            _buildTextField(
+              _lastNameController,
+              'Cognome',
+              Icons.person_outline,
+              isLandscape,
+            ),
             const SizedBox(height: 12),
             _buildTextField(
               _phoneController,
@@ -670,7 +686,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               'Inserisci il nome del tuo gruppo di catechismo '
               '(es. "Prima elementare", "Cresima 2026")',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: isLandscape ? 12 : 11, color: Colors.grey),
+              style: TextStyle(
+                fontSize: isLandscape ? 12 : 11,
+                color: Colors.grey,
+              ),
             ),
             const SizedBox(height: 20),
             ElevatedButton(
@@ -749,9 +768,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             ),
             const SizedBox(height: 16),
           ],
-          _buildTextField(_firstNameController, 'Nome', Icons.person, isLandscape),
+          _buildTextField(
+            _firstNameController,
+            'Nome',
+            Icons.person,
+            isLandscape,
+          ),
           const SizedBox(height: 12),
-          _buildTextField(_lastNameController, 'Cognome', Icons.person_outline, isLandscape),
+          _buildTextField(
+            _lastNameController,
+            'Cognome',
+            Icons.person_outline,
+            isLandscape,
+          ),
           const SizedBox(height: 12),
           _buildTextField(
             _phoneController,
@@ -903,8 +932,9 @@ class _HardLockScreenState extends State<HardLockScreen> {
     setState(() => _openingSettings = true);
     try {
       if (Platform.isAndroid) {
-        const MethodChannel channel =
-            MethodChannel('catechhub/security_settings');
+        const MethodChannel channel = MethodChannel(
+          'catechhub/security_settings',
+        );
         await channel.invokeMethod('openSecuritySettings');
       } else if (Platform.isIOS) {
         final uri = Uri.parse('app-settings:');
@@ -938,7 +968,9 @@ class _HardLockScreenState extends State<HardLockScreen> {
         setState(() => _isChecking = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Blocco schermo non ancora attivo. Riprova dopo averlo configurato.'),
+            content: Text(
+              'Blocco schermo non ancora attivo. Riprova dopo averlo configurato.',
+            ),
             backgroundColor: Color(0xFF174A7E),
           ),
         );

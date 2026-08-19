@@ -115,8 +115,10 @@ class _CreateSubstituteDelegationPageState
   // ─── Selezione supplente ───────────────────────────────────────────────
   Future<void> _pickSubstitute() async {
     if (_associations.isEmpty) {
-      _snack('Nessun dispositivo associato. Associa prima un altro '
-          'catechista nelle Impostazioni.');
+      _snack(
+        'Nessun dispositivo associato. Associa prima un altro '
+        'catechista nelle Impostazioni.',
+      );
       return;
     }
     final picked = await showDialog<P2PDeviceAssociation>(
@@ -264,7 +266,9 @@ class _CreateSubstituteDelegationPageState
 
   void _snack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -294,10 +298,7 @@ Widget _pickerTile({
               children: [
                 Text(
                   label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade500,
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
                 ),
                 const SizedBox(height: 2),
                 Text(

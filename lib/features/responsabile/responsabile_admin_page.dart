@@ -127,8 +127,8 @@ class ResponsabileAdminPage extends ConsumerWidget {
           final crossAxisCount = constraints.maxWidth >= 900
               ? 3
               : constraints.maxWidth >= 560
-                  ? 2
-                  : 1;
+              ? 2
+              : 1;
           return GridView.builder(
             padding: const EdgeInsets.all(16),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(

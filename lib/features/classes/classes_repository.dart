@@ -13,6 +13,7 @@
 /// Integrazione CateREG: usato da [classesRepoProvider] e da tutte le
 /// pagine che necessitano di leggere o modificare i dati delle classi.
 library;
+
 import 'package:flutter/foundation.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/storage/local_database.dart';
@@ -40,8 +41,9 @@ class ClassesRepository {
   void _requireCanManageClasses() {
     if (!RolePermissions.currentCan(RolePermission.manageClasses)) {
       throw UnsupportedError(
-          'Solo il Responsabile Catechistico può gestire le assegnazioni '
-          'e la logistica delle classi.');
+        'Solo il Responsabile Catechistico può gestire le assegnazioni '
+        'e la logistica delle classi.',
+      );
     }
   }
 
@@ -61,20 +63,29 @@ class ClassesRepository {
 
   Future<void> addClass(SchoolClass c) async {
     final id = c.id.isEmpty ? LocalDatabase.newId('class') : c.id;
-    final code = c.uniqueCode.isEmpty ? generateClassUniqueCode() : c.uniqueCode;
+    final code = c.uniqueCode.isEmpty
+        ? generateClassUniqueCode()
+        : c.uniqueCode;
     final catechistName = getCurrentCatechistName();
     final now = DateTime.now();
-    final creatorId = c.creatorId.isEmpty ? AuthService.localUserId : c.creatorId;
+    final creatorId = c.creatorId.isEmpty
+        ? AuthService.localUserId
+        : c.creatorId;
     final creatorName = c.creatorName.isEmpty ? catechistName : c.creatorName;
-    await _box.put(id, c.copyWith(
-      id: id,
-      uniqueCode: code,
-      lastModifiedBy: catechistName,
-      creatorId: creatorId,
-      creatorName: creatorName,
-      createdAt: now,
-      updatedAt: now,
-    ).toMap());
+    await _box.put(
+      id,
+      c
+          .copyWith(
+            id: id,
+            uniqueCode: code,
+            lastModifiedBy: catechistName,
+            creatorId: creatorId,
+            creatorName: creatorName,
+            createdAt: now,
+            updatedAt: now,
+          )
+          .toMap(),
+    );
     // Forza la scrittura su disco: evita la perdita di una classe appena
     // creata se il processo viene terminato dal sistema subito dopo.
     await _box.flush();
@@ -86,7 +97,11 @@ class ClassesRepository {
     if (previous == null) return;
 
     final currentName = getCurrentCatechistName();
-    final isCreator = previous.isCreator(AuthService.localUserId, currentName, catechistId: AuthService.getCatechistId());
+    final isCreator = previous.isCreator(
+      AuthService.localUserId,
+      currentName,
+      catechistId: AuthService.getCatechistId(),
+    );
 
     SchoolClass toSave;
     if (isCreator) {
@@ -99,11 +114,16 @@ class ClassesRepository {
     }
 
     final catechistName = getCurrentCatechistName();
-    await _box.put(id, toSave.copyWith(
-      id: id,
-      lastModifiedBy: catechistName,
-      updatedAt: DateTime.now(),
-    ).toMap());
+    await _box.put(
+      id,
+      toSave
+          .copyWith(
+            id: id,
+            lastModifiedBy: catechistName,
+            updatedAt: DateTime.now(),
+          )
+          .toMap(),
+    );
     await _box.flush();
 
     final removedStudentIds = previous.studentIds
@@ -113,10 +133,14 @@ class ClassesRepository {
 
     final attendanceBox = LocalDatabase.attendance();
     for (final attendanceKey in attendanceBox.keys) {
-      final data = LocalDatabase.toStringDynamicMap(attendanceBox.get(attendanceKey));
+      final data = LocalDatabase.toStringDynamicMap(
+        attendanceBox.get(attendanceKey),
+      );
       if (data['classId'] != id) continue;
 
-      final presence = Map<String, dynamic>.from(data['presence'] as Map? ?? {});
+      final presence = Map<String, dynamic>.from(
+        data['presence'] as Map? ?? {},
+      );
       var changed = false;
       for (final studentId in removedStudentIds) {
         changed = presence.remove(studentId) != null || changed;
@@ -136,8 +160,8 @@ class ClassesRepository {
       await _log(AuditActionType.deleteClass, id, AuditLog.entityClasse);
     } catch (e) {
       if (kDebugMode) {
-      debugPrint('[ClassesRepository] Errore eliminazione classe $id: $e');
-    }
+        debugPrint('[ClassesRepository] Errore eliminazione classe $id: $e');
+      }
     }
 
     try {
@@ -184,8 +208,10 @@ class ClassesRepository {
       }
     } catch (e) {
       if (kDebugMode) {
-      debugPrint('[ClassesRepository] Errore durante cascata cancellazione classe $id: $e');
-    }
+        debugPrint(
+          '[ClassesRepository] Errore durante cascata cancellazione classe $id: $e',
+        );
+      }
     }
   }
 
@@ -209,8 +235,11 @@ class ClassesRepository {
     );
   }
 
-  Future<void> addCatechistToClass(String classId, String catechistId,
-      {String role = roleTitolare}) async {
+  Future<void> addCatechistToClass(
+    String classId,
+    String catechistId, {
+    String role = roleTitolare,
+  }) async {
     _requireCanManageClasses();
     final current = _getClass(classId);
     if (current == null || current.catechistIds.contains(catechistId)) return;
@@ -221,7 +250,11 @@ class ClassesRepository {
         catechistRoles: {...current.catechistRoles, catechistId: role},
       ),
     );
-    await _log(AuditActionType.reassignCatechist, classId, AuditLog.entityClasse);
+    await _log(
+      AuditActionType.reassignCatechist,
+      classId,
+      AuditLog.entityClasse,
+    );
   }
 
   /// Imposta il ruolo interno di un catechista già assegnato a una classe
@@ -235,20 +268,32 @@ class ClassesRepository {
     final current = _getClass(classId);
     if (current == null) return;
     if (!current.catechistIds.contains(catechistId)) return;
-    await _box.put(classId, current.copyWith(
-      catechistRoles: {...current.catechistRoles, catechistId: role},
-      lastModifiedBy: getCurrentCatechistName(),
-      updatedAt: DateTime.now(),
-    ).toMap());
+    await _box.put(
+      classId,
+      current
+          .copyWith(
+            catechistRoles: {...current.catechistRoles, catechistId: role},
+            lastModifiedBy: getCurrentCatechistName(),
+            updatedAt: DateTime.now(),
+          )
+          .toMap(),
+    );
     await _box.flush();
-    await _log(AuditActionType.reassignCatechist, classId, AuditLog.entityClasse);
+    await _log(
+      AuditActionType.reassignCatechist,
+      classId,
+      AuditLog.entityClasse,
+    );
   }
 
   /// Restituisce il ruolo interno (TITOLARE/AIUTO) di un catechista in una classe.
   String roleOf(SchoolClass c, String catechistId) =>
       c.catechistRoles[catechistId] ?? roleTitolare;
 
-  Future<void> removeCatechistFromClass(String classId, String catechistId) async {
+  Future<void> removeCatechistFromClass(
+    String classId,
+    String catechistId,
+  ) async {
     _requireCanManageClasses();
     final current = _getClass(classId);
     if (current == null) return;
@@ -257,12 +302,17 @@ class ClassesRepository {
     await updateClass(
       classId,
       current.copyWith(
-        catechistIds:
-            current.catechistIds.where((id) => id != catechistId).toList(),
+        catechistIds: current.catechistIds
+            .where((id) => id != catechistId)
+            .toList(),
         catechistRoles: roles,
       ),
     );
-    await _log(AuditActionType.reassignCatechist, classId, AuditLog.entityClasse);
+    await _log(
+      AuditActionType.reassignCatechist,
+      classId,
+      AuditLog.entityClasse,
+    );
   }
 
   /// Assegna uno slot orario settimanale a una classe, verificando i conflitti.
@@ -290,15 +340,16 @@ class ClassesRepository {
     }
     await updateClass(
       classId,
-      current.copyWith(
-        roomSlots: [...current.roomSlots, slot],
-      ),
+      current.copyWith(roomSlots: [...current.roomSlots, slot]),
     );
     return _getClass(classId) ?? current;
   }
 
   /// Dismette uno slot da una classe.
-  Future<SchoolClass?> removeSlotFromClass(String classId, String slotId) async {
+  Future<SchoolClass?> removeSlotFromClass(
+    String classId,
+    String slotId,
+  ) async {
     _requireCanManageClasses();
     final current = _getClass(classId);
     if (current == null) return null;
@@ -356,8 +407,8 @@ class ClassesRepository {
       );
     } catch (e) {
       if (kDebugMode) {
-      debugPrint('[ClassesRepository] AuditLog non registrato ($action): $e');
-    }
+        debugPrint('[ClassesRepository] AuditLog non registrato ($action): $e');
+      }
     }
   }
 
@@ -380,7 +431,8 @@ class ClassesRepository {
       final raw = _box.get(key);
       if (raw == null) continue;
       final data = LocalDatabase.toStringDynamicMap(raw);
-      if (data['uniqueCode'] == null || (data['uniqueCode'] as String).isEmpty) {
+      if (data['uniqueCode'] == null ||
+          (data['uniqueCode'] as String).isEmpty) {
         data['uniqueCode'] = generateClassUniqueCode();
         data['updatedAt'] = DateTime.now().toUtc().toIso8601String();
         await _box.put(key, data);

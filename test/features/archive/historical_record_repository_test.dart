@@ -11,8 +11,12 @@ import 'package:CatechHub/core/storage/local_database.dart';
 import 'package:CatechHub/features/archive/historical_record_repository.dart';
 import 'package:CatechHub/shared/models/historical_record.dart';
 
-HistoricalRecord _record(String studentId, String year,
-    {String classId = 'c1', double attendance = 80}) {
+HistoricalRecord _record(
+  String studentId,
+  String year, {
+  String classId = 'c1',
+  double attendance = 80,
+}) {
   return HistoricalRecord(
     recordId: '',
     studentId: studentId,
@@ -55,8 +59,7 @@ void main() {
 
     test('lo snapshot serializzato mantiene tutti i campi', () async {
       final repo = HistoricalRecordRepository();
-      await repo.addRecord(
-          _record('s2', '2025-2026', attendance: 92.5));
+      await repo.addRecord(_record('s2', '2025-2026', attendance: 92.5));
 
       final loaded = repo.getAllRecordsSync().single;
       expect(loaded.academicYear, '2025-2026');
@@ -75,24 +78,29 @@ void main() {
       await repo.addRecord(_record('s3', '2025-2026'));
 
       final all = repo.getAllRecordsSync();
-      expect(all.map((r) => r.academicYear).toList(),
-          ['2026-2027', '2025-2026', '2024-2025']);
+      expect(all.map((r) => r.academicYear).toList(), [
+        '2026-2027',
+        '2025-2026',
+        '2024-2025',
+      ]);
     });
   });
 
   group('HistoricalRecordRepository.deleteRecordsForStudent', () {
-    test('elimina i record di un singolo studente (Diritto all\'Oblio)',
-        () async {
-      final repo = HistoricalRecordRepository();
-      await repo.addRecord(_record('s1', '2024-2025'));
-      await repo.addRecord(_record('s1', '2025-2026'));
-      await repo.addRecord(_record('s2', '2025-2026'));
+    test(
+      'elimina i record di un singolo studente (Diritto all\'Oblio)',
+      () async {
+        final repo = HistoricalRecordRepository();
+        await repo.addRecord(_record('s1', '2024-2025'));
+        await repo.addRecord(_record('s1', '2025-2026'));
+        await repo.addRecord(_record('s2', '2025-2026'));
 
-      await repo.deleteRecordsForStudent('s1');
+        await repo.deleteRecordsForStudent('s1');
 
-      expect(repo.count, 1);
-      expect(repo.getAllRecordsSync().single.studentId, 's2');
-    });
+        expect(repo.count, 1);
+        expect(repo.getAllRecordsSync().single.studentId, 's2');
+      },
+    );
 
     test('elimina i record di un gruppo di studenti', () async {
       final repo = HistoricalRecordRepository();

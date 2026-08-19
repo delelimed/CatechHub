@@ -13,7 +13,8 @@ class CatechesiDetailPage extends ConsumerStatefulWidget {
   const CatechesiDetailPage({super.key, required this.catechesi});
 
   @override
-  ConsumerState<CatechesiDetailPage> createState() => _CatechesiDetailPageState();
+  ConsumerState<CatechesiDetailPage> createState() =>
+      _CatechesiDetailPageState();
 }
 
 class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
@@ -35,9 +36,15 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
 
   void _initControllers() {
     _titleController = TextEditingController(text: _catechesi.title);
-    _descriptionController = TextEditingController(text: _catechesi.description);
-    _biblicalController = TextEditingController(text: _catechesi.biblicalReferences.join('\n'));
-    _websiteController = TextEditingController(text: _catechesi.websiteReferences.join('\n'));
+    _descriptionController = TextEditingController(
+      text: _catechesi.description,
+    );
+    _biblicalController = TextEditingController(
+      text: _catechesi.biblicalReferences.join('\n'),
+    );
+    _websiteController = TextEditingController(
+      text: _catechesi.websiteReferences.join('\n'),
+    );
     _tagsController = TextEditingController(text: _catechesi.tags.join(', '));
   }
 
@@ -80,9 +87,9 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
 
   Future<void> _save() async {
     if (_titleController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Inserisci un titolo')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Inserisci un titolo')));
       return;
     }
 
@@ -108,15 +115,15 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
         _isEditing = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Catechesi aggiornata')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Catechesi aggiornata')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Errore: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Errore: $e')));
       }
     }
   }
@@ -131,7 +138,9 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
       backgroundColor: isDark ? colorScheme.surface : Colors.grey.shade50,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: isDark ? colorScheme.primaryContainer : const Color(0xFF174A7E),
+        backgroundColor: isDark
+            ? colorScheme.primaryContainer
+            : const Color(0xFF174A7E),
         foregroundColor: isDark ? colorScheme.onPrimaryContainer : Colors.white,
         title: Text(
           _isEditing ? 'Modifica catechesi' : 'Catechesi',
@@ -139,7 +148,9 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
         ),
         actions: [
           IconButton(
-            icon: Icon(_isEditing ? Icons.lock_open_rounded : Icons.lock_outline_rounded),
+            icon: Icon(
+              _isEditing ? Icons.lock_open_rounded : Icons.lock_outline_rounded,
+            ),
             tooltip: _isEditing ? 'Torna a sola lettura' : 'Abilita modifica',
             onPressed: _toggleEditing,
           ),
@@ -183,7 +194,11 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
               colorScheme: colorScheme,
               child: Text(
                 _catechesi.description,
-                style: TextStyle(fontSize: 16, height: 1.5, color: isDark ? colorScheme.onSurface : null),
+                style: TextStyle(
+                  fontSize: 16,
+                  height: 1.5,
+                  color: isDark ? colorScheme.onSurface : null,
+                ),
               ),
             ),
             const SizedBox(height: 20),
@@ -203,8 +218,16 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
                       (t) => Chip(
                         label: Text(t),
                         visualDensity: VisualDensity.compact,
-                        side: BorderSide(color: isDark ? colorScheme.primary.withValues(alpha: 0.3) : Colors.purple.shade100),
-                        backgroundColor: isDark ? colorScheme.primaryContainer.withValues(alpha: 0.2) : Colors.purple.shade50,
+                        side: BorderSide(
+                          color: isDark
+                              ? colorScheme.primary.withValues(alpha: 0.3)
+                              : Colors.purple.shade100,
+                        ),
+                        backgroundColor: isDark
+                            ? colorScheme.primaryContainer.withValues(
+                                alpha: 0.2,
+                              )
+                            : Colors.purple.shade50,
                       ),
                     )
                     .toList(),
@@ -227,7 +250,11 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Text(
                           '• $b',
-                          style: TextStyle(fontSize: 15, height: 1.4, color: isDark ? colorScheme.onSurface : null),
+                          style: TextStyle(
+                            fontSize: 15,
+                            height: 1.4,
+                            color: isDark ? colorScheme.onSurface : null,
+                          ),
                         ),
                       ),
                     )
@@ -257,10 +284,15 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
                           if (uri != null &&
                               (uri.scheme == 'http' || uri.scheme == 'https') &&
                               uri.host.isNotEmpty) {
-                            final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            final ok = await launchUrl(
+                              uri,
+                              mode: LaunchMode.externalApplication,
+                            );
                             if (!ok && mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Impossibile aprire: $w')),
+                                SnackBar(
+                                  content: Text('Impossibile aprire: $w'),
+                                ),
                               );
                             }
                           }
@@ -269,15 +301,22 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
                           padding: const EdgeInsets.only(bottom: 8),
                           child: Row(
                             children: [
-                              Icon(Icons.open_in_new_rounded,
-                                  size: 16, color: isDark ? colorScheme.primary : Colors.teal.shade700),
+                              Icon(
+                                Icons.open_in_new_rounded,
+                                size: 16,
+                                color: isDark
+                                    ? colorScheme.primary
+                                    : Colors.teal.shade700,
+                              ),
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
                                   w,
                                   style: TextStyle(
                                     fontSize: 15,
-                                    color: isDark ? colorScheme.primary : Colors.teal.shade700,
+                                    color: isDark
+                                        ? colorScheme.primary
+                                        : Colors.teal.shade700,
                                     decoration: TextDecoration.underline,
                                   ),
                                 ),
@@ -396,7 +435,9 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
             width: double.infinity,
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                backgroundColor: isDark
+                    ? colorScheme.primary
+                    : const Color(0xFF174A7E),
                 foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
@@ -442,7 +483,11 @@ class _Section extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? colorScheme.surfaceContainer : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade200),
+        border: Border.all(
+          color: isDark
+              ? colorScheme.outline.withValues(alpha: 0.2)
+              : Colors.grey.shade200,
+        ),
         boxShadow: [
           BoxShadow(
             color: isDark
@@ -500,7 +545,11 @@ class _EditField extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? colorScheme.surfaceContainer : Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : color.withValues(alpha: 0.2)),
+        border: Border.all(
+          color: isDark
+              ? colorScheme.outline.withValues(alpha: 0.2)
+              : color.withValues(alpha: 0.2),
+        ),
         boxShadow: [
           BoxShadow(
             color: isDark
@@ -508,7 +557,7 @@ class _EditField extends StatelessWidget {
                 : Colors.black.withValues(alpha: 0.04),
             blurRadius: 16,
             offset: const Offset(0, 8),
-          )
+          ),
         ],
       ),
       child: Column(

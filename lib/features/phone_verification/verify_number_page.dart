@@ -86,45 +86,54 @@ class _VerifyNumberPageState extends ConsumerState<VerifyNumberPage> {
     for (final student in allStudents) {
       // Normalizza i numeri per il confronto (rimuovi spazi, trattini, ecc.)
       final searchNumber = _normalizePhone(phoneNumber);
-      
+
       // Controlla numero studente
       if (student.studentPhone.isNotEmpty) {
         final studentPhone = _normalizePhone(student.studentPhone);
-        if (studentPhone.contains(searchNumber) || searchNumber.contains(studentPhone)) {
-          foundMatches.add(PhoneMatch(
-            type: PhoneMatchType.student,
-            name: '${student.name} ${student.surname}',
-            phone: student.studentPhone,
-            studentId: student.id,
-          ));
+        if (studentPhone.contains(searchNumber) ||
+            searchNumber.contains(studentPhone)) {
+          foundMatches.add(
+            PhoneMatch(
+              type: PhoneMatchType.student,
+              name: '${student.name} ${student.surname}',
+              phone: student.studentPhone,
+              studentId: student.id,
+            ),
+          );
         }
       }
 
       // Controlla numero madre
       if (student.motherPhone.isNotEmpty) {
         final motherPhone = _normalizePhone(student.motherPhone);
-        if (motherPhone.contains(searchNumber) || searchNumber.contains(motherPhone)) {
-          foundMatches.add(PhoneMatch(
-            type: PhoneMatchType.mother,
-            name: '${student.motherName} ${student.motherSurname}',
-            phone: student.motherPhone,
-            studentName: '${student.name} ${student.surname}',
-            studentId: student.id,
-          ));
+        if (motherPhone.contains(searchNumber) ||
+            searchNumber.contains(motherPhone)) {
+          foundMatches.add(
+            PhoneMatch(
+              type: PhoneMatchType.mother,
+              name: '${student.motherName} ${student.motherSurname}',
+              phone: student.motherPhone,
+              studentName: '${student.name} ${student.surname}',
+              studentId: student.id,
+            ),
+          );
         }
       }
 
       // Controlla numero padre
       if (student.fatherPhone.isNotEmpty) {
         final fatherPhone = _normalizePhone(student.fatherPhone);
-        if (fatherPhone.contains(searchNumber) || searchNumber.contains(fatherPhone)) {
-          foundMatches.add(PhoneMatch(
-            type: PhoneMatchType.father,
-            name: '${student.fatherName} ${student.fatherSurname}',
-            phone: student.fatherPhone,
-            studentName: '${student.name} ${student.surname}',
-            studentId: student.id,
-          ));
+        if (fatherPhone.contains(searchNumber) ||
+            searchNumber.contains(fatherPhone)) {
+          foundMatches.add(
+            PhoneMatch(
+              type: PhoneMatchType.father,
+              name: '${student.fatherName} ${student.fatherSurname}',
+              phone: student.fatherPhone,
+              studentName: '${student.name} ${student.surname}',
+              studentId: student.id,
+            ),
+          );
         }
       }
     }
@@ -196,13 +205,15 @@ class _VerifyNumberPageState extends ConsumerState<VerifyNumberPage> {
                 ),
               ),
               const SizedBox(height: 12),
-              ..._matches.map((match) => _MatchCard(
-                match: match,
-                onCall: () => _callNumber(match.phone),
-                onWhatsapp: () => _whatsappNumber(match.phone),
-                isDark: isDark,
-                colorScheme: colorScheme,
-              )),
+              ..._matches.map(
+                (match) => _MatchCard(
+                  match: match,
+                  onCall: () => _callNumber(match.phone),
+                  onWhatsapp: () => _whatsappNumber(match.phone),
+                  isDark: isDark,
+                  colorScheme: colorScheme,
+                ),
+              ),
             ] else if (!_isSearching && _phoneController.text.isNotEmpty)
               _EmptyResult(isDark: isDark, colorScheme: colorScheme),
           ],
@@ -275,11 +286,17 @@ class _SearchCard extends StatelessWidget {
                   : null,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade300),
+                borderSide: BorderSide(
+                  color: isDark
+                      ? colorScheme.outline.withValues(alpha: 0.2)
+                      : Colors.grey.shade300,
+                ),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+                borderSide: BorderSide(
+                  color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                ),
               ),
             ),
           ),
@@ -289,7 +306,9 @@ class _SearchCard extends StatelessWidget {
             child: ElevatedButton(
               onPressed: isSearching ? null : onSearch,
               style: ElevatedButton.styleFrom(
-                backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                backgroundColor: isDark
+                    ? colorScheme.primary
+                    : const Color(0xFF174A7E),
                 foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
@@ -363,7 +382,9 @@ class _MatchCard extends StatelessWidget {
           children: [
             Text(
               match.phone,
-              style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey),
+              style: TextStyle(
+                color: isDark ? Colors.grey.shade400 : Colors.grey,
+              ),
             ),
             if (match.studentName != null) ...[
               const SizedBox(height: 4),

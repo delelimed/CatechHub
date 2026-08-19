@@ -13,8 +13,7 @@ class DeviceAssociation {
     required this.associatedAt,
   });
 
-  bool get isValid =>
-      DateTime.now().difference(associatedAt).inDays < 30;
+  bool get isValid => DateTime.now().difference(associatedAt).inDays < 30;
 
   int get daysRemaining {
     final elapsed = DateTime.now().difference(associatedAt).inDays;
@@ -23,19 +22,18 @@ class DeviceAssociation {
   }
 
   Map<String, dynamic> toJson() => {
-        'deviceId': deviceId,
-        'deviceName': deviceName,
-        'sharedSecretHex': sharedSecretHex,
-        'associatedAt': associatedAt.toUtc().toIso8601String(),
-      };
+    'deviceId': deviceId,
+    'deviceName': deviceName,
+    'sharedSecretHex': sharedSecretHex,
+    'associatedAt': associatedAt.toUtc().toIso8601String(),
+  };
 
   factory DeviceAssociation.fromJson(Map<String, dynamic> json) =>
       DeviceAssociation(
         deviceId: json['deviceId'] as String,
         deviceName: json['deviceName'] as String,
         sharedSecretHex: json['sharedSecretHex'] as String,
-        associatedAt:
-            DateTime.parse(json['associatedAt'] as String).toLocal(),
+        associatedAt: DateTime.parse(json['associatedAt'] as String).toLocal(),
       );
 }
 
@@ -128,37 +126,42 @@ class AssociatedDevice {
       deviceId: deviceId,
       catechistId: catechistId,
       publicKey: publicKey,
-      authorizedByResponsabile:
-          clearApproval ? false : (authorizedByResponsabile ?? this.authorizedByResponsabile),
-      timestampApproval:
-          clearApproval ? null : (timestampApproval ?? this.timestampApproval),
+      authorizedByResponsabile: clearApproval
+          ? false
+          : (authorizedByResponsabile ?? this.authorizedByResponsabile),
+      timestampApproval: clearApproval
+          ? null
+          : (timestampApproval ?? this.timestampApproval),
       deviceName: deviceName ?? this.deviceName,
-      approvedByDeviceId:
-          clearApproval ? null : (approvedByDeviceId ?? this.approvedByDeviceId),
-      approvedByName:
-          clearApproval ? null : (approvedByName ?? this.approvedByName),
-      approvalSignature:
-          clearApproval ? null : (approvalSignature ?? this.approvalSignature),
-      signerPublicKey:
-          clearApproval ? null : (signerPublicKey ?? this.signerPublicKey),
-      expiresAt:
-          clearApproval ? null : (expiresAt ?? this.expiresAt),
+      approvedByDeviceId: clearApproval
+          ? null
+          : (approvedByDeviceId ?? this.approvedByDeviceId),
+      approvedByName: clearApproval
+          ? null
+          : (approvedByName ?? this.approvedByName),
+      approvalSignature: clearApproval
+          ? null
+          : (approvalSignature ?? this.approvalSignature),
+      signerPublicKey: clearApproval
+          ? null
+          : (signerPublicKey ?? this.signerPublicKey),
+      expiresAt: clearApproval ? null : (expiresAt ?? this.expiresAt),
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'deviceId': deviceId,
-        'catechistId': catechistId,
-        'publicKey': publicKey,
-        'authorizedByResponsabile': authorizedByResponsabile,
-        'timestampApproval': timestampApproval?.toUtc().toIso8601String(),
-        'deviceName': deviceName,
-        'approvedByDeviceId': approvedByDeviceId,
-        'approvedByName': approvedByName,
-        'approvalSignature': approvalSignature,
-        'signerPublicKey': signerPublicKey,
-        'expiresAt': expiresAt?.toUtc().toIso8601String(),
-      };
+    'deviceId': deviceId,
+    'catechistId': catechistId,
+    'publicKey': publicKey,
+    'authorizedByResponsabile': authorizedByResponsabile,
+    'timestampApproval': timestampApproval?.toUtc().toIso8601String(),
+    'deviceName': deviceName,
+    'approvedByDeviceId': approvedByDeviceId,
+    'approvedByName': approvedByName,
+    'approvalSignature': approvalSignature,
+    'signerPublicKey': signerPublicKey,
+    'expiresAt': expiresAt?.toUtc().toIso8601String(),
+  };
 
   factory AssociatedDevice.fromJson(Map<String, dynamic> json) =>
       AssociatedDevice(
@@ -197,18 +200,18 @@ class QrHandshake {
       (DateTime.now().millisecondsSinceEpoch ~/ 1000 - timestamp).abs() <= 120;
 
   Map<String, dynamic> toJson() => {
-        'deviceId': deviceId,
-        'deviceName': deviceName,
-        'publicKeyHex': publicKeyHex,
-        'timestamp': timestamp,
-      };
+    'deviceId': deviceId,
+    'deviceName': deviceName,
+    'publicKeyHex': publicKeyHex,
+    'timestamp': timestamp,
+  };
 
   factory QrHandshake.fromJson(Map<String, dynamic> json) => QrHandshake(
-        deviceId: json['deviceId'] as String,
-        deviceName: json['deviceName'] as String,
-        publicKeyHex: json['publicKeyHex'] as String,
-        timestamp: json['timestamp'] as int,
-      );
+    deviceId: json['deviceId'] as String,
+    deviceName: json['deviceName'] as String,
+    publicKeyHex: json['publicKeyHex'] as String,
+    timestamp: json['timestamp'] as int,
+  );
 
   String encode() => jsonEncode(toJson());
 

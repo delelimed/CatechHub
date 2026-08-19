@@ -52,7 +52,8 @@ class PercorsiRepository {
   Future<List<String>> savePercorsi(List<String> percorsi) async {
     if (!canManage) {
       throw UnsupportedError(
-          'Solo il Responsabile Catechistico può gestire i percorsi.');
+        'Solo il Responsabile Catechistico può gestire i percorsi.',
+      );
     }
     final cleaned = percorsi
         .map((e) => e.trim())

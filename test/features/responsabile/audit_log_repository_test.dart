@@ -101,7 +101,8 @@ void main() {
         affectedEntityType: AuditLog.entityRagazzo,
       );
 
-      final ragazzoLogs = repo.getAllLogsSync()
+      final ragazzoLogs = repo
+          .getAllLogsSync()
           .where((l) => l.affectedEntityType == AuditLog.entityRagazzo)
           .toList();
       expect(ragazzoLogs.length, 1);

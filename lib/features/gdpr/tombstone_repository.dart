@@ -21,11 +21,10 @@ class TombstoneRepository {
   }
 
   /// True se esiste un tombstone per l'entità [entityId].
-  bool hasTombstone(String entityId) =>
-      _box.keys.any(
-        (k) => LocalDatabase.toStringDynamicMap(_box.get(k))['entityId'] ==
-            entityId,
-      );
+  bool hasTombstone(String entityId) => _box.keys.any(
+    (k) =>
+        LocalDatabase.toStringDynamicMap(_box.get(k))['entityId'] == entityId,
+  );
 
   /// Ritorna il tombstone di [entityId], o null se assente.
   Tombstone? byEntityId(String entityId) {
@@ -43,16 +42,16 @@ class TombstoneRepository {
     final list = _box.keys.map((key) {
       final map = LocalDatabase.toStringDynamicMap(_box.get(key));
       return Tombstone.fromMap(key.toString(), map);
-    }).toList()
-      ..sort((a, b) => b.deletedAt.compareTo(a.deletedAt));
+    }).toList()..sort((a, b) => b.deletedAt.compareTo(a.deletedAt));
     return list;
   }
 
   /// ID dei tombstone correnti (utile per esclusioni durante il sync).
   Set<String> entityIdsTombstoned() {
     return _box.keys
-        .map((key) =>
-            LocalDatabase.toStringDynamicMap(_box.get(key))['entityId'])
+        .map(
+          (key) => LocalDatabase.toStringDynamicMap(_box.get(key))['entityId'],
+        )
         .whereType<String>()
         .toSet();
   }

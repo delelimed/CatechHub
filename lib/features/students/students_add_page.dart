@@ -40,8 +40,7 @@ class AddStudentPage extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<AddStudentPage> createState() =>
-      _AddStudentPageState();
+  ConsumerState<AddStudentPage> createState() => _AddStudentPageState();
 }
 
 class _AddStudentPageState extends ConsumerState<AddStudentPage> {
@@ -65,8 +64,7 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
   String? customExitName;
   String? tempStudentId = LocalDatabase.newId('student');
 
-  bool get isDesktop =>
-      MediaQuery.of(context).size.width > 900;
+  bool get isDesktop => MediaQuery.of(context).size.width > 900;
 
   @override
   void dispose() {
@@ -94,7 +92,9 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
       backgroundColor: isDark ? colorScheme.surface : Colors.grey.shade50,
 
       appBar: AppBar(
-        backgroundColor: isDark ? colorScheme.primaryContainer : const Color(0xFF174A7E),
+        backgroundColor: isDark
+            ? colorScheme.primaryContainer
+            : const Color(0xFF174A7E),
         foregroundColor: isDark ? colorScheme.onPrimaryContainer : Colors.white,
         title: const Text('Nuovo ragazzo'),
       ),
@@ -116,8 +116,20 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
               isDark: isDark,
               colorScheme: colorScheme,
               children: [
-                _Field(name, 'Nome', capitalizeWords: true, isDark: isDark, colorScheme: colorScheme),
-                _Field(surname, 'Cognome', capitalizeWords: true, isDark: isDark, colorScheme: colorScheme),
+                _Field(
+                  name,
+                  'Nome',
+                  capitalizeWords: true,
+                  isDark: isDark,
+                  colorScheme: colorScheme,
+                ),
+                _Field(
+                  surname,
+                  'Cognome',
+                  capitalizeWords: true,
+                  isDark: isDark,
+                  colorScheme: colorScheme,
+                ),
 
                 const SizedBox(height: 10),
 
@@ -141,8 +153,7 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
               children: isDesktop
                   ? [
                       Row(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
                             child: _ParentCard(
@@ -166,7 +177,7 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
                             ),
                           ),
                         ],
-                      )
+                      ),
                     ]
                   : [
                       _ParentCard(
@@ -196,7 +207,13 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
               isDark: isDark,
               colorScheme: colorScheme,
               children: [
-                _Field(studentPhone, 'Cellulare ragazzo', keyboardType: TextInputType.phone, isDark: isDark, colorScheme: colorScheme),
+                _Field(
+                  studentPhone,
+                  'Cellulare ragazzo',
+                  keyboardType: TextInputType.phone,
+                  isDark: isDark,
+                  colorScheme: colorScheme,
+                ),
               ],
             ),
 
@@ -207,7 +224,13 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
               isDark: isDark,
               colorScheme: colorScheme,
               children: [
-                _Field(allergies, 'Allergie', maxLines: 2, isDark: isDark, colorScheme: colorScheme),
+                _Field(
+                  allergies,
+                  'Allergie',
+                  maxLines: 2,
+                  isDark: isDark,
+                  colorScheme: colorScheme,
+                ),
                 const SizedBox(height: 16),
                 _ExitsSelector(
                   selectedExits: selectedExits,
@@ -248,17 +271,19 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-                  foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 14),
+                  backgroundColor: isDark
+                      ? colorScheme.primary
+                      : const Color(0xFF174A7E),
+                  foregroundColor: isDark
+                      ? colorScheme.onPrimary
+                      : Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 onPressed: () async {
                   if (birthDate == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content:
-                            Text('Seleziona la data di nascita'),
+                        content: Text('Seleziona la data di nascita'),
                       ),
                     );
                     return;
@@ -270,7 +295,9 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
 
                   String? autonomousExits;
                   if (selectedExits.isNotEmpty) {
-                    if (selectedExits.contains('altro') && customExitName != null && customExitName!.isNotEmpty) {
+                    if (selectedExits.contains('altro') &&
+                        customExitName != null &&
+                        customExitName!.isNotEmpty) {
                       autonomousExits = 'altro:$customExitName';
                     } else if (selectedExits.length == 1) {
                       autonomousExits = selectedExits.first;
@@ -279,8 +306,8 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
                     }
                   }
 
-                  final currentClass = widget.classId != null &&
-                          widget.classId!.isNotEmpty
+                  final currentClass =
+                      widget.classId != null && widget.classId!.isNotEmpty
                       ? SchoolClass(
                           id: widget.classId!,
                           name: widget.classLabel ?? '',
@@ -304,7 +331,9 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
                     fatherSurname: fatherSurname.text,
                     fatherPhone: fatherPhone.text,
                     studentPhone: studentPhone.text,
-                    allergies: allergies.text.isNotEmpty ? allergies.text : null,
+                    allergies: allergies.text.isNotEmpty
+                        ? allergies.text
+                        : null,
                     autonomousExits: autonomousExits,
                     notes: notes.text,
                   );
@@ -327,9 +356,9 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
                     }
                   } catch (e) {
                     if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Errore: $e')),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text('Errore: $e')));
                   }
                 },
                 child: const Text('Salva ragazzo'),
@@ -367,10 +396,7 @@ class _HeaderCard extends StatelessWidget {
                   colorScheme.surfaceContainer,
                   colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                 ]
-              : [
-                  Colors.white,
-                  Colors.blue.shade50.withValues(alpha: 0.5),
-                ],
+              : [Colors.white, Colors.blue.shade50.withValues(alpha: 0.5)],
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
@@ -380,13 +406,16 @@ class _HeaderCard extends StatelessWidget {
                 : Colors.black.withValues(alpha: 0.05),
             blurRadius: 16,
             offset: const Offset(0, 10),
-          )
+          ),
         ],
       ),
       child: Row(
         children: [
-          Icon(Icons.person_add_alt_1,
-              color: isDark ? colorScheme.primary : const Color(0xFF174A7E), size: 30),
+          Icon(
+            Icons.person_add_alt_1,
+            color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+            size: 30,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -397,7 +426,9 @@ class _HeaderCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                    color: isDark
+                        ? colorScheme.primary
+                        : const Color(0xFF174A7E),
                   ),
                 ),
                 if (classLabel != null && classLabel!.trim().isNotEmpty)
@@ -453,7 +484,7 @@ class _Section extends StatelessWidget {
                 : Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 6),
-          )
+          ),
         ],
       ),
       child: Column(
@@ -499,9 +530,15 @@ class _ParentCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.grey.shade50,
+        color: isDark
+            ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
+            : Colors.grey.shade50,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade200),
+        border: Border.all(
+          color: isDark
+              ? colorScheme.outline.withValues(alpha: 0.2)
+              : Colors.grey.shade200,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -514,9 +551,27 @@ class _ParentCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          _Field(name, 'Nome', capitalizeWords: true, isDark: isDark, colorScheme: colorScheme),
-          _Field(surname, 'Cognome', capitalizeWords: true, isDark: isDark, colorScheme: colorScheme),
-          _Field(phone, 'Telefono', keyboardType: TextInputType.phone, isDark: isDark, colorScheme: colorScheme),
+          _Field(
+            name,
+            'Nome',
+            capitalizeWords: true,
+            isDark: isDark,
+            colorScheme: colorScheme,
+          ),
+          _Field(
+            surname,
+            'Cognome',
+            capitalizeWords: true,
+            isDark: isDark,
+            colorScheme: colorScheme,
+          ),
+          _Field(
+            phone,
+            'Telefono',
+            keyboardType: TextInputType.phone,
+            isDark: isDark,
+            colorScheme: colorScheme,
+          ),
         ],
       ),
     );
@@ -559,7 +614,9 @@ class _Field extends StatelessWidget {
         decoration: InputDecoration(
           labelText: label,
           filled: true,
-          fillColor: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.2) : Colors.grey.shade50,
+          fillColor: isDark
+              ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.2)
+              : Colors.grey.shade50,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
             borderSide: BorderSide.none,
@@ -578,7 +635,11 @@ class _NotesField extends StatelessWidget {
   final bool isDark;
   final ColorScheme colorScheme;
 
-  const _NotesField(this.controller, {required this.isDark, required this.colorScheme});
+  const _NotesField(
+    this.controller, {
+    required this.isDark,
+    required this.colorScheme,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -589,7 +650,9 @@ class _NotesField extends StatelessWidget {
         labelText: 'Note',
         alignLabelWithHint: true,
         filled: true,
-        fillColor: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.2) : Colors.grey.shade50,
+        fillColor: isDark
+            ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.2)
+            : Colors.grey.shade50,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
@@ -616,8 +679,7 @@ class _ExitsSelector extends StatefulWidget {
   });
 
   @override
-  State<_ExitsSelector> createState() =>
-      _ExitsSelectorState();
+  State<_ExitsSelector> createState() => _ExitsSelectorState();
 }
 
 class _ExitsSelectorState extends State<_ExitsSelector> {
@@ -648,7 +710,10 @@ class _ExitsSelectorState extends State<_ExitsSelector> {
       children: [
         Text(
           'Chi accompagna l\'uscita?',
-          style: TextStyle(fontWeight: FontWeight.w600, color: widget.isDark ? widget.colorScheme.onSurface : null),
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: widget.isDark ? widget.colorScheme.onSurface : null,
+          ),
         ),
         const SizedBox(height: 12),
         Wrap(
@@ -713,7 +778,11 @@ class _ExitsSelectorState extends State<_ExitsSelector> {
             decoration: InputDecoration(
               labelText: 'Specifica chi accompagna',
               filled: true,
-              fillColor: widget.isDark ? widget.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2) : Colors.grey.shade50,
+              fillColor: widget.isDark
+                  ? widget.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.2,
+                    )
+                  : Colors.grey.shade50,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide.none,
@@ -751,10 +820,14 @@ class _ExitChip extends StatelessWidget {
       label: Text(label),
       selected: selected,
       onSelected: onChanged,
-      backgroundColor: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.grey.shade100,
+      backgroundColor: isDark
+          ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
+          : Colors.grey.shade100,
       selectedColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
       labelStyle: TextStyle(
-        color: selected ? Colors.white : (isDark ? colorScheme.onSurface : Colors.black),
+        color: selected
+            ? Colors.white
+            : (isDark ? colorScheme.onSurface : Colors.black),
         fontWeight: FontWeight.w500,
       ),
     );
@@ -794,20 +867,31 @@ class _DatePicker extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.2) : Colors.grey.shade50,
+          color: isDark
+              ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.2)
+              : Colors.grey.shade50,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade300),
+          border: Border.all(
+            color: isDark
+                ? colorScheme.outline.withValues(alpha: 0.2)
+                : Colors.grey.shade300,
+          ),
         ),
         child: Row(
           children: [
-            Icon(Icons.calendar_month,
-                color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+            Icon(
+              Icons.calendar_month,
+              color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+            ),
             const SizedBox(width: 10),
             Text(
               date == null
                   ? 'Seleziona data nascita'
                   : '${date!.day}/${date!.month}/${date!.year}',
-              style: TextStyle(fontWeight: FontWeight.w500, color: isDark ? colorScheme.onSurface : null),
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: isDark ? colorScheme.onSurface : null,
+              ),
             ),
           ],
         ),

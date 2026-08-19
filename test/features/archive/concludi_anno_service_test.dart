@@ -24,11 +24,14 @@ import 'package:CatechHub/shared/models/parish_config.dart';
 import 'package:CatechHub/shared/models/student_model.dart';
 import 'package:CatechHub/shared/models/user_role.dart';
 
-Student _student(String id, String name,
-    {String? classId,
-    String stato = 'ATTIVO',
-    String anno = '2026-2027',
-    List<Sacrament> sacraments = const []}) {
+Student _student(
+  String id,
+  String name, {
+  String? classId,
+  String stato = 'ATTIVO',
+  String anno = '2026-2027',
+  List<Sacrament> sacraments = const [],
+}) {
   return Student(
     id: id,
     name: name,
@@ -90,28 +93,33 @@ void main() {
   }
 
   group('ConcludiAnnoService — guardia ruolo', () {
-    test('un Catechista non può concludere l\'anno (UnsupportedError)',
-        () async {
-      await UserRole.setCurrent(UserRole.catechista);
-      await setupConfig('2026-2027');
+    test(
+      'un Catechista non può concludere l\'anno (UnsupportedError)',
+      () async {
+        await UserRole.setCurrent(UserRole.catechista);
+        await setupConfig('2026-2027');
 
-      expect(
-        () => ConcludiAnnoService().concludiAnno(),
-        throwsUnsupportedError,
-      );
-    });
+        expect(
+          () => ConcludiAnnoService().concludiAnno(),
+          throwsUnsupportedError,
+        );
+      },
+    );
 
     test('un Catechista non può promuovere singolarmente', () async {
       await UserRole.setCurrent(UserRole.catechista);
       final s = _student('s1', 'Luca', classId: 'c1');
 
       expect(
-        () => ConcludiAnnoService().promuoviStudente(s, SchoolClass(
-          id: 'c1',
-          name: 'Comunione A',
-          studentIds: ['s1'],
-          catechistIds: [],
-        )),
+        () => ConcludiAnnoService().promuoviStudente(
+          s,
+          SchoolClass(
+            id: 'c1',
+            name: 'Comunione A',
+            studentIds: ['s1'],
+            catechistIds: [],
+          ),
+        ),
         throwsUnsupportedError,
       );
     });
@@ -123,21 +131,28 @@ void main() {
       await setupConfig('2026-2027');
 
       final studentsRepo = StudentsRepository();
-      await studentsRepo.addStudent(_student('s1', 'Luca',
+      await studentsRepo.addStudent(
+        _student(
+          's1',
+          'Luca',
           classId: 'c1',
-          sacraments: const [Sacrament.battesimo, Sacrament.comunione]));
+          sacraments: const [Sacrament.battesimo, Sacrament.comunione],
+        ),
+      );
       await studentsRepo.addStudent(_student('s2', 'Marco', classId: 'c1'));
 
-      await ClassesRepository().addClass(SchoolClass(
-        id: 'c1',
-        name: 'Comunione A',
-        studentIds: ['s1', 's2'],
-        catechistIds: ['cat_1'],
-        catechistRoles: const {'cat_1': 'TITOLARE'},
-        percorso: 'Prima Comunione',
-        livello: 1,
-        annoCatechistico: '2026-2027',
-      ));
+      await ClassesRepository().addClass(
+        SchoolClass(
+          id: 'c1',
+          name: 'Comunione A',
+          studentIds: ['s1', 's2'],
+          catechistIds: ['cat_1'],
+          catechistRoles: const {'cat_1': 'TITOLARE'},
+          percorso: 'Prima Comunione',
+          livello: 1,
+          annoCatechistico: '2026-2027',
+        ),
+      );
 
       // Presenze: s1 presente 2/2, s2 assente all'ultimo incontro.
       await LocalDatabase.attendance().put('att_1', {
@@ -166,67 +181,78 @@ void main() {
       expect(s1.academicYear, '2026-2027');
       expect(s1.className, 'Comunione A');
       expect(s1.catechistId, 'cat_1');
-      expect(s1.sacramentsReceived,
-          containsAll([Sacrament.battesimo, Sacrament.comunione]));
+      expect(
+        s1.sacramentsReceived,
+        containsAll([Sacrament.battesimo, Sacrament.comunione]),
+      );
       expect(s1.attendancePercentage, 100);
 
       final s2 = stored.firstWhere((r) => r.studentId == 's2');
       expect(s2.attendancePercentage, 50);
 
       // La classe è stata promossa al livello successivo.
-      final promoted = ClassesRepository()
-          .getClassesSync()
-          .firstWhere((c) => c.id == 'c1');
+      final promoted = ClassesRepository().getClassesSync().firstWhere(
+        (c) => c.id == 'c1',
+      );
       expect(promoted.livello, 2);
       expect(promoted.annoCatechistico, '2027-2028');
 
       // L'anno corrente è stato aggiornato.
       final config = LocalDatabase.parishConfig().get(ParishConfig.storageKey);
       final parsed = ParishConfig.fromMap(
-          LocalDatabase.toStringDynamicMap(config));
+        LocalDatabase.toStringDynamicMap(config),
+      );
       expect(parsed.annoCatechisticoCorrente, '2027-2028');
 
       // Gli studenti promossi hanno l'anno di iscrizione aggiornato.
-      final updatedS1 = studentsRepo.getAllStudentsSync()
-          .firstWhere((s) => s.id == 's1');
+      final updatedS1 = (await studentsRepo.getAllStudentsSync()).firstWhere(
+        (s) => s.id == 's1',
+      );
       expect(updatedS1.annoIscrizione, '2027-2028');
     });
 
-    test('è idempotente: uno snapshot già esistente non viene duplicato',
-        () async {
-      await UserRole.setCurrent(UserRole.responsabile);
-      await setupConfig('2026-2027');
+    test(
+      'è idempotente: uno snapshot già esistente non viene duplicato',
+      () async {
+        await UserRole.setCurrent(UserRole.responsabile);
+        await setupConfig('2026-2027');
 
-      await StudentsRepository()
-          .addStudent(_student('s1', 'Luca', classId: 'c1'));
-      await ClassesRepository().addClass(SchoolClass(
-        id: 'c1',
-        name: 'Comunione A',
-        studentIds: ['s1'],
-        catechistIds: ['cat_1'],
-        percorso: 'Prima Comunione',
-        livello: 1,
-        annoCatechistico: '2026-2027',
-      ));
+        await StudentsRepository().addStudent(
+          _student('s1', 'Luca', classId: 'c1'),
+        );
+        await ClassesRepository().addClass(
+          SchoolClass(
+            id: 'c1',
+            name: 'Comunione A',
+            studentIds: ['s1'],
+            catechistIds: ['cat_1'],
+            percorso: 'Prima Comunione',
+            livello: 1,
+            annoCatechistico: '2026-2027',
+          ),
+        );
 
-      // Snapshot già presente per lo studente/anno/classe: la chiusura non
-      // deve crearlo di nuovo (guardia anti-duplicato del servizio).
-      final repo = HistoricalRecordRepository();
-      await repo.addRecord(HistoricalRecord(
-        recordId: '',
-        studentId: 's1',
-        academicYear: '2026-2027',
-        classId: 'c1',
-        className: 'Comunione A',
-      ));
+        // Snapshot già presente per lo studente/anno/classe: la chiusura non
+        // deve crearlo di nuovo (guardia anti-duplicato del servizio).
+        final repo = HistoricalRecordRepository();
+        await repo.addRecord(
+          HistoricalRecord(
+            recordId: '',
+            studentId: 's1',
+            academicYear: '2026-2027',
+            classId: 'c1',
+            className: 'Comunione A',
+          ),
+        );
 
-      final result = await ConcludiAnnoService().concludiAnno(
-        nuovoAnno: '2027-2028',
-      );
+        final result = await ConcludiAnnoService().concludiAnno(
+          nuovoAnno: '2027-2028',
+        );
 
-      expect(result.records, hasLength(0));
-      expect(repo.count, 1);
-    });
+        expect(result.records, hasLength(0));
+        expect(repo.count, 1);
+      },
+    );
 
     test('lancia StateError se l\'anno corrente non è configurato', () async {
       await UserRole.setCurrent(UserRole.responsabile);
@@ -240,77 +266,89 @@ void main() {
   });
 
   group('ConcludiAnnoService.promuoviStudente', () {
-    test('archivia l\'anno corrente e aggiorna l\'anno di iscrizione',
-        () async {
-      await UserRole.setCurrent(UserRole.responsabile);
-      await setupConfig('2026-2027');
+    test(
+      'archivia l\'anno corrente e aggiorna l\'anno di iscrizione',
+      () async {
+        await UserRole.setCurrent(UserRole.responsabile);
+        await setupConfig('2026-2027');
 
-      await StudentsRepository()
-          .addStudent(_student('s1', 'Luca', classId: 'c1'));
-      final s = StudentsRepository()
-          .getAllStudentsSync()
-          .firstWhere((st) => st.id == 's1');
-      final cls = SchoolClass(
-        id: 'c1',
-        name: 'Comunione A',
-        studentIds: ['s1'],
-        catechistIds: ['cat_1'],
-        percorso: 'Prima Comunione',
-        livello: 1,
-        annoCatechistico: '2026-2027',
-      );
+        await StudentsRepository().addStudent(
+          _student('s1', 'Luca', classId: 'c1'),
+        );
+        final s = (await StudentsRepository().getAllStudentsSync()).firstWhere(
+          (st) => st.id == 's1',
+        );
+        final cls = SchoolClass(
+          id: 'c1',
+          name: 'Comunione A',
+          studentIds: ['s1'],
+          catechistIds: ['cat_1'],
+          percorso: 'Prima Comunione',
+          livello: 1,
+          annoCatechistico: '2026-2027',
+        );
 
-      final record = await ConcludiAnnoService()
-          .promuoviStudente(s, cls, nuovoAnno: '2027-2028');
+        final record = await ConcludiAnnoService().promuoviStudente(
+          s,
+          cls,
+          nuovoAnno: '2027-2028',
+        );
 
-      expect(record.academicYear, '2026-2027');
-      expect(HistoricalRecordRepository().count, 1);
+        expect(record.academicYear, '2026-2027');
+        expect(HistoricalRecordRepository().count, 1);
 
-      final updated = StudentsRepository()
-          .getAllStudentsSync()
-          .firstWhere((st) => st.id == 's1');
-      expect(updated.annoIscrizione, '2027-2028');
-    });
+        final updated = (await StudentsRepository().getAllStudentsSync())
+            .firstWhere((st) => st.id == 's1');
+        expect(updated.annoIscrizione, '2027-2028');
+      },
+    );
   });
 
   group('ConcludiAnnoService.archiviaStudente', () {
-    test('archivia ad anno concluso: snapshot + stato + rimozione dalla classe',
-        () async {
-      await UserRole.setCurrent(UserRole.responsabile);
-      await setupConfig('2026-2027');
+    test(
+      'archivia ad anno concluso: snapshot + stato + rimozione dalla classe',
+      () async {
+        await UserRole.setCurrent(UserRole.responsabile);
+        await setupConfig('2026-2027');
 
-      final studentsRepo = StudentsRepository();
-      await studentsRepo.addStudent(_student('s1', 'Luca', classId: 'c1'));
-      await ClassesRepository().addClass(SchoolClass(
-        id: 'c1',
-        name: 'Comunione A',
-        studentIds: ['s1'],
-        catechistIds: [],
-        percorso: 'Prima Comunione',
-        livello: 1,
-        annoCatechistico: '2026-2027',
-      ));
+        final studentsRepo = StudentsRepository();
+        await studentsRepo.addStudent(_student('s1', 'Luca', classId: 'c1'));
+        await ClassesRepository().addClass(
+          SchoolClass(
+            id: 'c1',
+            name: 'Comunione A',
+            studentIds: ['s1'],
+            catechistIds: [],
+            percorso: 'Prima Comunione',
+            livello: 1,
+            annoCatechistico: '2026-2027',
+          ),
+        );
 
-      final cls = ClassesRepository()
-          .getClassesSync()
-          .firstWhere((c) => c.id == 'c1');
-      final s = studentsRepo.getAllStudentsSync().firstWhere((st) => st.id == 's1');
+        final cls = ClassesRepository().getClassesSync().firstWhere(
+          (c) => c.id == 'c1',
+        );
+        final s = (await studentsRepo.getAllStudentsSync()).firstWhere(
+          (st) => st.id == 's1',
+        );
 
-      final record = await ConcludiAnnoService().archiviaStudente(s, cls);
+        final record = await ConcludiAnnoService().archiviaStudente(s, cls);
 
-      expect(record.academicYear, '2026-2027');
-      expect(HistoricalRecordRepository().count, 1);
+        expect(record.academicYear, '2026-2027');
+        expect(HistoricalRecordRepository().count, 1);
 
-      final archived =
-          studentsRepo.getAllStudentsSync().firstWhere((st) => st.id == 's1');
-      expect(archived.statoPercorso, ConcludiAnnoService.statoArchiviato);
-      expect(archived.classId, isNull);
+        final archived = (await studentsRepo.getAllStudentsSync()).firstWhere(
+          (st) => st.id == 's1',
+        );
+        expect(archived.statoPercorso, ConcludiAnnoService.statoArchiviato);
+        expect(archived.classId, isNull);
 
-      // Il ragazzo è stato rimosso dalla classe attiva.
-      final updatedCls = ClassesRepository()
-          .getClassesSync()
-          .firstWhere((c) => c.id == 'c1');
-      expect(updatedCls.studentIds, isNot(contains('s1')));
-    });
+        // Il ragazzo è stato rimosso dalla classe attiva.
+        final updatedCls = ClassesRepository().getClassesSync().firstWhere(
+          (c) => c.id == 'c1',
+        );
+        expect(updatedCls.studentIds, isNot(contains('s1')));
+      },
+    );
   });
 }

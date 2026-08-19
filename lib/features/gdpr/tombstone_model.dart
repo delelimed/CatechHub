@@ -55,7 +55,8 @@ class Tombstone {
       id: id,
       entityType: data['entityType'] ?? '',
       entityId: data['entityId'] ?? '',
-      deletedAt: DateTime.tryParse(data['deletedAt']?.toString() ?? '') ??
+      deletedAt:
+          DateTime.tryParse(data['deletedAt']?.toString() ?? '') ??
           DateTime.now().toUtc(),
       executedBy: data['executedBy'] ?? '',
       executedByCatechistId: data['executedByCatechistId'] ?? '',
@@ -65,12 +66,12 @@ class Tombstone {
   }
 
   Map<String, dynamic> toMap() => {
-        'entityType': entityType,
-        'entityId': entityId,
-        'deletedAt': deletedAt.toUtc().toIso8601String(),
-        'executedBy': executedBy,
-        'executedByCatechistId': executedByCatechistId,
-        'signature': signature,
-        'signerDeviceId': signerDeviceId,
-      };
+    'entityType': entityType,
+    'entityId': entityId,
+    'deletedAt': deletedAt.toUtc().toIso8601String(),
+    'executedBy': executedBy,
+    'executedByCatechistId': executedByCatechistId,
+    'signature': signature,
+    'signerDeviceId': signerDeviceId,
+  };
 }

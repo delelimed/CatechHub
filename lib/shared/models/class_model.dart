@@ -135,8 +135,8 @@ class SchoolClass {
     this.roomSlots = const [],
     DateTime? createdAt,
     DateTime? updatedAt,
-  })  : createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now();
+  }) : createdAt = createdAt ?? DateTime.now(),
+       updatedAt = updatedAt ?? DateTime.now();
 
   SchoolClass copyWith({
     String? id,
@@ -171,8 +171,10 @@ class SchoolClass {
       creatorId: creatorId ?? this.creatorId,
       creatorName: creatorName ?? this.creatorName,
       creatorCatechistId: creatorCatechistId ?? this.creatorCatechistId,
-      associatedCatechistIds: associatedCatechistIds ?? this.associatedCatechistIds,
-      catechistDeviceCounts: catechistDeviceCounts ?? this.catechistDeviceCounts,
+      associatedCatechistIds:
+          associatedCatechistIds ?? this.associatedCatechistIds,
+      catechistDeviceCounts:
+          catechistDeviceCounts ?? this.catechistDeviceCounts,
       percorso: percorso ?? this.percorso,
       livello: livello ?? this.livello,
       annoCatechistico: annoCatechistico ?? this.annoCatechistico,
@@ -204,17 +206,23 @@ class SchoolClass {
       associatedCatechistIds: (data['associatedCatechistIds'] as List? ?? [])
           .map((e) => e.toString())
           .toList(),
-      catechistDeviceCounts: (data['catechistDeviceCounts'] as Map? ?? {})
-          .map((k, v) => MapEntry(k.toString(), (v as num).toInt())),
+      catechistDeviceCounts: (data['catechistDeviceCounts'] as Map? ?? {}).map(
+        (k, v) => MapEntry(k.toString(), (v as num).toInt()),
+      ),
       percorso: data['percorso'] ?? '',
       livello: (data['livello'] as num?)?.toInt() ?? 1,
       annoCatechistico: data['annoCatechistico'] ?? '',
       archived: data['archived'] == true,
-      catechistRoles: (data['catechistRoles'] as Map? ?? {})
-          .map((k, v) => MapEntry(k.toString(), v.toString())),
+      catechistRoles: (data['catechistRoles'] as Map? ?? {}).map(
+        (k, v) => MapEntry(k.toString(), v.toString()),
+      ),
       roomSlots: _parseRoomSlots(data['roomSlots']),
-      createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(data['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(data['updatedAt']?.toString() ?? '') ??
+          DateTime.now(),
     );
   }
 

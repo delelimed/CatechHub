@@ -5,17 +5,16 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:developer' as dev;
 import 'dart:math';
 
-import 'package:crypto/crypto.dart' show sha256;
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:local_auth_android/local_auth_android.dart';
 import 'package:local_auth_darwin/local_auth_darwin.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/crypto_utils.dart';
 import '../storage/local_database.dart';
 import '../../features/sync/p2p/p2p_security_service.dart';
 import '../../shared/models/class_model.dart';
@@ -84,7 +83,7 @@ class AuthService {
       salt = _generateUuidV4();
       box.put(_catechistSaltKey, salt);
     }
-    final hash = sha256.convert(utf8.encode('$normalized:$salt')).toString();
+    final hash = sha256HexSync('$normalized:$salt');
     final newId = 'cat_${hash.substring(0, 16)}';
     box.put(_catechistIdKey, newId);
     return newId;
@@ -107,10 +106,8 @@ class AuthService {
   static String normalizeCatechistName(String value) {
     final lower = value.toLowerCase();
     // Rimuove gli accenti (à→a, è→e, ...) così "Marìo" == "Mario".
-    const withAccents =
-        'àáâãäåèéêëìíîïòóôõöùúûüñç';
-    const withoutAccents =
-        'aaaaaaeeeeiiiiooooouuuunc';
+    const withAccents = 'àáâãäåèéêëìíîïòóôõöùúûüñç';
+    const withoutAccents = 'aaaaaaeeeeiiiiooooouuuunc';
     final buffer = StringBuffer();
     for (final rune in lower.runes) {
       final ch = String.fromCharCode(rune);
@@ -213,7 +210,8 @@ class AuthService {
 
       // Se il device supporta biometria E (ha biometrie registrate O ha lockscreen)
       // canCheckBiometrics torna true anche se ci sono solo PIN/Pattern (Android 10+)
-      return isDeviceSupported && (canCheckBiometrics || availableBiometrics.isNotEmpty);
+      return isDeviceSupported &&
+          (canCheckBiometrics || availableBiometrics.isNotEmpty);
     } on PlatformException catch (e) {
       dev.log('Errore canAuthenticate: ${e.message}');
       return false;
@@ -318,7 +316,9 @@ class AuthService {
 
             // 3. Marca come completato
             await prefs.setBool(legacyCleanedKey, true);
-            dev.log('Migrazione completata: legacy PIN rimosso da Hive auth box');
+            dev.log(
+              'Migrazione completata: legacy PIN rimosso da Hive auth box',
+            );
           } catch (e) {
             dev.log('Errore durante pulizia legacy PIN (non bloccante): $e');
             // Non bloccare il login se la pulizia fallisce
@@ -331,7 +331,9 @@ class AuthService {
       dev.log('Autenticazione fallita o annullata');
       return false;
     } on PlatformException catch (e) {
-      dev.log('Errore PlatformException authenticate: ${e.code} - ${e.message}');
+      dev.log(
+        'Errore PlatformException authenticate: ${e.code} - ${e.message}',
+      );
       // Codici comuni: NotEnrolled, NotAvailable, LockedOut, PermanentlyLockedOut
       return false;
     } on TimeoutException {
@@ -392,12 +394,16 @@ class AuthService {
         isResponsabile
             ? 'RESPONSABILE'
             : createClass
-                ? 'NORMAL'
-                : 'REPLICATED_PEER',
+            ? 'NORMAL'
+            : 'REPLICATED_PEER',
       );
       await _box.put(
         'setup_mode',
-        isResponsabile ? 'responsabile' : createClass ? 'create' : 'join',
+        isResponsabile
+            ? 'responsabile'
+            : createClass
+            ? 'create'
+            : 'join',
       );
       await UserRole.setCurrent(role);
 

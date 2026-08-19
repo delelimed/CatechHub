@@ -70,8 +70,9 @@ class _OnboardingClassesPageState extends ConsumerState<OnboardingClassesPage> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor:
-                  isDark ? colorScheme.primary : const Color(0xFF174A7E),
+              backgroundColor: isDark
+                  ? colorScheme.primary
+                  : const Color(0xFF174A7E),
               foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
             ),
             onPressed: () => Navigator.of(dialogContext).pop(controller.text),
@@ -109,9 +110,9 @@ class _OnboardingClassesPageState extends ConsumerState<OnboardingClassesPage> {
         await ref.read(currentClassProvider.notifier).setClass(classId);
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Classe "$trimmed" creata.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Classe "$trimmed" creata.')));
       }
     } catch (e) {
       if (mounted) {
@@ -437,8 +438,8 @@ class _ClassCard extends StatelessWidget {
             color: isSelected
                 ? primaryColor
                 : (isDark
-                    ? colorScheme.outline.withValues(alpha: 0.2)
-                    : Colors.blue.shade100),
+                      ? colorScheme.outline.withValues(alpha: 0.2)
+                      : Colors.blue.shade100),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -448,7 +449,9 @@ class _ClassCard extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: isSelected ? primaryColor : primaryColor.withValues(alpha: 0.1),
+                color: isSelected
+                    ? primaryColor
+                    : primaryColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
@@ -466,7 +469,9 @@ class _ClassCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
+                      color: isDark
+                          ? colorScheme.onSurface
+                          : const Color(0xFF174A7E),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -475,7 +480,9 @@ class _ClassCard extends StatelessWidget {
                     '${schoolClass.catechistIds.length} catechist${schoolClass.catechistIds.length == 1 ? 'a' : 'i'}',
                     style: TextStyle(
                       fontSize: 12,
-                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                      color: isDark
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
                     ),
                   ),
                 ],
@@ -550,7 +557,11 @@ class _ActionButton extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: filled ? Colors.white : (isDark ? colorScheme.onSurface : const Color(0xFF174A7E)),
+                  color: filled
+                      ? Colors.white
+                      : (isDark
+                            ? colorScheme.onSurface
+                            : const Color(0xFF174A7E)),
                 ),
               ),
               const SizedBox(height: 2),
@@ -578,7 +589,9 @@ class _ActionButton extends StatelessWidget {
         else
           Icon(
             Icons.chevron_right_rounded,
-            color: filled ? Colors.white.withValues(alpha: 0.85) : Colors.grey.shade400,
+            color: filled
+                ? Colors.white.withValues(alpha: 0.85)
+                : Colors.grey.shade400,
           ),
       ],
     );
@@ -605,20 +618,20 @@ class _ActionButton extends StatelessWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: loading ? null : onTap,
-        child: Container(
-          height: 64,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: isDark ? colorScheme.surfaceContainer : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isDark
-                  ? colorScheme.outline.withValues(alpha: 0.2)
-                  : Colors.blue.shade100,
-            ),
+      child: Container(
+        height: 64,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: isDark ? colorScheme.surfaceContainer : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isDark
+                ? colorScheme.outline.withValues(alpha: 0.2)
+                : Colors.blue.shade100,
           ),
-          child: content,
         ),
+        child: content,
+      ),
     );
   }
 }

@@ -65,7 +65,8 @@ class PassaggioAnnoService {
 
     final allClasses = classesRepo.getClassesSync();
     final config = _currentConfig();
-    final targetAnno = nuovoAnno ?? annoSuccessivo(config.annoCatechisticoCorrente);
+    final targetAnno =
+        nuovoAnno ?? annoSuccessivo(config.annoCatechisticoCorrente);
     if (targetAnno.isEmpty || config.annoCatechisticoCorrente.trim().isEmpty) {
       throw StateError('Configura prima l\'anno catechistico corrente.');
     }
@@ -82,7 +83,7 @@ class PassaggioAnnoService {
     });
 
     for (final cls in candidates) {
-      final studenti = studentiRepo.getStudentsByClassSync(cls.id);
+      final studenti = await studentiRepo.getStudentsByClassSync(cls.id);
       var ritirati = 0;
       var promossi = 0;
 
@@ -121,12 +122,14 @@ class PassaggioAnnoService {
         timestamp: now,
       );
 
-      results.add(PassaggioClasseResult(
-        source: cls,
-        promoted: promossa,
-        promossi: promossi,
-        ritirati: ritirati,
-      ));
+      results.add(
+        PassaggioClasseResult(
+          source: cls,
+          promoted: promossa,
+          promossi: promossi,
+          ritirati: ritirati,
+        ),
+      );
     }
 
     // Aggiorna l'anno catechistico corrente nella configurazione locale.
@@ -147,7 +150,10 @@ class PassaggioAnnoService {
 
   Future<void> _salvaAnno(String anno) async {
     final updated = _currentConfig().copyWith(annoCatechisticoCorrente: anno);
-    await LocalDatabase.parishConfig().put(ParishConfig.storageKey, updated.toMap());
+    await LocalDatabase.parishConfig().put(
+      ParishConfig.storageKey,
+      updated.toMap(),
+    );
     await LocalDatabase.parishConfig().flush();
   }
 }

@@ -17,42 +17,44 @@ void main() {
   });
 
   group('FieldEncryptionService', () {
-    test('cifra e decifra in modo reversibile', () {
+    test('cifra e decifra in modo reversibile', () async {
       const piano = 'Allergia alle arachidi, iniezione EpiPen';
-      final cifrato = FieldEncryptionService.encrypt(piano);
+      final cifrato = await FieldEncryptionService.encrypt(piano);
       expect(cifrato, isNotNull);
       expect(cifrato, startsWith('cieI1:'));
       expect(cifrato, isNot(contains(piano)));
-      expect(FieldEncryptionService.decrypt(cifrato), piano);
+      expect(await FieldEncryptionService.decrypt(cifrato), piano);
     });
 
-    test('input nulli o vuoti restituiscono null', () {
-      expect(FieldEncryptionService.encrypt(null), isNull);
-      expect(FieldEncryptionService.encrypt('   '), isNull);
-      expect(FieldEncryptionService.decrypt(null), isNull);
+    test('input nulli o vuoti restituiscono null', () async {
+      expect(await FieldEncryptionService.encrypt(null), isNull);
+      expect(await FieldEncryptionService.encrypt('   '), isNull);
+      expect(await FieldEncryptionService.decrypt(null), isNull);
     });
 
-    test('decrypt lascia invariato un valore non cifrato (fallback)', () {
-      expect(FieldEncryptionService.decrypt('testo in chiaro'),
-          'testo in chiaro');
+    test('decrypt lascia invariato un valore non cifrato (fallback)', () async {
+      expect(
+        await FieldEncryptionService.decrypt('testo in chiaro'),
+        'testo in chiaro',
+      );
     });
 
-    test('encrypt è idempotente su un valore già cifrato', () {
-      final cifrato = FieldEncryptionService.encrypt('nota sensibile');
-      expect(FieldEncryptionService.encrypt(cifrato), cifrato);
+    test('encrypt è idempotente su un valore già cifrato', () async {
+      final cifrato = await FieldEncryptionService.encrypt('nota sensibile');
+      expect(await FieldEncryptionService.encrypt(cifrato), cifrato);
     });
 
-    test('decrypt non fallisce su dati corrotti (graceful fallback)', () {
+    test('decrypt non fallisce su dati corrotti (graceful fallback)', () async {
       // Valore con prefisso ma base64 corrotto: deve tornare il valore grezzo.
       final corrupted = 'cieI1:%%%non-base64%%%';
-      expect(FieldEncryptionService.decrypt(corrupted), corrupted);
+      expect(await FieldEncryptionService.decrypt(corrupted), corrupted);
     });
 
-    test('chiavi diverse producono un ciphertext non decifrabile', () {
+    test('chiavi diverse producono un ciphertext non decifrabile', () async {
       final plain = 'Nota riservata';
-      final encA = FieldEncryptionService.encrypt(plain);
+      final encA = await FieldEncryptionService.encrypt(plain);
       FieldEncryptionService.debugSecretOverride = 'altro-dispositivo';
-      final decB = FieldEncryptionService.decrypt(encA);
+      final decB = await FieldEncryptionService.decrypt(encA);
       // Il dispositivo B, con chiave diversa, non può decifrare: fallback grezzo.
       expect(decB, isNot(plain));
     });

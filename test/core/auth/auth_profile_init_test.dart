@@ -101,7 +101,9 @@ class StudentFormValidator {
   /// Accetta solo cifre, spazi, prefissi internazionali e il + iniziale.
   static void validateMotherPhone(String phone) {
     if (phone.trim().isEmpty) {
-      throw const FormException('Il numero di telefono della madre e obbligatorio');
+      throw const FormException(
+        'Il numero di telefono della madre e obbligatorio',
+      );
     }
     if (!_isValidPhoneFormat(phone)) {
       throw const FormException(
@@ -114,7 +116,9 @@ class StudentFormValidator {
   /// Valida il numero di telefono del padre.
   static void validateFatherPhone(String phone) {
     if (phone.trim().isEmpty) {
-      throw const FormException('Il numero di telefono del padre e obbligatorio');
+      throw const FormException(
+        'Il numero di telefono del padre e obbligatorio',
+      );
     }
     if (!_isValidPhoneFormat(phone)) {
       throw const FormException(
@@ -170,11 +174,13 @@ void main() {
       // Act/Assert: deve sollevare FormException
       expect(
         () => ProfileValidator.validateProfile(profile),
-        throwsA(isA<FormException>().having(
-          (e) => e.message,
-          'messaggio',
-          contains('nome'),
-        )),
+        throwsA(
+          isA<FormException>().having(
+            (e) => e.message,
+            'messaggio',
+            contains('nome'),
+          ),
+        ),
       );
     });
 
@@ -189,11 +195,13 @@ void main() {
       // Act/Assert: deve sollevare FormException per il cognome
       expect(
         () => ProfileValidator.validateProfile(profile),
-        throwsA(isA<FormException>().having(
-          (e) => e.message,
-          'messaggio',
-          contains('cognome'),
-        )),
+        throwsA(
+          isA<FormException>().having(
+            (e) => e.message,
+            'messaggio',
+            contains('cognome'),
+          ),
+        ),
       );
     });
 
@@ -208,11 +216,13 @@ void main() {
       // Act/Assert: deve sollevare FormException per il gruppo
       expect(
         () => ProfileValidator.validateProfile(profile),
-        throwsA(isA<FormException>().having(
-          (e) => e.message,
-          'messaggio',
-          contains('gruppo'),
-        )),
+        throwsA(
+          isA<FormException>().having(
+            (e) => e.message,
+            'messaggio',
+            contains('gruppo'),
+          ),
+        ),
       );
     });
 
@@ -227,11 +237,13 @@ void main() {
       // Act/Assert: deve sollevare FormException per il PIN
       expect(
         () => ProfileValidator.validatePin(profile.pin),
-        throwsA(isA<FormException>().having(
-          (e) => e.message,
-          'messaggio',
-          contains('4 cifre'),
-        )),
+        throwsA(
+          isA<FormException>().having(
+            (e) => e.message,
+            'messaggio',
+            contains('4 cifre'),
+          ),
+        ),
       );
     });
 
@@ -342,11 +354,13 @@ void main() {
       // Act/Assert: deve sollevare eccezione per formato non valido
       expect(
         () => StudentFormValidator.validateMotherPhone(form.motherPhone),
-        throwsA(isA<FormException>().having(
-          (e) => e.message,
-          'messaggio',
-          contains('formato'),
-        )),
+        throwsA(
+          isA<FormException>().having(
+            (e) => e.message,
+            'messaggio',
+            contains('formato'),
+          ),
+        ),
       );
     });
 

@@ -48,10 +48,10 @@ class SyncableRecord {
   }) {
     final createdAt =
         DateTime.tryParse(data['createdAt']?.toString() ?? '')?.toUtc() ??
-            DateTime.now().toUtc();
+        DateTime.now().toUtc();
     final updatedAt =
         DateTime.tryParse(data['updatedAt']?.toString() ?? '')?.toUtc() ??
-            DateTime.now().toUtc();
+        DateTime.now().toUtc();
     final isDeleted = data['isDeleted'] == true;
 
     return SyncableRecord(

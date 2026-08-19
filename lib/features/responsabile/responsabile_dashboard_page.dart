@@ -40,10 +40,14 @@ class ResponsabileDashboardPage extends ConsumerWidget {
         data: (classes) {
           final active = classes.where((c) => !c.archived).toList();
           final nClassi = active.length;
-          final nRagazzi =
-              active.fold<int>(0, (sum, c) => sum + c.studentIds.length);
-          final nCatechisti =
-              active.fold<int>(0, (sum, c) => sum + c.catechistIds.length);
+          final nRagazzi = active.fold<int>(
+            0,
+            (sum, c) => sum + c.studentIds.length,
+          );
+          final nCatechisti = active.fold<int>(
+            0,
+            (sum, c) => sum + c.catechistIds.length,
+          );
 
           return Align(
             alignment: Alignment.topCenter,
@@ -88,9 +92,9 @@ class ResponsabileDashboardPage extends ConsumerWidget {
                   Text(
                     'Funzioni rapide',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF174A7E),
-                        ),
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF174A7E),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   _QuickActions(),
@@ -117,15 +121,17 @@ class _AccessDenied extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.admin_panel_settings_outlined,
-                  size: 56, color: Colors.grey),
+              const Icon(
+                Icons.admin_panel_settings_outlined,
+                size: 56,
+                color: Colors.grey,
+              ),
               const SizedBox(height: 16),
               Text(
                 'Accesso riservato',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleLarge
-                    ?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               const Text(
@@ -193,8 +199,10 @@ class _Header extends StatelessWidget {
                   ),
                 const SizedBox(height: 6),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(999),

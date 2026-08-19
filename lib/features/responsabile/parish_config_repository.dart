@@ -29,13 +29,16 @@ class ParishConfigRepository {
   }
 
   /// True se l'utente corrente può gestire la configurazione parrocchiale.
-  bool get canManage => RolePermissions.currentCan(RolePermission.manageParishConfig);
+  bool get canManage =>
+      RolePermissions.currentCan(RolePermission.manageParishConfig);
 
   /// Salva la configurazione. Solo il Responsabile può scrivere.
   Future<ParishConfig> save(ParishConfig config) async {
     if (!canManage) {
-      throw UnsupportedError('Solo il Responsabile Catechistico può gestire '
-          'la configurazione parrocchiale.');
+      throw UnsupportedError(
+        'Solo il Responsabile Catechistico può gestire '
+        'la configurazione parrocchiale.',
+      );
     }
     await _box.put(ParishConfig.storageKey, config.toMap());
     await _box.flush();

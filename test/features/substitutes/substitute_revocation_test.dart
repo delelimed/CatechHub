@@ -73,51 +73,58 @@ Future<String> _assembleRevoke(
 
 void main() {
   group('Revoca supplenza (regressione C2)', () {
-    test('la revoca firmata dal Titolare viene verificata dal Supplente',
-        () async {
-      final x25519 = X25519();
-      final ownerKp = await x25519.newKeyPair();
-      final subKp = await x25519.newKeyPair();
-      final ownerPub = await ownerKp.extractPublicKey();
-      final subPub = await subKp.extractPublicKey();
+    test(
+      'la revoca firmata dal Titolare viene verificata dal Supplente',
+      () async {
+        final x25519 = X25519();
+        final ownerKp = await x25519.newKeyPair();
+        final subKp = await x25519.newKeyPair();
+        final ownerPub = await ownerKp.extractPublicKey();
+        final subPub = await subKp.extractPublicKey();
 
-      final delegation = _delegation(
-        ownerPublicKey: base64Encode(ownerPub.bytes),
-        substitutePublicKey: base64Encode(subPub.bytes),
-      );
+        final delegation = _delegation(
+          ownerPublicKey: base64Encode(ownerPub.bytes),
+          substitutePublicKey: base64Encode(subPub.bytes),
+        );
 
-      // Lato Titolare: firma la revoca con DH(owner_priv, sub_pub).
-      final ownerService =
-          SubstituteDelegationService(p2p: _FakeP2PSecurityService(ownerKp));
-      final assembled = await _assembleRevoke(ownerService, delegation);
+        // Lato Titolare: firma la revoca con DH(owner_priv, sub_pub).
+        final ownerService = SubstituteDelegationService(
+          p2p: _FakeP2PSecurityService(ownerKp),
+        );
+        final assembled = await _assembleRevoke(ownerService, delegation);
 
-      // Lato Supplente: verifica con DH(sub_priv, owner_pub) → stesso segreto.
-      final subService =
-          SubstituteDelegationService(p2p: _FakeP2PSecurityService(subKp));
-      final delegationId = await subService.verifyRevoke(assembled);
+        // Lato Supplente: verifica con DH(sub_priv, owner_pub) → stesso segreto.
+        final subService = SubstituteDelegationService(
+          p2p: _FakeP2PSecurityService(subKp),
+        );
+        final delegationId = await subService.verifyRevoke(assembled);
 
-      expect(delegationId, delegation.delegationId);
-    });
+        expect(delegationId, delegation.delegationId);
+      },
+    );
 
-    test('una delega con chiave Supplente mancante non genera la revoca',
-        () async {
-      final x25519 = X25519();
-      final ownerKp = await x25519.newKeyPair();
-      final ownerPub = await ownerKp.extractPublicKey();
+    test(
+      'una delega con chiave Supplente mancante non genera la revoca',
+      () async {
+        final x25519 = X25519();
+        final ownerKp = await x25519.newKeyPair();
+        final ownerPub = await ownerKp.extractPublicKey();
 
-      final delegation = _delegation(
-        ownerPublicKey: base64Encode(ownerPub.bytes),
-        substitutePublicKey: '',
-      );
+        final delegation = _delegation(
+          ownerPublicKey: base64Encode(ownerPub.bytes),
+          substitutePublicKey: '',
+        );
 
-      final ownerService =
-          SubstituteDelegationService(p2p: _FakeP2PSecurityService(ownerKp));
+        final ownerService = SubstituteDelegationService(
+          p2p: _FakeP2PSecurityService(ownerKp),
+        );
 
-      expect(
-        () => ownerService.buildRevokeQrChunks(delegation),
-        throwsA(isA<Exception>()),
-      );
-    });
+        expect(
+          () => ownerService.buildRevokeQrChunks(delegation),
+          throwsA(isA<Exception>()),
+        );
+      },
+    );
 
     test('una revoca da un dispositivo NON-Titolare viene rifiutata', () async {
       final x25519 = X25519();
@@ -134,12 +141,14 @@ void main() {
 
       // L'attaccante firma con DH(attacker_priv, sub_pub): segreto diverso
       // da quello che il Supplente può ricalcolare → firma non valida.
-      final attackerService =
-          SubstituteDelegationService(p2p: _FakeP2PSecurityService(attackerKp));
+      final attackerService = SubstituteDelegationService(
+        p2p: _FakeP2PSecurityService(attackerKp),
+      );
       final assembled = await _assembleRevoke(attackerService, delegation);
 
-      final subService =
-          SubstituteDelegationService(p2p: _FakeP2PSecurityService(subKp));
+      final subService = SubstituteDelegationService(
+        p2p: _FakeP2PSecurityService(subKp),
+      );
       final delegationId = await subService.verifyRevoke(assembled);
 
       expect(delegationId, isNull);
@@ -157,8 +166,9 @@ void main() {
         substitutePublicKey: base64Encode(subPub.bytes),
       );
 
-      final ownerService =
-          SubstituteDelegationService(p2p: _FakeP2PSecurityService(ownerKp));
+      final ownerService = SubstituteDelegationService(
+        p2p: _FakeP2PSecurityService(ownerKp),
+      );
       final chunks = await ownerService.buildRevokeQrChunks(delegation);
       final assembled = QRDataService.assembleChunks(
         chunks.map(QRChunk.fromMap).toList(),
@@ -167,15 +177,16 @@ void main() {
       // Alterazione del payload firmato: si modifica il delegationId nel body
       // JSON (la firma HMAC non lo copre più) mantenendo il trasporto valido.
       final wrapper = QRDataService.decompressData(assembled);
-      final body = jsonDecode(
-        utf8.decode(base64Decode(wrapper['body'] as String)),
-      ) as Map<String, dynamic>;
+      final body =
+          jsonDecode(utf8.decode(base64Decode(wrapper['body'] as String)))
+              as Map<String, dynamic>;
       body['delegationId'] = 'supp_altro_id';
       wrapper['body'] = base64Encode(utf8.encode(jsonEncode(body)));
       final tampered = QRDataService.compressData(wrapper);
 
-      final subService =
-          SubstituteDelegationService(p2p: _FakeP2PSecurityService(subKp));
+      final subService = SubstituteDelegationService(
+        p2p: _FakeP2PSecurityService(subKp),
+      );
       final delegationId = await subService.verifyRevoke(tampered);
 
       expect(delegationId, isNull);

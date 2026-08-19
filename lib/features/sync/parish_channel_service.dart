@@ -20,9 +20,9 @@
 
 import 'dart:convert';
 
-import 'package:crypto/crypto.dart';
 import 'package:hive/hive.dart';
 
+import '../../core/services/crypto_utils.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/avviso_template_model.dart';
 import '../../shared/models/parish_event.dart';
@@ -57,9 +57,10 @@ class ParishChannelService {
         ? LocalDatabase.newId('parish_event')
         : event.id;
     await _eventsBox.put(id, event.toMap());
-    return ParishEvent.fromMap(id, LocalDatabase.toStringDynamicMap(
-      _eventsBox.get(id),
-    ));
+    return ParishEvent.fromMap(
+      id,
+      LocalDatabase.toStringDynamicMap(_eventsBox.get(id)),
+    );
   }
 
   static Future<void> deleteEvent(String id) async {
@@ -104,11 +105,13 @@ class ParishChannelService {
       final id = key.toString();
       final raw = _eventsBox.get(id);
       if (raw == null) continue;
-      events.add(SyncRecord.fromHiveEntry(
-        id: id,
-        boxName: LocalDatabase.parishEventsBox,
-        entry: LocalDatabase.toStringDynamicMap(raw),
-      ).toJson());
+      events.add(
+        SyncRecord.fromHiveEntry(
+          id: id,
+          boxName: LocalDatabase.parishEventsBox,
+          entry: LocalDatabase.toStringDynamicMap(raw),
+        ).toJson(),
+      );
     }
 
     final avvisi = <Map<String, dynamic>>[];
@@ -119,11 +122,13 @@ class ParishChannelService {
       final data = LocalDatabase.toStringDynamicMap(raw);
       final code = data['classUniqueCode']?.toString();
       if (code != null && code.isNotEmpty) continue;
-      avvisi.add(SyncRecord.fromHiveEntry(
-        id: id,
-        boxName: LocalDatabase.avvisiBox,
-        entry: data,
-      ).toJson());
+      avvisi.add(
+        SyncRecord.fromHiveEntry(
+          id: id,
+          boxName: LocalDatabase.avvisiBox,
+          entry: data,
+        ).toJson(),
+      );
     }
 
     return {
@@ -153,14 +158,10 @@ class ParishChannelService {
     List<dynamic> serialized,
   ) async {
     var applied = 0;
-    final box = boxName == LocalDatabase.avvisiBox
-        ? _avvisiBox
-        : _eventsBox;
+    final box = boxName == LocalDatabase.avvisiBox ? _avvisiBox : _eventsBox;
     for (final raw in serialized) {
       if (raw is! Map) continue;
-      final record = SyncRecord.fromJson(
-        Map<String, dynamic>.from(raw),
-      );
+      final record = SyncRecord.fromJson(Map<String, dynamic>.from(raw));
       try {
         final localRaw = box.get(record.id);
         if (localRaw == null) {
@@ -171,9 +172,10 @@ class ParishChannelService {
         }
         final localData = LocalDatabase.toStringDynamicMap(localRaw);
         final localUpdatedAt =
-            DateTime.tryParse(localData['updatedAt']?.toString() ?? '')
-                    ?.toUtc() ??
-                DateTime.fromMillisecondsSinceEpoch(0).toUtc();
+            DateTime.tryParse(
+              localData['updatedAt']?.toString() ?? '',
+            )?.toUtc() ??
+            DateTime.fromMillisecondsSinceEpoch(0).toUtc();
 
         if (record.isDeleted && !(localData['isDeleted'] == true)) {
           await box.put(record.id, {
@@ -195,9 +197,6 @@ class ParishChannelService {
 
   /// Checksum del payload (per log/deduplica opzionale).
   static String payloadChecksum(Map<String, dynamic> payload) {
-    return sha256
-        .convert(utf8.encode(jsonEncode(payload)))
-        .toString()
-        .substring(0, 12);
+    return sha256HexSync(jsonEncode(payload)).substring(0, 12);
   }
 }

@@ -191,22 +191,43 @@ void main() {
     test('compareBySurname ordina prima per cognome, poi per nome', () {
       // Arrange: prepara tre studenti con cognomi e nomi diversi
       final a = Student(
-        id: '1', name: 'Marco', surname: 'Rossi',
+        id: '1',
+        name: 'Marco',
+        surname: 'Rossi',
         birthDate: DateTime(2010, 1, 1),
-        motherName: '', motherSurname: '', fatherName: '', fatherSurname: '',
-        motherPhone: '', fatherPhone: '', studentPhone: '',
+        motherName: '',
+        motherSurname: '',
+        fatherName: '',
+        fatherSurname: '',
+        motherPhone: '',
+        fatherPhone: '',
+        studentPhone: '',
       );
       final b = Student(
-        id: '2', name: 'Anna', surname: 'Bianchi',
+        id: '2',
+        name: 'Anna',
+        surname: 'Bianchi',
         birthDate: DateTime(2010, 1, 1),
-        motherName: '', motherSurname: '', fatherName: '', fatherSurname: '',
-        motherPhone: '', fatherPhone: '', studentPhone: '',
+        motherName: '',
+        motherSurname: '',
+        fatherName: '',
+        fatherSurname: '',
+        motherPhone: '',
+        fatherPhone: '',
+        studentPhone: '',
       );
       final c = Student(
-        id: '3', name: 'Luca', surname: 'Bianchi',
+        id: '3',
+        name: 'Luca',
+        surname: 'Bianchi',
         birthDate: DateTime(2010, 1, 1),
-        motherName: '', motherSurname: '', fatherName: '', fatherSurname: '',
-        motherPhone: '', fatherPhone: '', studentPhone: '',
+        motherName: '',
+        motherSurname: '',
+        fatherName: '',
+        fatherSurname: '',
+        motherPhone: '',
+        fatherPhone: '',
+        studentPhone: '',
       );
       // Act: applica il confronto
       final confrontoBA = Student.compareBySurname(b, a);

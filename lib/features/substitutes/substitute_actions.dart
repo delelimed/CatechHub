@@ -26,7 +26,8 @@ Future<void> showDelegationQr(
     );
     return;
   }
-  final range = '${_fmtDate(delegation.validFrom)} → ${_fmtDate(delegation.validUntil)}';
+  final range =
+      '${_fmtDate(delegation.validFrom)} → ${_fmtDate(delegation.validUntil)}';
   await QrChunksDialog.show(
     context,
     title: 'QR di delega',
@@ -171,7 +172,9 @@ Future<bool> applyRevocation(
   final delegation = repo.getById(delegationId);
   if (delegation == null) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Nessuna supplenza corrispondente a questa revoca.')),
+      const SnackBar(
+        content: Text('Nessuna supplenza corrispondente a questa revoca.'),
+      ),
     );
     return true;
   }

@@ -33,11 +33,7 @@ class AulaManagementSection extends ConsumerStatefulWidget {
 }
 
 class _AulaManagementSectionState extends ConsumerState<AulaManagementSection> {
-  Future<void> _createAula(
-    String nome,
-    String capienza,
-    String note,
-  ) async {
+  Future<void> _createAula(String nome, String capienza, String note) async {
     if (nome.trim().isEmpty) {
       _snack('Inserisci il nome della stanza.');
       return;
@@ -45,13 +41,15 @@ class _AulaManagementSectionState extends ConsumerState<AulaManagementSection> {
     final capienzaNum = int.tryParse(capienza.trim()) ?? 0;
     try {
       final repo = AulaRepository();
-      await repo.saveAula(Aula(
-        stanzaId: LocalDatabase.newId('stanza'),
-        nomeStanza: nome.trim(),
-        capienzaMassima: capienzaNum,
-        noteAccessibilita: note.trim(),
-        lastModifiedBy: getCurrentCatechistName(),
-      ));
+      await repo.saveAula(
+        Aula(
+          stanzaId: LocalDatabase.newId('stanza'),
+          nomeStanza: nome.trim(),
+          capienzaMassima: capienzaNum,
+          noteAccessibilita: note.trim(),
+          lastModifiedBy: getCurrentCatechistName(),
+        ),
+      );
       _snack('Aula "${nome.trim()}" creata.');
     } catch (e) {
       _snack('Errore: $e');
@@ -138,8 +136,9 @@ class _AulaManagementSectionState extends ConsumerState<AulaManagementSection> {
       builder: (context) => AlertDialog(
         title: const Text('Elimina aula'),
         content: Text(
-            'Eliminare definitivamente l\'aula "${aula.nomeStanza}"? '
-            'Verranno rimossi anche gli orari ad essa assegnati.'),
+          'Eliminare definitivamente l\'aula "${aula.nomeStanza}"? '
+          'Verranno rimossi anche gli orari ad essa assegnati.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -159,8 +158,7 @@ class _AulaManagementSectionState extends ConsumerState<AulaManagementSection> {
   }
 
   void _snack(String msg) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
@@ -299,10 +297,9 @@ class _AulaManagementSectionState extends ConsumerState<AulaManagementSection> {
     return _SlotAssignment(
       classes: activeClasses,
       aulas: aulas,
-      onAssigned: (msg) =>
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg)),
-          ),
+      onAssigned: (msg) => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(msg))),
     );
   }
 
@@ -373,14 +370,20 @@ class _AulaManagementSectionState extends ConsumerState<AulaManagementSection> {
                 dataRowMaxHeight: 64,
                 columns: [
                   const DataColumn(
-                    label: Text('Stanza',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: Text(
+                      'Stanza',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                   for (final g in giorni)
                     DataColumn(
-                      label: Text(g,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 12)),
+                      label: Text(
+                        g,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
                 ],
                 rows: [
@@ -392,14 +395,14 @@ class _AulaManagementSectionState extends ConsumerState<AulaManagementSection> {
                             width: 120,
                             child: Text(
                               aula.nomeStanza,
-                              style: const TextStyle(fontWeight: FontWeight.w600),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ),
                         for (var g = 1; g <= 7; g++)
-                          DataCell(
-                            _cellaOccupazione(aula, activeClasses, g),
-                          ),
+                          DataCell(_cellaOccupazione(aula, activeClasses, g)),
                       ],
                     ),
                 ],
@@ -494,8 +497,11 @@ class _AulaManagementSectionState extends ConsumerState<AulaManagementSection> {
     );
   }
 
-  Widget _aulaGrid(List<SchoolClass> classes, List<Aula> aulas,
-      {bool readOnly = false}) {
+  Widget _aulaGrid(
+    List<SchoolClass> classes,
+    List<Aula> aulas, {
+    bool readOnly = false,
+  }) {
     if (aulas.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(20),
@@ -591,7 +597,8 @@ class _AulaCard extends StatelessWidget {
             Text(
               'Capienza: ${aula.capienzaMassima}',
               style: TextStyle(
-                  color: isDark ? Colors.grey.shade400 : Colors.black54),
+                color: isDark ? Colors.grey.shade400 : Colors.black54,
+              ),
             ),
           if (aula.noteAccessibilita.isNotEmpty)
             Text(
@@ -680,7 +687,9 @@ class _SlotAssignmentState extends State<_SlotAssignment> {
   Future<void> _assign() async {
     setState(() => _error = '');
     if (_inizio.hour * 60 + _inizio.minute >= _fine.hour * 60 + _fine.minute) {
-      setState(() => _error = 'L\'ora di inizio deve precedere l\'ora di fine.');
+      setState(
+        () => _error = 'L\'ora di inizio deve precedere l\'ora di fine.',
+      );
       return;
     }
     final slot = RoomSlot(
@@ -692,10 +701,7 @@ class _SlotAssignmentState extends State<_SlotAssignment> {
       oraFine: _hhmm(_fine),
     );
     try {
-      await ClassesRepository().assignRoomSlot(
-        classId: _class.id,
-        slot: slot,
-      );
+      await ClassesRepository().assignRoomSlot(classId: _class.id, slot: slot);
       if (mounted) {
         widget.onAssigned(
           'Slot assegnato a "${_class.name}" (${_aula.nomeStanza}, '
@@ -727,7 +733,8 @@ class _SlotAssignmentState extends State<_SlotAssignment> {
             : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-            color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+          color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -744,7 +751,10 @@ class _SlotAssignmentState extends State<_SlotAssignment> {
           DropdownButtonFormField<String>(
             initialValue: _class.id,
             decoration: InputDecoration(
-                labelText: 'Classe', border: border, isDense: true),
+              labelText: 'Classe',
+              border: border,
+              isDense: true,
+            ),
             items: [
               for (final c in widget.classes)
                 DropdownMenuItem(value: c.id, child: Text(c.name)),
@@ -761,7 +771,10 @@ class _SlotAssignmentState extends State<_SlotAssignment> {
           DropdownButtonFormField<String>(
             initialValue: _aula.stanzaId,
             decoration: InputDecoration(
-                labelText: 'Aula', border: border, isDense: true),
+              labelText: 'Aula',
+              border: border,
+              isDense: true,
+            ),
             items: [
               for (final a in widget.aulas)
                 DropdownMenuItem(value: a.stanzaId, child: Text(a.nomeStanza)),
@@ -778,9 +791,10 @@ class _SlotAssignmentState extends State<_SlotAssignment> {
           DropdownButtonFormField<int>(
             initialValue: _giorno,
             decoration: InputDecoration(
-                labelText: 'Giorno della settimana',
-                border: border,
-                isDense: true),
+              labelText: 'Giorno della settimana',
+              border: border,
+              isDense: true,
+            ),
             items: [
               for (var i = 1; i <= 7; i++)
                 DropdownMenuItem(value: i, child: Text(_giorni[i - 1])),

@@ -1,5 +1,6 @@
 /// Provider Riverpod del modulo "Supplenze Temporanee e Delega Sicura".
 library;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/auth_service.dart';
@@ -12,17 +13,18 @@ import 'substitute_delegation_service.dart';
 
 final substituteDelegationRepoProvider =
     Provider<SubstituteDelegationRepository>((ref) {
-  return SubstituteDelegationRepository();
-});
+      return SubstituteDelegationRepository();
+    });
 
 final substituteDelegationServiceProvider =
     Provider<SubstituteDelegationService>((ref) {
-  return SubstituteDelegationService();
-});
+      return SubstituteDelegationService();
+    });
 
-final substituteDelegationsProvider = StreamProvider<List<SubstituteDelegation>>(
-  (ref) => ref.watch(substituteDelegationRepoProvider).watchDelegations(),
-);
+final substituteDelegationsProvider =
+    StreamProvider<List<SubstituteDelegation>>(
+      (ref) => ref.watch(substituteDelegationRepoProvider).watchDelegations(),
+    );
 
 /// Deleghe in cui il catechista locale è il Supplente e che sono ancora
 /// "visibili": attive o scadute ma non ancora acquisite dal Titolare (in
@@ -30,24 +32,27 @@ final substituteDelegationsProvider = StreamProvider<List<SubstituteDelegation>>
 /// dati, ma è di sola lettura).
 final mySubstitutionsProvider = Provider<List<SubstituteDelegation>>((ref) {
   final catechistId = AuthService.getCatechistId();
-  final delegations = ref.watch(substituteDelegationsProvider).maybeWhen(
-        data: (list) => list,
-        orElse: () => <SubstituteDelegation>[],
-      );
+  final delegations = ref
+      .watch(substituteDelegationsProvider)
+      .maybeWhen(data: (list) => list, orElse: () => <SubstituteDelegation>[]);
   final now = DateTime.now().toUtc();
   return delegations
-      .where((d) =>
-          d.substituteCatechistId == catechistId &&
-          d.status != SubstituteDelegationStatus.revoked &&
-          d.status != SubstituteDelegationStatus.completed &&
-          (d.isActiveAt(now) ||
-              (d.status == SubstituteDelegationStatus.expired &&
-                  !d.dataCollected)))
+      .where(
+        (d) =>
+            d.substituteCatechistId == catechistId &&
+            d.status != SubstituteDelegationStatus.revoked &&
+            d.status != SubstituteDelegationStatus.completed &&
+            (d.isActiveAt(now) ||
+                (d.status == SubstituteDelegationStatus.expired &&
+                    !d.dataCollected)),
+      )
       .toList();
 });
 
 /// Delega attiva (in corso) di cui il catechista locale è il Supplente.
-final myActiveSubstitutionsProvider = Provider<List<SubstituteDelegation>>((ref) {
+final myActiveSubstitutionsProvider = Provider<List<SubstituteDelegation>>((
+  ref,
+) {
   final now = DateTime.now().toUtc();
   return ref
       .watch(mySubstitutionsProvider)

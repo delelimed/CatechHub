@@ -68,9 +68,12 @@ class ConsensiService {
       return StatoConsenso.nonFirmato;
     }
     final firma = student.dataFirmaConsenso!;
-    final scadenza = student.dataScadenzaTrattamento ??
+    final scadenza =
+        student.dataScadenzaTrattamento ??
         DateTime(firma.year, firma.month + 12, firma.day, 23, 59, 59);
-    return scadenza.isBefore(oggi) ? StatoConsenso.scaduto : StatoConsenso.valido;
+    return scadenza.isBefore(oggi)
+        ? StatoConsenso.scaduto
+        : StatoConsenso.valido;
   }
 
   /// Costruisce la [ConsensoInfo] per un ragazzo in un solo passaggio.
@@ -79,8 +82,7 @@ class ConsensiService {
     final firma = s.dataFirmaConsenso;
     DateTime? scadenza = s.dataScadenzaTrattamento;
     if (firma != null && scadenza == null) {
-      scadenza = DateTime(
-          firma.year, firma.month + 12, firma.day, 23, 59, 59);
+      scadenza = DateTime(firma.year, firma.month + 12, firma.day, 23, 59, 59);
     }
     return ConsensoInfo(
       student: s,
@@ -101,8 +103,14 @@ class ConsensiService {
   }) async {
     final firma = (dataFirma ?? DateTime.now()).toLocal();
     final mesi = durataMesi ?? durataMesiDaConfig();
-    final scadenza =
-        DateTime(firma.year, firma.month + mesi, firma.day, 23, 59, 59);
+    final scadenza = DateTime(
+      firma.year,
+      firma.month + mesi,
+      firma.day,
+      23,
+      59,
+      59,
+    );
     await StudentsRepository().updateStudent(
       student.id,
       student.copyWith(
@@ -162,8 +170,8 @@ class ConsensiService {
       );
     } catch (e) {
       if (kDebugMode) {
-      debugPrint('[ConsensiService] AuditLog non registrato ($action): $e');
-    }
+        debugPrint('[ConsensiService] AuditLog non registrato ($action): $e');
+      }
     }
   }
 }

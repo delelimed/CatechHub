@@ -14,6 +14,7 @@
 /// [PlanningRepository] e [StudentsRepository] tramite i rispettivi
 /// provider per l'accesso offline ai dati Hive.
 library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -138,9 +139,7 @@ class _AttendancePrintPageState extends ConsumerState<AttendancePrintPage> {
   Future<void> _handlePrint(BuildContext context) async {
     try {
       final studentsRaw =
-          ref
-              .read(studentsRepositoryProvider)
-              .getAllStudentsSync()
+          (await ref.read(studentsRepositoryProvider).getAllStudentsSync())
               .where((s) => widget.schoolClass.studentIds.contains(s.id))
               .toList()
             ..sort(Student.compareBySurname);

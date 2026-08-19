@@ -17,7 +17,7 @@
 //   Il payload in chiaro è il JSON dei record serializzati (SyncRecord[]).
 //
 // DIPENDENZE:
-//   - pointycastle: AES-256-GCM in Dart puro (testabile su VM).
+//   - cryptography: AES-256-GCM + SHA-256 in Dart puro (testabile su VM).
 //   - QRDataService: confezionamento del grant con PIN (come il data share).
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -25,9 +25,9 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:hive/hive.dart';
-import 'package:pointycastle/export.dart' as pc;
 
 import '../../core/services/qr_data_service.dart';
 import '../../core/storage/local_database.dart';
@@ -48,14 +48,14 @@ class ClassChannelService {
     return base64Encode(bytes);
   }
 
-  static Uint8List _sha256(List<int> input) {
-    final digest = pc.Digest('SHA-256');
-    return digest.process(Uint8List.fromList(input));
+  static Future<Uint8List> _sha256(List<int> input) async {
+    final hash = await Sha256().hash(input);
+    return Uint8List.fromList(hash.bytes);
   }
 
   /// Fingerprint della chiave (primi 16 esadecimali dello SHA-256).
-  static String computeKeyId(String keyBase64) {
-    final hash = _sha256(base64Decode(keyBase64));
+  static Future<String> computeKeyId(String keyBase64) async {
+    final hash = await _sha256(base64Decode(keyBase64));
     return hash
         .map((b) => b.toRadixString(16).padLeft(2, '0'))
         .join()
@@ -69,7 +69,7 @@ class ClassChannelService {
     );
   }
 
-  static Uint8List _classKeyBytes(String keyBase64) {
+  static Future<Uint8List> _classKeyBytes(String keyBase64) async {
     // L'override di test è ammesso SOLO in debug: in release un downgrade a
     // chiavi deterministiche sarebbe un backdoor.
     final seed = kDebugMode ? debugSeedOverride : null;
@@ -135,12 +135,12 @@ class ClassChannelService {
 
   /// Crea (o restituisce) la chiave della classe [classId]. Da usare SOLO
   /// quando il dispositivo è autorizzato (Titolare/Responsabile/membro).
-  static ClassChannelKey getOrCreateKey({
+  static Future<ClassChannelKey> getOrCreateKey({
     required String classId,
     required String classUniqueCode,
     required String className,
     String grantorCatechistId = '',
-  }) {
+  }) async {
     final existing = getKeyByClassId(classId);
     if (existing != null) return existing;
 
@@ -150,7 +150,7 @@ class ClassChannelService {
       classUniqueCode: classUniqueCode,
       className: className,
       keyBase64: keyBase64,
-      keyId: computeKeyId(keyBase64),
+      keyId: await computeKeyId(keyBase64),
       grantorCatechistId: grantorCatechistId,
       grantedAt: DateTime.now().toUtc(),
     );
@@ -160,16 +160,16 @@ class ClassChannelService {
 
   /// Salva una chiave ricevuta (bootstrap in-band o import QR).
   /// Ritorna la chiave salvata, o null se già presente una chiave attiva.
-  static ClassChannelKey? storeKey({
+  static Future<ClassChannelKey?> storeKey({
     required String classId,
     required String classUniqueCode,
     required String className,
     required String keyBase64,
     String grantorCatechistId = '',
-  }) {
+  }) async {
     if (keyBase64.isEmpty) return null;
     final existing = getKeyByClassId(classId);
-    if (existing != null && existing.keyId == computeKeyId(keyBase64)) {
+    if (existing != null && existing.keyId == await computeKeyId(keyBase64)) {
       return existing;
     }
     final key = ClassChannelKey(
@@ -177,7 +177,7 @@ class ClassChannelService {
       classUniqueCode: classUniqueCode,
       className: className,
       keyBase64: keyBase64,
-      keyId: computeKeyId(keyBase64),
+      keyId: await computeKeyId(keyBase64),
       grantorCatechistId: grantorCatechistId,
       grantedAt: DateTime.now().toUtc(),
     );
@@ -200,19 +200,19 @@ class ClassChannelService {
 
   /// Ruota la chiave della classe (nuova chiave casuale). Usata dopo una
   /// revoca per invalidare i titoli concessi in precedenza.
-  static ClassChannelKey rotateKey({
+  static Future<ClassChannelKey> rotateKey({
     required String classId,
     required String classUniqueCode,
     required String className,
     String grantorCatechistId = '',
-  }) {
+  }) async {
     final keyBase64 = generateKeyBase64();
     final key = ClassChannelKey(
       classId: classId,
       classUniqueCode: classUniqueCode,
       className: className,
       keyBase64: keyBase64,
-      keyId: computeKeyId(keyBase64),
+      keyId: await computeKeyId(keyBase64),
       grantorCatechistId: grantorCatechistId,
       grantedAt: DateTime.now().toUtc(),
     );
@@ -226,52 +226,40 @@ class ClassChannelService {
 
   /// Cifra i record serializzati della classe [classUniqueCode].
   /// Ritorna il blob opaco da trasmettere nella rete P2P.
-  static Map<String, dynamic>? encryptRecords(
+  static Future<Map<String, dynamic>?> encryptRecords(
     String classUniqueCode,
     List<Map<String, dynamic>> records,
-  ) {
+  ) async {
     if (records.isEmpty) return null;
     final key = getKeyByUniqueCode(classUniqueCode);
     if (key == null) return null;
 
     final plain = utf8.encode(jsonEncode(records));
-    final keyBytes = _classKeyBytes(key.keyBase64);
+    final keyBytes = await _classKeyBytes(key.keyBase64);
     final nonce = _secureBytes(12);
 
     // AAD di contesto: lega il ciphertext alla classe di provenienza.
     // Impedisce la sostituzione/cross-class di un blob cifrato.
     final aad = _aadContext(classUniqueCode);
 
-    final cipher = pc.GCMBlockCipher(pc.AESEngine())
-      ..init(
-        true,
-        pc.AEADParameters(
-          pc.KeyParameter(keyBytes),
-          128,
-          nonce,
-          aad,
-        ),
-      );
-    final out = Uint8List(cipher.getOutputSize(plain.length));
-    var len = cipher.processBytes(plain, 0, plain.length, out, 0);
-    len += cipher.doFinal(out, len);
-    final sealed = Uint8List(nonce.length + len)
-      ..setAll(0, nonce)
-      ..setAll(nonce.length, Uint8List.sublistView(out, 0, len));
+    final box = await AesGcm.with256bits().encrypt(
+      plain,
+      secretKey: SecretKey(keyBytes),
+      nonce: nonce,
+      aad: aad,
+    );
+    // Formato sealed = nonce || ct || tag (identico al vecchio output GCM).
+    final sealed = box.concatenation();
 
-    return {
-      'v': 1,
-      'keyId': key.keyId,
-      'sealed': base64Encode(sealed),
-    };
+    return {'v': 1, 'keyId': key.keyId, 'sealed': base64Encode(sealed)};
   }
 
   /// Decifra un blob prodotto da [encryptRecords]. Ritorna i record in chiaro
   /// o `null` se la chiave non è disponibile o la decifratura fallisce.
-  static List<Map<String, dynamic>>? decryptRecords(
+  static Future<List<Map<String, dynamic>>?> decryptRecords(
     String classUniqueCode,
     Map<String, dynamic> blob,
-  ) {
+  ) async {
     final key = getKeyByUniqueCode(classUniqueCode);
     if (key == null) return null;
 
@@ -286,32 +274,26 @@ class ClassChannelService {
     if (sealedBase64 == null || sealedBase64.isEmpty) return null;
     try {
       final sealed = base64Decode(sealedBase64);
-      if (sealed.length < 12) return null;
-      final nonce = Uint8List.sublistView(sealed, 0, 12);
-      final data = Uint8List.sublistView(sealed, 12);
-      final keyBytes = _classKeyBytes(key.keyBase64);
+      if (sealed.length < 12 + 16) return null;
+      final keyBytes = await _classKeyBytes(key.keyBase64);
 
       final aad = _aadContext(classUniqueCode);
 
-      final cipher = pc.GCMBlockCipher(pc.AESEngine())
-        ..init(
-          false,
-          pc.AEADParameters(
-            pc.KeyParameter(keyBytes),
-            128,
-            nonce,
-            aad,
-          ),
-        );
-      final out = Uint8List(cipher.getOutputSize(data.length));
-      var len = cipher.processBytes(data, 0, data.length, out, 0);
-      len += cipher.doFinal(out, len);
-      final plain = utf8.decode(Uint8List.sublistView(out, 0, len));
+      final box = SecretBox.fromConcatenation(
+        sealed,
+        nonceLength: 12,
+        macLength: 16,
+      );
+      final plain = utf8.decode(
+        await AesGcm.with256bits().decrypt(
+          box,
+          secretKey: SecretKey(keyBytes),
+          aad: aad,
+        ),
+      );
       final decoded = jsonDecode(plain);
       if (decoded is List) {
-        return decoded
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .toList();
+        return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       }
       return null;
     } catch (_) {
@@ -334,11 +316,11 @@ class ClassChannelService {
     final existingMap = existing is Map
         ? LocalDatabase.toStringDynamicMap(existing)
         : const <String, dynamic>{};
-    final incomingTs = blob['receivedAt']?.toString() ??
+    final incomingTs =
+        blob['receivedAt']?.toString() ??
         DateTime.now().toUtc().toIso8601String();
     if (existingMap.isNotEmpty &&
-        (existingMap['updatedAt']?.toString() ?? '')
-            .compareTo(incomingTs) >
+        (existingMap['updatedAt']?.toString() ?? '').compareTo(incomingTs) >
             0) {
       return;
     }
@@ -356,9 +338,7 @@ class ClassChannelService {
     _ciphertextBox.delete(classUniqueCode);
     final map = LocalDatabase.toStringDynamicMap(raw);
     final blob = map['blob'];
-    return blob is Map
-        ? Map<String, dynamic>.from(blob)
-        : null;
+    return blob is Map ? Map<String, dynamic>.from(blob) : null;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -386,29 +366,33 @@ class ClassChannelService {
 
   /// Confeziona il grant in un DataPackage cifrato dal [pin] e lo segmenta
   /// in chunk QR (riusando il flusso del data share).
-  static List<Map<String, dynamic>> createKeyGrantChunks(
+  static Future<List<Map<String, dynamic>>> createKeyGrantChunks(
     Map<String, dynamic> grantMap,
     String pin,
-  ) {
-    final package = QRDataService.createPackage(grantMap, pin);
+  ) async {
+    final package = await QRDataService.createPackage(grantMap, pin);
     final compressed = QRDataService.compressData(package.toMap());
     final segments = QRDataService.segmentData(compressed);
-    return segments.asMap().entries
-        .map((e) => QRDataService.createQRChunk(
-              e.value,
-              e.key,
-              segments.length,
-            ).toMap())
+    return segments
+        .asMap()
+        .entries
+        .map(
+          (e) => QRDataService.createQRChunk(
+            e.value,
+            e.key,
+            segments.length,
+          ).toMap(),
+        )
         .toList();
   }
 
   /// Importa un grant dal [assembledData] (dati QR assemblati) verificando il
   /// [pin]. Ritorna la chiave salvata o `null` se il grant è scaduto/invalido.
-  static ClassChannelKey? importKeyGrant(
+  static Future<ClassChannelKey?> importKeyGrant(
     String assembledData,
     String pin,
-  ) {
-    final payload = QRDataService.extractPackageData(assembledData, pin);
+  ) async {
+    final payload = await QRDataService.extractPackageData(assembledData, pin);
     if (payload['type'] != 'class_key_grant') return null;
     final classId = payload['classId']?.toString() ?? '';
     final classUniqueCode = payload['classUniqueCode']?.toString() ?? '';

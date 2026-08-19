@@ -62,10 +62,7 @@ class XlsxParser {
     final bytes = file.readBytes();
     if (bytes == null || bytes.isEmpty) return const [];
     final doc = XmlDocument.parse(String.fromCharCodes(bytes));
-    return doc
-        .findAllElements('t')
-        .map((node) => node.innerText)
-        .toList();
+    return doc.findAllElements('t').map((node) => node.innerText).toList();
   }
 
   /// Risolve il path della prima worksheet tramite workbook.xml + rels.
@@ -88,14 +85,12 @@ class XlsxParser {
         final bytes = rels.readBytes();
         if (bytes != null && bytes.isNotEmpty) {
           final doc = XmlDocument.parse(String.fromCharCodes(bytes));
-          final rel = doc.findAllElements('Relationship').firstWhereOrNull(
-                (node) => node.getAttribute('Id') == rId,
-              );
+          final rel = doc
+              .findAllElements('Relationship')
+              .firstWhereOrNull((node) => node.getAttribute('Id') == rId);
           final target = rel?.getAttribute('Target');
           if (target != null && target.isNotEmpty) {
-            return target.startsWith('/')
-                ? target.substring(1)
-                : 'xl/$target';
+            return target.startsWith('/') ? target.substring(1) : 'xl/$target';
           }
         }
       }
@@ -156,10 +151,7 @@ class XlsxParser {
       return const XlsxParseResult(headers: null, rows: []);
     }
 
-    return XlsxParseResult(
-      headers: grid.first,
-      rows: grid.skip(1).toList(),
-    );
+    return XlsxParseResult(headers: grid.first, rows: grid.skip(1).toList());
   }
 
   /// Estrae il valore testuale di una cella gestendo i tipi XLSX.
@@ -176,9 +168,11 @@ class XlsxParser {
         return sharedStrings[index];
 
       case 'inlineStr':
-        return cell.findElements('is').expand((e) => e.findElements('t')).map(
-              (e) => e.innerText,
-            ).join();
+        return cell
+            .findElements('is')
+            .expand((e) => e.findElements('t'))
+            .map((e) => e.innerText)
+            .join();
 
       case 'b':
         final v = cell.getElement('v')?.innerText;

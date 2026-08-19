@@ -29,9 +29,11 @@ class DocumentsRepository {
       (id, data) => {'id': id, ...data},
     ).map((documents) {
       documents.sort((a, b) {
-        final aDate = DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+        final aDate =
+            DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
             DateTime.fromMillisecondsSinceEpoch(0);
-        final bDate = DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+        final bDate =
+            DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
             DateTime.fromMillisecondsSinceEpoch(0);
         return bDate.compareTo(aDate);
       });
@@ -47,9 +49,11 @@ class DocumentsRepository {
       (id, data) => {'id': id, ...data},
     );
     documents.sort((a, b) {
-      final aDate = DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+      final aDate =
+          DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0);
-      final bDate = DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+      final bDate =
+          DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0);
       return bDate.compareTo(aDate);
     });
@@ -57,32 +61,41 @@ class DocumentsRepository {
   }
 
   /// Stream dei documenti filtrati per codice univoco della classe.
-  Stream<List<Map<String, dynamic>>> getDocumentsByClass(String classUniqueCode) {
+  Stream<List<Map<String, dynamic>>> getDocumentsByClass(
+    String classUniqueCode,
+  ) {
     return LocalDatabase.watchList(
       _documentsBox,
       (id, data) => {'id': id, ...data},
-    ).map((documents) => documents
-        .where((d) => d['classUniqueCode'] == classUniqueCode)
-        .toList()
-      ..sort((a, b) {
-        final aDate = DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
-            DateTime.fromMillisecondsSinceEpoch(0);
-        final bDate = DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
-            DateTime.fromMillisecondsSinceEpoch(0);
-        return bDate.compareTo(aDate);
-      }));
+    ).map(
+      (documents) =>
+          documents
+              .where((d) => d['classUniqueCode'] == classUniqueCode)
+              .toList()
+            ..sort((a, b) {
+              final aDate =
+                  DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+                  DateTime.fromMillisecondsSinceEpoch(0);
+              final bDate =
+                  DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+                  DateTime.fromMillisecondsSinceEpoch(0);
+              return bDate.compareTo(aDate);
+            }),
+    );
   }
 
   /// Versione sincrona di [getDocumentsByClass].
   List<Map<String, dynamic>> getDocumentsByClassSync(String classUniqueCode) {
     return LocalDatabase.values(
-      _documentsBox,
-      (id, data) => {'id': id, ...data},
-    ).where((d) => d['classUniqueCode'] == classUniqueCode).toList()
+        _documentsBox,
+        (id, data) => {'id': id, ...data},
+      ).where((d) => d['classUniqueCode'] == classUniqueCode).toList()
       ..sort((a, b) {
-        final aDate = DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+        final aDate =
+            DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
             DateTime.fromMillisecondsSinceEpoch(0);
-        final bDate = DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+        final bDate =
+            DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
             DateTime.fromMillisecondsSinceEpoch(0);
         return bDate.compareTo(aDate);
       });
@@ -129,7 +142,9 @@ class DocumentsRepository {
   /// corrente; i successivi vengono emessi ad ogni modifica del box Hive.
   Stream<Map<String, dynamic>> getDeliveries(String docId) async* {
     yield getDeliveriesSync(docId);
-    yield* _deliveriesBox.watch(key: docId).map((_) => getDeliveriesSync(docId));
+    yield* _deliveriesBox
+        .watch(key: docId)
+        .map((_) => getDeliveriesSync(docId));
   }
 
   /// Versione sincrona di [getDeliveries]. Legge la mappa delle consegne
@@ -150,7 +165,9 @@ class DocumentsRepository {
     required bool isCurrentlyGiven,
   }) async {
     final deliveries = getDeliveriesSync(docId);
-    final current = Map<String, dynamic>.from(deliveries[studentId] as Map? ?? {});
+    final current = Map<String, dynamic>.from(
+      deliveries[studentId] as Map? ?? {},
+    );
 
     if (isCurrentlyGiven) {
       current['givenOutAt'] = null;
@@ -177,7 +194,9 @@ class DocumentsRepository {
     required bool isCurrentlyReceived,
   }) async {
     final deliveries = getDeliveriesSync(docId);
-    final current = Map<String, dynamic>.from(deliveries[studentId] as Map? ?? {});
+    final current = Map<String, dynamic>.from(
+      deliveries[studentId] as Map? ?? {},
+    );
 
     if (isCurrentlyReceived) {
       current['receivedAt'] = null;
@@ -202,7 +221,9 @@ class DocumentsRepository {
     required bool isCurrentlyExonerated,
   }) async {
     final deliveries = getDeliveriesSync(docId);
-    final current = Map<String, dynamic>.from(deliveries[studentId] as Map? ?? {});
+    final current = Map<String, dynamic>.from(
+      deliveries[studentId] as Map? ?? {},
+    );
 
     if (isCurrentlyExonerated) {
       current.remove('exoneratedAt');

@@ -129,8 +129,7 @@ class BluetoothPermissionService {
     if (notGranted.isNotEmpty) {
       if (context != null) {
         final shouldShowRationale = await _shouldShowRationale(notGranted);
-        if (shouldShowRationale) {
-          // ignore: use_build_context_synchronously
+        if (shouldShowRationale && context.mounted) {
           final userAgreed = await _showRationaleDialog(
             context,
             notGranted,

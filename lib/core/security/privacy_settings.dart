@@ -113,6 +113,10 @@ class PrivacySettingsNotifier extends StateNotifier<PrivacySettings> {
   }
 
   Future<void> setBlockScreenshots(bool value) async {
+    // M2 (fail-closed): applica/verifica PRIMA di persistere la preferenza.
+    // Se l'abilitazione fallisce, l'eccezione propaga al chiamante e lo
+    // stato non viene salvato come "bloccato".
+    await ScreenSecurity.setEnabled(value);
     state = PrivacySettings(
       lockOnBackground: state.lockOnBackground,
       blockScreenshots: value,
@@ -121,7 +125,6 @@ class PrivacySettingsNotifier extends StateNotifier<PrivacySettings> {
       absenceThreshold: state.absenceThreshold,
     );
     await _persist();
-    await ScreenSecurity.setEnabled(value);
   }
 
   Future<void> setCheckUpdatesOnStart(bool value) async {

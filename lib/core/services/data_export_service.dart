@@ -34,6 +34,7 @@ import 'package:hive/hive.dart';
 import '../auth/auth_service.dart';
 import '../storage/encrypted_file_storage.dart';
 import '../storage/local_database.dart';
+import '../../features/gdpr/tombstone_repository.dart';
 import '../../shared/models/catechesi_model.dart';
 import '../../shared/models/student_model.dart';
 import '../../shared/models/class_model.dart';
@@ -322,20 +323,62 @@ class DataExportService {
     SchoolClass? targetClass,
     PhaseCallback? onPhase,
   }) async {
+    // C4 / H5: mai "resuscitare" entità cancellate (Diritto all'Oblio o
+    // cleanup retention). Un import/ripristino/QR non deve riportare in vita
+    // un minore tombstoned: si filtrano studenti, allegati, note di contatto
+    // e annotazioni riferiti a entità con tombstone attivo.
+    final tombstoned = _tombstonedEntityIds();
+
     onPhase?.call('Importazione anagrafica ragazzi...');
     if (receivedData.containsKey('anagrafica')) {
+      final anagrafica = Map<String, dynamic>.from(
+        receivedData['anagrafica'] as Map,
+      );
+      if (tombstoned.isNotEmpty) {
+        anagrafica['students'] = (anagrafica['students'] as List? ?? [])
+            .where((item) {
+              final id = (item as Map)['id']?.toString() ?? '';
+              return !tombstoned.contains(id);
+            })
+            .toList();
+      }
       await _importAnagrafica(
-        receivedData['anagrafica'],
+        anagrafica,
         targetClass: targetClass,
       );
     }
     onPhase?.call('Importazione allegati studenti...');
     if (receivedData.containsKey('allegati_studenti')) {
-      await _importAllegati(receivedData['allegati_studenti'], 'student');
+      final allegati = Map<String, dynamic>.from(
+        receivedData['allegati_studenti'] as Map,
+      );
+      if (tombstoned.isNotEmpty) {
+        allegati['attachments'] = (allegati['attachments'] as List? ?? [])
+            .where((item) {
+              final parentId = (item as Map)['parentId']?.toString() ?? '';
+              return !tombstoned.contains(parentId);
+            })
+            .toList();
+      }
+      await _importAllegati(allegati, 'student');
     }
     onPhase?.call('Importazione presenze...');
     if (receivedData.containsKey('agenda')) {
-      await _importAgenda(receivedData['agenda']);
+      final agenda = Map<String, dynamic>.from(receivedData['agenda'] as Map);
+      if (tombstoned.isNotEmpty) {
+        agenda['attendance'] = (agenda['attendance'] as List? ?? []).map((item) {
+          final m = Map<String, dynamic>.from(item as Map);
+          if (m.containsKey('presence')) {
+            final presence = Map<String, dynamic>.from(m['presence'] as Map? ?? {});
+            for (final id in tombstoned) {
+              presence.remove(id);
+            }
+            m['presence'] = presence;
+          }
+          return m;
+        }).toList();
+      }
+      await _importAgenda(agenda);
     }
     onPhase?.call('Importazione programmazione...');
     if (receivedData.containsKey('programmazione')) {
@@ -354,7 +397,16 @@ class DataExportService {
     }
     onPhase?.call('Importazione note di contatto...');
     if (receivedData.containsKey('note_contatto')) {
-      await _importNoteContatto(receivedData['note_contatto']);
+      final notes = Map<String, dynamic>.from(
+        receivedData['note_contatto'] as Map,
+      );
+      if (tombstoned.isNotEmpty) {
+        notes['notes'] = (notes['notes'] as List? ?? []).where((item) {
+          final studentId = (item as Map)['studentId']?.toString() ?? '';
+          return !tombstoned.contains(studentId);
+        }).toList();
+      }
+      await _importNoteContatto(notes);
     }
     onPhase?.call('Importazione catechesi...');
     if (receivedData.containsKey('catechesi')) {
@@ -370,7 +422,16 @@ class DataExportService {
     }
     onPhase?.call('Importazione annotazioni...');
     if (receivedData.containsKey('annotazioni_giornaliere')) {
-      await _importStudentDailyNotes(receivedData['annotazioni_giornaliere']);
+      final notes = Map<String, dynamic>.from(
+        receivedData['annotazioni_giornaliere'] as Map,
+      );
+      if (tombstoned.isNotEmpty) {
+        notes['notes'] = (notes['notes'] as List? ?? []).where((item) {
+          final studentId = (item as Map)['studentId']?.toString() ?? '';
+          return !tombstoned.contains(studentId);
+        }).toList();
+      }
+      await _importStudentDailyNotes(notes);
     }
     onPhase?.call('Aggiornamento configurazione parrocchiale...');
     if (receivedData['parishConfig'] is Map) {
@@ -378,6 +439,15 @@ class DataExportService {
     }
     onPhase?.call('Aggiornamento classi...');
     await _ensureLocalCatechistInClasses();
+  }
+
+  /// ID delle entità attualmente tombstoned sul dispositivo locale.
+  static Set<String> _tombstonedEntityIds() {
+    try {
+      return TombstoneRepository().entityIdsTombstoned();
+    } catch (_) {
+      return <String>{};
+    }
   }
 
   /// Ripristina la configurazione parrocchiale ricevuta (incl. la modalità

@@ -44,7 +44,9 @@ import '../../core/storage/local_database.dart';
 import '../../shared/models/audit_action.dart';
 import '../../shared/models/audit_log.dart';
 import '../../shared/models/student_model.dart';
+import '../responsabile/audit_log_repository.dart';
 import '../students/students_repository.dart';
+import 'hard_delete_service.dart';
 
 /// Servizio di enforcement del periodo di conservazione GDPR.
 class GdprRetentionService {
@@ -195,6 +197,12 @@ class GdprRetentionService {
   ) {
     if (markedAt == null) return;
 
+    // C1: la pulizia non deve mai colpire studenti con consenso rinnovato
+    // o riattivati: rivalida lo stato corrente prima di procedere.
+    final scadenza = student.dataScadenzaTrattamento;
+    if (scadenza == null || !scadenza.isBefore(now)) return;
+    if (student.statoPercorso != 'RITIRATO') return;
+
     final markedDate = DateTime.tryParse(markedAt);
     if (markedDate == null) return;
 
@@ -211,8 +219,8 @@ class GdprRetentionService {
   //  ma rimuove i dati operativi dello studente dal database locale.
   static Future<void> _performSingleStudentCleanup(String studentId) async {
     try {
-      // M7 / Fase 3 — item 8: CASCATA DI CANCELLAZIONE REALE. In passato qui
-      // veniva eseguito un semplice `box.delete(studentId)`, lasciando sul
+      // C2 / M7 / Fase 3 — item 8: CASCATA DI CANCELLAZIONE REALE. In passato
+      // qui veniva eseguito un semplice `box.delete(studentId)`, lasciando sul
       // dispositivo gli allegati cifrati, le note giornaliere, i record
       // storici e le presenze del minore. Ora si usa la stessa cascata della
       // cancellazione manuale, che rimuove:
@@ -222,13 +230,11 @@ class GdprRetentionService {
       //   - lo studente dalle classi (studentIds);
       //   - presenze/consegne documenti;
       //   - il record studente stesso.
-      // Il tombstone e il registro trattamenti restano per la compliance
-      // storage limitation.
-      await StudentsRepository().deleteStudent(studentId);
-      debugPrint(
-        '[GdprRetention] Cleanup automatico dati completato per studente: $studentId '
-        '(grace period scaduto, cascata allegati/note/storici/presenze)',
-      );
+      // Inoltre viene creato e propagato un tombstone PRIMA della
+      // cancellazione, cosicché il minore non possa essere "resuscitato" da
+      // un sync P2P successivo di un dispositivo collega. Il tombstone e il
+      // registro trattamenti restano per la compliance storage limitation.
+      await HardDeleteService.retentionCleanupStudent(studentId);
     } catch (e) {
       if (kDebugMode) {
         debugPrint(
@@ -244,11 +250,28 @@ class GdprRetentionService {
     final Map<String, Map<String, dynamic>> processed,
     final DateTime now,
   ) async {
+    // C1: rivalida lo stato ATTUALE di ogni studente prima del cleanup.
+    // La mappa `processed` è caricata a inizio esecuzione e può contenere
+    // studenti il cui consenso è stato nel frattempo RINNOVATO (nuova
+    // dataScadenzaTrattamento) o il cui percorso è stato riattivato: in quei
+    // casi i dati non devono essere toccati.
+    final students = await StudentsRepository().getAllStudentsSync();
+    final studentsById = {for (final s in students) s.id: s};
+
     for (final entry in processed.entries) {
       final studentId = entry.key;
       final studentData = entry.value;
       final markedAt = studentData['markedAt'] as String?;
       if (markedAt == null) continue;
+
+      final student = studentsById[studentId];
+      if (student == null) continue; // già cancellato: nessun cleanup da fare.
+
+      // Consenso rinnovato o trattamento non più scaduto: salta.
+      final scadenza = student.dataScadenzaTrattamento;
+      if (scadenza == null || !scadenza.isBefore(now)) continue;
+      // Percorso riattivato (non più RITIRATO): salta.
+      if (student.statoPercorso != 'RITIRATO') continue;
 
       final markedDate = DateTime.tryParse(markedAt);
       if (markedDate == null) continue;
@@ -265,22 +288,17 @@ class GdprRetentionService {
     Student student,
     String expirationKey,
   ) async {
-    final logId = generateAuditLogUuidV4();
-    final now = DateTime.now().toUtc();
-    final executedByCatechistId = _currentOperatorId();
-    final executedByCatechistName = _currentOperatorName();
-    final auditLog = AuditLog(
-      logId: logId,
-      timestamp: now,
+    // A5: la voce viene scritta tramite AuditLogRepository.record, che firma
+    // HMAC la voce prima della persistenza (append-only). In passato la voce
+    // veniva scritta direttamente nel box senza firma, rendendo il Registro
+    // Trattamenti suscettibile di manomissione.
+    await AuditLogRepository().record(
       actionType: AuditActionType.retentionTreatmentExpired,
-      executedByCatechistId: executedByCatechistId,
-      executedByCatechistName: executedByCatechistName,
-      affectedEntityType: AuditLog.entityRagazzo,
       affectedEntityId: student.id,
+      affectedEntityType: AuditLog.entityRagazzo,
+      executedByCatechistId: _currentOperatorId(),
+      executedByCatechistName: _currentOperatorName(),
     );
-    final box = LocalDatabase.auditLog();
-    await box.put(auditLog.logId, auditLog.toMap());
-    await box.flush();
   }
 
   static String _currentOperatorId() {

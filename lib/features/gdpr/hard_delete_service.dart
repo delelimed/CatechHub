@@ -51,15 +51,16 @@ class HardDeleteService {
       return null;
     }
 
-    // 1. Storale: elimina il dato (cascade) e logga DELETE_STUDENT_HARD.
-    await StudentsRepository().deleteStudent(student.id);
-
-    // 2. Crea il tombstone locale.
-    final tombstone = await _buildTombstone(
+    // 1. Crea e registra PRIMA il tombstone (M9): se il processo si interrompe
+    //    tra la registrazione e la cancellazione, il tombstone impedisce
+    //    comunque la "resurrezione" del dato via sync P2P.
+    final tombstone = await createTombstone(
       entityType: AuditLog.entityRagazzo,
       entityId: student.id,
     );
-    await TombstoneRepository().put(tombstone);
+
+    // 2. Elimina il dato (cascade) e logga DELETE_STUDENT_HARD.
+    await StudentsRepository().deleteStudent(student.id);
 
     // 3. Propaga ai dispositivi associati connessi (best-effort).
     try {
@@ -75,16 +76,68 @@ class HardDeleteService {
     return tombstone;
   }
 
+  /// Crea e registra un tombstone per l'entità indicata.
+  ///
+  /// Il tombstone viene salvato nel repository locale (append-only): serve a
+  /// impedire la resurrezione dell'entità via sync P2P. La cancellazione dei
+  /// dati resta un'operazione separata.
+  static Future<Tombstone> createTombstone({
+    required String entityType,
+    required String entityId,
+  }) async {
+    final tombstone = await _buildTombstone(
+      entityType: entityType,
+      entityId: entityId,
+    );
+    await TombstoneRepository().put(tombstone);
+    return tombstone;
+  }
+
+  /// Cleanup automatico GDPR (termine di conservazione, Art. 5 GDPR).
+  ///
+  /// Eseguito dal [GdprRetentionService]: NON richiede il Diritto all'Oblio,
+  /// perché è l'enforcement automatico della scadenza del trattamento.
+  /// Crea PRIMA il tombstone (mai resuscitabile via sync), poi elimina i dati
+  /// operativi con la cascata completa, poi propaga ai dispositivi connessi.
+  static Future<Tombstone?> retentionCleanupStudent(String studentId) async {
+    try {
+      final tombstone = await createTombstone(
+        entityType: AuditLog.entityRagazzo,
+        entityId: studentId,
+      );
+      await StudentsRepository().deleteStudent(studentId);
+      try {
+        await P2PSyncService().broadcastTombstone(tombstone);
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint(
+            '[HardDelete] Broadcast tombstone retention fallito: $e',
+          );
+        }
+      }
+      return tombstone;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[HardDelete] Cleanup retention fallito per $studentId: $e');
+      }
+      return null;
+    }
+  }
+
   /// Applica localmente lo tombstone ricevuto da un dispositivo remoto e
   /// registra l'evento [AuditActionType.tombstoneReceived].
   ///
   /// Il tombstone viene SEMPRE registrato (append-only) per impedire la
   /// "resurrezione" del dato via sync. La cancellazione irreversibile del
-  /// dato, invece, viene eseguita SOLO se l'operatore locale possiede il
-  /// Diritto all'Oblio (Responsabile): una firma HMAC simmetrica (segreto
-  /// ECDH condiviso) autentica il mittente come dispositivo associato, ma
-  /// NON è sufficiente per autorizzare la cancellazione definitiva di un
-  /// minore su un dispositivo a privilegio ridotto.
+  /// dato viene eseguita su OGNI dispositivo che riceve il tombstone,
+  /// indipendentemente dal ruolo locale: l'eliminazione è già stata
+  /// autorizzata dal dispositivo mittente (l'autenticità è garantita dalla
+  /// firma HMAC sul segreto ECDH condiviso e dal gate di approvazione in
+  /// [P2PSyncService._handleTombstone]) e l'Art. 17 GDPR impone la cancellazione
+  /// senza ingiustificato ritardo su tutte le copie sotto il controllo del
+  /// titolare, incluse quelle sui dispositivi a privilegio ridotto.
+  /// In passato (C5) su tali dispositivi la PII del minore restava
+  /// indefinitamente nel box locale, violando lo storage limitation (Art. 5).
   static Future<bool> applyRemoteTombstone(Map<String, dynamic> ts) async {
     final entityId = ts['entityId'] as String?;
     final entityType = ts['entityType'] as String?;
@@ -97,18 +150,7 @@ class HardDeleteService {
     // 0. Conserva SEMPRE il tombstone: impedisce la resurrezione via sync.
     await repo.put(_buildRemoteTombstone(ts));
 
-    // 1. La cancellazione irreversibile richiede il Diritto all'Oblio.
-    if (!canHardDelete()) {
-      if (kDebugMode) {
-        debugPrint(
-          '[HardDelete] Tombstone registrato ma cancellazione non '
-          'eseguita: l\'operatore locale non possiede il Diritto all\'Oblio',
-        );
-      }
-      return false;
-    }
-
-    // 2. Eliminazione dell'entità nel box di origine.
+    // 1. Eliminazione dell'entità nel box di origine (su ogni dispositivo).
     var deleted = false;
     if (entityType == AuditLog.entityRagazzo) {
       try {
@@ -172,6 +214,8 @@ class HardDeleteService {
   }) async {
     String signer = 'unknown';
     String signingSecret = _localHello();
+    String signatureEd25519 = '';
+    String signerEd25519PublicKey = '';
     try {
       final security = P2PSecurityService();
       final identity = await security.getLocalIdentity();
@@ -181,6 +225,20 @@ class HardDeleteService {
       final keyPair = await security.getOrCreateIdentityKeyPair();
       final privBytes = await keyPair.extractPrivateKeyBytes();
       signingSecret = base64Encode(privBytes);
+      // A7: firma Ed25519 per-dispositivo (attribuibile e verificabile).
+      signatureEd25519 = await security.signTombstonePayload(
+        TombstoneService.canonical(
+          {
+            'entityType': entityType,
+            'entityId': entityId,
+            'executedBy': _operatorName(),
+            'executedByCatechistId': _operatorId(),
+            'deletedAt': DateTime.now().toUtc().toIso8601String(),
+          },
+        ),
+      );
+      signerEd25519PublicKey =
+          await security.getTombstoneSigningPublicKeyBase64();
     } catch (_) {}
     final deletedAt = DateTime.now().toUtc();
     final executedBy = _operatorName();
@@ -209,6 +267,8 @@ class HardDeleteService {
       executedByCatechistId: executedByCatechistId,
       signature: signature,
       signerDeviceId: signer,
+      signatureEd25519: signatureEd25519,
+      signerEd25519PublicKey: signerEd25519PublicKey,
     );
   }
 
@@ -225,6 +285,8 @@ class HardDeleteService {
       executedByCatechistId: ts['executedByCatechistId'] ?? '',
       signature: ts['signature'] ?? '',
       signerDeviceId: ts['signerDeviceId'] ?? '',
+      signatureEd25519: ts['signatureEd25519'] ?? '',
+      signerEd25519PublicKey: ts['signerEd25519PublicKey'] ?? '',
     );
   }
 

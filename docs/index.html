@@ -142,12 +142,12 @@
         <tr><td><strong>Blocco hardware</strong></td><td>Verifica TEE/StrongBox all'avvio — hardware di sicurezza obbligatorio, nessun fallback software</td></tr>
         <tr><td><strong>Dati sul telefono</strong></td><td>Cifrati con AES-256-GCM — chiave master in AndroidKeyStore (TEE/StrongBox); cifratura di campo aggiuntiva per i dati più sensibili</td></tr>
         <tr><td><strong>Sync P2P Bluetooth/WiFi</strong></td><td>Crittografia end-to-end TripleDH X25519 + HKDF-SHA256 + AES-256-GCM, rotazione chiavi di sessione ogni 30 minuti, pairing code a 6 cifre anti-MitM, key pinning per dispositivo, forward secrecy, canale classe cifrato per-classe</td></tr>
-        <tr><td><strong>Condivisione QR</strong></td><td>AES-256-GCM con PIN a 12 cifre (valido 3 min, PBKDF2 60.000 iterazioni), checksum SHA-256 per chunk, sync differenziale</td></tr>
+        <tr><td><strong>Condivisione QR</strong></td><td>AES-256-GCM con PIN a 12 cifre (valido 3 min, PBKDF2 350.000 iterazioni per i nuovi pacchetti), checksum SHA-256 per chunk, sync differenziale, rate-limit all'import</td></tr>
         <tr><td><strong>Schermo</strong></td><td>Blocco screenshot e screen recording non autorizzati</td></tr>
         <tr><td><strong>Protezione runtime</strong></td><td>freeRASP: rilevamento root, emulatori, hooking, tampering</td></tr>
-        <tr><td><strong>Sessione in background</strong></td><td>Blocco automatico dopo 2 minuti di inattività</td></tr>
-        <tr><td><strong>Backup</strong></td><td>Protetto da password con PBKDF2 (210.000 / 350.000 iterazioni) + AES-256-GCM; anti-brute-force su import</td></tr>
-        <tr><td><strong>GDPR</strong></td><td>Registro Trattamenti firmato HMAC-SHA256, consensi con scadenza e retention automatica, tombstone anti-resurrezione per la cancellazione</td></tr>
+        <tr><td><strong>Sessione in background</strong></td><td>Blocco automatico dopo 2 minuti in background e 5 minuti di inattività in foreground</td></tr>
+        <tr><td><strong>Backup</strong></td><td>Protetto da password con PBKDF2 (210.000 iterazioni, PIN min 12 alfanumerici) + AES-256-GCM; l'export conformità GDPR usa 350.000 iterazioni con anti-brute-force (5 tentativi / 30 min)</td></tr>
+        <tr><td><strong>GDPR</strong></td><td>Registro Trattamenti firmato HMAC-SHA256, consensi con scadenza ed evidenza del firmatario, retention automatica, tombstone firmati (HMAC + Ed25519) anti-resurrezione per la cancellazione</td></tr>
       </tbody>
     </table>
 
@@ -288,7 +288,7 @@
         <tr><td>Framework</td><td>Flutter &amp; Dart</td></tr>
         <tr><td>Gestione stato</td><td>Riverpod</td></tr>
         <tr><td>Database locale</td><td>Hive (cifrato AES-256-GCM, chiave hardware-backed)</td></tr>
-        <tr><td>Crittografia</td><td>AES-256-GCM, X25519 (TripleDH), Ed25519, ECDH P-256, PBKDF2-HMAC-SHA256, HKDF-SHA256, HMAC-SHA256</td></tr>
+        <tr><td>Crittografia</td><td>AES-256-GCM, X25519 (TripleDH/ECDH), Ed25519, PBKDF2-HMAC-SHA256, HKDF-SHA256, HMAC-SHA256</td></tr>
         <tr><td>Sincronizzazione P2P</td><td>Google Nearby Connections (P2P_CLUSTER — Bluetooth/WiFi Direct) + canale classe cifrato + canale parrocchiale</td></tr>
         <tr><td>Autenticazione</td><td>Biometria nativa Android</td></tr>
         <tr><td>QR Code</td><td>mobile_scanner, qr_flutter</td></tr>
@@ -316,7 +316,7 @@
 
     <div class="faq-item">
       <h3>I dati sono sicuri?</h3>
-      <p>Assolutamente sì. CatechHub è stato progettato con la privacy al centro. I dati non vengono mai caricati su cloud o server esterni: restano <strong>solo sul tuo telefono</strong>. Il database è crittografato con AES-256-GCM (chiave in AndroidKeyStore con hardware TEE/StrongBox), i dati più sensibili hanno una cifratura di campo aggiuntiva, l'accesso è protetto da impronta digitale o PIN, e la sincronizzazione con altri catechisti avviene con crittografia end-to-end. In più, l'app blocca screenshot non autorizzati e si blocca automaticamente dopo 2 minuti di inattività.</p>
+      <p>Assolutamente sì. CatechHub è stato progettato con la privacy al centro. I dati non vengono mai caricati su cloud o server esterni: restano <strong>solo sul tuo telefono</strong>. Il database è crittografato con AES-256-GCM (chiave in AndroidKeyStore con hardware TEE/StrongBox), i dati più sensibili hanno una cifratura di campo aggiuntiva, l'accesso è protetto da impronta digitale o PIN, e la sincronizzazione con altri catechisti avviene con crittografia end-to-end. In più, l'app blocca screenshot non autorizzati e si blocca automaticamente dopo 2 minuti in background (o 5 minuti di inattività).</p>
     </div>
 
     <div class="faq-item">

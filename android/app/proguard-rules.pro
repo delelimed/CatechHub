@@ -75,12 +75,12 @@
 -keep class dev.fluttercommunity.plus.deviceinfo.** { public *; }
 
 # =========================================================================
-# 7. TUO CANALE BLUETOOTH NATIVO (ch.catechhub.app)
+# 7. TUO CANALE BLUETOOTH NATIVO (com.delelimed.catechhub)
 # =========================================================================
 # Poiché usi un MethodChannel personalizzato scritto in Kotlin, dobbiamo 
 # assicurarci che la classe del tuo plugin e i metodi richiamati via riflessione 
 # non vengano eliminati. Manteniamo la classe e i suoi membri pubblici.
--keep class ch.catechhub.app.** {
+-keep class com.delelimed.catechhub.** {
     public *;
 }
 

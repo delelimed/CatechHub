@@ -15,6 +15,11 @@ class EncryptionService {
   // il brute-force offline del PIN QR (insieme alla lunghezza minima di 10
   // cifre del PIN, la ricerca esaustiva diventa impraticabile).
   static const int fastShareIterations = 60000;
+  // A1: iterazioni usate per i NUOVI pacchetti QR share. Allineate al backup
+  // (350000): rendono impraticabile il brute-force offline del PIN (10^12
+  // combinazioni). La decifratura accetta anche i pacchetti legacy a 60000
+  // iterazioni (stesso AAD QR) per non rompere i dati già condivisi.
+  static const int secureShareIterations = 350000;
   static const int saltLength = 16;
   static const int nonceLength = 12;
   static const int tagLengthBytes = 16;
@@ -35,6 +40,13 @@ class EncryptionService {
       List<int>.generate(length, (_) => random.nextInt(256)),
     );
   }
+
+  /// True se il pacchetto usa il contesto QR share (AAD dedicato).
+  /// Accetta sia le iterazioni legacy (60000) sia quelle correnti (350000)
+  /// per la decifratura retrocompatibile dei pacchetti già condivisi.
+  static bool _isQrShareContext(int iterations) =>
+      iterations == fastShareIterations ||
+      iterations == secureShareIterations;
 
   // ──────────────────────────────────────────────
   //  PBKDF2 — DERIVAZIONE CHIAVE DA PASSWORD
@@ -84,7 +96,7 @@ class EncryptionService {
     );
     final jsonData = jsonEncode(data);
 
-    final isFastShare = iterations == fastShareIterations;
+    final isFastShare = _isQrShareContext(iterations);
     final aad = isFastShare ? _aadQrShare : _aadPasswordData;
 
     // AES-256-GCM standard: ciphertext || tag (16 byte), identico al formato
@@ -140,7 +152,7 @@ class EncryptionService {
         iterations: iterations,
       );
 
-      final isFastShare = iterations == fastShareIterations;
+      final isFastShare = _isQrShareContext(iterations);
       final aad = isFastShare ? _aadQrShare : _aadPasswordData;
 
       // Ricostruisce nonce || ciphertext || tag e decifra con AES-256-GCM.

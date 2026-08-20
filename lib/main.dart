@@ -13,6 +13,7 @@ import 'package:wiredash/wiredash.dart';
 
 import 'app/router.dart';
 import 'core/auth/auth_provider.dart';
+import 'core/auth/hard_lock_screen.dart';
 import 'core/auth/session_lifecycle_observer.dart';
 import 'core/navigation/back_button_handler.dart';
 import 'core/providers/nearby_sync_provider.dart';
@@ -168,6 +169,18 @@ Future<void> main() async {
       // handler custom per gli errori del framework.
       // ══════════════════════════════════════════════════════════════════════
       WidgetsFlutterBinding.ensureInitialized();
+
+      // ─────────────────────────────────────────────────────────────────────
+      // SICUREZZA LOG IN RELEASE: nessun debugPrint in produzione.
+      //
+      // L'app gestisce dati sensibili di minori: in release le schermate di
+      // log debug (che possono contenere dati personali, PIN e segreti) NON
+      // devono finire su logcat / console di sistema. debugPrint viene quindi
+      // reso no-op nei build di release, pur restando attivo in debug.
+      // ─────────────────────────────────────────────────────────────────────
+      if (kReleaseMode) {
+        debugPrint = (String? message, {int? wrapWidth}) {};
+      }
 
       // ══════════════════════════════════════════════════════════════════════
       // FASE 0.5 - INIZIALIZZAZIONE FREERASP (SICUREZZA RUNTIME)
@@ -675,21 +688,26 @@ class MyApp extends ConsumerWidget {
                 data: (_) {
                   return BackButtonHandler(
                     router: router,
-                    child: Router(
-                      routerDelegate: router.routerDelegate,
-                      routeInformationParser: router.routeInformationParser,
-                      routeInformationProvider: router.routeInformationProvider,
+                    child: HardLockGuard(
+                      child: Router(
+                        routerDelegate: router.routerDelegate,
+                        routeInformationParser: router.routeInformationParser,
+                        routeInformationProvider:
+                            router.routeInformationProvider,
+                      ),
                     ),
                   );
                 },
                 loading: () => isLoginRoute
                     ? BackButtonHandler(
                         router: router,
-                        child: Router(
-                          routerDelegate: router.routerDelegate,
-                          routeInformationParser: router.routeInformationParser,
-                          routeInformationProvider:
-                              router.routeInformationProvider,
+                        child: HardLockGuard(
+                          child: Router(
+                            routerDelegate: router.routerDelegate,
+                            routeInformationParser: router.routeInformationParser,
+                            routeInformationProvider:
+                                router.routeInformationProvider,
+                          ),
                         ),
                       )
                     : const _LoadingScreen(),

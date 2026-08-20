@@ -123,7 +123,7 @@ class QRChunk {
 class QRDataService {
   static const int maxQRSize = 1200;
   // PIN di 12 cifre: con 10^12 combinazioni e KDF PBKDF2-SHA256
-  // (fastShareIterations = 60000) il brute-force offline del PIN QR diventa
+  // (secureShareIterations = 350000) il brute-force offline del PIN QR diventa
   // impraticabile, anche per un pacchetto QR valido 3 minuti.
   static const int pinLength = 12;
 
@@ -188,7 +188,7 @@ class QRDataService {
     final encryptedData = await EncryptionService.encryptData(
       packagePayload,
       pin,
-      iterations: EncryptionService.fastShareIterations,
+      iterations: EncryptionService.secureShareIterations,
     );
     return DataPackage(
       encryptedData: encryptedData,
@@ -817,5 +817,45 @@ class QRDataService {
   static Map<String, dynamic> deserializeIndexFromChunks(List<QRChunk> chunks) {
     final assembled = assembleChunks(chunks);
     return decompressData(assembled);
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // A9 — INDICE CIFRATO CON IL PIN DI SESSIONE
+  // ═════════════════════════════════════════════════════════════════════════
+
+  /// Cifra l'indice del database con il PIN di sessione e lo segmenta in
+  /// chunk QR.
+  ///
+  /// A9: l'indice (id + timestamp dei record) NON viaggia più in chiaro.
+  /// Sebbene contenga solo metadati opachi, cifrarlo impedisce che un terzo
+  /// possa fotografare/leggere l'elenco dei record esistenti durante la
+  /// condivisione (metadata exposure). Il PIN è quello generato dal mittente
+  /// all'inizio del flusso e comunicato al ricevente prima dello scambio.
+  static Future<List<Map<String, dynamic>>> encryptIndexToChunks(
+    Map<String, dynamic> indexMap,
+    String pin,
+  ) async {
+    final package = await createPackage(indexMap, pin);
+    final compressedPackage = compressData(package.toMap());
+    final segments = segmentData(compressedPackage);
+    return segments
+        .asMap()
+        .entries
+        .map(
+          (entry) =>
+              createQRChunk(entry.value, entry.key, segments.length).toMap(),
+        )
+        .toList();
+  }
+
+  /// Riassembla e decifra un indice ricevuto (cifrato con il PIN di sessione).
+  /// Lancia [Exception] se il PIN è errato, i chunk sono incompleti/corrotti
+  /// o il pacchetto è scaduto.
+  static Future<Map<String, dynamic>> decryptIndexFromChunks(
+    List<QRChunk> chunks,
+    String pin,
+  ) async {
+    final assembled = assembleChunks(chunks);
+    return extractPackageData(assembled, pin);
   }
 }

@@ -47,9 +47,9 @@
       <tbody>
         <tr><td>Dati a riposo (Hive)</td><td>AES-256-GCM</td><td>Nonce 12B, tag 128bit, chiave 256bit master in AndroidKeyStore (TEE/StrongBox)</td><td>NIST SP 800-38D</td></tr>
         <tr><td>Campi sensibili (field encryption)</td><td>AES-256-GCM</td><td>Formato <code>cieI1:</code>, chiave per-dispositivo (32B) nel box cifrato</td><td>NIST SP 800-38D</td></tr>
-        <tr><td>Derivazione chiave (backup generale)</td><td>PBKDF2-HMAC-SHA256</td><td>210.000 iterazioni, salt 16B, key 32B</td><td>NIST SP 800-132</td></tr>
-        <tr><td>Derivazione chiave (backup conformità GDPR)</td><td>PBKDF2-HMAC-SHA256</td><td>350.000 iterazioni, PIN min. 12 alfanumerici, anti-brute-force (5 tentativi / 30 min)</td><td>NIST SP 800-132</td></tr>
-        <tr><td>Derivazione chiave (share rapido QR)</td><td>PBKDF2-HMAC-SHA256</td><td>60.000 iterazioni, PIN 12 cifre (3 min)</td><td>NIST SP 800-132</td></tr>
+        <tr><td>Derivazione chiave (backup generale)</td><td>PBKDF2-HMAC-SHA256</td><td>210.000 iterazioni, salt 16B, key 32B, PIN min. 12 alfanumerici richiesto in UI</td><td>NIST SP 800-132</td></tr>
+        <tr><td>Derivazione chiave (export conformità GDPR)</td><td>PBKDF2-HMAC-SHA256</td><td>350.000 iterazioni, salt 16B, key 32B, PIN min. 12 alfanumerici, anti-brute-force (5 tentativi / 30 min)</td><td>NIST SP 800-132</td></tr>
+        <tr><td>Derivazione chiave (condivisione QR)</td><td>PBKDF2-HMAC-SHA256</td><td>350.000 iterazioni per i nuovi pacchetti, PIN 12 cifre (3 min). 60.000 accettate solo in lettura per compatibilità</td><td>NIST SP 800-132</td></tr>
         <tr><td>Scambio chiavi (sync)</td><td>X25519 TripleDH</td><td>Static↔static + static↔effimero + effimero↔effimero, chiave per dispositivo associato</td><td>RFC 7748</td></tr>
         <tr><td>Session key derivation</td><td>HKDF-SHA256</td><td>Info: "CatechHub_P2P_Session_v3", rotazione chiavi ogni 30 minuti</td><td>RFC 5869</td></tr>
         <tr><td>Cifratura sync P2P</td><td>AES-256-GCM</td><td>Chiave di sessione derivata da TripleDH + HKDF, nonce 12B, tag 128bit</td><td>NIST SP 800-38D</td></tr>
@@ -57,6 +57,7 @@
         <tr><td>Key pinning</td><td>Confronto chiave pubblica</td><td>Chiave X25519 ricevuta vs salvata in associazione</td><td>Key continuity management</td></tr>
         <tr><td>Catena di fiducia</td><td>Ed25519</td><td>Certificati di approvazione asimmetrici, validità 30 giorni, revoche firmate, trust root via QR (solo chiave pubblica)</td><td>RFC 8032</td></tr>
         <tr><td>Registro Trattamenti</td><td>HMAC-SHA256</td><td>Audit log append-only firmato, verifica constant-time</td><td>FIPS 198-1</td></tr>
+        <tr><td>Tombstone (diritto all'oblio)</td><td>HMAC-SHA256 + Ed25519</td><td>HMAC sul canale P2P + firma asimmetrica per-dispositivo (attribuibile), verifica con la chiave pubblica del firmatario</td><td>FIPS 198-1 / RFC 8032</td></tr>
         <tr><td>Hashing ID messaggio</td><td>SHA-256</td><td>Digest 32B</td><td>FIPS 180-4</td></tr>
         <tr><td>Aggiornamenti (TLS)</td><td>Certificate pinning</td><td>Fingerprint SHA-256 dei certificati GitHub, fail-closed</td><td>RFC 7469</td></tr>
         <tr><td>Formato legacy (v1)</td><td>Rimosso</td><td>AES-256-CBC senza MAC non è più accettato (anti-downgrade / padding oracle)</td><td>—</td></tr>
@@ -68,7 +69,7 @@
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
       <li><strong>Autenticazione biometrica</strong>: impronta digitale o riconoscimento facciale tramite BiometricPrompt di Android. <code>biometricOnly=false</code>: se la biometria non è disponibile, fallback a PIN/Pattern/Password del dispositivo.</li>
       <li><strong>Sessione in RAM</strong>: lo stato di autenticazione vive esclusivamente in memoria volatile. Nessun token persistito su disco.</li>
-      <li><strong>Timeout sessione</strong>: 120 secondi in background. Trascorso il timeout, la sessione viene invalidata e l'utente deve riautenticarsi.</li>
+      <li><strong>Timeout sessione</strong>: 120 secondi in background. Trascorso il timeout, la sessione viene invalidata e l'utente deve riautenticarsi. In aggiunta, un blocco per inattività in foreground dopo 5 minuti.</li>
       <li><strong>Verifica hardware all'avvio</strong>: <code>SecurityManager</code> (singleton) controlla la presenza di TEE (Trusted Execution Environment) o StrongBox tramite <code>local_auth</code> (proxy biometria) e <code>FlutterSecureStorage</code> (test Keystore) prima di generare la chiave master. Se l'hardware di sicurezza non è disponibile, l'app <strong>non si avvia</strong> — solleva <code>HardwareSecurityException</code> e mostra <code>SecurityBlockScreen</code>. Nessun fallback software.</li>
     </ul>
 

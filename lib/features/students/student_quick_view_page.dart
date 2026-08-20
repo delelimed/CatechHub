@@ -444,17 +444,36 @@ class _ConsensoContributoCardState
 
   Future<void> _registraScheda() async {
     final durata = ConsensiService.durataMesiDaConfig();
+    final controller = TextEditingController();
     final conferma = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         icon: const Icon(Icons.task_alt_rounded),
         title: const Text('Registra scheda firmata'),
-        content: Text(
-          'Confermi che la famiglia di ${_student.name} ${_student.surname} '
-          'ha firmato la scheda di iscrizione unificata? Il trattamento dei '
-          'dati sarà valido per $durata mesi dalla data di oggi.',
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 13, height: 1.4),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Confermi che la famiglia di ${_student.name} ${_student.surname} '
+              'ha firmato la scheda di iscrizione unificata? Il trattamento dei '
+              'dati sarà valido per $durata mesi dalla data di oggi.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Firmatario (genitore/tutore)',
+                hintText: 'Es. Mario Rossi',
+                prefixIcon: Icon(Icons.draw_rounded, size: 20),
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -469,7 +488,12 @@ class _ConsensoContributoCardState
       ),
     );
     if (conferma != true) return;
-    await ConsensiService.registraScheda(_student);
+    final firmatario = controller.text.trim();
+    if (firmatario.isEmpty) {
+      _snack('Inserisci il nome del firmatario per registrare la firma.');
+      return;
+    }
+    await ConsensiService.registraScheda(_student, firmatario: firmatario);
     final firma = DateTime.now();
     final mesi = ConsensiService.durataMesiDaConfig();
     setState(
@@ -484,6 +508,7 @@ class _ConsensoContributoCardState
           59,
           59,
         ),
+        consensoFirmatario: firmatario,
       ),
     );
     _snack(

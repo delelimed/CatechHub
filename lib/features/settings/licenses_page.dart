@@ -59,8 +59,6 @@ SOFTWARE.
       'version': '^2.3.0',
       'license': 'BSD-3-Clause',
     },
-    {'name': 'pointycastle', 'version': '^4.0.0', 'license': 'MIT'},
-    {'name': 'crypto', 'version': '^3.0.3', 'license': 'BSD-3-Clause'},
     {'name': 'cryptography', 'version': '^2.7.0', 'license': 'Apache-2.0'},
     {'name': 'freerasp', 'version': '^8.0.0', 'license': 'MIT'},
     {'name': 'file_picker', 'version': '^12.0.0-beta.7', 'license': 'MIT'},

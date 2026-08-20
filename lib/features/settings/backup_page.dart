@@ -26,10 +26,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/auth/auth_provider.dart';
+import '../../core/services/backup_encryption_service.dart';
 import '../../core/services/data_export_service.dart';
 import '../../core/providers/current_class_provider.dart';
 import '../../shared/models/class_model.dart';
-import '../../shared/utils/auth_utils.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../classes/classes_provider.dart';
 import '../documents/documents_provider.dart';
@@ -79,30 +79,15 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         return;
       }
 
-      // Chiedi il PIN per cifrare il backup (PIN dedicato al file di backup)
-      final pin = await _askPin(
-        title: 'Cifra Backup',
-        message:
-            'Crea un PIN per proteggere il file di backup.\nQuesto PIN sarà necessario per ripristinare il backup.',
+      // A2: chiedi il PIN per cifrare il backup (politica forte: almeno
+      // 12 caratteri alfanumerici con lettere e cifre, conferma in dialogo).
+      if (!mounted) return;
+      final pin = await BackupEncryptionService.showBackupPinDialog(
+        context: context,
+        isExport: true,
       );
       if (pin == null) {
         if (mounted) setState(() => _isExporting = false);
-        return;
-      }
-
-      // Conferma PIN
-      final confirmPin = await _askPin(
-        title: 'Conferma PIN',
-        message: 'Reinserisci il PIN per confermare.',
-      );
-      if (confirmPin == null || confirmPin != pin) {
-        if (mounted) {
-          setState(() {
-            _isExporting = false;
-            _statusMessage = 'I PIN non coincidono';
-            _isError = true;
-          });
-        }
         return;
       }
 
@@ -152,13 +137,16 @@ class _BackupPageState extends ConsumerState<BackupPage> {
 
       // Permetti all'utente di scegliere dove salvare
       final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-      final catechistName = getCurrentCatechistName();
       final className = exportClass != null
           ? exportClass.name
           : 'ClassiCompleto';
+      // Il nome file NON include il nome del catechista: i backup contengono
+      // dati sensibili di minori e un nome file con dati personali aumenterebbe
+      // il rischio di esposizione PII se il file venisse condiviso o caricato
+      // accidentalmente su un servizio di cloud.
       final fileName =
-          'catechhub_backup_${_sanitizeFilename(catechistName)}_'
-          '${_sanitizeFilename(className)}_$timestamp.catechhub';
+          'catechhub_backup_${_sanitizeFilename(className)}_$timestamp'
+          '.catechhub';
 
       String? savedPath;
       bool saved = false;
@@ -257,10 +245,12 @@ class _BackupPageState extends ConsumerState<BackupPage> {
 
       final encryptedData = utf8.decode(await file.readAsBytes());
 
-      // Chiedi il PIN per decifrare
-      final pin = await _askPin(
-        title: 'Decifra Backup',
-        message: 'Inserisci il PIN usato per proteggere questo backup.',
+      // Chiedi il PIN per decifrare (in lettura accetta anche i PIN numerici
+      // legacy usati dalle versioni precedenti)
+      if (!mounted) return;
+      final pin = await BackupEncryptionService.showBackupPinDialog(
+        context: context,
+        isExport: false,
       );
       if (pin == null) {
         if (mounted) setState(() => _isImporting = false);
@@ -345,82 +335,10 @@ class _BackupPageState extends ConsumerState<BackupPage> {
     }
   }
 
-  // ────────────────────────────────────────────
+// ────────────────────────────────────────────
   //  DIALOGS
   // ────────────────────────────────────────────
 
-  Future<String?> _askPin({
-    required String title,
-    required String message,
-  }) async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.lock_rounded, color: Color(0xFF174A7E)),
-            const SizedBox(width: 8),
-            Text(title),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(message),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              obscureText: true,
-              maxLength: 12,
-              decoration: InputDecoration(
-                labelText: 'PIN',
-                hintText: 'Inserisci il PIN (min 10 cifre)',
-                prefixIcon: const Icon(Icons.security_rounded),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                counterText: '',
-              ),
-              style: const TextStyle(fontSize: 20, letterSpacing: 8),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, null),
-            child: const Text('Annulla'),
-          ),
-          TextButton(
-            onPressed: () {
-              final pin = controller.text.trim();
-              // Min 10 cifre: rende il brute-force offline del file impraticabile.
-              if (pin.length < 10) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(
-                    content: Text('Il PIN deve essere di almeno 10 cifre.'),
-                  ),
-                );
-                return;
-              }
-              Navigator.pop(ctx, pin);
-            },
-            child: const Text('Conferma'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    return (result != null && result.isNotEmpty) ? result : null;
-  }
-
-  /// Dialog per scegliere lo scope di esportazione: tutte le classi
-  /// oppure una singola classe del catechista.
-  ///
-  /// Ritorna `'ALL'` per tutte le classi, l'id della classe selezionata,
-  /// oppure `null` se l'utente annulla.
   Future<String?> _askExportScope() async {
     final myClasses = ref.read(myClassesProvider);
     var selected = 'ALL';

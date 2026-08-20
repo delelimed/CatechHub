@@ -1515,6 +1515,77 @@ class P2PSecurityService {
     }
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // A7 — FIRMA Ed25519 PER-DISPOSITIVO DEI TOMBSTONE
+  //
+  // I tombstone (Diritto all'Oblio) vengono firmati anche con una chiave
+  // Ed25519 LEGATA ALL'IDENTITÀ del dispositivo: la chiave viene derivata
+  // dallo stesso seed della coppia X25519 di identità, quindi è stabile per
+  // tutto il ciclo di vita del device e cambia se l'identità viene rigenerata.
+  //
+  // Differenza rispetto al vecchio HMAC simmetrico (segreto ECDH condiviso):
+  // la firma Ed25519 è ASIMMETRICA e attribuibile a un singolo dispositivo.
+  // Un dispositivo compromesso può firmare solo tombstone a proprio nome
+  // (attribuibili e verificabili), non può spacciarli per un altro device.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Recupera (derivandola dal seed dell'identità X25519) la coppia di firma
+  /// Ed25519 per i tombstone. Il seed è lo stesso della coppia di identità
+  /// P2P: se l'identità viene rigenerata cambia anche questa firma.
+  Future<SimpleKeyPair> getOrCreateTombstoneSigningKeyPair() async {
+    final identityKeyPair = await getOrCreateIdentityKeyPair();
+    final seed = await identityKeyPair.extractPrivateKeyBytes();
+    if (seed.length != 32) {
+      throw Exception(
+        'Seed identità non valido per la derivazione Ed25519 dei tombstone.',
+      );
+    }
+    // Deriva la coppia dal seed: stabile, senza persistenza aggiuntiva.
+    return await _ed25519.newKeyPairFromSeed(seed);
+  }
+
+  /// Chiave pubblica Ed25519 (base64) usata per firmare i tombstone locali.
+  Future<String> getTombstoneSigningPublicKeyBase64() async {
+    final keyPair = await getOrCreateTombstoneSigningKeyPair();
+    final publicKey = await keyPair.extractPublicKey();
+    return base64Encode(publicKey.bytes);
+  }
+
+  /// Firma il payload canonico del tombstone con la chiave privata Ed25519
+  /// del dispositivo. Ritorna la firma in base64.
+  Future<String> signTombstonePayload(String canonicalPayload) async {
+    final keyPair = await getOrCreateTombstoneSigningKeyPair();
+    final signature = await _ed25519.sign(
+      utf8.encode(canonicalPayload),
+      keyPair: keyPair,
+    );
+    return base64Encode(signature.bytes);
+  }
+
+  /// Verifica la firma Ed25519 di un tombstone contro la chiave pubblica del
+  /// firmatario dichiarata. Asimmetrica: la sola chiave pubblica non consente
+  /// di falsificare la firma.
+  static Future<bool> verifyTombstoneSignature({
+    required String canonicalPayload,
+    required String signature,
+    required String publicKeyBase64,
+  }) async {
+    if (signature.isEmpty || publicKeyBase64.isEmpty) return false;
+    try {
+      final publicKey = SimplePublicKey(
+        base64Decode(publicKeyBase64),
+        type: KeyPairType.ed25519,
+      );
+      final sig = Signature(base64Decode(signature), publicKey: publicKey);
+      return await Ed25519().verify(
+        utf8.encode(canonicalPayload),
+        signature: sig,
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Firma un certificato di approvazione per un nuovo dispositivo.
   /// Il certificato include la SCADENZA ([expiresAt]) e viene firmato con la
   /// chiave privata Ed25519 del Responsabile.

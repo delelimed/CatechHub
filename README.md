@@ -46,16 +46,16 @@ CatechHub adotta un approccio **defense-in-depth**, dove ogni livello è progett
 | **Sincronizzazione P2P BT/WiFi** | End-to-end encryption con **TripleDH X25519 + HKDF-SHA256 + AES-256-GCM** — chiavi per-dispositivo per l'associazione, chiavi effimere per sessione (forward secrecy), **rotazione chiave di sessione ogni 30 minuti**, pairing code a 6 cifre anti-MitM, key pinning sulle riconnessioni, **doppio consenso** per dispositivi "Altro Catechista" |
 | **Canale classe (P2P)** | **Chiave per-classe AES-256-GCM**: i dispositivi "Senza Titolo" ricevono solo blob opachi (relay) e non possono leggere i dati |
 | **Canale parrocchiale (P2P)** | Avvisi e riunioni della rete parrocchiale scambiati **in chiaro** tra dispositivi associati: per scelta di design non contengono dati personali (solo testo di comunicazione). I dati personali passano sempre dal canale classe cifrato |
-| **Condivisione QR** | Cifratura AES-256-GCM con **PIN a 12 cifre** (valido 3 minuti, PBKDF2-SHA256 60.000 iterazioni), checksum SHA-256 per chunk, chunking automatico, sync differenziale |
+| **Condivisione QR** | Cifratura AES-256-GCM con **PIN a 12 cifre** (valido 3 minuti, PBKDF2-HMAC-SHA256 **350.000 iterazioni** per i nuovi pacchetti; 60.000 solo per compatibilità con i vecchi), checksum SHA-256 per chunk, chunking automatico, sync differenziale, **rate-limit anti-brute-force all'import** (5 tentativi errati → blocco 1 minuto) |
 | **Schermo** | Blocco screenshot e screen recording non autorizzati con FLAG_SECURE |
 | **Runtime** | freeRASP (Talsec) rileva e blocca root, emulatori, tampering, hooking e hacking |
-| **Sessione** | Blocco automatico dopo 2 minuti in background, stato solo in RAM |
-| **Backup** | AES-256-GCM con derivazione **PBKDF2-HMAC-SHA256** — backup generale 210.000 iterazioni (PIN min. 10 cifre); export conformità GDPR/audit 350.000 iterazioni (PIN min. 12 caratteri alfanumerici) con **anti-brute-force** (5 tentativi, blocco 30 min) |
+| **Sessione** | Stato solo in RAM (mai persistito su disco); blocco automatico dopo 2 minuti in background e dopo 5 minuti di inattività in foreground |
+| **Backup** | AES-256-GCM con derivazione **PBKDF2-HMAC-SHA256** — **210.000 iterazioni** e **PIN min. 12 caratteri alfanumerici** (chiave forte richiesta all'esportazione); l'**export conformità GDPR** (Registro Trattamenti) usa **350.000 iterazioni** con **anti-brute-force** (5 tentativi, blocco 30 min) |
 | **Aggiornamenti** | Controllo versione verso GitHub con **certificate pinning SHA-256** (fail-closed), opzionale e disattivabile dalle impostazioni |
 | **Associazioni P2P** | Chiavi X25519 per dispositivo salvate con l'associazione — chiave pubblica remota verificata ad ogni riconnessione (key pinning) |
 | **Catena di fiducia** | Certificati di approvazione **Ed25519** (firma asimmetrica) con scadenza 30 giorni, verificati su una trust root pubblica (QR di fiducia), revoche firmate propagate peer-to-peer |
 | **GDPR / Tracciabilità** | Ogni registrazione memorizza data, ora e autore dell'ultima modifica; **Registro Trattamenti** firmato **HMAC-SHA256** (audit log append-only) per ogni operazione rilevante |
-| **Diritto all'oblio** | Tombstone **firmati** e propagati peer-to-peer che impediscono la "resurrezione" dei dati cancellati; hard delete irreversibile (solo Responsabile) |
+| **Diritto all'oblio** | Tombstone **firmati** (HMAC-SHA256 sul canale P2P + firma **Ed25519 per-dispositivo**, asimmetrica e attribuibile) e propagati peer-to-peer che impediscono la "resurrezione" dei dati cancellati; hard delete irreversibile (solo Responsabile) |
 | **Retention automatica** | Consensi con scadenza: scaduti → stato RITIRATO → 30 giorni di grazia → cancellazione a cascata automatica dei dati |
 
 > **Nessun dato personale lascia mai il tuo telefono** se non durante una sincronizzazione volontaria con un altro catechista di tua fiducia, previa approvazione e crittografia end-to-end.
@@ -68,7 +68,7 @@ CatechHub è progettata per **lasciare al catechista il pieno controllo dei prop
 - **Sei tu a gestire i dati.** L'utente è il soggetto che tratta e gestisce i dati: inserimento, modifica ed eliminazione avvengono direttamente dal tuo dispositivo. Non esistono account remoti, profili online o registri lato server.
 - **Dati sensibili trattati con cautela (art. 9 GDPR).** I dati dei minori sono informazioni "particolari" e come tali vengono trattati: cifrati con AES-256-GCM, custoditi nel secure storage hardware, con cifratura di campo aggiuntiva per i dati più delicati e accessibili solo previa autenticazione all'app.
 - **Privacy by design e by default (art. 25 GDPR).** Minimo, essenziale: vengono raccolti solo i dati strettamente necessari, la crittografia è attiva di default e ogni funzione di condivisione richiede un consenso esplicito (doppio consenso per i catechisti, PIN per QR e backup).
-- **Consensi con scadenza (art. 7, 9 GDPR).** In modalità Responsabile ogni iscritto ha un consenso privacy con **data di sottoscrizione e durata di validità** configurabile: l'app segnala i consensi in scadenza e applica automaticamente la retention (RITIRATO → grazia 30 giorni → cancellazione a cascata).
+- **Consensi con scadenza (art. 7, 9 GDPR).** In modalità Responsabile ogni iscritto ha un consenso privacy con **data di sottoscrizione e durata di validità** configurabile, registrato con **evidenza del firmatario** (nome del genitore/tutore) e l'**identità del catechista che ha registrato la firma** (voce immutabile nel Registro Trattamenti): l'app segnala i consensi in scadenza e applica automaticamente la retention (RITIRATO → grazia 30 giorni → cancellazione a cascata).
 - **Sincronizzazione solo consensuale e verificata.** L'unico scambio possibile avviene peer-to-peer (Bluetooth/WiFi Direct) esclusivamente con dispositivi di tua fiducia, previo pairing verificato e crittografia end-to-end. Nessun intermediario. In modalità Responsabile solo i dispositivi **approvati** (certificati Ed25519) possono sincronizzare le classi.
 - **Tracciabilità (art. 5.2 GDPR).** Registro Trattamenti **firmato HMAC-SHA256**: ogni operazione rilevante (iscrizione, modifica, consenso, passaggio anno, retention, oblio) è registrata con data, ora e autore. Il registro è append-only e verificabile.
 - **Portabilità (art. 20 GDPR).** Puoi esportare l'intero database in un file `.catechhub` protetto da password e ripristinarlo su un altro dispositivo quando vuoi. È disponibile anche un **export conformità GDPR** (CSV del registro + pacchetto cifrato).
@@ -112,11 +112,11 @@ CatechHub è progettata per **lasciare al catechista il pieno controllo dei prop
 | Database locale | Hive (cifrato AES-256-GCM), auto-recovery per box |
 | Chiave master | AndroidKeyStore (TEE/StrongBox hardware) — SecurityManager, nessun fallback software |
 | Storage sicuro | flutter_secure_storage (Keystore hardware-backed) |
-| Crittografia | PointyCastle, cryptography: AES-256-GCM, X25519 (TripleDH), Ed25519, ECDH P-256, PBKDF2-HMAC-SHA256 (210k/350k/60k), HKDF-SHA256, HMAC-SHA256 |
+| Crittografia | cryptography (puro Dart): AES-256-GCM, X25519 (TripleDH/ECDH), Ed25519, PBKDF2-HMAC-SHA256 (350k per nuovi QR e export GDPR; 210k per i backup generali; 60k legacy QR), HKDF-SHA256, HMAC-SHA256 |
 | Cifratura di campo | FieldEncryptionService — AES-256-GCM per i dati sensibili, chiave per-dispositivo |
 | Sincronizzazione P2P | Google Nearby Connections (P2P_CLUSTER — Bluetooth/WiFi Direct) + protocollo a stati con sync differenziale, pairing code, key pinning, rotazione sessione |
 | Canali di sincronizzazione | Canale classe cifrato per-classe + canale parrocchiale (riunioni/avvisi, non personali) |
-| Condivisione QR | QR code con chunking, PIN 12 cifre (3 min, PBKDF2 60k), checksum SHA-256, sync differenziale per modulo |
+| Condivisione QR | QR code con chunking, PIN 12 cifre (3 min, PBKDF2 350k per i nuovi pacchetti), checksum SHA-256, sync differenziale per modulo |
 | Autenticazione | Biometria nativa Android (local_auth) — solo dispositivo |
 | Comunicazioni | Template WhatsApp con placeholders, apertura via URL scheme |
 | QR Code | mobile_scanner, qr_flutter |

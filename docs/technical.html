@@ -107,14 +107,14 @@ final HKDF_INFO = 'CatechHub_P2P_Session_v3';
 {
   "v": 2,               // versione formato
   "kdf": "PBKDF2",      // key derivation function
-  "iter": 210000,       // iterazioni PBKDF2 (default)
+  "iter": 350000,       // iterazioni PBKDF2 (default)
   "alg": "AES-256-GCM", // algoritmo cifratura
   "salt": "aGVsbG8=",   // salt base64
   "nonce": "d29ybGQ=",  // nonce base64
   "data": "Y2l0ZXJv"    // ciphertext + tag base64
 }
     </pre>
-    <p>Il campo <code>iter</code> varia per contesto: <strong>210.000</strong> per i dati protetti da password (backup generale), <strong>60.000</strong> per la condivisione QR "fast share" (<code>fastShareIterations</code>, con PIN a 12 cifre), <strong>350.000</strong> per il backup di conformità GDPR (con 210.000 accettate in lettura per retrocompatibilità). L'AAD (Additional Authenticated Data) lega il ciphertext al contesto d'uso (<code>CatechHub_Context_QRShare_v1</code>, <code>CatechHub_Context_PasswordData_v1</code>, <code>CatechHub_Context_Backup_v1</code>).</p>
+    <p>Il campo <code>iter</code> varia per contesto: <strong>350.000</strong> per i nuovi pacchetti QR ("secure share", <code>secureShareIterations</code>) e per l'export conformità GDPR (<code>BackupEncryptionService</code>); <strong>210.000</strong> (<code>defaultIterations</code> di <code>EncryptionService</code>) per i backup generali generati dalle versioni correnti; <strong>60.000</strong> (<code>fastShareIterations</code>) per i vecchi pacchetti QR, accettate solo in lettura. L'AAD (Additional Authenticated Data) lega il ciphertext al contesto d'uso (<code>CatechHub_Context_QRShare_v1</code>, <code>CatechHub_Context_PasswordData_v1</code>, <code>CatechHub_Context_Backup_v1</code>).</p>
 
     <pre>
   Encryption/Decryption Flow
@@ -127,7 +127,7 @@ final HKDF_INFO = 'CatechHub_P2P_Session_v3';
   │  │ Generate random      │    │ PBKDF2-HMAC-SHA256       │        │
   │  │ salt (16B)           │───▶│ password + salt          │        │
   │  └──────────────────────┘    │ iterazioni per contesto  │        │
-  │                              │ (210k / 350k / 60k)      │        │
+  │                              │ (350k; 210k/60k legacy)  │        │
   │                              └────────────┬─────────────┘        │
   │                                           ▼                       │
   │                              ┌──────────────────────────┐        │
@@ -201,8 +201,8 @@ final HKDF_INFO = 'CatechHub_P2P_Session_v3';
     <h3>4.2 QR Code Sync</h3>
     <p>Canale alternativo per dispositivi senza Bluetooth o per trasferimenti one-shot. Implementato in <code>QRDataService</code>:</p>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
-      <li><strong>Cifratura:</strong> AES-256-GCM con PIN a 12 cifre generato via <code>Random.secure()</code>, valido 3 minuti. Derivazione chiave con PBKDF2-HMAC-SHA256 a 60.000 iterazioni (<code>fastShareIterations</code>).</li>
-      <li><strong>Chunking:</strong> Payload diviso in chunk JSON di max 1200 caratteri, ognuno con checksum SHA-256 (prime 4 cifre esadecimali).</li>
+      <li><strong>Cifratura:</strong> AES-256-GCM con PIN a 12 cifre generato via <code>Random.secure()</code>, valido 3 minuti. Derivazione chiave con PBKDF2-HMAC-SHA256 a 350.000 iterazioni per i nuovi pacchetti (<code>secureShareIterations</code>); 60.000 (<code>fastShareIterations</code>) accettate solo in lettura per compatibilità.</li>
+      <li><strong>Chunking:</strong> Payload diviso in chunk JSON di max 1200 byte, ognuno con checksum SHA-256 (prime 4 cifre esadecimali).</li>
       <li><strong>Integrità:</strong> Checksum SHA-256 dell'intero payload (prime 12 cifre hex) verificato dopo il riassemblaggio.</li>
       <li><strong>Sync differenziale:</strong> <code>buildDatabaseIndex()</code> crea un indice per modulo. <code>computeDiffExport()</code> confronta l'indice locale con quello remoto e trasferisce solo i record nuovi/modificati (risoluzione conflitti: local wins).</li>
       <li><strong>Moduli supportati:</strong> Anagrafica, Presenze, Programmazione, Documenti, Note contatto, Catechesi, Annotazioni giornaliere.</li>
@@ -251,7 +251,7 @@ final HKDF_INFO = 'CatechHub_P2P_Session_v3';
 // Each chunk:
 {"i": 0, "t": 3, "d": "&lt;base64 data&gt;", "c": "&lt;chunk checksum 4 hex&gt;"}
     </pre>
-    <p>I pacchetti QR usano un formato simile ma con chunking automatico. Ogni chunk contiene checksum individuale (prime 4 cifre SHA-256). Il PIN a 12 cifre ha validità 3 minuti. Derivazione chiave: PBKDF2-HMAC-SHA256 a 60.000 iterazioni (fast share).</p>
+    <p>I pacchetti QR usano un formato simile ma con chunking automatico. Ogni chunk contiene checksum individuale (prime 4 cifre SHA-256). Il PIN a 12 cifre ha validità 3 minuti. Derivazione chiave: PBKDF2-HMAC-SHA256 a 350.000 iterazioni per i nuovi pacchetti (secure share), 60.000 in lettura per i vecchi.</p>
 
     <h2 id="security">5. Security architecture</h2>
 
@@ -342,7 +342,7 @@ if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
   ├─────────────────────────────────────────────────────────────────┤
   │  Layer 3: SecurityManager — verifica TEE/StrongBox all'avvio   │
   ├─────────────────────────────────────────────────────────────────┤
-  │  Layer 2: PBKDF2-HMAC-SHA256 (210k / 350k / 60k) + TLS pinning │
+  │  Layer 2: PBKDF2-HMAC-SHA256 (350k; 210k/60k legacy) + TLS pinning │
   ├─────────────────────────────────────────────────────────────────┤
   │  Layer 1: Device OS encryption + PIN/Biometric lock screen      │
   └─────────────────────────────────────────────────────────────────┘

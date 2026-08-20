@@ -225,6 +225,16 @@ class _ConsensiPageState extends ConsumerState<ConsensiPage> {
           ),
           if (info.scadenza != null)
             _infoRow(Icons.event_available, 'Scadenza: ${_fmt(info.scadenza)}'),
+          if (info.eFirmato && s.consensoFirmatario.trim().isNotEmpty)
+            _infoRow(
+              Icons.draw_rounded,
+              'Firmatario: ${s.consensoFirmatario}',
+            ),
+          if (info.eFirmato && s.consensoRegistratoDaNome.trim().isNotEmpty)
+            _infoRow(
+              Icons.person_pin_circle_rounded,
+              'Registrata da: ${s.consensoRegistratoDaNome}',
+            ),
           _infoRow(
             Icons.payments_rounded,
             s.contributoVersato
@@ -286,17 +296,36 @@ class _ConsensiPageState extends ConsumerState<ConsensiPage> {
 
   Future<void> _registraScheda(Student s) async {
     final durata = ConsensiService.durataMesiDaConfig();
+    final controller = TextEditingController();
     final conferma = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         icon: const Icon(Icons.task_alt_rounded),
         title: const Text('Registra scheda firmata'),
-        content: Text(
-          'Confermi che la famiglia di ${s.name} ${s.surname} ha firmato la '
-          'scheda di iscrizione unificata? Il trattamento dei dati sarà '
-          'valido per $durata mesi dalla data di oggi.',
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 13, height: 1.4),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Confermi che la famiglia di ${s.name} ${s.surname} ha firmato '
+              'la scheda di iscrizione unificata? Il trattamento dei dati '
+              'sarà valido per $durata mesi dalla data di oggi.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Firmatario (genitore/tutore)',
+                hintText: 'Es. Mario Rossi',
+                prefixIcon: Icon(Icons.draw_rounded, size: 20),
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -311,7 +340,12 @@ class _ConsensiPageState extends ConsumerState<ConsensiPage> {
       ),
     );
     if (conferma != true) return;
-    await ConsensiService.registraScheda(s);
+    final firmatario = controller.text.trim();
+    if (firmatario.isEmpty) {
+      _snack('Inserisci il nome del firmatario per registrare la firma.');
+      return;
+    }
+    await ConsensiService.registraScheda(s, firmatario: firmatario);
     _snack('Scheda firmata registrata per ${s.name} ${s.surname}.');
   }
 

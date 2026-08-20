@@ -8,10 +8,12 @@
 // parrocchia affinché il dato non venga "resuscitato" da un sync successivo.
 //
 // FIRMA:
-//   Il tombstone trasporta una firma HMAC-SHA256 calcolata sul contenuto
-//   canonico usato il shared secret statico ECDH (static-static) del canale
-//   P2P. Il ricevente ricalcola la firma con lo STESSO segreto (simmetrico)
-//   e accetta il tombstone solo se la firma coincide.
+//   - HMAC-SHA256 sul contenuto canonico con il shared secret statico ECDH
+//     del canale P2P (per-recipiente, verificato da chi lo riceve);
+//   - A7: firma Ed25519 PER-DISPOSITIVO ([signatureEd25519]) calcolata con la
+//     chiave privata Ed25519 derivata dall'identità del dispositivo. È
+//     asimmetrica e attribuibile: il firmatario è identificabile tramite
+//     [signerEd25519PublicKey] e non può essere spacciato per un altro device.
 // ══════════════════════════════════════════════════════════════════════════════
 
 class Tombstone {
@@ -39,6 +41,12 @@ class Tombstone {
   /// DeviceId dell'autore, per debugg e deduplicazione.
   final String signerDeviceId;
 
+  /// A7: firma Ed25519 per-dispositivo (base64) sul payload canonico.
+  final String signatureEd25519;
+
+  /// A7: chiave pubblica Ed25519 (base64) del firmatario.
+  final String signerEd25519PublicKey;
+
   const Tombstone({
     required this.id,
     required this.entityType,
@@ -48,6 +56,8 @@ class Tombstone {
     required this.executedByCatechistId,
     required this.signature,
     required this.signerDeviceId,
+    this.signatureEd25519 = '',
+    this.signerEd25519PublicKey = '',
   });
 
   factory Tombstone.fromMap(String id, Map<String, dynamic> data) {
@@ -62,6 +72,8 @@ class Tombstone {
       executedByCatechistId: data['executedByCatechistId'] ?? '',
       signature: data['signature'] ?? '',
       signerDeviceId: data['signerDeviceId'] ?? '',
+      signatureEd25519: data['signatureEd25519'] ?? '',
+      signerEd25519PublicKey: data['signerEd25519PublicKey'] ?? '',
     );
   }
 
@@ -73,5 +85,7 @@ class Tombstone {
     'executedByCatechistId': executedByCatechistId,
     'signature': signature,
     'signerDeviceId': signerDeviceId,
+    'signatureEd25519': signatureEd25519,
+    'signerEd25519PublicKey': signerEd25519PublicKey,
   };
 }

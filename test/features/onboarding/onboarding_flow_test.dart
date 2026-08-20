@@ -2,8 +2,17 @@
 // TEST: OnboardingPage — flusso a 2 schermate
 // Copre: permessi contestuali, selezione modalità operativa e persistenza
 // (ruolo, app_mode, setup_mode, configurazione parrocchiale).
+//
+// NOTA SUL BACKEND MEMORIA: i box Hive vengono aperti con StorageBackendMemory
+// (scritture sincrone in memoria, nessun I/O su disco). Le scritture Hive
+// programmano altrimenti timer/operazioni asincrone reali che, nel FakeAsync
+// di testWidgets, non completano e bloccano il teardown del test ("did not
+// complete"). Con il backend in memoria ogni put() completa in un microtask
+// e il flusso di onboarding (che esegue diverse put sequenziali) può essere
+// guidato dal semplice pumpAndSettle.
 // ============================================================================
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,19 +26,20 @@ import 'package:CatechHub/features/responsabile/parish_config_repository.dart';
 import 'package:CatechHub/shared/models/user_role.dart';
 
 void main() {
-  late Directory tempDir;
-
   setUp(() async {
-    tempDir = Directory.systemTemp.createTempSync('onboarding_test_');
-    Hive.init(tempDir.path);
-    await Hive.openBox(LocalDatabase.authBox);
-    await Hive.openBox(LocalDatabase.parishConfigBox);
+    Hive.init(Directory.systemTemp.path);
+    await Hive.openBox(
+      LocalDatabase.authBox,
+      bytes: Uint8List.fromList([]),
+    );
+    await Hive.openBox(
+      LocalDatabase.parishConfigBox,
+      bytes: Uint8List.fromList([]),
+    );
   });
 
   tearDown(() async {
-    await Hive.deleteBoxFromDisk(LocalDatabase.parishConfigBox);
-    await Hive.deleteBoxFromDisk(LocalDatabase.authBox);
-    tempDir.deleteSync(recursive: true);
+    await Hive.close();
   });
 
   GoRouter buildRouter() {
@@ -128,6 +138,15 @@ void main() {
       await tester.tap(find.text('Conferma modalità'));
       await tester.pumpAndSettle();
 
+      // STEP 2: in Modalità Responsabile si chiede il nome della parrocchia.
+      expect(find.text('La tua parrocchia'), findsOneWidget);
+      await tester.enterText(
+        find.byType(TextField).first,
+        'Parrocchia San Testo',
+      );
+      await tester.tap(find.text('Continua'));
+      await tester.pumpAndSettle();
+
       expect(find.text('LOGIN_DEST'), findsOneWidget);
       expect(LocalDatabase.auth().get('app_mode'), 'RESPONSABILE');
       expect(LocalDatabase.auth().get('setup_mode'), 'responsabile');
@@ -136,6 +155,10 @@ void main() {
       expect(
         ParishConfigRepository().getConfig().isResponsabileModeActive,
         true,
+      );
+      expect(
+        ParishConfigRepository().getConfig().nomeParrocchia,
+        'Parrocchia San Testo',
       );
     });
 

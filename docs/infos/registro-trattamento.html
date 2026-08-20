@@ -126,7 +126,7 @@
           <td>Tutti i dati presenti nel database al momento del backup</td>
           <td>Tutti gli interessati (minori, genitori)</td>
           <td>Fino alla cancellazione del file da parte dell'utente</td>
-          <td>PBKDF2-HMAC-SHA256 (210k iterazioni) + AES-256-GCM per il backup generale; export conformità GDPR con PBKDF2 350k iterazioni, PIN min 12 alfanumerici e anti-brute-force (5 tentativi / 30 min)</td>
+          <td>PBKDF2-HMAC-SHA256 + AES-256-GCM: 350k iterazioni con anti-brute-force (5 tentativi / 30 min) per l'export conformità GDPR; 210k per i backup generali; PIN min 12 alfanumerici</td>
           <td>Obbligo di sicurezza (Art. 32 GDPR) — adempimento</td>
         </tr>
         <tr>
@@ -222,7 +222,7 @@
       <thead><tr><th>Categoria</th><th>Misure implementate</th></tr></thead>
       <tbody>
         <tr><td>Controllo accessi</td><td>Biometria / PIN, sessione in RAM, timeout 120s background</td></tr>
-        <tr><td>Crittografia</td><td>AES-256-GCM (a riposo, sync e field encryption), PBKDF2-HMAC-SHA256 (210k / 350k / 60k), X25519 TripleDH, HKDF-SHA256, Ed25519, pairing code anti-MitM</td></tr>
+        <tr><td>Crittografia</td><td>AES-256-GCM (a riposo, sync e field encryption), PBKDF2-HMAC-SHA256 (350k per nuovi QR ed export GDPR; 210k per backup generali; 60k legacy QR), X25519 TripleDH, HKDF-SHA256, Ed25519 (approvazioni e tombstone), pairing code anti-MitM</td></tr>
         <tr><td>Integrità</td><td>Tag GCM 128bit, checksum SHA-256 su backup e QR, message ID SHA-256, audit log HMAC-SHA256, tombstone firmati</td></tr>
         <tr><td>Disponibilità</td><td>Auto-recovery corruzione Hive (2 livelli), retry apertura box, snapshot immutabili archivio</td></tr>
         <tr><td>Riservatezza</td><td>FLAG_SECURE, AndroidKeyStore, freeRASP anti-tamper, canale classe cifrato per-classe</td></tr>

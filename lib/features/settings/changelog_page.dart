@@ -2,9 +2,9 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
+import '../../core/services/update_service.dart';
 import '../../shared/utils/markdown.dart';
 
 class ChangelogPage extends StatefulWidget {
@@ -27,26 +27,40 @@ class _ChangelogPageState extends State<ChangelogPage> {
 
   Future<void> _fetchReleases() async {
     try {
-      final response = await http
-          .get(
-            Uri.parse(
-              'https://api.github.com/repos/delelimed/CatechHub/releases',
-            ),
-            headers: {'Accept': 'application/vnd.github.v3+json'},
-          )
-          .timeout(const Duration(seconds: 15));
+      // A8: certificate pinning per api.github.com. Fail-closed: senza
+      // pinning configurato non ci colleghiamo affatto.
+      final httpClient = UpdateService.createPinnedClient();
+      if (httpClient == null) {
+        setState(() {
+          _error = 'Connessione non disponibile: pinning non configurato';
+          _isLoading = false;
+        });
+        return;
+      }
+      try {
+        final response = await httpClient
+            .get(
+              Uri.parse(
+                'https://api.github.com/repos/delelimed/CatechHub/releases',
+              ),
+              headers: {'Accept': 'application/vnd.github.v3+json'},
+            )
+            .timeout(const Duration(seconds: 15));
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body) as List<dynamic>;
-        setState(() {
-          _releases = data;
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _error = 'Errore nel recupero changelog (${response.statusCode})';
-          _isLoading = false;
-        });
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body) as List<dynamic>;
+          setState(() {
+            _releases = data;
+            _isLoading = false;
+          });
+        } else {
+          setState(() {
+            _error = 'Errore nel recupero changelog (${response.statusCode})';
+            _isLoading = false;
+          });
+        }
+      } finally {
+        httpClient.close();
       }
     } catch (e) {
       setState(() {

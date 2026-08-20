@@ -13,6 +13,7 @@ import '../../shared/utils/auth_utils.dart';
 import '../../shared/utils/name_formatting.dart';
 import '../archive/historical_record_repository.dart';
 import '../attachments/attachments_repository.dart';
+import '../contact_notes/contact_notes_repository.dart';
 import '../responsabile/audit_log_repository.dart';
 import 'student_daily_notes_repository.dart';
 
@@ -293,6 +294,9 @@ class StudentsRepository {
       parentType: AttachmentParentType.student,
     );
     await StudentDailyNotesRepository().deleteAllForStudent(id);
+    // C3: cascata completa. In passato le note di contatto (PII del minore)
+    // non venivano rimosse, lasciando residui di dati dopo l'eliminazione.
+    await ContactNotesRepository().deleteAllForStudent(id);
     await _box.delete(id);
     await HistoricalRecordRepository().deleteRecordsForStudent(id);
 

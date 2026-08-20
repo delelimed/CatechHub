@@ -18,6 +18,8 @@
 
 import 'package:flutter/foundation.dart';
 
+import '../../core/auth/auth_service.dart';
+import '../../core/storage/local_database.dart';
 import '../../shared/models/audit_action.dart';
 import '../../shared/models/audit_log.dart';
 import '../../shared/models/parish_config.dart';
@@ -94,10 +96,14 @@ class ConsensiService {
 
   /// Registra la scheda di iscrizione unificata firmata per [student].
   ///
+  /// [firmatario] è il nome del genitore/tutore che ha firmato: viene
+  /// memorizzato come evidenza sul record dello studente insieme all'identità
+  /// del catechista/responsabile che ha registrato la firma e al timestamp.
   /// [durataMesi] (default: dalla Config parrocchiale) definisce la validità
   /// del trattamento, con scadenza calcolata automaticamente.
   static Future<void> registraScheda(
     Student student, {
+    required String firmatario,
     DateTime? dataFirma,
     int? durataMesi,
   }) async {
@@ -111,28 +117,40 @@ class ConsensiService {
       59,
       59,
     );
+    final registratore = _operatoreCorrente();
     await StudentsRepository().updateStudent(
       student.id,
       student.copyWith(
         consensoPrivacyFirmato: true,
         dataFirmaConsenso: firma,
         dataScadenzaTrattamento: scadenza,
+        consensoFirmatario: firmatario,
+        consensoRegistratoDaId: registratore.id,
+        consensoRegistratoDaNome: registratore.nome,
       ),
     );
-    await _log(AuditActionType.grantConsent, student.id);
+    await _log(
+      AuditActionType.grantConsent,
+      student.id,
+      registratore,
+    );
   }
 
   /// Revoca il consenso (scheda ritirata). Mantiene l'anagrafica.
   static Future<void> revoca(Student student) async {
+    final registratore = _operatoreCorrente();
     await StudentsRepository().updateStudent(
       student.id,
       student.copyWith(
         consensoPrivacyFirmato: false,
         dataFirmaConsenso: null,
         dataScadenzaTrattamento: null,
+        consensoFirmatario: '',
+        consensoRegistratoDaId: '',
+        consensoRegistratoDaNome: '',
       ),
     );
-    await _log(AuditActionType.revokeConsent, student.id);
+    await _log(AuditActionType.revokeConsent, student.id, registratore);
   }
 
   /// Aggiorna il contributo volontario della famiglia.
@@ -161,12 +179,33 @@ class ConsensiService {
     }
   }
 
-  static Future<void> _log(AuditActionType action, String id) async {
+  /// Operatore corrente (catechista/responsabile) che esegue l'azione.
+  static _Operatore _operatoreCorrente() {
+    String id = '';
+    String nome = '';
+    try {
+      id = (LocalDatabase.auth().get('catechist_id') as String?) ?? '';
+    } catch (_) {}
+    try {
+      nome = (LocalDatabase.auth().get('local_user_name') as String?) ?? '';
+    } catch (_) {}
+    if (id.isEmpty) id = AuthService.localUserId;
+    if (nome.isEmpty) nome = 'Responsabile Catechistico';
+    return _Operatore(id: id, nome: nome);
+  }
+
+  static Future<void> _log(
+    AuditActionType action,
+    String id,
+    _Operatore operatore,
+  ) async {
     try {
       await AuditLogRepository().record(
         actionType: action,
         affectedEntityId: id,
         affectedEntityType: AuditLog.entityRagazzo,
+        executedByCatechistId: operatore.id,
+        executedByCatechistName: operatore.nome,
       );
     } catch (e) {
       if (kDebugMode) {
@@ -174,4 +213,11 @@ class ConsensiService {
       }
     }
   }
+}
+
+/// Identità dell'operatore che ha registrato/revocato il consenso.
+class _Operatore {
+  final String id;
+  final String nome;
+  const _Operatore({required this.id, required this.nome});
 }

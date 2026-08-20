@@ -97,7 +97,7 @@
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
       <li><strong>Sincronizzazione P2P Bluetooth/WiFi Direct</strong>: avviata volontariamente dall'utente, solo con dispositivi di altri catechisti di fiducia. I dati sono cifrati end-to-end con TripleDH X25519 + HKDF-SHA256 + AES-256-GCM, con verifica pairing code a 6 cifre, key pinning e rotazione chiavi di sessione ogni 30 minuti. In modalità Responsabile solo i dispositivi approvati (certificati Ed25519) possono sincronizzare le classi. I dati personali passano sempre dal canale classe cifrato per-classe.</li>
       <li><strong>Canale parrocchiale</strong>: riunioni e avvisi parrocchiali vengono scambiati tra i dispositivi associati in un canale separato che <strong>non contiene dati personali</strong> (solo testi di comunicazione).</li>
-      <li><strong>Condivisione QR</strong>: esportazione volontaria di moduli selezionati, protetta da PIN temporaneo a 12 cifre (valido 3 minuti) con cifratura AES-256-GCM.</li>
+      <li><strong>Condivisione QR</strong>: esportazione volontaria di moduli selezionati, protetta da PIN temporaneo a 12 cifre (valido 3 minuti, derivazione chiave PBKDF2-SHA256 a 350.000 iterazioni) con cifratura AES-256-GCM.</li>
       <li><strong>Backup manuale</strong>: l'utente può creare un file .catechhub e trasferirlo come preferisce.</li>
       <li><strong>Controllo aggiornamenti (opzionale)</strong>: l'app può verificare la disponibilità di nuove versioni su GitHub (certificato verificato tramite pinning); disattivabile dalle Impostazioni. Non trasmette alcun dato personale.</li>
       <li><strong>Feedback all'autore (opt-in)</strong>: il modulo di feedback (Wiredash) è disattivato per impostazione predefinita e si attiva solo su scelta esplicita dell'utente.</li>
@@ -112,10 +112,10 @@
       <li>Autenticazione biometrica per l'accesso all'app</li>
       <li>Blocco screenshot e screen recording</li>
       <li>freeRASP per rilevamento root, emulatori e tampering</li>
-      <li>Blocco automatico sessione dopo 120 secondi in background</li>
-      <li>Backup protetti da password con derivazione PBKDF2-HMAC-SHA256 (210.000 iterazioni per il backup generale; 350.000 iterazioni con PIN alfanumerico per l'export di conformità) + anti-brute-force all'import</li>
+      <li>Blocco automatico sessione dopo 120 secondi in background e dopo 5 minuti di inattività in foreground</li>
+      <li>Backup protetti da password con derivazione PBKDF2-HMAC-SHA256 (210.000 iterazioni, PIN minimo 12 caratteri alfanumerici); l'export conformità GDPR usa 350.000 iterazioni con anti-brute-force all'import (5 tentativi, blocco 30 minuti)</li>
       <li>Sincronizzazione P2P con crittografia end-to-end TripleDH X25519 + HKDF-SHA256 + AES-256-GCM, rotazione chiavi di sessione ogni 30 minuti, pairing code a 6 cifre anti-MitM, key pinning per dispositivo</li>
-      <li>Registro Trattamenti GDPR firmato HMAC-SHA256, tombstone firmati per la cancellazione, retention automatica dei consensi scaduti</li>
+      <li>Registro Trattamenti GDPR firmato HMAC-SHA256, tombstone firmati (HMAC + firma Ed25519 per-dispositivo) per la cancellazione, retention automatica dei consensi scaduti</li>
     </ul>
 
     <h2>8. Diritti dell'interessato (GDPR)</h2>

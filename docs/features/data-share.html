@@ -71,9 +71,9 @@
 
     <h2>Sicurezza</h2>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
-      <li><strong>Crittografia end-to-end:</strong> AES-256-GCM con derivazione chiave PBKDF2-HMAC-SHA256 (60.000 iterazioni "fast share")</li>
+      <li><strong>Crittografia end-to-end:</strong> AES-256-GCM con derivazione chiave PBKDF2-HMAC-SHA256 (350.000 iterazioni per i nuovi pacchetti; 60.000 "fast share" accettate solo in lettura per compatibilità)</li>
       <li><strong>Protezione PIN a 12 cifre:</strong> PIN generato via Random.secure(), valido 3 minuti</li>
-      <li><strong>Chunking automatico:</strong> payload diviso in chunk JSON da max 1200 caratteri, ognuno con checksum SHA-256</li>
+      <li><strong>Chunking automatico:</strong> payload diviso in chunk JSON da max 1200 byte, ognuno con checksum SHA-256</li>
       <li><strong>Sync differenziale:</strong> trasferisce solo i record nuovi/modificati (confronto indice per modulo)</li>
       <li><strong>Niente internet:</strong> il trasferimento avviene solo tramite fotocamera, offline</li>
       <li><strong>Scegli cosa condividere:</strong> decidi tu esattamente quali dati inviare</li>

@@ -42,7 +42,7 @@
     <ol style="padding-left:1.25rem;margin-bottom:1rem;">
       <li>Dal menu impostazioni, scegli "Crea backup"</li>
       <li>Confermi con la tua impronta digitale o riconoscimento facciale</li>
-      <li>Inserisci un PIN numerico (almeno 10 cifre)</li>
+      <li>Inserisci un PIN alfanumerico di almeno 12 caratteri (lettere e cifre)</li>
       <li>Scegli quali moduli includere (di default sono tutti selezionati)</li>
       <li>L'app crea il file e ti mostra il progresso dell'operazione</li>
       <li>Puoi salvarlo sul dispositivo, condividerlo o inviarlo via email</li>
@@ -66,9 +66,9 @@
     <h2>Sicurezza</h2>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
       <li><strong>Crittografia AES-256-GCM:</strong> il file di backup è cifrato con lo standard militare</li>
-      <li><strong>Derivazione chiave PBKDF2-HMAC-SHA256:</strong> 210.000 iterazioni per il backup generale</li>
+      <li><strong>Derivazione chiave PBKDF2-HMAC-SHA256:</strong> 210.000 iterazioni per i backup generali (60000/210000/350000 accettate in lettura a seconda del contesto del file)</li>
       <li><strong>Autenticazione biometrica:</strong> serve l'impronta o il volto per avviare export e import</li>
-      <li><strong>PIN obbligatorio (min 10 cifre):</strong> senza il PIN giusto, il backup è illeggibile</li>
+      <li><strong>PIN obbligatorio (min 12 caratteri alfanumerici):</strong> senza il PIN giusto, il backup è illeggibile</li>
       <li><strong>Verifica integrità:</strong> prima di importare, l'app controlla che il file non sia corrotto o manomesso</li>
       <li>Se il file è danneggiato, l'import viene annullato automaticamente</li>
     </ul>

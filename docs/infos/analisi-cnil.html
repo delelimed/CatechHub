@@ -80,7 +80,7 @@
         <tr><td>RGS A2 — Intégrité</td><td>Tag GCM 128bit su tutti i dati. Checksum SHA-256 su backup.</td><td>&#9989; Conforme</td></tr>
         <tr><td>RGS A3 — Confidentialité</td><td>AES-256-GCM a riposo e in transito. X25519 TripleDH + HKDF + AES-256-GCM per sync P2P, rotazione chiavi ogni 30 min. Cifratura di campo per i dati sensibili.</td><td>&#9989; Conforme</td></tr>
         <tr><td>RGS A4 — Traçabilité</td><td>Registro Trattamenti in modalità Responsabile: audit log append-only firmato HMAC-SHA256 di ogni operazione rilevante, con verifica d'integrità in tempo reale. Campi createdAt/updatedAt/lastModifiedBy su tutti i record.</td><td>&#9989; Conforme</td></tr>
-        <tr><td>ANSSI — Chiffrement fort</td><td>AES-256-GCM, PBKDF2-HMAC-SHA256 (210k / 350k / 60k iterazioni per contesto), X25519 TripleDH, HKDF-SHA256, Ed25519, pairing code anti-MitM.</td><td>&#9989; Conforme</td></tr>
+        <tr><td>ANSSI — Chiffrement fort</td><td>AES-256-GCM, PBKDF2-HMAC-SHA256 (350k per nuovi QR ed export GDPR; 210k per backup generali; 60k legacy QR), X25519 TripleDH, HKDF-SHA256, Ed25519 (approvazioni e tombstone), pairing code anti-MitM.</td><td>&#9989; Conforme</td></tr>
         <tr><td>ANSSI — Gestion des clés</td><td>AndroidKeyStore (isolamento hardware). Chiavi mai esposte al livello Dart. Chiavi di sessione effimere mai persistite.</td><td>&#9989; Conforme</td></tr>
         <tr><td>ANSSI — Sécurité runtime</td><td>freeRASP: anti-root, anti-hooking, anti-emulator, app integrity. SecurityBlockScreen non bypassabile.</td><td>&#9989; Conforme</td></tr>
         <tr><td>ANSSI — Chiffrement de sessions</td><td>Session key derivata con HKDF per ogni coppia di dispositivi, rotazione ogni 30 minuti (forward secrecy).</td><td>&#9989; Conforme</td></tr>

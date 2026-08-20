@@ -91,6 +91,16 @@ class Student {
   /// (data_firma_consenso + durata validità configurata in ParishConfig).
   final DateTime? dataScadenzaTrattamento;
 
+  /// Nome del firmatario della scheda (genitore/tutore che ha firmato il
+  /// consenso al trattamento dei dati del minore). Evidenza del firmatario.
+  final String consensoFirmatario;
+
+  /// ID del catechista/responsabile che ha registrato la firma.
+  final String consensoRegistratoDaId;
+
+  /// Nome del catechista/responsabile che ha registrato la firma.
+  final String consensoRegistratoDaNome;
+
   /// Consenso esplicito alle uscite autonome senza accompagnamento.
   final bool consensoUsciteAutonome;
 
@@ -153,6 +163,9 @@ class Student {
     this.consensoPrivacyFirmato = false,
     this.dataFirmaConsenso,
     this.dataScadenzaTrattamento,
+    this.consensoFirmatario = '',
+    this.consensoRegistratoDaId = '',
+    this.consensoRegistratoDaNome = '',
     this.consensoUsciteAutonome = false,
     this.contributoVersato = false,
     this.contributoEuros = 0,
@@ -197,6 +210,9 @@ class Student {
       dataScadenzaTrattamento: DateTime.tryParse(
         data['dataScadenzaTrattamento']?.toString() ?? '',
       ),
+      consensoFirmatario: data['consensoFirmatario'] ?? '',
+      consensoRegistratoDaId: data['consensoRegistratoDaId'] ?? '',
+      consensoRegistratoDaNome: data['consensoRegistratoDaNome'] ?? '',
       consensoUsciteAutonome: data['consensoUsciteAutonome'] ?? false,
       contributoVersato: data['contributoVersato'] ?? false,
       contributoEuros: (data['contributoEuros'] as num?)?.toDouble() ?? 0,
@@ -255,6 +271,9 @@ class Student {
     bool? consensoPrivacyFirmato,
     DateTime? dataFirmaConsenso,
     DateTime? dataScadenzaTrattamento,
+    String? consensoFirmatario,
+    String? consensoRegistratoDaId,
+    String? consensoRegistratoDaNome,
     bool? consensoUsciteAutonome,
     bool? contributoVersato,
     double? contributoEuros,
@@ -290,6 +309,11 @@ class Student {
       dataFirmaConsenso: dataFirmaConsenso ?? this.dataFirmaConsenso,
       dataScadenzaTrattamento:
           dataScadenzaTrattamento ?? this.dataScadenzaTrattamento,
+      consensoFirmatario: consensoFirmatario ?? this.consensoFirmatario,
+      consensoRegistratoDaId:
+          consensoRegistratoDaId ?? this.consensoRegistratoDaId,
+      consensoRegistratoDaNome:
+          consensoRegistratoDaNome ?? this.consensoRegistratoDaNome,
       consensoUsciteAutonome:
           consensoUsciteAutonome ?? this.consensoUsciteAutonome,
       contributoVersato: contributoVersato ?? this.contributoVersato,
@@ -328,6 +352,9 @@ class Student {
       'consensoPrivacyFirmato': consensoPrivacyFirmato,
       'dataFirmaConsenso': dataFirmaConsenso?.toIso8601String(),
       'dataScadenzaTrattamento': dataScadenzaTrattamento?.toIso8601String(),
+      'consensoFirmatario': consensoFirmatario,
+      'consensoRegistratoDaId': consensoRegistratoDaId,
+      'consensoRegistratoDaNome': consensoRegistratoDaNome,
       'consensoUsciteAutonome': consensoUsciteAutonome,
       'contributoVersato': contributoVersato,
       'contributoEuros': contributoEuros,

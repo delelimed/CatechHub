@@ -5434,6 +5434,35 @@ class P2PSyncService {
         return;
       }
 
+      // A7: verifica della firma Ed25519 per-dispositivo. La firma è
+      // asimmetrica e attribuibile al device firmatario ([signerEd25519PublicKey]).
+      // Un dispositivo compromesso può firmare solo tombstone a proprio nome,
+      // non spacciarli per un altro device. Fallback retrocompatibile: un
+      // tombstone proveniente da una versione precedente (senza firma Ed25519)
+      // resta accettato se l'HMAC ECDH è valido, ma viene loggato.
+      final edSignature = ts['signatureEd25519']?.toString() ?? '';
+      final edPublicKey = ts['signerEd25519PublicKey']?.toString() ?? '';
+      if (edSignature.isNotEmpty && edPublicKey.isNotEmpty) {
+        final edValid = await P2PSecurityService.verifyTombstoneSignature(
+          canonicalPayload: TombstoneService.canonical(ts),
+          signature: edSignature,
+          publicKeyBase64: edPublicKey,
+        );
+        if (!edValid) {
+          addLog(
+            'WARN',
+            'Tombstone con firma Ed25519 non valida da $remoteId — ignorato',
+          );
+          return;
+        }
+      } else {
+        addLog(
+          'WARN',
+          'Tombstone senza firma Ed25519 da $remoteId '
+          '(versione precedente) — accettato solo via HMAC',
+        );
+      }
+
       // In modalità Responsabile, solo i dispositivi approvati dal
       // Responsabile possono propagare tombstone: la firma HMAC usa un
       // segreto ECDH simmetrico, condiviso con TUTTI i dispositivi

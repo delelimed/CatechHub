@@ -264,7 +264,10 @@ class AuthService {
       final authenticated = await _localAuth.authenticate(
         localizedReason: localizedReason,
         biometricOnly: false,
-        persistAcrossBackgrounding: true,
+        // M3: il prompt biometrico NON deve sopravvivere a un passaggio in
+        // background a metà autenticazione: se l'app viene interrotta, la
+        // sessione resta bloccata e va rifatto l'accesso.
+        persistAcrossBackgrounding: false,
         sensitiveTransaction: false,
         authMessages: const <AuthMessages>[
           AndroidAuthMessages(

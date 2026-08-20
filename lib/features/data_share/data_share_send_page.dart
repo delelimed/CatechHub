@@ -71,6 +71,8 @@ class _DataShareSendPageState extends ConsumerState<DataShareSendPage> {
   // Il PIN è nascosto di default e mostrato solo su richiesta esplicita
   // (tap-to-reveal): evita lo shoulder-surfing in ambienti affollati.
   bool _pinVisible = false;
+  // A9: visibilità del PIN di sessione mostrato già nella fase di scansione.
+  bool _sessionPinVisible = false;
   int? _filterStartChunk;
   // Comune
   String? _errorMessage;
@@ -78,6 +80,10 @@ class _DataShareSendPageState extends ConsumerState<DataShareSendPage> {
   @override
   void initState() {
     super.initState();
+    // A9: il PIN di sessione viene generato SUBITO (non dopo la scansione
+    // dell'indice): il ricevente lo usa per cifrare il proprio indice prima
+    // della trasmissione. L'indice non viaggia più in chiaro.
+    _pin = QRDataService.generatePin();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final options = ref.read(dataShareOptionsProvider);
       if (options == null && mounted) context.pop();
@@ -129,16 +135,33 @@ class _DataShareSendPageState extends ConsumerState<DataShareSendPage> {
 
   void _allIndexChunksReceived() {
     setState(() => _isIndexScanning = false);
+    _decryptAndShowDiff();
+  }
+
+  // A9: decifra l'indice ricevuto (cifrato col PIN di sessione) e calcola
+  // il diff. Se la decifratura fallisce (PIN errato/chunk corrotti/scaduti),
+  // riprende la scansione con un messaggio d'errore.
+  Future<void> _decryptAndShowDiff() async {
     try {
-      final assembled = QRDataService.assembleChunks(_receivedIndexChunks);
-      final remoteIndex = QRDataService.decompressData(assembled);
+      final pin = _pin;
+      if (pin == null) {
+        setState(() {
+          _errorMessage = 'PIN di sessione non disponibile';
+          _isIndexScanning = true;
+        });
+        return;
+      }
+      final remoteIndex = await QRDataService.decryptIndexFromChunks(
+        _receivedIndexChunks,
+        pin,
+      );
       setState(() {
         _remoteIndex = remoteIndex;
       });
-      _computeAndShowDiff();
+      await _computeAndShowDiff();
     } catch (e) {
       setState(() {
-        _errorMessage = 'Errore assemblaggio indice: $e';
+        _errorMessage = 'Errore assemblaggio/decifratura indice: $e';
         _isIndexScanning = true;
       });
     }
@@ -151,8 +174,12 @@ class _DataShareSendPageState extends ConsumerState<DataShareSendPage> {
 
     final options =
         ref.read(dataShareOptionsProvider) ?? const DataShareOptions();
-    final pin = QRDataService.generatePin();
-    _pin = pin;
+    final pin = _pin;
+    if (pin == null) {
+      if (!mounted) return;
+      setState(() => _errorMessage = 'PIN di sessione non disponibile');
+      return;
+    }
 
     setState(() {
       _phase = _SendPhase.preparingDiff;
@@ -321,6 +348,55 @@ class _DataShareSendPageState extends ConsumerState<DataShareSendPage> {
             ],
           ),
         ),
+        _InfoBanner(
+          icon: Icons.pin_rounded,
+          message:
+              'Comunica questo PIN al ricevente: lo userà per cifrare il proprio indice',
+          color: Colors.amber.shade800,
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          decoration: BoxDecoration(
+            color: Colors.amber.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.security_rounded, color: Colors.amber, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'PIN di sessione:',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () =>
+                    setState(() => _sessionPinVisible = !_sessionPinVisible),
+                child: Text(
+                  _sessionPinVisible ? (_pin ?? '---') : '••••••••••••',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.amber,
+                    letterSpacing: 2,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                _sessionPinVisible
+                    ? Icons.visibility_off_rounded
+                    : Icons.visibility_rounded,
+                size: 16,
+                color: Colors.amber,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
         _InfoBanner(
           icon: Icons.camera_alt_rounded,
           message: 'Inquadra il QR code dell\'indice mostrato dal ricevente',
@@ -589,7 +665,7 @@ class _DataShareSendPageState extends ConsumerState<DataShareSendPage> {
           steps: [
             'I QR mostrano solo i dati nuovi o modificati rispetto al ricevente',
             'Il ricevente deve inquadrare questi QR con la fotocamera',
-            'Al termine, comunica il PIN di sicurezza al ricevente',
+            'Il PIN di sessione è già stato comunicato all\'inizio dello scambio',
           ],
         ),
       ],

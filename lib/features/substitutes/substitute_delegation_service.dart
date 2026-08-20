@@ -314,6 +314,32 @@ class SubstituteDelegationService {
     if (delegationId.isEmpty || classId.isEmpty) {
       throw Exception('Delega incompleta (id mancanti).');
     }
+
+    // M6: la delega viene accettata SOLO se è nel suo periodo di validità.
+    // Importare una delega scaduta (o non ancora attiva) permetterebbe al
+    // Supplente di operare sul registro fuori finestra temporale.
+    final validFrom = SubstituteDelegation.parseUtc(
+      token['validFrom']?.toString(),
+      DateTime.now(),
+    );
+    final validUntil = SubstituteDelegation.parseUtc(
+      token['validUntil']?.toString(),
+      DateTime.now(),
+    );
+    final now = DateTime.now().toUtc();
+    if (now.isAfter(validUntil)) {
+      throw Exception(
+        'Delega scaduta: il periodo di validità (fino al '
+        '${validUntil.toLocal()}) è terminato.',
+      );
+    }
+    if (now.isBefore(validFrom.subtract(const Duration(minutes: 5)))) {
+      throw Exception(
+        'Delega non ancora attiva: inizia il '
+        '${validFrom.toLocal()}.',
+      );
+    }
+
     final delegation = _delegationFromToken(
       token,
       ownerPublicKey,

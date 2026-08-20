@@ -136,16 +136,35 @@ class MainActivity : FlutterFragmentActivity() {
                     "setSecureFlag" -> {
                         val requested = call.argument<Boolean>("enabled") ?: false
                         runOnUiThread {
-                            if (requested) {
-                                window.setFlags(
-                                    WindowManager.LayoutParams.FLAG_SECURE,
-                                    WindowManager.LayoutParams.FLAG_SECURE,
-                                )
-                            } else {
-                                window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                            try {
+                                if (requested) {
+                                    window.setFlags(
+                                        WindowManager.LayoutParams.FLAG_SECURE,
+                                        WindowManager.LayoutParams.FLAG_SECURE,
+                                    )
+                                } else {
+                                    window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                                }
+                                // M2 (fail-closed): verifica che il flag sia stato
+                                // realmente applicato. Se la verifica fallisce,
+                                // restituisci un errore: il lato Flutter NON deve
+                                // continuare come se lo screenshot fosse bloccato.
+                                val applied =
+                                    (window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE) != 0
+                                if (applied != requested) {
+                                    result.error(
+                                        "SECURE_FLAG_VERIFY_FAILED",
+                                        "FLAG_SECURE non applicato come richiesto " +
+                                            "(richiesto=$requested, applicato=$applied)",
+                                        null,
+                                    )
+                                } else {
+                                    result.success(null)
+                                }
+                            } catch (e: Exception) {
+                                result.error("SECURE_FLAG_ERROR", e.message, null)
                             }
                         }
-                        result.success(null)
                     }
                     "getAndroidSdkVersion" -> {
                         result.success(Build.VERSION.SDK_INT)

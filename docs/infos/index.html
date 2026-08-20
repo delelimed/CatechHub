@@ -87,7 +87,7 @@
         <tr>
           <td>Art. 17</td>
           <td>Right to erasure</td>
-          <td>Funzione "Elimina dati" integrata nell'app (cancellazione completa o selettiva, a cascata: studente, presenze, documenti, note, allegati). La cancellazione genera un <strong>tombstone firmato</strong> propagato peer-to-peer che impedisce la "resurrezione" dei dati da backup o altri dispositivi. L'hard delete irreversibile è riservato al Responsabile. Disinstallando l'app tutti i dati vengono rimossi dal dispositivo.</td>
+          <td>Funzione "Elimina dati" integrata nell'app (cancellazione completa o selettiva, a cascata: studente, presenze, documenti, note, allegati). La cancellazione genera un <strong>tombstone firmato</strong> (HMAC-SHA256 sul canale P2P + firma Ed25519 per-dispositivo, attribuibile) propagato peer-to-peer che impedisce la "resurrezione" dei dati da backup o altri dispositivi. L'hard delete irreversibile è riservato al Responsabile. Disinstallando l'app tutti i dati vengono rimossi dal dispositivo.</td>
         </tr>
         <tr>
           <td>Art. 20</td>
@@ -107,7 +107,7 @@
         <tr>
           <td>Art. 32</td>
           <td>Security of processing</td>
-          <td>AES-256-GCM a riposo con chiave in AndroidKeyStore (TEE/StrongBox), verifica hardware obbligatoria all'avvio, cifratura di campo per i dati sensibili, PBKDF2-HMAC-SHA256 (210k/350k/60k iterazioni) per backup e QR, X25519 <strong>TripleDH</strong> + HKDF + AES-256-GCM per sync P2P con rotazione chiavi di sessione ogni 30 minuti, pairing code a 6 cifre anti-MitM, key pinning per dispositivo, certificati di approvazione Ed25519, doppio consenso esplicito tra catechisti, sessione in RAM, timeout 120s, freeRASP anti-tamper, certificate pinning per gli aggiornamenti.</td>
+          <td>AES-256-GCM a riposo con chiave in AndroidKeyStore (TEE/StrongBox), verifica hardware obbligatoria all'avvio, cifratura di campo per i dati sensibili, PBKDF2-HMAC-SHA256 (350.000 iterazioni per i nuovi pacchetti QR e per l'export GDPR; 210.000 per i backup generali; 60.000 accettate in lettura per i vecchi QR), X25519 <strong>TripleDH</strong> + HKDF + AES-256-GCM per sync P2P con rotazione chiavi di sessione ogni 30 minuti, pairing code a 6 cifre anti-MitM, key pinning per dispositivo, certificati di approvazione Ed25519, firma Ed25519 per-dispositivo sui tombstone, doppio consenso esplicito tra catechisti, sessione in RAM, timeout 120s + inattività foreground 5 min, freeRASP anti-tamper, certificate pinning per gli aggiornamenti.</td>
         </tr>
         <tr>
           <td>Art. 35</td>

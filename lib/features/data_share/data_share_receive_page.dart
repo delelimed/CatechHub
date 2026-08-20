@@ -37,6 +37,14 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
   Timer? _indexTimer;
   bool _isIndexPlaying = false;
 
+  // A9: il PIN di sessione (comunicato dal mittente all'inizio del flusso)
+  // cifra l'indice prima della trasmissione. L'indice non viaggia più in
+  // chiaro: un terzo che fotografasse i QR non leggerebbe nemmeno i metadati
+  // (id + timestamp) dei record.
+  String? _sessionPin;
+  bool _isPreparingIndex = false;
+  final TextEditingController _sessionPinController = TextEditingController();
+
   // Stato per la fase "scanData"
   final List<QRChunk> _receivedChunks = [];
   final Set<int> _receivedChunkIndices = {};
@@ -49,36 +57,64 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
   String? _errorMessage;
   String? _phaseMessage;
 
+  // A1: rate-limit sulla verifica del PIN. L'app non limita i tentativi di
+  // decifratura (la KDF a 350k iterazioni è già costosa), ma un lockout dopo
+  // troppi errori consecutivi scoraggia il brute-force interattivo del PIN.
+  static const int _maxPinAttempts = 5;
+  static const Duration _pinLockoutDuration = Duration(minutes: 1);
+  int _pinAttempts = 0;
+  DateTime? _pinLockoutUntil;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _prepareIndex());
+    // A9: l'indice viene preparato (e cifrato) solo dopo che l'utente inserisce
+    // il PIN di sessione comunicato dal mittente, quindi non serve prepararlo
+    // qui all'apertura della pagina.
   }
 
   @override
   void dispose() {
     _indexTimer?.cancel();
     _pinController.dispose();
+    _sessionPinController.dispose();
     super.dispose();
   }
 
   Future<void> _prepareIndex() async {
+    final pin = _sessionPinController.text.trim();
+    if (pin.length != QRDataService.pinLength) {
+      setState(
+        () => _errorMessage =
+            'Il PIN deve essere di ${QRDataService.pinLength} cifre',
+      );
+      return;
+    }
     final options =
         ref.read(dataShareOptionsProvider) ?? const DataShareOptions();
+    setState(() {
+      _sessionPin = pin;
+      _isPreparingIndex = true;
+      _errorMessage = null;
+    });
     try {
       final indexMap = QRDataService.buildDatabaseIndex(options);
       if (!mounted) return;
-      final chunkMaps = QRDataService.serializeIndexToChunks(indexMap);
+      final chunkMaps = await QRDataService.encryptIndexToChunks(indexMap, pin);
       if (!mounted) return;
       final chunks = chunkMaps
           .map((m) => QRChunk.fromMap(Map<String, dynamic>.from(m)))
           .toList();
       setState(() {
         _indexChunks = chunks;
+        _isPreparingIndex = false;
         _startIndexAnimation();
       });
     } catch (e) {
-      setState(() => _errorMessage = 'Errore creazione indice: $e');
+      setState(() {
+        _isPreparingIndex = false;
+        _errorMessage = 'Errore creazione indice: $e';
+      });
     }
   }
 
@@ -109,6 +145,20 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
     _indexTimer?.cancel();
     setState(() {
       _phase = _ReceivePhase.scanData;
+      _errorMessage = null;
+    });
+  }
+
+  // A9: torna alla richiesta del PIN di sessione (es. PIN errato lato mittente).
+  void _resetIndex() {
+    _indexTimer?.cancel();
+    setState(() {
+      _sessionPin = null;
+      _sessionPinController.clear();
+      _indexChunks.clear();
+      _currentIndexChunk = 0;
+      _isIndexPlaying = false;
+      _isPreparingIndex = false;
       _errorMessage = null;
     });
   }
@@ -153,6 +203,9 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
       QRDataService.extractPackage(assembledData);
       setState(() {
         _assembledPackageData = assembledData;
+        // A9: il PIN di sessione è già noto (usato per l'indice): lo
+        // precompiliamo, l'utente deve solo confermare.
+        _pinController.text = _sessionPin ?? '';
         _phase = _ReceivePhase.pinVerification;
       });
     } catch (e) {
@@ -166,6 +219,17 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
   void _verifyAndImport() {
     if (_assembledPackageData == null) {
       setState(() => _errorMessage = 'Pacchetto dati non disponibile');
+      return;
+    }
+    // A1: lockout dopo troppi tentativi non validi.
+    final now = DateTime.now();
+    if (_pinLockoutUntil != null && now.isBefore(_pinLockoutUntil!)) {
+      final remaining =
+          _pinLockoutUntil!.difference(now).inSeconds + 1;
+      setState(
+        () => _errorMessage =
+            'Troppi tentativi non validi. Riprova tra $remaining secondi.',
+      );
       return;
     }
     final inputPin = _pinController.text.trim();
@@ -232,12 +296,24 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
       ref.invalidate(studentsRepoProvider);
 
       setState(() {
+        _pinAttempts = 0;
+        _pinLockoutUntil = null;
         _phaseMessage = null;
       });
       if (mounted) _showSuccessDialog();
     } catch (e) {
+      // A1: conta i tentativi non validi e applica il lockout dopo il massimo.
       setState(() {
-        _errorMessage = 'PIN non corretto o dati non validi';
+        _pinAttempts++;
+        if (_pinAttempts >= _maxPinAttempts) {
+          _pinLockoutUntil = DateTime.now().add(_pinLockoutDuration);
+          _pinAttempts = 0;
+          _errorMessage =
+              'Troppi tentativi non validi. Riprova tra '
+              '${_pinLockoutDuration.inMinutes} minuto.';
+        } else {
+          _errorMessage = 'PIN non corretto o dati non validi';
+        }
         _phase = _ReceivePhase.pinVerification;
         _phaseMessage = null;
       });
@@ -354,12 +430,15 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
             ],
           ),
         ),
-        _InfoBanner(
-          icon: Icons.qr_code_2_rounded,
-          message:
-              'Mostra questo QR code al mittente\nper consentirgli di confrontare i database',
-          color: const Color(0xFF174A7E),
-        ),
+        if (_sessionPin == null)
+          _buildSessionPinForm()
+        else ...[
+          _InfoBanner(
+            icon: Icons.qr_code_2_rounded,
+            message:
+                'Mostra questo QR code al mittente\nper consentirgli di confrontare i database',
+            color: const Color(0xFF174A7E),
+          ),
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(20),
@@ -432,14 +511,128 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
             ),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 8),
+        TextButton.icon(
+          onPressed: _resetIndex,
+          icon: const Icon(Icons.replay_rounded, size: 18),
+          label: const Text('PIN errato? Reinserisci'),
+        ),
+        const SizedBox(height: 16),
         _InstructionsCard(
           steps: [
             'Mostra questo QR al mittente per l\'analisi del database',
             'Dopo averlo scansionato, il mittente invierà solo i dati aggiornati',
             'Premi "Passa alla Ricezione" e inquadra i QR del mittente',
-            'Inserisci il PIN per completare l\'importazione',
+            'Il PIN inserito all\'inizio completa l\'importazione',
           ],
+        ),
+        ],
+      ],
+    );
+  }
+
+  // A9: form di inserimento del PIN di sessione mostrato dal mittente.
+  // L'indice viene cifrato SOLO dopo questo inserimento.
+  Widget _buildSessionPinForm() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _InfoBanner(
+          icon: Icons.pin_rounded,
+          message:
+              'Il mittente ti mostrerà un PIN di sicurezza.\nInseriscilo qui: l\'indice del database verrà cifrato prima della trasmissione.',
+          color: const Color(0xFF174A7E),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isDark ? colorScheme.surfaceContainer : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+            border: Border.all(color: const Color(0xFF174A7E), width: 1.5),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'PIN di sicurezza',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _sessionPinController,
+                keyboardType: TextInputType.number,
+                obscureText: true,
+                maxLength: QRDataService.pinLength,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 20,
+                  letterSpacing: 8,
+                  fontWeight: FontWeight.bold,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'PIN',
+                  hintText: '••••••••••••',
+                  prefixIcon: const Icon(Icons.lock_rounded),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  counterText: '',
+                ),
+              ),
+              if (_isPreparingIndex) ...[
+                const SizedBox(height: 12),
+                const Center(child: CircularProgressIndicator()),
+                const SizedBox(height: 8),
+                const Center(
+                  child: Text(
+                    'Preparazione indice cifrato…',
+                    style: TextStyle(fontSize: 13, color: Colors.grey),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        if (_errorMessage != null) ...[
+          const SizedBox(height: 12),
+          _ErrorMessage(message: _errorMessage!),
+        ],
+        const SizedBox(height: 16),
+        ElevatedButton.icon(
+          onPressed: _isPreparingIndex ? null : _prepareIndex,
+          icon: const Icon(Icons.qr_code_2_rounded),
+          label: Text(
+            _isPreparingIndex ? 'Preparazione…' : 'Cifra e mostra indice',
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF174A7E),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextButton.icon(
+          onPressed: () {
+            ref.read(dataShareOptionsProvider.notifier).state = null;
+            context.pop();
+          },
+          icon: const Icon(Icons.cancel_rounded),
+          label: const Text('Annulla'),
         ),
       ],
     );
@@ -591,7 +784,7 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
         TextField(
           controller: _pinController,
           keyboardType: TextInputType.number,
-          maxLength: 8,
+          maxLength: QRDataService.pinLength,
           decoration: const InputDecoration(
             labelText: 'PIN di sicurezza',
             hintText: 'Inserisci ${QRDataService.pinLength} cifre',

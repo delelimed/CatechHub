@@ -453,6 +453,10 @@ class P2PSyncService {
   final Map<String, _PendingHandshakeData> _pendingHandshakeData = {};
   final Map<String, _PendingAssociationData> _pendingAssociations = {};
 
+  /// Pairing codes computed during pairing, keyed by deviceId.
+  /// Persists across endpoint reconnections so the PIN stays stable.
+  final Map<String, String> _pairingCodesByDeviceId = {};
+
   StreamSubscription<BoxEvent>? _hiveBoxesSub;
   final List<StreamSubscription<BoxEvent>> _boxSubscriptions = [];
   final List<StreamController<BoxEvent>> _boxControllers = [];
@@ -1408,13 +1412,13 @@ Future(() async {
       _pendingEndpointId = null;
     }
     if (_state.isPairingMode && deviceId != null) {
-      if (_pendingAssociations.containsKey(deviceId)) {
-        addLog(
-          'INFO',
-          'Associazione pendente rimossa per $deviceId (disconnessione)',
-        );
-        _pendingAssociations.remove(deviceId);
-      }
+      // During pairing, keep the pending association so that if the device
+      // reconnects (possibly with a new endpoint ID), the pairing can continue
+      // with the same PIN. Only remove the handshake data for this endpoint.
+      addLog(
+        'DEBUG',
+        'Disconnessione durante pairing: mantengo associazione pendente per $deviceId',
+      );
       _pendingHandshakeData.remove(endpointId);
     }
     if (_state.connectedDeviceId == endpointId) {
@@ -1874,6 +1878,14 @@ Future(() async {
     required String? remoteNonce,
     String? endpointId,
   }) async {
+    // Check if we already have a pairing code stored for this device
+    // (persists across endpoint reconnections during pairing).
+    final cachedCode = _pairingCodesByDeviceId[remoteId];
+    if (cachedCode != null && _state.isPairingMode) {
+      addLog('DEBUG', 'Riutilizzo pairing code memorizzato per $remoteId');
+      return cachedCode;
+    }
+
     addLog(
       'INFO',
       '_computePairingCode: remote=$remoteId, localNonce present=${localNonce != null}, remoteNonce present=${remoteNonce != null}',
@@ -1946,6 +1958,13 @@ Future(() async {
           ? _endpointRemoteEphemeralPub[endpointId]
           : null,
     );
+
+    // Store the pairing code by deviceId so it persists across endpoint
+    // reconnections during the pairing session.
+    if (_state.isPairingMode) {
+      _pairingCodesByDeviceId[remoteId] = code;
+    }
+
     // Privacy: il codice pairing NON viene loggato. È il segreto di
     // autenticazione a breve termine per l'associazione; un log (anche
     // DEBUG) lo esporrebbe a chiunque legga il log di sync.
@@ -2060,6 +2079,9 @@ Future(() async {
           break;
         case 'p2p_sync_ack':
           await _handleSyncAck(endpointId, decoded);
+          break;
+        case 'p2p_sync_complete':
+          await _handleSyncComplete(endpointId, decoded);
           break;
         case 'p2p_association_confirmed':
           await _handleAssociationConfirmed(endpointId, decoded);
@@ -3343,6 +3365,17 @@ Future(() async {
       phase.receiveDone = false;
       _isSyncing = false;
       _lastSyncStartTime = null;
+
+      // Send explicit sync complete signal to remote so it knows
+      // the data exchange is fully finished on our side.
+      try {
+        final completePayload = jsonEncode({'type': 'p2p_sync_complete'});
+        await _sendEncryptedPayload(endpointId, completePayload);
+        addLog('DEBUG', 'Segnale p2p_sync_complete inviato a $endpointId');
+      } catch (e) {
+        addLog('WARN', 'Errore invio sync complete: $e');
+      }
+
       addLog(
         'INFO',
         'Sincronizzazione completata con $endpointId '
@@ -4143,6 +4176,22 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
     await _checkSyncComplete(endpointId);
   }
 
+  Future<void> _handleSyncComplete(
+    String endpointId,
+    Map<String, dynamic> message,
+  ) async {
+    final phase = _endpointSyncPhase[endpointId];
+    if (phase == null) {
+      addLog('DEBUG', 'Sync complete ignorato: nessuna sync attiva per $endpointId');
+      return;
+    }
+    // The remote has finished sending all its data. We can mark receiveDone
+    // if we haven't already, and check for completion.
+    phase.receiveDone = true;
+    addLog('INFO', 'Segnale sync complete ricevuto da $endpointId');
+    await _checkSyncComplete(endpointId);
+  }
+
   Future<void> _handleAssociationConfirmed(
     String endpointId,
     Map<String, dynamic> message,
@@ -4257,7 +4306,13 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
   }
 
   Future<void> confirmPairingCode() async {
-    if (_state.status != P2PSyncStatus.pairingVerification) return;
+    // Allow proceeding if status is already completed (remote confirmed first).
+    // In that case we still need to complete local side (save association, etc.)
+    // but won't send another confirmation.
+    final alreadyCompleted = _state.status == P2PSyncStatus.completed;
+    if (!alreadyCompleted && _state.status != P2PSyncStatus.pairingVerification) {
+      return;
+    }
     if (_state.connectedDeviceId == null) return;
 
     final endpointId = _state.connectedDeviceId!;
@@ -4395,7 +4450,31 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
     }
 
     await _maybeAdoptRemoteCatechistId(remoteCatechistId);
-    await _completePairing(endpointId, remoteIdentity);
+
+    if (!alreadyCompleted) {
+      await _completePairing(endpointId, remoteIdentity);
+    } else {
+      // Remote already confirmed, just finalize local state
+      _pairingCodesByDeviceId.remove(remoteIdentity.deviceId);
+      _pendingAssociations.remove(remoteIdentity.deviceId);
+      _pendingHandshakeIdentity = null;
+      _pendingHandshakeRemoteRole = null;
+      _pendingHandshakeRemoteCatechistId = null;
+      _pendingChoiceEndpoint = null;
+      _pendingChoiceRemoteIdentity = null;
+
+      _pairingTimeoutTimer?.cancel();
+      _pairingTimeoutTimer = null;
+      _updateState(
+        _state.copyWith(
+          isPairingMode: false,
+          pairingCode: null,
+          remotePairingCode: null,
+          awaitingCatechistIdChoice: false,
+        ),
+      );
+      addLog('INFO', 'Pairing già confermato dal remoto, completato lato locale');
+    }
   }
 
   /// Completa l'associazione (invio conferma cifrata, aggiornamento classi,
@@ -4455,6 +4534,7 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
     _pendingHandshakeRemoteCatechistId = null;
     _pendingChoiceEndpoint = null;
     _pendingChoiceRemoteIdentity = null;
+    _pairingCodesByDeviceId.remove(remoteIdentity.deviceId);
 
     _pairingTimeoutTimer?.cancel();
     _pairingTimeoutTimer = null;
@@ -4640,6 +4720,7 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
     _pendingHandshakeRemoteRole = null;
     _pendingHandshakeRemoteCatechistId = null;
     _pendingAssociations.clear();
+    _pairingCodesByDeviceId.clear();
 
     _updateState(
       _state.copyWith(

@@ -232,6 +232,45 @@ bool _recordMatchesSingleScope({
     return false;
   }
 
+  // Allegati: risolviamo la classe dal parent entity se classUniqueCode
+  // non è direttamente sull'allegato.
+  if (boxName == LocalDatabase.attachmentsBox) {
+    try {
+      final parentId = data['parentId']?.toString() ?? '';
+      final parentType = data['parentType']?.toString() ?? '';
+      if (parentId.isNotEmpty && parentType.isNotEmpty) {
+        String? parentClassCode;
+        String? parentClassId;
+        if (parentType == 'student') {
+          final studentRaw = Hive.box<Map>(LocalDatabase.studentsBox).get(parentId);
+          if (studentRaw != null) {
+            final student = LocalDatabase.toStringDynamicMap(studentRaw);
+            parentClassId = student['classId']?.toString();
+          }
+        } else if (parentType == 'meeting') {
+          final meetingRaw = Hive.box<Map>(LocalDatabase.planningBox).get(parentId);
+          if (meetingRaw != null) {
+            final meeting = LocalDatabase.toStringDynamicMap(meetingRaw);
+            parentClassId = meeting['classId']?.toString();
+          }
+        } else if (parentType == 'catechesi') {
+          final catechesiRaw = Hive.box<Map>(LocalDatabase.catechesiBox).get(parentId);
+          if (catechesiRaw != null) {
+            final catechesi = LocalDatabase.toStringDynamicMap(catechesiRaw);
+            parentClassCode = catechesi['classUniqueCode']?.toString();
+          }
+        }
+        if (parentClassCode != null && parentClassCode.isNotEmpty) {
+          return parentClassCode == scope.classUniqueCode;
+        }
+        if (parentClassId != null && parentClassId.isNotEmpty) {
+          return parentClassId == scope.classId;
+        }
+      }
+    } catch (_) {}
+    return false;
+  }
+
   return false;
 }
 

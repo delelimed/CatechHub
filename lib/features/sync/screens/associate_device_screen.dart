@@ -10,6 +10,7 @@ import '../../../core/auth/auth_service.dart';
 import '../../../core/providers/current_class_provider.dart';
 import '../../../core/providers/nearby_sync_provider.dart';
 import '../../../core/storage/local_database.dart';
+import '../../../shared/widgets/loading_overlay.dart';
 import '../p2p/p2p_sync_service.dart';
 import '../p2p/p2p_security_service.dart';
 
@@ -108,6 +109,7 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
 
   bool _isPairing = false;
   bool _pairingComplete = false;
+  bool _isLoading = false;
   Timer? _pairingTimeoutTimer;
   StreamSubscription<P2PSyncState>? _p2pStateSub;
   bool _pairingDialogShown = false;
@@ -196,6 +198,7 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
       _errorMessage = null;
       _successMessage = null;
       _currentStep = _AssociationStep.showQrAndWait;
+      _isLoading = true;
     });
     _startAdvertiseOnly();
   }
@@ -207,6 +210,7 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
       _errorMessage = null;
       _successMessage = null;
       _currentStep = _AssociationStep.scanFirstQr;
+      _isLoading = true;
     });
     _openScanner();
   }
@@ -256,6 +260,7 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
       _remoteIdentity = null;
       _isPairing = false;
       _pairingComplete = false;
+      _isLoading = false;
       _pairingCode = null;
       _awaitingVerification = false;
       _pairingDialogShown = false;
@@ -349,12 +354,14 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
               : 'Associazione completata!';
           _errorMessage = null;
           _isPairing = false;
+          _isLoading = false;
         });
       } else if (state.status == P2PSyncStatus.error) {
         if (!_pairingComplete && _isPairing && !_isConfirmingPairing) {
           setState(() {
             _errorMessage = state.errorMessage ?? 'Errore di connessione.';
             _isPairing = false;
+            _isLoading = false;
           });
         }
       }
@@ -644,6 +651,7 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
             : 'Associazione completata!';
         _errorMessage = null;
         _isPairing = false;
+        _isLoading = false;
       });
     }
   }
@@ -839,6 +847,15 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    // Mostra banner di caricamento durante operazioni pesanti
+    final showLoadingBanner = _isLoading &&
+        (_currentStep == _AssociationStep.showQrAndWait ||
+            _currentStep == _AssociationStep.scanFirstQr ||
+            _currentStep == _AssociationStep.showSecondQr ||
+            _currentStep == _AssociationStep.scanSecondQr ||
+            _currentStep == _AssociationStep.pairingCodeVerification ||
+            _currentStep == _AssociationStep.onboardingSync);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -853,25 +870,58 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
               : _resetWizard,
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            _buildStepIndicator(theme),
-            const SizedBox(height: 20),
-            _buildCurrentStep(theme, colorScheme),
-            if (_errorMessage != null) ...[
-              const SizedBox(height: 12),
-              _buildMessageBanner(theme, _errorMessage!, isError: true),
-            ],
-            if (_successMessage != null && _errorMessage == null) ...[
-              const SizedBox(height: 12),
-              _buildMessageBanner(theme, _successMessage!, isError: false),
-            ],
-          ],
-        ),
+      body: Column(
+        children: [
+          if (showLoadingBanner)
+            LoadingBanner(
+              message: _getLoadingMessage(),
+            ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  _buildStepIndicator(theme),
+                  const SizedBox(height: 20),
+                  _buildCurrentStep(theme, colorScheme),
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 12),
+                    _buildMessageBanner(theme, _errorMessage!, isError: true),
+                  ],
+                  if (_successMessage != null && _errorMessage == null) ...[
+                    const SizedBox(height: 12),
+                    _buildMessageBanner(theme, _successMessage!, isError: false),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  String _getLoadingMessage() {
+    switch (_currentStep) {
+      case _AssociationStep.showQrAndWait:
+        return _isFirstToShowQr
+            ? 'In attesa di connessione...'
+            : 'Connessione in corso...';
+      case _AssociationStep.scanFirstQr:
+        return 'Scansione QR in corso...';
+      case _AssociationStep.showSecondQr:
+        return 'In attesa scansione partner...';
+      case _AssociationStep.scanSecondQr:
+        return 'Scansione QR partner...';
+      case _AssociationStep.pairingCodeVerification:
+        return 'Verifica codice sicurezza...';
+      case _AssociationStep.onboardingSync:
+        return _isOnboarding
+            ? 'Sincronizzazione dati classe in corso...'
+            : 'Registrazione catechista in corso...';
+      default:
+        return 'Operazione in corso...';
+    }
   }
 
   Widget _buildStepIndicator(ThemeData theme) {
@@ -1035,7 +1085,7 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
                     RadioListTile<P2PSyncRole>(
                       title: const Text('Altro Catechista'),
                       subtitle: const Text(
-                        'Richiede conferma prima di sincronizzare',
+                        'Sincronizzazione automatica dopo verifica codice',
                       ),
                       secondary: const Icon(Icons.how_to_reg),
                       value: P2PSyncRole.altroCatechista,

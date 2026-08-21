@@ -446,7 +446,6 @@ class P2PSyncService {
   final Set<String> _authRequestSent = {};
   bool _restartingEndpoints = false;
 
-  bool _sessionSyncAllowed = false;
   bool _isInitiator = false;
 
   String? _sessionPairingNonce;
@@ -593,61 +592,6 @@ class P2PSyncService {
     } catch (_) {}
   }
 
-  void resetSessionPermission() {
-    _sessionSyncAllowed = false;
-    _updateState(
-      _state.copyWith(
-        awaitingSessionPermission: false,
-        pendingSessionDeviceName: null,
-      ),
-    );
-    _reevaluateDiscoveredDevices();
-  }
-
-  Future<void> _reevaluateDiscoveredDevices() async {
-    for (final entry in _nearbyEndpointToDevice.entries.toList()) {
-      final endpointId = entry.key;
-      final deviceId = entry.value;
-      if (_connectedEndpoints.contains(endpointId)) continue;
-      if (_endpointConnIdMap.containsValue(deviceId)) continue;
-      final assoc = await _security.getAssociation(deviceId);
-      if (assoc != null && assoc.isValid) {
-        if (_needsSessionPermission(assoc)) {
-          _updateState(
-            _state.copyWith(
-              awaitingSessionPermission: true,
-              pendingSessionDeviceName: assoc.deviceName,
-            ),
-          );
-          return;
-        }
-      }
-    }
-  }
-
-  void grantSessionPermission() {
-    _sessionSyncAllowed = true;
-    addLog('INFO', 'Permesso sessione concesso');
-    _updateState(
-      _state.copyWith(
-        awaitingSessionPermission: false,
-        pendingSessionDeviceName: null,
-      ),
-    );
-    _attemptKnownDeviceConnections();
-  }
-
-  void denySessionPermission() {
-    _sessionSyncAllowed = false;
-    addLog('INFO', 'Permesso sessione negato');
-    _updateState(
-      _state.copyWith(
-        awaitingSessionPermission: false,
-        pendingSessionDeviceName: null,
-      ),
-    );
-  }
-
   void _startPeriodicSync() {
     _periodicSyncTimer?.cancel();
     _periodicSyncTimer = Timer.periodic(_periodicSyncInterval, (_) {
@@ -736,7 +680,7 @@ class P2PSyncService {
           _nearbyDiscoveredDevices.add(deviceId);
           _updateNearbyCount();
 
-          Future(() async {
+Future(() async {
             try {
               if (_connectedEndpoints.contains(endpointId)) {
                 addLog('DEBUG', '  già connesso a $endpointId');
@@ -749,22 +693,6 @@ class P2PSyncService {
 
               final assoc = await _security.getAssociation(deviceId);
               if (assoc != null && assoc.isValid) {
-                if (_needsSessionPermission(assoc)) {
-                  if (!_sessionSyncAllowed) {
-                    _updateState(
-                      _state.copyWith(
-                        awaitingSessionPermission: true,
-                        pendingSessionDeviceName: assoc.deviceName,
-                      ),
-                    );
-                    addLog(
-                      'DEBUG',
-                      '  consenso sessione richiesto per $deviceId, '
-                          'connessione differita',
-                    );
-                    return;
-                  }
-                }
                 addLog(
                   'DEBUG',
                   '  associazione valida, richiedo connessione a $deviceId',
@@ -843,21 +771,6 @@ class P2PSyncService {
 
       final assoc = await _security.getAssociation(deviceId);
       if (assoc != null && assoc.isValid) {
-        if (_needsSessionPermission(assoc)) {
-          if (!_sessionSyncAllowed) {
-            _updateState(
-              _state.copyWith(
-                awaitingSessionPermission: true,
-                pendingSessionDeviceName: assoc.deviceName,
-              ),
-            );
-            addLog(
-              'DEBUG',
-              'Consenso sessione richiesto per $deviceId, connessione differita',
-            );
-            continue;
-          }
-        }
         final localIdentity = await _security.getLocalIdentity();
         await _nearby.requestConnection(
           localIdentity.deviceId,
@@ -1401,11 +1314,6 @@ class P2PSyncService {
       'DEBUG',
       'Connessione iniziata da $endpointId: ${info.endpointName}',
     );
-    if (_state.role == P2PSyncRole.responsabile) {
-      addLog('WARN', 'Rifiuto connessione: ruolo responsabile');
-      await _nearby.rejectConnection(endpointId);
-      return;
-    }
 
     if (!_state.isPairingMode) {
       final deviceId = _extractDeviceId(info.endpointName);
@@ -1415,14 +1323,6 @@ class P2PSyncService {
           addLog(
             'WARN',
             'Rifiuto connessione: nessuna associazione valida per $deviceId',
-          );
-          await _nearby.rejectConnection(endpointId);
-          return;
-        }
-        if (_needsSessionPermission(association) && !_sessionSyncAllowed) {
-          addLog(
-            'WARN',
-            'Rifiuto connessione da $deviceId: consenso sessione non concesso',
           );
           await _nearby.rejectConnection(endpointId);
           return;
@@ -1572,35 +1472,6 @@ class P2PSyncService {
   }
 
   bool _rolesAreCompatible(P2PSyncRole local, P2PSyncRole remote) {
-    return true;
-  }
-
-  /// Determina se è necessario il CONSENSO ESPLICITO dell'utente prima di
-  /// sincronizzarsi in questa sessione. Il consenso è richiesto quando almeno
-  /// uno dei due dispositivi è un "Altro Catechista" con identità diversa
-  /// (dati di minori tra persone diverse). Se entrambi sono "Mio Dispositivo"
-  /// o condividono lo stesso catechistId, la sincronizzazione è automatica.
-  ///
-  /// La sync NON parte finché entrambe le parti non hanno concesso il consenso
-  /// (vedi [grantSessionPermission]); l'auto-accettazione dell'auth è stata
-  /// rimossa in favore di questa verifica.
-  bool _needsSessionPermission(P2PDeviceAssociation assoc) {
-    final localRole = _state.role;
-    final isLocalOther = localRole == P2PSyncRole.altroCatechista;
-    final isRemoteOther = assoc.remoteRole == P2PSyncRole.altroCatechista.name;
-    if (!isLocalOther && !isRemoteOther) {
-      // Entrambi "Mio Dispositivo": stessa persona, sync automatica.
-      return false;
-    }
-    // Almeno un "Altro Catechista": consent automatico solo se stessa identità.
-    final localCat = AuthService.getCatechistId();
-    final remoteCat = assoc.catechistId;
-    if (localCat.isNotEmpty &&
-        remoteCat != null &&
-        remoteCat.isNotEmpty &&
-        localCat == remoteCat) {
-      return false;
-    }
     return true;
   }
 
@@ -3265,29 +3136,8 @@ class P2PSyncService {
     final deviceId = message['deviceId'] as String?;
     final deviceName = message['deviceName'] as String? ?? 'Sconosciuto';
 
-    // Consenso per-sessione: la sincronizzazione richiede il consenso esplicito
-    // di ENTRAMBE le parti. Se il peer è un "Altro Catechista" con identità
-    // diversa e il consenso locale non è stato concesso, l'auth viene rifiutata.
-    var needsConsent = false;
-    if (deviceId != null) {
-      final assoc = await _security.getAssociation(deviceId);
-      needsConsent = assoc != null && _needsSessionPermission(assoc);
-    }
-    if (needsConsent && !_sessionSyncAllowed) {
-      addLog(
-        'WARN',
-        'Sync rifiutata per $deviceName: consenso sessione non concesso',
-      );
-      final reject = jsonEncode({
-        'type': 'p2p_auth_response',
-        'accepted': false,
-        'deviceId': deviceId,
-      });
-      await _sendEncryptedPayload(endpointId, reject);
-      return;
-    }
-
-    addLog('INFO', 'Auto-accettazione auth (deviceId sessione)');
+    // La sincronizzazione è sempre automatica: auto-accetta l'auth.
+    addLog('INFO', 'Auto-accettazione auth per $deviceName');
 
     final ack = jsonEncode({
       'type': 'p2p_auth_response',
@@ -3412,23 +3262,6 @@ class P2PSyncService {
   }
 
   Future<void> _performBidirectionalSync(String endpointId) async {
-    // Consenso per-sessione (kill-switch): nessun sync verso un "Altro
-    // Catechista" senza il consenso esplicito dell'utente in questa sessione.
-    final deviceId =
-        _endpointConnIdMap[endpointId] ?? _nearbyEndpointToDevice[endpointId];
-    if (deviceId != null) {
-      final assoc = await _security.getAssociation(deviceId);
-      if (assoc != null &&
-          _needsSessionPermission(assoc) &&
-          !_sessionSyncAllowed) {
-        addLog(
-          'WARN',
-          'Sync bloccato: consenso sessione non concesso per $deviceId',
-        );
-        return;
-      }
-    }
-
     final phase = _endpointSyncPhase[endpointId] ??= _SyncPhase2();
     if (!phase.isIdle && !phase.complete) {
       addLog('DEBUG', 'Sync già in corso per $endpointId');
@@ -3543,41 +3376,66 @@ class P2PSyncService {
     }
   }
 
-  /// Applica il profilo anagrafico ricevuto dall'handshake (ruolo "Altro
-  /// Catechista") al dispositivo ricevente: configura l'account locale con
-  /// nome, cognome e numero inseriti da chi condivide. Viene eseguito SOLO
-  /// se il profilo locale non è ancora configurato (dispositivo nuovo / join).
-  Future<void> _applyPendingRemoteProfileIfNeeded() async {
+/// Applica il profilo anagrafico ricevuto dall'handshake (ruolo "Altro
+/// Catechista") al dispositivo ricevente: configura l'account locale con
+/// nome, cognome e numero inseriti da chi condivide.
+///
+/// Se il profilo locale NON è ancora configurato (dispositivo nuovo / join),
+/// lo configura con i dati del mittente.
+///
+/// Se il profilo locale È già configurato, verifica che l'anagrafica
+/// (nome+cognome, normalizzata senza spazi/maiuscole) corrisponda a quella
+/// del mittente. Se NON corrisponde, logga un warning ma NON sovrascrive
+/// il profilo locale. Le classi verranno comunque aggiunte accanto a quelle
+/// esistenti (merge additivo).
+Future<void> _applyPendingRemoteProfileIfNeeded() async {
     final profile = _pendingHandshakeRemoteProfile;
     if (profile == null || profile.isEmpty) return;
 
     final auth = AuthService();
-    if (auth.isProfileConfigured) return;
-
     final firstName = profile['firstName'] ?? '';
     final lastName = profile['lastName'] ?? '';
     if (firstName.trim().isEmpty || lastName.trim().isEmpty) return;
 
-    addLog(
-      'INFO',
-      'Configuro account del dispositivo ricevente con il profilo '
-          'fornito dal mittente: $firstName $lastName',
-    );
-
-    final ok = await auth.setupInitialProfile(
-      firstName: firstName,
-      lastName: lastName,
-      phoneNumber: profile['phoneNumber'],
-      createClass: false,
-    );
-
-    if (ok) {
-      addLog('INFO', 'Account configurato con i dati del mittente');
-    } else {
+    if (!auth.isProfileConfigured) {
       addLog(
-        'WARN',
-        'Impossibile configurare l\'account con il profilo remoto',
+        'INFO',
+        'Configuro account del dispositivo ricevente con il profilo '
+            'fornito dal mittente: $firstName $lastName',
       );
+
+      final ok = await auth.setupInitialProfile(
+        firstName: firstName,
+        lastName: lastName,
+        phoneNumber: profile['phoneNumber'],
+        createClass: false,
+      );
+
+      if (ok) {
+        addLog('INFO', 'Account configurato con i dati del mittente');
+      } else {
+        addLog(
+          'WARN',
+          'Impossibile configurare l\'account con il profilo remoto',
+        );
+      }
+    } else {
+      // Profilo già configurato: verifica corrispondenza anagrafica
+      final remoteAnagrafica = AuthService.anagraficaKey(firstName, lastName);
+      final localAnagrafica = AuthService.getLocalAnagraficaKey();
+      if (remoteAnagrafica.isNotEmpty && remoteAnagrafica != localAnagrafica) {
+        addLog(
+          'WARN',
+          'Anagrafica mittente ($remoteAnagrafica) diversa da locale ($localAnagrafica). '
+          'Il profilo locale NON viene sovrascritto. Le classi verranno aggiunte accanto a quelle esistenti.',
+        );
+      } else {
+        addLog(
+          'INFO',
+          'Anagrafica mittente corrisponde a quella locale. '
+          'Le classi ricevute verranno aggiunte accanto a quelle esistenti.',
+        );
+      }
     }
     _pendingHandshakeRemoteProfile = null;
   }
@@ -4377,6 +4235,10 @@ class P2PSyncService {
         addLog('INFO', 'Avvio modalità continua dopo conferma remota');
         _startContinuousMode();
       }
+
+      // Applica il profilo anagrafico ricevuto (nome, cognome, telefono)
+      // per configurare l'account del dispositivo ricevente.
+      await _applyPendingRemoteProfileIfNeeded();
     } else {
       addLog(
         'DEBUG',
@@ -4619,6 +4481,10 @@ class P2PSyncService {
     }
 
     _ensureLocalCatechistInClasses();
+
+    // Applica il profilo anagrafico ricevuto (nome, cognome, telefono)
+    // per configurare l'account del dispositivo ricevente.
+    await _applyPendingRemoteProfileIfNeeded();
 
     addLog('INFO', 'Associazione completata con successo');
   }

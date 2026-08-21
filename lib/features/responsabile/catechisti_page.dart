@@ -543,18 +543,44 @@ class _CatechistDetailSheetState extends ConsumerState<_CatechistDetailSheet> {
             ),
             child: const Text(
               'Nessun dispositivo collegato a questo catechista. '
-              'Associa il suo telefono tramite la Catena di Fiducia.',
+              'Associa il suo telefono tramite la Catena di Fiducia o '
+              'l\'associazione diretta.',
               style: TextStyle(fontSize: 13, height: 1.4),
             ),
           ),
           const SizedBox(height: 8),
-          FilledButton.tonalIcon(
-            onPressed: () {
-              Navigator.pop(context);
-              context.push('/settings/approval-center');
-            },
-            icon: const Icon(Icons.qr_code_2_rounded, size: 18),
-            label: const Text('Associa il cellulare'),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.tonalIcon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    context.push('/settings/approval-center');
+                  },
+                  icon: const Icon(Icons.verified_user_rounded, size: 18),
+                  label: const Text('Catena di Fiducia'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.teal.withValues(alpha: 0.15),
+                    foregroundColor: Colors.teal[800],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    context.push('/settings/associate-device');
+                  },
+                  icon: const Icon(Icons.qr_code_2_rounded, size: 18),
+                  label: const Text('Associazione diretta'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.blue[800],
+                    side: BorderSide(color: Colors.blue[800]!),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       );
@@ -615,13 +641,37 @@ class _CatechistDetailSheetState extends ConsumerState<_CatechistDetailSheet> {
             ),
           ),
         const SizedBox(height: 4),
-        TextButton.icon(
-          onPressed: () {
-            Navigator.pop(context);
-            context.push('/settings/approval-center');
-          },
-          icon: const Icon(Icons.qr_code_2_rounded, size: 18),
-          label: const Text('Gestisci dispositivi'),
+        Row(
+          children: [
+            Expanded(
+              child: TextButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  context.push('/settings/approval-center');
+                },
+                icon: const Icon(Icons.verified_user_rounded, size: 18),
+                label: const Text('Catena di Fiducia'),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.teal[800],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  context.push('/settings/associate-device');
+                },
+                icon: const Icon(Icons.qr_code_2_rounded, size: 18),
+                label: const Text('Associazione diretta'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.blue[800],
+                  side: BorderSide(color: Colors.blue[800]!),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );

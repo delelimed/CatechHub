@@ -11,6 +11,7 @@ import '../../../../core/providers/nearby_sync_provider.dart';
 import '../../../../core/storage/local_database.dart';
 import '../../../../features/sync/p2p/p2p_sync_service.dart';
 import '../../../../features/sync/p2p/p2p_security_service.dart';
+import '../../../../shared/widgets/loading_overlay.dart';
 
 enum _OnboardingStep {
   roleChoice,
@@ -49,6 +50,7 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
   bool _isPairing = false;
   bool _syncCompleted = false;
   bool _syncStarted = false;
+  bool _isLoading = false;
   String? _scannedDeviceId;
   Timer? _pairingTimeoutTimer;
   StreamSubscription<P2PSyncState>? _p2pStateSub;
@@ -104,6 +106,7 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
       _choseScanFirst = true;
       _currentStep = _OnboardingStep.scanQr;
       _errorMessage = null;
+      _isLoading = true;
     });
     _openScanner();
   }
@@ -113,6 +116,7 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
       _choseScanFirst = false;
       _currentStep = _OnboardingStep.showQr;
       _errorMessage = null;
+      _isLoading = true;
     });
     _startShowQrWithP2p();
   }
@@ -296,6 +300,7 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
                   '${state.connectedDeviceName != null ? "di ${state.connectedDeviceName}" : ""}!'
               .trim();
       _isPairing = false;
+      _isLoading = false;
     });
   }
 
@@ -496,6 +501,13 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Mostra banner di caricamento durante operazioni pesanti
+    final showLoadingBanner = _isLoading &&
+        (_currentStep == _OnboardingStep.showQr ||
+            _currentStep == _OnboardingStep.scanQr ||
+            _currentStep == _OnboardingStep.pairingVerification ||
+            _currentStep == _OnboardingStep.syncing);
+
     return PopScope(
       canPop: false,
       child: Scaffold(
@@ -503,9 +515,36 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
           title: const Text('Unisciti a una classe'),
           automaticallyImplyLeading: false,
         ),
-        body: SafeArea(child: _buildBody()),
+        body: Column(
+          children: [
+            if (showLoadingBanner)
+              LoadingBanner(
+                message: _getLoadingMessage(),
+              ),
+            Expanded(
+              child: SafeArea(child: _buildBody()),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  String _getLoadingMessage() {
+    switch (_currentStep) {
+      case _OnboardingStep.showQr:
+        return _choseScanFirst
+            ? 'In attesa di connessione...'
+            : 'Connessione in corso...';
+      case _OnboardingStep.scanQr:
+        return 'Scansione QR in corso...';
+      case _OnboardingStep.pairingVerification:
+        return 'Verifica codice sicurezza...';
+      case _OnboardingStep.syncing:
+        return 'Sincronizzazione in corso...';
+      default:
+        return 'Operazione in corso...';
+    }
   }
 
   Widget _buildBody() {

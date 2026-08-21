@@ -3738,6 +3738,17 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
     if (keys == null || keys.isEmpty) return;
     final currentWindow = P2PSecurityService.sessionWindowIndex();
     if (!keys.any((k) => k.windowIndex == currentWindow)) return;
+
+    // Durante il pairing iniziale, l'associazione non è ancora stata salvata
+    // (viene salvata alla ricezione di p2p_association_confirmed).
+    // In questo caso saltiamo l'upgrade e riproveremo al prossimo giro
+    // (es. rotazione chiavi o nuova connessione).
+    final assocExists = await _security.getAssociation(deviceId);
+    if (assocExists == null) {
+      addLog('DEBUG', 'M5: associazione non ancora salvata per $deviceId, upgrade rimandato');
+      return;
+    }
+
     try {
       final upgraded = await _deriveSessionKey(
         deviceId,

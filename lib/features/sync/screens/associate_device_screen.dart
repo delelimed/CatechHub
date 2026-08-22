@@ -10,6 +10,9 @@ import '../../../core/auth/auth_service.dart';
 import '../../../core/providers/current_class_provider.dart';
 import '../../../core/providers/nearby_sync_provider.dart';
 import '../../../core/storage/local_database.dart';
+import '../../../features/responsabile/catechists_repository.dart';
+import '../../../shared/models/catechist_profile.dart';
+import '../../../shared/utils/app_mode.dart';
 import '../../../shared/widgets/loading_overlay.dart';
 import '../p2p/p2p_sync_service.dart';
 import '../p2p/p2p_security_service.dart';
@@ -85,9 +88,19 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
   P2PSyncRole _selectedRole = P2PSyncRole.mioDispositivo;
   final bool _isOnboarding = false;
 
+  /// True se l'account è in Modalità Responsabile Catechistico: in questo caso
+  /// l'anagrafica dei catechisti è già in rubrica e NON va richiesta a mano.
+  bool get _isResponsabileMode => AppModeUtils.isResponsabileMode;
+
+  /// Catechista selezionato dalla rubrica parrocchiale (solo modalità
+  /// Responsabile): i suoi dati configureranno l'account del dispositivo
+  /// ricevente e il suo catechistId verrà adottato dal ricevente.
+  CatechistProfile? _selectedCatechistProfile;
+
   /// Profilo anagrafico dell'altro catechista (ruolo "Altro Catechista"):
   /// nome, cognome e numero che verranno usati per configurare l'account
-  /// del dispositivo ricevente.
+  /// del dispositivo ricevente. Usato SOLO in modalità normale, dove i dati
+  /// vanno inseriti manualmente.
   final TextEditingController _remoteFirstNameController =
       TextEditingController();
   final TextEditingController _remoteLastNameController =
@@ -155,6 +168,9 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
     setState(() {
       _selectedRole = role;
       _errorMessage = null;
+      if (role != P2PSyncRole.altroCatechista) {
+        _selectedCatechistProfile = null;
+      }
     });
     ref.read(nearbySyncServiceProvider).setRole(role);
 
@@ -192,6 +208,7 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
   }
 
   void _chooseShowQrFirst() {
+    if (!_validateCatechistData()) return;
     _applyRemoteProfile();
     _isFirstToShowQr = true;
     setState(() {
@@ -204,6 +221,7 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
   }
 
   void _chooseScanFirst() {
+    if (!_validateCatechistData()) return;
     _applyRemoteProfile();
     _isFirstToShowQr = false;
     setState(() {
@@ -215,10 +233,61 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
     _openScanner();
   }
 
-  /// Trasmette i dati anagrafici inseriti nel modulo "Altro Catechista" al
-  /// servizio P2P, così da includerli nell'handshake per configurare
-  /// l'account del dispositivo ricevente.
+  /// Verifica che i dati dell'altro catechista siano completi prima di
+  /// avviare il flusso: in modalità Responsabile deve essere stato selezionato
+  /// un profilo dalla rubrica; in modalità normale nome e cognome sono
+  /// obbligatori nel form manuale.
+  bool _validateCatechistData() {
+    if (_selectedRole != P2PSyncRole.altroCatechista) return true;
+    if (_isResponsabileMode) {
+      if (_selectedCatechistProfile == null) {
+        setState(() {
+          _errorMessage =
+              'Seleziona il catechista dalla rubrica parrocchiale '
+              'prima di procedere.';
+        });
+        return false;
+      }
+      return true;
+    }
+    if (_remoteFirstNameController.text.trim().isEmpty ||
+        _remoteLastNameController.text.trim().isEmpty) {
+      setState(() {
+        _errorMessage =
+            'Inserisci nome e cognome dell\'altro catechista '
+            'prima di procedere.';
+      });
+      return false;
+    }
+    return true;
+  }
+
+  /// Trasmette i dati anagrafici dell'altro catechista al servizio P2P, così
+  /// da includerli nell'handshake per configurare l'account del dispositivo
+  /// ricevente.
+  ///
+  /// In modalità Responsabile usa il profilo selezionato dalla rubrica
+  /// (i dati sono già noti: nessuna richiesta manuale), includendo anche il
+  /// catechistId così che il ricevente adotti l'identità già assegnata nelle
+  /// classi. In modalità normale usa i campi inseriti a mano.
   void _applyRemoteProfile() {
+    if (_selectedRole != P2PSyncRole.altroCatechista) {
+      ref.read(nearbySyncServiceProvider).setAssociationRemoteProfile();
+      return;
+    }
+    if (_isResponsabileMode) {
+      final profile = _selectedCatechistProfile;
+      if (profile == null) return;
+      ref
+          .read(nearbySyncServiceProvider)
+          .setAssociationRemoteProfile(
+            firstName: profile.firstName,
+            lastName: profile.lastName,
+            phoneNumber: profile.phone,
+            catechistId: profile.id,
+          );
+      return;
+    }
     ref
         .read(nearbySyncServiceProvider)
         .setAssociationRemoteProfile(
@@ -258,6 +327,7 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
       _errorMessage = null;
       _successMessage = null;
       _remoteIdentity = null;
+      _selectedCatechistProfile = null;
       _isPairing = false;
       _pairingComplete = false;
       _isLoading = false;
@@ -1095,20 +1165,19 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
               ),
             ),
             if (_selectedRole == P2PSyncRole.altroCatechista) ...[
-              _buildRemoteProfileForm(theme, colorScheme),
+              // Modalità Responsabile: i dati dei catechisti sono già nella
+              // rubrica parrocchiale → selezione dal registro, nessun form.
+              if (_isResponsabileMode)
+                _buildResponsabileCatechistPicker(theme, colorScheme)
+              else
+                _buildRemoteProfileForm(theme, colorScheme),
               _buildSharedClassSelector(theme, colorScheme),
             ],
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _currentStep = _AssociationStep.showQrAndWait;
-                    _errorMessage = null;
-                  });
-                  _chooseShowQrFirst();
-                },
+                onPressed: _chooseShowQrFirst,
                 icon: const Icon(Icons.qr_code),
                 label: const Text('Mostra QR (attendere connessione)'),
                 style: FilledButton.styleFrom(
@@ -1120,13 +1189,7 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _currentStep = _AssociationStep.scanFirstQr;
-                    _errorMessage = null;
-                  });
-                  _chooseScanFirst();
-                },
+                onPressed: _chooseScanFirst,
                 icon: const Icon(Icons.qr_code_scanner),
                 label: const Text('Scansiona QR partner'),
                 style: OutlinedButton.styleFrom(
@@ -1140,10 +1203,125 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
     );
   }
 
+  /// Selettore del catechista dalla rubrica parrocchiale (SOLO modalità
+  /// Responsabile): i dati dei catechisti sono già noti al Responsabile,
+  /// quindi non vengono richiesti manualmente. Il profilo scelto fornisce
+  /// nome, cognome, telefono e catechistId per configurare l'account del
+  /// dispositivo ricevente.
+  Widget _buildResponsabileCatechistPicker(
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
+    final catechistsAsync = ref.watch(catechistsStreamProvider);
+    final catechists = catechistsAsync.value ?? const [];
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.badge_outlined, size: 18, color: colorScheme.primary),
+              const SizedBox(width: 6),
+              Text(
+                'Catechista da associare',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Sei in Modalità Responsabile: seleziona il catechista dalla '
+            'rubrica parrocchiale. I suoi dati (già in registro) configureranno '
+            'l\'account del dispositivo del collega.',
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.3,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (catechists.isEmpty)
+            Text(
+              'Nessun catechista in rubrica. Aggiungili prima da '
+              '"Parrocchia → Catechisti".',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+            )
+          else
+            RadioGroup<String>(
+              groupValue: _selectedCatechistProfile?.id,
+              onChanged: (id) {
+                final match = catechists.where((c) => c.id == id).toList();
+                if (match.isEmpty) return;
+                setState(() {
+                  _selectedCatechistProfile = match.first;
+                  _errorMessage = null;
+                });
+              },
+              child: Column(
+                children: catechists
+                    .map(
+                      (c) => RadioListTile<String>(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                        value: c.id,
+                        title: Text(
+                          c.fullName,
+                          style: const TextStyle(fontSize: 14),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: c.phone.trim().isEmpty
+                            ? null
+                            : Text(
+                                c.phone,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                        secondary: CircleAvatar(
+                          radius: 14,
+                          backgroundColor: colorScheme.primary.withValues(
+                            alpha: 0.12,
+                          ),
+                          child: Text(
+                            c.initials,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          const SizedBox(height: 4),
+          Text(
+            'Il dispositivo del collega adotterà l\'identità (catechistId) già '
+            'assegnata nelle classi della parrocchia.',
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Modulo dati anagrafici dell'altro catechista: nome, cognome e numero
   /// che configureranno l'account del dispositivo ricevente.
-  Widget _buildRemoteProfileForm(ThemeData theme, ColorScheme colorScheme) {
-    return Container(
+  Widget _buildRemoteProfileForm(ThemeData theme, ColorScheme colorScheme) {    return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(top: 4),
       padding: const EdgeInsets.all(12),

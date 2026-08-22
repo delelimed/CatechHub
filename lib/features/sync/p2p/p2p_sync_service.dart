@@ -386,6 +386,14 @@ class P2PSyncService {
   /// al termine dell'associazione se non ha ancora un profilo configurato.
   Map<String, String>? _pendingHandshakeRemoteProfile;
 
+  /// Anagrafica del PEER (nome+cognome dichiarati nel payload `p2p_identity`).
+  /// Usata come FALLBACK per configurare l'account di un dispositivo ricevente
+  /// appena configurato quando il mittente non ha fornito un profilo esplicito:
+  /// in modalità normale ("Mio Dispositivo") i due dispositivi appartengono
+  /// alla stessa persona, quindi l'anagrafica del mittente È quella corretta.
+  String _peerFirstName = '';
+  String _peerLastName = '';
+
   /// Mappa endpoint → catechistId del dispositivo remoto, raccolto dall'handshake.
   /// Permette di distinguere un altro dispositivo dello STESSO catechista
   /// (stesso catechistId → sincronizza tutte le classi) da un catechista
@@ -929,10 +937,14 @@ Future(() async {
   /// fornisce per l'ALTRO catechista durante l'associazione con ruolo
   /// "Altro Catechista". Il profilo viene trasmesso all'handshake e applicato
   /// dal dispositivo ricevente per configurare il proprio account.
+  /// [catechistId] è opzionale: se presente (es. selezione dalla rubrica in
+  /// modalità Responsabile), il dispositivo ricevente lo adotta come identità
+  /// stabile così da coincidere con le assegnazioni già presenti nelle classi.
   Future<void> setAssociationRemoteProfile({
     String? firstName,
     String? lastName,
     String? phoneNumber,
+    String? catechistId,
   }) async {
     _associationRemoteProfile = {
       if (firstName != null && firstName.trim().isNotEmpty)
@@ -941,6 +953,8 @@ Future(() async {
         'lastName': lastName.trim(),
       if (phoneNumber != null && phoneNumber.trim().isNotEmpty)
         'phoneNumber': phoneNumber.trim(),
+      if (catechistId != null && catechistId.trim().isNotEmpty)
+        'catechistId': catechistId.trim(),
     };
     // Privacy: il log NON deve contenere il profilo anagrafico (nome, cognome,
     // telefono) del catechista remoto — sono dati personali di un collega e
@@ -1252,6 +1266,8 @@ Future(() async {
     _associationSharedClassIds = {};
     _associationRemoteProfile = {};
     _pendingHandshakeRemoteProfile = null;
+    _peerFirstName = '';
+    _peerLastName = '';
     _endpointRemoteCatechistId.clear();
     _endpointRemoteHasClasses.clear();
     _endpointSharedClassIds.clear();
@@ -1529,6 +1545,10 @@ Future(() async {
       if (lastName.isNotEmpty) profile['lastName'] = lastName;
       if (phoneNumber.isNotEmpty) profile['phoneNumber'] = phoneNumber;
     }
+    // Identità stabile opzionale (rubrica del Responsabile): il ricevente
+    // la adotta come proprio catechistId dopo la configurazione dell'account.
+    final catechistId = (raw['catechistId'] as String?)?.trim() ?? '';
+    if (catechistId.isNotEmpty) profile['catechistId'] = catechistId;
     return profile;
   }
 
@@ -1841,9 +1861,13 @@ Future(() async {
     }
 
     // Anagrafica (nome/cognome) per il controllo anti-associazione errata.
+    // Conservata anche come fallback per la configurazione dell'account del
+    // ricevente quando il mittente non fornisce un profilo esplicito.
     final firstName = message['senderFirstName'] as String? ?? '';
     final lastName = message['senderLastName'] as String? ?? '';
     if (firstName.isNotEmpty || lastName.isNotEmpty) {
+      _peerFirstName = firstName;
+      _peerLastName = lastName;
       final current = _pendingHandshakeIdentity;
       if (current != null) {
         _pendingHandshakeIdentity = P2PIdentity(
@@ -3422,38 +3446,15 @@ Future(() async {
 /// il profilo locale. Le classi verranno comunque aggiunte accanto a quelle
 /// esistenti (merge additivo).
 Future<void> _applyPendingRemoteProfileIfNeeded() async {
-    final profile = _pendingHandshakeRemoteProfile;
-    if (profile == null || profile.isEmpty) return;
-
     final auth = AuthService();
-    final firstName = profile['firstName'] ?? '';
-    final lastName = profile['lastName'] ?? '';
-    if (firstName.trim().isEmpty || lastName.trim().isEmpty) return;
+    if (auth.isProfileConfigured) {
+      final profile = _pendingHandshakeRemoteProfile;
+      if (profile == null || profile.isEmpty) return;
 
-    if (!auth.isProfileConfigured) {
-      addLog(
-        'INFO',
-        'Configuro account del dispositivo ricevente con il profilo '
-            'fornito dal mittente: $firstName $lastName',
-      );
-
-      final ok = await auth.setupInitialProfile(
-        firstName: firstName,
-        lastName: lastName,
-        phoneNumber: profile['phoneNumber'],
-        createClass: false,
-      );
-
-      if (ok) {
-        addLog('INFO', 'Account configurato con i dati del mittente');
-      } else {
-        addLog(
-          'WARN',
-          'Impossibile configurare l\'account con il profilo remoto',
-        );
-      }
-    } else {
       // Profilo già configurato: verifica corrispondenza anagrafica
+      final firstName = profile['firstName'] ?? '';
+      final lastName = profile['lastName'] ?? '';
+      if (firstName.trim().isEmpty || lastName.trim().isEmpty) return;
       final remoteAnagrafica = AuthService.anagraficaKey(firstName, lastName);
       final localAnagrafica = AuthService.getLocalAnagraficaKey();
       if (remoteAnagrafica.isNotEmpty && remoteAnagrafica != localAnagrafica) {
@@ -3469,6 +3470,77 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
           'Le classi ricevute verranno aggiunte accanto a quelle esistenti.',
         );
       }
+      _pendingHandshakeRemoteProfile = null;
+      return;
+    }
+
+    // Account NON ancora configurato (dispositivo nuovo / onboarding "join"):
+    // configura l'account con i dati condivisi dall'inviante. Se il mittente
+    // non ha fornito un profilo esplicito ("Altro Catechista"), usa come
+    // fallback l'anagrafica del peer dichiarata nel payload `p2p_identity`:
+    // in modalità normale i due dispositivi appartengono alla stessa persona,
+    // quindi l'anagrafica del mittente è quella corretta per il ricevente.
+    var profile = _pendingHandshakeRemoteProfile;
+    if (profile == null ||
+        profile.isEmpty ||
+        (profile['firstName'] ?? '').trim().isEmpty ||
+        (profile['lastName'] ?? '').trim().isEmpty) {
+      if (_peerFirstName.trim().isEmpty || _peerLastName.trim().isEmpty) {
+        addLog(
+          'WARN',
+          'Nessun profilo disponibile per configurare l\'account del ricevente',
+        );
+        return;
+      }
+      profile = {
+        'firstName': _peerFirstName,
+        'lastName': _peerLastName,
+        if (_pendingHandshakeRemoteProfile?['phoneNumber']?.isNotEmpty == true)
+          'phoneNumber': _pendingHandshakeRemoteProfile!['phoneNumber']!,
+        if (_pendingHandshakeRemoteProfile?['catechistId']?.isNotEmpty == true)
+          'catechistId': _pendingHandshakeRemoteProfile!['catechistId']!,
+      };
+      addLog(
+        'INFO',
+        'Nessun profilo esplicito dal mittente: uso l\'anagrafica del peer '
+            'per configurare l\'account del ricevente',
+      );
+    }
+
+    final firstName = profile['firstName'] ?? '';
+    final lastName = profile['lastName'] ?? '';
+    if (firstName.trim().isEmpty || lastName.trim().isEmpty) return;
+
+    addLog(
+      'INFO',
+      'Configuro account del dispositivo ricevente con il profilo '
+          'fornito dal mittente: $firstName $lastName',
+    );
+
+    final ok = await auth.setupInitialProfile(
+      firstName: firstName,
+      lastName: lastName,
+      phoneNumber: profile['phoneNumber'],
+      createClass: false,
+    );
+
+    if (ok) {
+      addLog('INFO', 'Account configurato con i dati del mittente');
+      // Identità stabile opzionale (es. rubrica del Responsabile): adottata
+      // DOPO la configurazione dell'account, così il catechistId coincide con
+      // le assegnazioni già presenti nelle classi ricevute.
+      final adoptedId = profile['catechistId'];
+      if (adoptedId != null && adoptedId.isNotEmpty) {
+        AuthService.adoptCatechistId(adoptedId);
+        addLog('INFO', 'CatechistId adottato dal profilo condiviso');
+        await _security.refreshIdentityName();
+        await _security.refreshIdentityAnagrafica();
+      }
+    } else {
+      addLog(
+        'WARN',
+        'Impossibile configurare l\'account con il profilo remoto',
+      );
     }
     _pendingHandshakeRemoteProfile = null;
   }
@@ -4468,11 +4540,27 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
       // Remote already confirmed, just finalize local state
       _pairingCodesByDeviceId.remove(remoteIdentity.deviceId);
       _pendingAssociations.remove(remoteIdentity.deviceId);
+
+      // FIX: in questo ramo la conferma del dispositivo che conferma PER
+      // SECONDO non passa da _completePairing, quindi nessuno dei due lati
+      // avviava mai la sincronizzazione dati (il remoto ha già completato il
+      // pairing e noi abbiamo saltato l'avvio): il ricevente restava bloccato
+      // sull'attesa dei dati. Avviamo qui la sync bidirezionale; i guard di
+      // _performBidirectionalSync rendono la chiamata idempotente.
+      try {
+        addLog('INFO', 'Avvio sincronizzazione dopo conferma tardiva locale');
+        await _performBidirectionalSync(endpointId);
+      } catch (e) {
+        addLog('WARN', 'Sync post-conferna tardiva fallita: $e');
+      }
+
       _pendingHandshakeIdentity = null;
       _pendingHandshakeRemoteRole = null;
       _pendingHandshakeRemoteCatechistId = null;
       _pendingChoiceEndpoint = null;
       _pendingChoiceRemoteIdentity = null;
+      _peerFirstName = '';
+      _peerLastName = '';
 
       _pairingTimeoutTimer?.cancel();
       _pairingTimeoutTimer = null;

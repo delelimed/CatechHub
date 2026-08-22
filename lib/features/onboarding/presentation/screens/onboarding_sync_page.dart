@@ -50,6 +50,7 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
   bool _isPairing = false;
   bool _syncCompleted = false;
   bool _syncStarted = false;
+  bool _manualRetryStarted = false;
   bool _isLoading = false;
   String? _scannedDeviceId;
   Timer? _pairingTimeoutTimer;
@@ -158,6 +159,7 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
   void _resetState() {
     _syncCompleted = false;
     _syncStarted = false;
+    _manualRetryStarted = false;
     _isPairing = false;
     _scannedDeviceId = null;
   }
@@ -259,38 +261,59 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
     }
   }
 
-  void _onSyncCompleted(P2PSyncState state) {
+  /// True se il catechista locale risulta in almeno una classe ricevuta.
+  bool _isLocalUserInAnyClass() {
     try {
       final classesBox = LocalDatabase.classes();
       const localId = AuthService.localUserId;
-      bool found = false;
       for (final key in classesBox.keys) {
         final data = LocalDatabase.toStringDynamicMap(classesBox.get(key));
         final ids = (data['catechistIds'] as List? ?? [])
             .map((e) => e.toString())
             .toList();
-        if (ids.contains(localId)) {
-          found = true;
-          break;
-        }
+        if (ids.contains(localId)) return true;
       }
+    } catch (_) {}
+    return false;
+  }
 
-      if (!found) {
-        setState(() {
-          _errorMessage =
-              'Sincronizzazione completata ma non risulti in '
-              'nessuna classe. Assicurati che l\'altro catechista ti abbia '
-              'aggiunto al gruppo.';
-          _currentStep = _OnboardingStep.error;
-          _isPairing = false;
-        });
-        return;
+  Future<void> _onSyncCompleted(P2PSyncState state) async {
+    if (_syncCompleted) return;
+
+    // Il servizio emette `completed` anche appena dopo la conferma del codice
+    // pairing, PRIMA che i dati della classe siano effettivamente arrivati.
+    // In quel caso non fallire subito: forza una sincronizzazione manuale e
+    // attendi (finestra limitata) che l'associazione alla classe arrivi.
+    var found = _isLocalUserInAnyClass();
+    if (!found && !_manualRetryStarted) {
+      _manualRetryStarted = true;
+      addLog(
+        'INFO',
+        'Sync completata ma classe non ancora presente: avvio sync manuale di recupero',
+      );
+      final service = ref.read(nearbySyncServiceProvider);
+      unawaited(service.triggerManualSync());
+      for (int i = 0; i < 60 && !found; i++) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        found = _isLocalUserInAnyClass();
       }
+    }
 
-      LocalDatabase.auth().put('onboarding_completed', true);
-    } catch (_) {
+    if (!found || !AuthService.hasLocalAnagrafica()) {
+      setState(() {
+        _errorMessage = !found
+            ? 'Sincronizzazione completata ma non risulti in '
+                  'nessuna classe. Assicurati che l\'altro catechista ti abbia '
+                  'aggiunto al gruppo.'
+            : 'Sincronizzazione completata ma l\'account non è stato '
+                  'configurato con i dati condivisi. Riprova l\'associazione.';
+        _currentStep = _OnboardingStep.error;
+        _isPairing = false;
+      });
       return;
     }
+
+    LocalDatabase.auth().put('onboarding_completed', true);
 
     _syncCompleted = true;
     setState(() {
@@ -399,11 +422,23 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
     }
 
     addLog('INFO', 'Codice pairing confermato, attesa sincronizzazione dati');
-    if (mounted) {
-      setState(() {
-        _currentStep = _OnboardingStep.syncing;
-        _successMessage = 'Sincronizzazione dati classe in corso...';
-      });
+    if (!mounted) return;
+
+    // Dalla conferma in poi siamo nella fase di sincronizzazione: senza
+    // questo flag l'evento `completed` emesso dal servizio veniva ignorato
+    // (il ricevente non osserva mai lo stato `syncing`, impostato solo da chi
+    // avvia la sync) e la UI restava bloccata su "Sincronizzazione in corso".
+    _syncStarted = true;
+    setState(() {
+      _currentStep = _OnboardingStep.syncing;
+      _successMessage = 'Sincronizzazione dati classe in corso...';
+    });
+
+    // Se il remoto ha già confermato prima di noi, il servizio è già passato
+    // a `completed` e l'evento nello stream è stato perso: completa subito.
+    final latest = ref.read(nearbySyncServiceProvider).currentState;
+    if (latest.status == P2PSyncStatus.completed && !_syncCompleted) {
+      await _onSyncCompleted(latest);
     }
   }
 
@@ -1281,6 +1316,7 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
     _stopScanner();
     _syncCompleted = false;
     _syncStarted = false;
+    _manualRetryStarted = false;
     _isPairing = false;
     _scannedDeviceId = null;
     _errorMessage = null;

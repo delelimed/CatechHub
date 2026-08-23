@@ -19,6 +19,7 @@ import '../data/association_models.dart';
 import '../parish_channel_service.dart';
 import 'p2p_security_service.dart';
 import 'hive_sync_engine.dart';
+import '../../../shared/models/class_model.dart' show generateClassUniqueCode;
 
 enum P2PSyncRole { mioDispositivo, altroCatechista, responsabile }
 
@@ -37,6 +38,9 @@ enum P2PSyncStatus {
   onboardingSync,
   completed,
   error,
+  associationAccountConfig,
+  associationClassInfo,
+  associationVerifying,
 }
 
 class P2PSyncState {
@@ -74,6 +78,13 @@ class P2PSyncState {
   final String? pendingCatechistChoiceRemoteId;
   final String? pendingCatechistChoiceRemoteName;
   final String? pendingCatechistChoiceDefault;
+  // ── Handshake ordinato (account → classe) + stato sync continuo ───────
+  final bool isAssociationHandshakeActive;
+  final String associationHandshakeStep;
+  final bool continuousSyncVerified;
+  final String? remoteSyncState;
+  final DateTime? lastSyncStartedAt;
+  final DateTime? lastSyncEndedAt;
 
   const P2PSyncState({
     this.status = P2PSyncStatus.idle,
@@ -110,6 +121,12 @@ class P2PSyncState {
     this.pendingCatechistChoiceRemoteId,
     this.pendingCatechistChoiceRemoteName,
     this.pendingCatechistChoiceDefault,
+    this.isAssociationHandshakeActive = false,
+    this.associationHandshakeStep = 'idle',
+    this.continuousSyncVerified = false,
+    this.remoteSyncState,
+    this.lastSyncStartedAt,
+    this.lastSyncEndedAt,
   });
 
   double get syncProgressPercent {
@@ -153,6 +170,12 @@ class P2PSyncState {
     String? pendingCatechistChoiceRemoteId,
     String? pendingCatechistChoiceRemoteName,
     String? pendingCatechistChoiceDefault,
+    bool? isAssociationHandshakeActive,
+    String? associationHandshakeStep,
+    bool? continuousSyncVerified,
+    String? remoteSyncState,
+    DateTime? lastSyncStartedAt,
+    DateTime? lastSyncEndedAt,
     bool clearError = false,
   }) {
     return P2PSyncState(
@@ -205,6 +228,15 @@ class P2PSyncState {
           this.pendingCatechistChoiceRemoteName,
       pendingCatechistChoiceDefault:
           pendingCatechistChoiceDefault ?? this.pendingCatechistChoiceDefault,
+      isAssociationHandshakeActive:
+          isAssociationHandshakeActive ?? this.isAssociationHandshakeActive,
+      associationHandshakeStep:
+          associationHandshakeStep ?? this.associationHandshakeStep,
+      continuousSyncVerified:
+          continuousSyncVerified ?? this.continuousSyncVerified,
+      remoteSyncState: remoteSyncState ?? this.remoteSyncState,
+      lastSyncStartedAt: lastSyncStartedAt ?? this.lastSyncStartedAt,
+      lastSyncEndedAt: lastSyncEndedAt ?? this.lastSyncEndedAt,
     );
   }
 }
@@ -421,6 +453,25 @@ class P2PSyncService {
   String? _pendingChoiceEndpoint;
   P2PIdentity? _pendingChoiceRemoteIdentity;
 
+  // ─── Handshake ordinato (account → classe) ───────────────────────────────
+  /// Fase ordinata per endpoint: idle → accountSent → accountConfirmed →
+  /// classSent → classConfirmed → verifyingContinuous → completed
+  final Map<String, String> _associationHandshakeStep = {};
+  final Map<String, Timer> _handshakeTimeoutTimers = {};
+  static const Duration _accountAckTimeout = Duration(seconds: 15);
+  static const Duration _classAckTimeout = Duration(seconds: 15);
+  static const Duration _continuousVerifyTimeout = Duration(seconds: 30);
+
+  // ─── Stato sync continuo (inizio/fine) ─────────────────────────────────
+  /// Stato remoto per endpoint: 'idle' | 'syncing'
+  final Map<String, String> _remoteSyncState = {};
+  final Map<String, Timer> _syncStateWatchdog = {};
+  final Map<String, DateTime> _remoteSyncStartAt = {};
+  static const Duration _syncStateWatchdogTimeout = Duration(seconds: 60);
+  static const Duration _heartbeatInterval = Duration(seconds: 30);
+  Timer? _heartbeatTimer;
+  bool _continuousSyncVerified = false;
+
   /// Chiavi di sessione per endpoint, con rotazione per finestra temporale:
   /// per ogni endpoint manteniamo solo le chiavi della finestra corrente e
   /// della finestra precedente (per gestire i messaggi in transito al confine
@@ -563,6 +614,7 @@ class P2PSyncService {
     _scheduleReconnectCycle();
     _startPeriodicSync();
     _startSessionKeyRotation();
+    _startHeartbeat();
 
     _updateState(
       _state.copyWith(isBackgroundSyncActive: true, clearError: true),
@@ -598,6 +650,20 @@ class P2PSyncService {
     _isSyncing = false;
     _sessionPairingNonce = null;
     _remoteSessionPairingNonce = null;
+    // Pulisci handshake ordinato e watchdog stato sync
+    for (final t in _handshakeTimeoutTimers.values) {
+      t.cancel();
+    }
+    _handshakeTimeoutTimers.clear();
+    _associationHandshakeStep.clear();
+    for (final t in _syncStateWatchdog.values) {
+      t.cancel();
+    }
+    _syncStateWatchdog.clear();
+    _remoteSyncState.clear();
+    _remoteSyncStartAt.clear();
+    _continuousSyncVerified = false;
+    _stopHeartbeat();
     try {
       _nearby.stopAdvertising();
       _nearby.stopDiscovery();
@@ -1275,6 +1341,19 @@ Future(() async {
     _endpointSupportsParishChannel.clear();
     _pendingChoiceEndpoint = null;
     _pendingChoiceRemoteIdentity = null;
+    for (final t in _handshakeTimeoutTimers.values) {
+      t.cancel();
+    }
+    _handshakeTimeoutTimers.clear();
+    _associationHandshakeStep.clear();
+    for (final t in _syncStateWatchdog.values) {
+      t.cancel();
+    }
+    _syncStateWatchdog.clear();
+    _remoteSyncState.clear();
+    _remoteSyncStartAt.clear();
+    _continuousSyncVerified = false;
+    _stopHeartbeat();
 
     _updateState(
       _state.copyWith(
@@ -1288,6 +1367,12 @@ Future(() async {
         pendingCatechistChoiceLocalId: null,
         pendingCatechistChoiceRemoteId: null,
         pendingCatechistChoiceRemoteName: null,
+        isAssociationHandshakeActive: false,
+        associationHandshakeStep: 'idle',
+        continuousSyncVerified: false,
+        remoteSyncState: null,
+        lastSyncStartedAt: null,
+        lastSyncEndedAt: null,
         pendingCatechistChoiceDefault: null,
         pairingCode: null,
         remotePairingCode: null,
@@ -1423,6 +1508,11 @@ Future(() async {
     _endpointSharedClassIds.remove(endpointId);
     _endpointSupportsClassChannel.remove(endpointId);
     _endpointSupportsParishChannel.remove(endpointId);
+    _associationHandshakeStep.remove(endpointId);
+    _handshakeTimeoutTimers.remove(endpointId)?.cancel();
+    _remoteSyncState.remove(endpointId);
+    _remoteSyncStartAt.remove(endpointId);
+    _syncStateWatchdog.remove(endpointId)?.cancel();
     _isSyncing = false;
     if (_pendingEndpointId == endpointId) {
       _pendingEndpointId = null;
@@ -1471,6 +1561,11 @@ Future(() async {
     _endpointSharedClassIds.remove(endpointId);
     _endpointSupportsClassChannel.remove(endpointId);
     _endpointSupportsParishChannel.remove(endpointId);
+    _associationHandshakeStep.remove(endpointId);
+    _handshakeTimeoutTimers.remove(endpointId)?.cancel();
+    _remoteSyncState.remove(endpointId);
+    _remoteSyncStartAt.remove(endpointId);
+    _syncStateWatchdog.remove(endpointId)?.cancel();
     if (_pendingEndpointId == endpointId) {
       _pendingEndpointId = null;
     }
@@ -2131,6 +2226,27 @@ Future(() async {
           break;
         case 'p2p_parish_channel':
           await _handleParishChannel(endpointId, decoded);
+          break;
+        case 'p2p_account_config':
+          await _handleAccountConfig(endpointId, decoded);
+          break;
+        case 'p2p_account_config_ack':
+          await _handleAccountConfigAck(endpointId, decoded);
+          break;
+        case 'p2p_class_info':
+          await _handleClassInfo(endpointId, decoded);
+          break;
+        case 'p2p_class_info_ack':
+          await _handleClassInfoAck(endpointId, decoded);
+          break;
+        case 'p2p_sync_state':
+          await _handleSyncState(endpointId, decoded);
+          break;
+        case 'p2p_continuous_sync_ping':
+          await _handleContinuousSyncPing(endpointId, decoded);
+          break;
+        case 'p2p_continuous_sync_pong':
+          await _handleContinuousSyncPong(endpointId, decoded);
           break;
       }
     } catch (e) {
@@ -3328,8 +3444,15 @@ Future(() async {
     _isSyncing = true;
 
     try {
-      _updateState(_state.copyWith(status: P2PSyncStatus.syncing));
+      _updateState(
+        _state.copyWith(
+          status: P2PSyncStatus.syncing,
+          lastSyncStartedAt: DateTime.now(),
+        ),
+      );
       addLog('INFO', 'Avvio sincronizzazione bidirezionale con $endpointId');
+      // Scambio stato inizio sync (anti-blocco)
+      await _sendSyncState(endpointId, 'sync_start');
 
       final engine = HiveSyncEngine();
       final lastSync = await engine.getLastSyncTimestamp();
@@ -3400,6 +3523,13 @@ Future(() async {
         addLog('WARN', 'Errore invio sync complete: $e');
       }
 
+      // Scambio stato fine sync (anti-blocco) — informa il remoto che abbiamo terminato
+      try {
+        await _sendSyncState(endpointId, 'sync_end');
+      } catch (e) {
+        addLog('WARN', 'Errore invio sync_end: $e');
+      }
+
       addLog(
         'INFO',
         'Sincronizzazione completata con $endpointId '
@@ -3422,6 +3552,7 @@ Future(() async {
         _state.copyWith(
           status: P2PSyncStatus.completed,
           lastSyncAt: now,
+          lastSyncEndedAt: now,
           totalRecordsToExchange: 0,
           sentRecordsCount: 0,
           receivedRecordsCount: 0,
@@ -4541,17 +4672,26 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
       _pairingCodesByDeviceId.remove(remoteIdentity.deviceId);
       _pendingAssociations.remove(remoteIdentity.deviceId);
 
-      // FIX: in questo ramo la conferma del dispositivo che conferma PER
-      // SECONDO non passa da _completePairing, quindi nessuno dei due lati
-      // avviava mai la sincronizzazione dati (il remoto ha già completato il
-      // pairing e noi abbiamo saltato l'avvio): il ricevente restava bloccato
-      // sull'attesa dei dati. Avviamo qui la sync bidirezionale; i guard di
-      // _performBidirectionalSync rendono la chiamata idempotente.
-      try {
-        addLog('INFO', 'Avvio sincronizzazione dopo conferma tardiva locale');
-        await _performBidirectionalSync(endpointId);
-      } catch (e) {
-        addLog('WARN', 'Sync post-conferna tardiva fallita: $e');
+      // Handshake ordinato: se siamo l'iniziatore e l'handshake non è ancora
+      // partito, avvialo; altrimenti attendi l'account config dal mittente.
+      final localIdentityForTardy = await _security.getLocalIdentity();
+      final tardyIsInitiator =
+          localIdentityForTardy.deviceId.compareTo(remoteIdentity.deviceId) <= 0;
+      if (tardyIsInitiator) {
+        try {
+          addLog('INFO', 'Avvio handshake ordinato dopo conferma tardiva (iniziatore)');
+          // Associaz. già salvata in Hive nel ramo precedente, avvia handshake
+          await _security.getAssociation(remoteIdentity.deviceId);
+          // Assicura modalità continua attiva
+          if (!_continuousModeActive) await _startContinuousMode();
+          await Future.delayed(const Duration(milliseconds: 300));
+          await startOrderedHandshake(endpointId);
+        } catch (e) {
+          addLog('WARN', 'Handshake tardivo fallito: $e');
+        }
+      } else {
+        addLog('INFO', 'Conferma tardiva come ricevente: attendo account config dal mittente');
+        if (!_continuousModeActive) await _startContinuousMode();
       }
 
       _pendingHandshakeIdentity = null;
@@ -4572,7 +4712,7 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
           awaitingCatechistIdChoice: false,
         ),
       );
-      addLog('INFO', 'Pairing già confermato dal remoto, completato lato locale');
+      addLog('INFO', 'Pairing già confermato dal remoto, completato lato locale (handshake ordinato in attesa se ricevente)');
     }
   }
 
@@ -4617,9 +4757,16 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
 
     // Idempotenza: evita doppi conteggi di dispositivi/catechisti se il flusso
     // viene completato più volte per lo stesso dispositivo.
-    if (!_sessionConfirmedDevices.contains(remoteIdentity.deviceId)) {
+    final isNewPairing = !_sessionConfirmedDevices.contains(remoteIdentity.deviceId);
+    if (isNewPairing) {
       _sessionConfirmedDevices.add(remoteIdentity.deviceId);
-      _updateClassAfterPairing();
+      // L'aggiunta del catechista alla classe viene gestita dall'handshake
+      // ordinato (step 1) per l'inviante; per il ricevente che non invia
+      // account, manteniamo il comportamento legacy come fallback se non
+      // parte l'handshake ordinato (compatibilità).
+      if (!iAmInitiator) {
+        _updateClassAfterPairing();
+      }
     } else {
       addLog(
         'DEBUG',
@@ -4654,18 +4801,25 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
     }
 
     if (iAmInitiator) {
-      await Future.delayed(const Duration(seconds: 2));
-      addLog('INFO', 'Avvio sincronizzazione immediata dopo associazione');
-      await _performBidirectionalSync(endpointId);
+      // Handshake ordinato: inviante aggiunge catechista, invia account → classe
+      await Future.delayed(const Duration(milliseconds: 500));
+      addLog('INFO', 'Avvio handshake ordinato (account → classe → verifica continuo) per $endpointId');
+      await startOrderedHandshake(endpointId);
+    } else {
+      addLog('INFO', 'In attesa di handshake ordinato dal dispositivo inviante (_receiver_)');
+      // Il ricevente resta in attesa di p2p_account_config; nessun sync immediato.
+      // Il via libera arriverà dopo la verifica del sync continuo.
     }
 
     _ensureLocalCatechistInClasses();
 
-    // Applica il profilo anagrafico ricevuto (nome, cognome, telefono)
-    // per configurare l'account del dispositivo ricevente.
-    await _applyPendingRemoteProfileIfNeeded();
+    // Fallback legacy: applica profilo se handshake ordinato non è partito
+    // (compatibilità con dispositivi precedenti).
+    if (!_associationHandshakeStep.containsKey(endpointId)) {
+      await _applyPendingRemoteProfileIfNeeded();
+    }
 
-    addLog('INFO', 'Associazione completata con successo');
+    addLog('INFO', 'Associazione completata con successo (handshake ordinato in corso se iniziatore)');
   }
 
   /// Identità di default da conservare in caso di discordanza tra due
@@ -5232,6 +5386,741 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
     } catch (e) {
       addLog('ERROR', 'Errore applicazione record relayed: $e');
     }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // HANDSHAKE ORDINATO: account → classe → verifica sync continuo
+  // Protocollo richiesto:
+  //  1. Inviante (normale/responsabile) aggiunge catechista alla classe e invia
+  //     informazioni account (nome, cognome, id, telefono) al ricevente.
+  //  2. Ricevente configura account e invia conferma (p2p_account_config_ack).
+  //  3. Inviante invia informazioni classe (p2p_class_info), ricevente registra.
+  //  4. Ricevente invia conferma registrazione (p2p_class_info_ack).
+  //  5. Verifica sincronizzazione costante con scambio stato inizio/fine.
+  //  Solo al termine → via libera (continuousSyncVerified = true).
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Avvia l'handshake ordinato per [endpointId] dal lato INVANTE.
+  /// Chiamato DOPO la conferma del pairing (association salvata) sul dispositivo
+  /// che ha il ruolo di mittente (normale o responsabile).
+  Future<void> startOrderedHandshake(String endpointId) async {
+    if (_associationHandshakeStep.containsKey(endpointId) &&
+        _associationHandshakeStep[endpointId] != 'idle') {
+      addLog('DEBUG', 'Handshake ordinato già in corso per $endpointId');
+      return;
+    }
+    // Step 1: aggiungi catechista alla classe localmente (idempotente)
+    try {
+      _updateClassAfterPairing();
+      addLog('INFO', 'Handshake ordinato: catechista aggiunto alla classe locale');
+    } catch (e) {
+      addLog('WARN', 'Errore aggiunta catechista alla classe: $e');
+    }
+
+    _associationHandshakeStep[endpointId] = 'accountSent';
+    _updateState(
+      _state.copyWith(
+        isAssociationHandshakeActive: true,
+        associationHandshakeStep: 'accountSent',
+        continuousSyncVerified: false,
+      ),
+    );
+    await _sendAccountConfig(endpointId);
+
+    // Watchdog: se la conferma account non arriva entro timeout, ritenta o fallisce
+    _handshakeTimeoutTimers[endpointId]?.cancel();
+    _handshakeTimeoutTimers[endpointId] = Timer(_accountAckTimeout, () {
+      final step = _associationHandshakeStep[endpointId];
+      if (step == 'accountSent') {
+        addLog('WARN', 'Timeout conferma account per $endpointId, ritento invio');
+        _sendAccountConfig(endpointId);
+        // Re-arm second timeout → errore
+        _handshakeTimeoutTimers[endpointId]?.cancel();
+        _handshakeTimeoutTimers[endpointId] = Timer(_accountAckTimeout, () {
+          if (_associationHandshakeStep[endpointId] == 'accountSent') {
+            addLog('ERROR', 'Handshake ordinato fallito: nessuna conferma account');
+            _failOrderedHandshake(endpointId, 'Timeout conferma configurazione account');
+          }
+        });
+      }
+    });
+  }
+
+  Future<void> _sendAccountConfig(String endpointId) async {
+    try {
+      final localCatechistId = AuthService.getCatechistId();
+      // Profilo da inviare: se l'associazione ha un profilo remoto esplicito
+      // (altroCatechista con dati inseriti dall'inviante) usa quello,
+      // altrimenti usa il profilo locale (mioDispositivo / responsabile).
+      String firstName = '';
+      String lastName = '';
+      String phone = '';
+      String catechistId = localCatechistId;
+      if (_associationRemoteProfile.isNotEmpty) {
+        firstName = _associationRemoteProfile['firstName'] ?? '';
+        lastName = _associationRemoteProfile['lastName'] ?? '';
+        phone = _associationRemoteProfile['phoneNumber'] ?? '';
+        if ((_associationRemoteProfile['catechistId'] ?? '').isNotEmpty) {
+          catechistId = _associationRemoteProfile['catechistId']!;
+        }
+      } else {
+        final box = LocalDatabase.auth();
+        firstName = box.get('first_name', defaultValue: '') as String? ?? '';
+        lastName = box.get('last_name', defaultValue: '') as String? ?? '';
+        phone = box.get('phone_number', defaultValue: '') as String? ?? '';
+      }
+      final msg = jsonEncode({
+        'type': 'p2p_account_config',
+        'firstName': firstName,
+        'lastName': lastName,
+        'catechistId': catechistId,
+        'phoneNumber': phone,
+        'senderRole': _state.role.name,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      });
+      await _sendEncryptedPayload(endpointId, msg);
+      addLog('INFO', 'Account config inviata a $endpointId');
+      _updateState(
+        _state.copyWith(
+          status: P2PSyncStatus.associationAccountConfig,
+          associationHandshakeStep: 'accountSent',
+        ),
+      );
+    } catch (e) {
+      addLog('ERROR', 'Errore invio account config a $endpointId: $e');
+      _failOrderedHandshake(endpointId, 'Errore invio configurazione account: $e');
+    }
+  }
+
+  Future<void> _handleAccountConfig(
+    String endpointId,
+    Map<String, dynamic> message,
+  ) async {
+    final firstName = (message['firstName'] as String?)?.trim() ?? '';
+    final lastName = (message['lastName'] as String?)?.trim() ?? '';
+    final catechistId = (message['catechistId'] as String?)?.trim() ?? '';
+    final phone = (message['phoneNumber'] as String?)?.trim() ?? '';
+
+    addLog('INFO', 'Account config ricevuta da $endpointId');
+
+    // Marca handshake attivo anche sul ricevente
+    _associationHandshakeStep[endpointId] = 'accountReceived';
+    _updateState(
+      _state.copyWith(
+        isAssociationHandshakeActive: true,
+        associationHandshakeStep: 'accountReceived',
+        status: P2PSyncStatus.associationAccountConfig,
+      ),
+    );
+
+    bool accepted = false;
+    String reason = '';
+    try {
+      // Se il profilo locale non è configurato, configuralo con i dati ricevuti
+      final auth = AuthService();
+      if (!auth.isProfileConfigured) {
+        if (firstName.isEmpty || lastName.isEmpty) {
+          reason = 'Dati account incompleti (nome/cognome mancanti)';
+        } else {
+          final ok = await auth.setupInitialProfile(
+            firstName: firstName,
+            lastName: lastName,
+            phoneNumber: phone.isEmpty ? null : phone,
+            createClass: false,
+          );
+          if (ok) {
+            if (catechistId.isNotEmpty) {
+              AuthService.adoptCatechistId(catechistId);
+              await _security.refreshIdentityName();
+              await _security.refreshIdentityAnagrafica();
+            }
+            accepted = true;
+            addLog('INFO', 'Account configurato dal ricevente con dati inviante');
+          } else {
+            reason = 'Impossibile configurare account';
+          }
+        }
+      } else {
+        // Profilo già esistente: verifica coerenza anagrafica (non sovrascrive)
+        final localKey = AuthService.getLocalAnagraficaKey();
+        final remoteKey = AuthService.anagraficaKey(firstName, lastName);
+        if (remoteKey.isNotEmpty && remoteKey != localKey) {
+          addLog(
+            'WARN',
+            'Anagrafica account ricevuta diversa dalla locale '
+            '($remoteKey vs $localKey) — non sovrascrivo',
+          );
+        }
+        // Se il catechistId ricevuto è diverso e il dispositivo non ha classi,
+        // adotto solo se è lo stesso individuo (mioDispositivo)
+        if (catechistId.isNotEmpty && catechistId != AuthService.getCatechistId()) {
+          final senderRoleStr = message['senderRole'] as String? ?? '';
+          final isSamePerson = senderRoleStr == P2PSyncRole.mioDispositivo.name &&
+              _state.role == P2PSyncRole.mioDispositivo;
+          if (isSamePerson && !_hasCatechistIdentity(AuthService.getCatechistId())) {
+            AuthService.adoptCatechistId(catechistId);
+            addLog('INFO', 'CatechistId adottato da account config');
+          }
+        }
+        accepted = true;
+      }
+      // Memorizza profilo per eventuale uso successivo
+      _pendingHandshakeRemoteProfile = {
+        'firstName': firstName,
+        'lastName': lastName,
+        if (phone.isNotEmpty) 'phoneNumber': phone,
+        if (catechistId.isNotEmpty) 'catechistId': catechistId,
+      };
+      if (catechistId.isNotEmpty) {
+        _endpointRemoteCatechistId[endpointId] = catechistId;
+      }
+    } catch (e) {
+      reason = 'Eccezione configurazione: $e';
+      addLog('ERROR', 'Errore configurazione account ricevente: $e');
+    }
+
+    final ack = jsonEncode({
+      'type': 'p2p_account_config_ack',
+      'accepted': accepted,
+      'reason': reason,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+    try {
+      await _sendEncryptedPayload(endpointId, ack);
+      addLog('INFO', 'Conferma account config inviata a $endpointId (accepted=$accepted)');
+    } catch (e) {
+      addLog('ERROR', 'Errore invio ack account config: $e');
+    }
+
+    if (accepted) {
+      _associationHandshakeStep[endpointId] = 'accountConfirmed';
+      _updateState(
+        _state.copyWith(associationHandshakeStep: 'accountConfirmed'),
+      );
+    } else {
+      _failOrderedHandshake(endpointId, reason);
+    }
+  }
+
+  Future<void> _handleAccountConfigAck(
+    String endpointId,
+    Map<String, dynamic> message,
+  ) async {
+    final accepted = message['accepted'] == true;
+    _handshakeTimeoutTimers[endpointId]?.cancel();
+
+    if (!accepted) {
+      final reason = message['reason'] as String? ?? 'Rifiutata';
+      addLog('WARN', 'Conferma account NEGATIVA da $endpointId: $reason');
+      _failOrderedHandshake(endpointId, 'Ricevente ha rifiutato config account: $reason');
+      return;
+    }
+
+    addLog('INFO', 'Conferma account POSITIVA ricevuta da $endpointId');
+    _associationHandshakeStep[endpointId] = 'accountConfirmed';
+    _updateState(
+      _state.copyWith(associationHandshakeStep: 'accountConfirmed'),
+    );
+
+    // Step 3: invia informazioni classe
+    _associationHandshakeStep[endpointId] = 'classSent';
+    _updateState(
+      _state.copyWith(
+        status: P2PSyncStatus.associationClassInfo,
+        associationHandshakeStep: 'classSent',
+      ),
+    );
+    await _sendClassInfo(endpointId);
+
+    _handshakeTimeoutTimers[endpointId]?.cancel();
+    _handshakeTimeoutTimers[endpointId] = Timer(_classAckTimeout, () {
+      if (_associationHandshakeStep[endpointId] == 'classSent') {
+        addLog('WARN', 'Timeout conferma classe per $endpointId, ritento');
+        _sendClassInfo(endpointId);
+        _handshakeTimeoutTimers[endpointId]?.cancel();
+        _handshakeTimeoutTimers[endpointId] = Timer(_classAckTimeout, () {
+          if (_associationHandshakeStep[endpointId] == 'classSent') {
+            addLog('ERROR', 'Handshake ordinato fallito: nessuna conferma classe');
+            _failOrderedHandshake(endpointId, 'Timeout conferma registrazione classe');
+          }
+        });
+      }
+    });
+  }
+
+  Future<void> _sendClassInfo(String endpointId) async {
+    try {
+      // Raccogli classi condivise per questo endpoint
+      final sharedIds = await _sharedClassIdsForEndpoint(endpointId);
+      List<Map<String, dynamic>> classesPayload = [];
+      final classKeysPayload = <String, dynamic>{};
+      if (sharedIds == null) {
+        // Tutte le classi (stesso catechista)
+        final box = LocalDatabase.classes();
+        for (final key in box.keys) {
+          final data = LocalDatabase.toStringDynamicMap(box.get(key));
+          classesPayload.add({'id': key.toString(), 'data': data});
+          // Includi chiave di canale per bootstrap titolo sul ricevente
+          final uniqueCode = data['uniqueCode']?.toString() ?? '';
+          if (uniqueCode.isNotEmpty) {
+            try {
+              var cKey = ClassChannelService.getKeyByUniqueCode(uniqueCode);
+              cKey ??= await ClassChannelService.getOrCreateKey(
+                classId: key.toString(),
+                classUniqueCode: uniqueCode,
+                className: data['name']?.toString() ?? key.toString(),
+              );
+              classKeysPayload[key.toString()] = cKey.toMap();
+            } catch (_) {}
+          }
+        }
+      } else if (sharedIds.isNotEmpty) {
+        final box = LocalDatabase.classes();
+        for (final id in sharedIds) {
+          final data = LocalDatabase.toStringDynamicMap(box.get(id));
+          if (data.isNotEmpty) {
+            classesPayload.add({'id': id, 'data': data});
+            final uniqueCode = data['uniqueCode']?.toString() ?? '';
+            if (uniqueCode.isNotEmpty) {
+              try {
+                var cKey = ClassChannelService.getKeyByUniqueCode(uniqueCode);
+                cKey ??= await ClassChannelService.getOrCreateKey(
+                  classId: id,
+                  classUniqueCode: uniqueCode,
+                  className: data['name']?.toString() ?? id,
+                );
+                classKeysPayload[id] = cKey.toMap();
+              } catch (_) {}
+            }
+          }
+        }
+      } else {
+        // fallback: classe corrente
+        final current = _getCurrentClassId();
+        if (current.isNotEmpty) {
+          final data = LocalDatabase.toStringDynamicMap(
+            LocalDatabase.classes().get(current),
+          );
+          if (data.isNotEmpty) {
+            classesPayload.add({'id': current, 'data': data});
+            final uniqueCode = data['uniqueCode']?.toString() ?? '';
+            if (uniqueCode.isNotEmpty) {
+              try {
+                var cKey = ClassChannelService.getKeyByUniqueCode(uniqueCode);
+                cKey ??= await ClassChannelService.getOrCreateKey(
+                  classId: current,
+                  classUniqueCode: uniqueCode,
+                  className: data['name']?.toString() ?? current,
+                );
+                classKeysPayload[current] = cKey.toMap();
+              } catch (_) {}
+            }
+          }
+        }
+      }
+
+      final msg = jsonEncode({
+        'type': 'p2p_class_info',
+        'classes': classesPayload,
+        'classKeys': classKeysPayload,
+        'sharedClassIds': sharedIds?.toList() ?? [],
+        'senderRole': _state.role.name,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      });
+      await _sendEncryptedPayload(endpointId, msg);
+      addLog('INFO', 'Class info inviata a $endpointId (${classesPayload.length} classi, ${classKeysPayload.length} chiavi)');
+    } catch (e) {
+      addLog('ERROR', 'Errore invio class info: $e');
+      _failOrderedHandshake(endpointId, 'Errore invio informazioni classe: $e');
+    }
+  }
+
+  Future<void> _handleClassInfo(
+    String endpointId,
+    Map<String, dynamic> message,
+  ) async {
+    addLog('INFO', 'Class info ricevuta da $endpointId');
+    _associationHandshakeStep[endpointId] = 'classReceived';
+    _updateState(
+      _state.copyWith(
+        isAssociationHandshakeActive: true,
+        associationHandshakeStep: 'classReceived',
+        status: P2PSyncStatus.associationClassInfo,
+      ),
+    );
+
+    bool accepted = false;
+    String reason = '';
+    int applied = 0;
+    try {
+      final classes = (message['classes'] as List<dynamic>? ?? []);
+      final box = LocalDatabase.classes();
+      for (final entry in classes) {
+        if (entry is! Map) continue;
+        final map = Map<String, dynamic>.from(entry);
+        final id = map['id']?.toString() ?? '';
+        final dataRaw = map['data'];
+        if (id.isEmpty || dataRaw is! Map) continue;
+        final data = Map<String, dynamic>.from(dataRaw);
+        // Merge: se la classe esiste già, preserva nameLocked e aggiorna campi
+        final existing = box.get(id);
+        if (existing != null) {
+          final ex = LocalDatabase.toStringDynamicMap(existing);
+          // Non sovrascrivere uniqueCode / id
+          data['uniqueCode'] ??= ex['uniqueCode'];
+          data['nameLocked'] = (ex['nameLocked'] == true) || (data['nameLocked'] == true);
+        } else {
+          // Nuova classe: assicurati che campi obbligatori esistano
+          data['uniqueCode'] ??= data['uniqueCode'] ?? _generateUniqueCode();
+          data['nameLocked'] ??= true;
+        }
+        // Assicura che il catechista locale sia incluso
+        const localId = AuthService.localUserId;
+        final catechistIds = (data['catechistIds'] as List? ?? [])
+            .map((e) => e.toString())
+            .toList();
+        if (!catechistIds.contains(localId)) {
+          catechistIds.add(localId);
+          data['catechistIds'] = catechistIds;
+        }
+        await box.put(id, data);
+        applied++;
+
+        // Applica chiave di canale trasmessa dall'inviante (bootstrap titolo).
+        // Non generare una chiave divergente: se il mittente ha fornito la chiave,
+        // memorizzala; altrimenti lascia senza titolo (verrà fornita al prossimo
+        // sync via enc+key).
+        final uniqueCode = data['uniqueCode']?.toString() ?? '';
+        final keysMap = message['classKeys'] as Map<String, dynamic>? ?? const {};
+        final rawKey = keysMap[id] ?? keysMap[uniqueCode];
+        if (rawKey is Map) {
+          try {
+            await ClassChannelService.storeKey(
+              classId: id,
+              classUniqueCode: uniqueCode.isNotEmpty
+                  ? uniqueCode
+                  : rawKey['classUniqueCode']?.toString() ?? '',
+              className: data['name']?.toString() ?? id,
+              keyBase64: rawKey['keyBase64']?.toString() ?? '',
+              grantorCatechistId: rawKey['grantorCatechistId']?.toString() ?? '',
+            );
+          } catch (_) {}
+        }
+        // Fallback legacy: se nessuna chiave è stata trasmessa e il dispositivo
+        // non ha titolo, non creare chiavi divergenti qui — la chiave arriverà
+        // con il prossimo sync in-band (enc+key) dal membro titolare.
+      }
+      await box.flush();
+      accepted = true;
+      addLog('INFO', 'Class info applicata: $applied classi registrate');
+
+      // Aggiorna associazioni endpoint
+      final shared = (message['sharedClassIds'] as List<dynamic>? ?? [])
+          .map((e) => e.toString())
+          .toSet();
+      if (shared.isNotEmpty) {
+        _endpointSharedClassIds[endpointId] = shared;
+      }
+
+      // Dopo registrazione classe, prova ad applicare eventuali blob relay
+      for (final entry in classes) {
+        if (entry is! Map) continue;
+        final data = Map<String, dynamic>.from(entry['data'] as Map? ?? {});
+        final code = data['uniqueCode']?.toString() ?? '';
+        if (code.isNotEmpty) {
+          await tryApplyRelayedCiphertext(code);
+        }
+      }
+
+      // Assicura che il catechista locale sia nelle classi
+      _ensureLocalCatechistInClasses();
+    } catch (e) {
+      reason = 'Errore registrazione classe: $e';
+      addLog('ERROR', 'Errore handleClassInfo: $e');
+    }
+
+    final ack = jsonEncode({
+      'type': 'p2p_class_info_ack',
+      'accepted': accepted,
+      'applied': applied,
+      'reason': reason,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+    try {
+      await _sendEncryptedPayload(endpointId, ack);
+      addLog('INFO', 'Conferma registrazione classe inviata (accepted=$accepted, applied=$applied)');
+    } catch (e) {
+      addLog('ERROR', 'Errore invio ack classe: $e');
+    }
+
+    if (accepted) {
+      _associationHandshakeStep[endpointId] = 'classConfirmed';
+      _updateState(
+        _state.copyWith(associationHandshakeStep: 'classConfirmed'),
+      );
+      // Avvia verifica sync continuo anche sul ricevente (verrà confermata dal pong)
+      _startContinuousSyncVerification(endpointId, isInitiator: false);
+    } else {
+      _failOrderedHandshake(endpointId, reason);
+    }
+  }
+
+  Future<void> _handleClassInfoAck(
+    String endpointId,
+    Map<String, dynamic> message,
+  ) async {
+    final accepted = message['accepted'] == true;
+    _handshakeTimeoutTimers[endpointId]?.cancel();
+
+    if (!accepted) {
+      final reason = message['reason'] as String? ?? 'Rifiutata';
+      addLog('WARN', 'Conferma classe NEGATIVA da $endpointId: $reason');
+      _failOrderedHandshake(endpointId, 'Ricevente ha rifiutato classe: $reason');
+      return;
+    }
+
+    final applied = message['applied'] as int? ?? 0;
+    addLog('INFO', 'Conferma classe POSITIVA ricevuta da $endpointId (applied=$applied)');
+    _associationHandshakeStep[endpointId] = 'classConfirmed';
+    _updateState(
+      _state.copyWith(associationHandshakeStep: 'classConfirmed'),
+    );
+
+    // Step 5: verifica sincronizzazione costante
+    await _startContinuousSyncVerification(endpointId, isInitiator: true);
+  }
+
+  void _failOrderedHandshake(String endpointId, String reason) {
+    _handshakeTimeoutTimers[endpointId]?.cancel();
+    _handshakeTimeoutTimers.remove(endpointId);
+    _associationHandshakeStep[endpointId] = 'failed';
+    _updateState(
+      _state.copyWith(
+        isAssociationHandshakeActive: false,
+        associationHandshakeStep: 'failed',
+        status: P2PSyncStatus.error,
+        errorMessage: reason,
+      ),
+    );
+    addLog('ERROR', 'Handshake ordinato fallito per $endpointId: $reason');
+  }
+
+  String _generateUniqueCode() => generateClassUniqueCode();
+
+  // ── Verifica sincronizzazione costante (tentativo) ────────────────────────
+
+  Future<void> _startContinuousSyncVerification(
+    String endpointId, {
+    required bool isInitiator,
+  }) async {
+    _associationHandshakeStep[endpointId] = 'verifyingContinuous';
+    _updateState(
+      _state.copyWith(
+        associationHandshakeStep: 'verifyingContinuous',
+        status: P2PSyncStatus.associationVerifying,
+      ),
+    );
+
+    // Invia ping di verifica (lo scambio stato sync_start/end verrà testato
+    // anche tramite un tentativo reale di sync bidirezionale).
+    try {
+      final ping = jsonEncode({
+        'type': 'p2p_continuous_sync_ping',
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'isInitiator': isInitiator,
+      });
+      await _sendEncryptedPayload(endpointId, ping);
+      addLog('INFO', 'Continuous sync ping inviato a $endpointId');
+    } catch (e) {
+      addLog('WARN', 'Errore invio continuous ping: $e');
+    }
+
+    // Avvia in parallelo un tentativo reale di sincronizzazione bidirezionale
+    // (verifica che lo scambio dati funzioni end-to-end).
+    try {
+      addLog('INFO', 'Tentativo sincronizzazione costante: avvio sync di verifica');
+      await _performBidirectionalSync(endpointId);
+    } catch (e) {
+      addLog('WARN', 'Sync di verifica fallita (verrà ritentata via pong): $e');
+    }
+
+    // Watchdog: se entro timeout non arriva pong + sync_end, fallisce
+    _handshakeTimeoutTimers[endpointId]?.cancel();
+    _handshakeTimeoutTimers[endpointId] = Timer(_continuousVerifyTimeout, () {
+      if (_associationHandshakeStep[endpointId] == 'verifyingContinuous' &&
+          !_continuousSyncVerified) {
+        addLog('WARN', 'Timeout verifica sync continuo per $endpointId');
+        // Fallback: se il sync bidirezionale è comunque completato, considera verificato
+        if (_state.status == P2PSyncStatus.completed) {
+          _completeOrderedHandshake(endpointId);
+        } else {
+          _failOrderedHandshake(endpointId, 'Timeout verifica sincronizzazione costante');
+        }
+      }
+    });
+  }
+
+  Future<void> _handleContinuousSyncPing(
+    String endpointId,
+    Map<String, dynamic> message,
+  ) async {
+    addLog('INFO', 'Continuous sync PING ricevuto da $endpointId');
+    // Risponde con pong
+    try {
+      final pong = jsonEncode({
+        'type': 'p2p_continuous_sync_pong',
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'receivedPingAt': message['timestamp'],
+      });
+      await _sendEncryptedPayload(endpointId, pong);
+      addLog('INFO', 'Continuous sync PONG inviato a $endpointId');
+    } catch (e) {
+      addLog('WARN', 'Errore invio pong: $e');
+    }
+
+    // Anche il ricevente avvia un tentativo di sync per verificare la continuità
+    try {
+      if (_endpointSyncPhase[endpointId] == null || _endpointSyncPhase[endpointId]!.isIdle) {
+        await _performBidirectionalSync(endpointId);
+      }
+    } catch (e) {
+      addLog('WARN', 'Sync verifica lato ricevente fallita: $e');
+    }
+  }
+
+  Future<void> _handleContinuousSyncPong(
+    String endpointId,
+    Map<String, dynamic> message,
+  ) async {
+    addLog('INFO', 'Continuous sync PONG ricevuto da $endpointId — sincronizzazione costante verificata');
+    _handshakeTimeoutTimers[endpointId]?.cancel();
+    _completeOrderedHandshake(endpointId);
+  }
+
+  void _completeOrderedHandshake(String endpointId) {
+    _handshakeTimeoutTimers[endpointId]?.cancel();
+    _handshakeTimeoutTimers.remove(endpointId);
+    _associationHandshakeStep[endpointId] = 'completed';
+    _continuousSyncVerified = true;
+    _updateState(
+      _state.copyWith(
+        isAssociationHandshakeActive: false,
+        associationHandshakeStep: 'completed',
+        continuousSyncVerified: true,
+        status: P2PSyncStatus.completed,
+        lastSyncAt: DateTime.now(),
+      ),
+    );
+    addLog('INFO', 'Handshake ordinato COMPLETATO con via libera per $endpointId — sincronizzazione costante funzionante');
+  }
+
+  // ── Scambio stato inizio/fine sync (anti-blocco) ────────────────────────
+
+  Future<void> _sendSyncState(
+    String endpointId,
+    String state, {
+    String? detail,
+  }) async {
+    try {
+      final payload = <String, dynamic>{
+        'type': 'p2p_sync_state',
+        'state': state, // sync_start | sync_end | heartbeat
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'isSyncing': state == 'sync_start',
+      };
+      if (detail != null) payload['detail'] = detail;
+      final msg = jsonEncode(payload);
+      await _sendEncryptedPayload(endpointId, msg);
+      addLog('DEBUG', 'Stato sync inviato a $endpointId: $state');
+    } catch (e) {
+      addLog('WARN', 'Errore invio stato sync $state: $e');
+    }
+
+    if (state == 'sync_start') {
+      _updateState(
+        _state.copyWith(lastSyncStartedAt: DateTime.now(), remoteSyncState: 'syncing'),
+      );
+    } else if (state == 'sync_end') {
+      _updateState(
+        _state.copyWith(lastSyncEndedAt: DateTime.now(), remoteSyncState: 'idle'),
+      );
+    }
+  }
+
+  Future<void> _handleSyncState(
+    String endpointId,
+    Map<String, dynamic> message,
+  ) async {
+    final state = message['state'] as String? ?? 'unknown';
+    final isSyncing = message['isSyncing'] == true;
+    _remoteSyncState[endpointId] = isSyncing ? 'syncing' : 'idle';
+
+    if (state == 'sync_start') {
+      _remoteSyncStartAt[endpointId] = DateTime.now();
+      addLog('INFO', 'Stato remoto $endpointId: INIZIO sincronizzazione');
+      _updateState(
+        _state.copyWith(remoteSyncState: 'syncing', lastSyncStartedAt: DateTime.now()),
+      );
+      // Watchdog: se non arriva sync_end entro 60s, sblocca
+      _syncStateWatchdog[endpointId]?.cancel();
+      _syncStateWatchdog[endpointId] = Timer(_syncStateWatchdogTimeout, () {
+        final lastStart = _remoteSyncStartAt[endpointId];
+        if (lastStart != null &&
+            _remoteSyncState[endpointId] == 'syncing' &&
+            DateTime.now().difference(lastStart).inSeconds >= 60) {
+          addLog('WARN', 'Watchdog: sincronizzazione remota bloccata da >60s per $endpointId — reset forzato');
+          _remoteSyncState[endpointId] = 'idle';
+          _syncStateWatchdog[endpointId]?.cancel();
+          _updateState(_state.copyWith(remoteSyncState: 'idle'));
+          // Sblocca eventuale sync locale bloccata
+          if (_isSyncing &&
+              _lastSyncStartTime != null &&
+              DateTime.now().difference(_lastSyncStartTime!).inSeconds > 60) {
+            addLog('WARN', 'Sblocco _isSyncing locale da watchdog stato remoto');
+            _isSyncing = false;
+            _lastSyncStartTime = null;
+            _endpointSyncPhase.remove(endpointId);
+          }
+        }
+      });
+    } else if (state == 'sync_end') {
+      _syncStateWatchdog[endpointId]?.cancel();
+      _remoteSyncState[endpointId] = 'idle';
+      addLog('INFO', 'Stato remoto $endpointId: FINE sincronizzazione');
+      _updateState(
+        _state.copyWith(remoteSyncState: 'idle', lastSyncEndedAt: DateTime.now()),
+      );
+    } else if (state == 'heartbeat') {
+      addLog('DEBUG', 'Heartbeat ricevuto da $endpointId');
+      _syncStateWatchdog[endpointId]?.cancel();
+      // Heartbeat resetta il watchdog se il remoto è in syncing
+      if (_remoteSyncState[endpointId] == 'syncing') {
+        _syncStateWatchdog[endpointId] = Timer(_syncStateWatchdogTimeout, () {
+          addLog('WARN', 'Watchdog heartbeat: sync remota bloccata per $endpointId — reset');
+          _remoteSyncState[endpointId] = 'idle';
+          _updateState(_state.copyWith(remoteSyncState: 'idle'));
+        });
+      }
+    }
+  }
+
+  void _startHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) async {
+      if (_connectedEndpoints.isEmpty) return;
+      for (final endpointId in _connectedEndpoints.toList()) {
+        // Invia heartbeat solo se non in sync attivo (evita spam)
+        if (_isSyncing) continue;
+        try {
+          await _sendSyncState(endpointId, 'heartbeat');
+        } catch (_) {}
+      }
+    });
+  }
+
+  void _stopHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
   }
 
   // ─────────────────────────────────────────────────────────────────────────

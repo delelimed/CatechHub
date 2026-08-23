@@ -3690,18 +3690,58 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
     } catch (_) {}
   }
 
-  void _updateClassAfterPairing() {
+  /// [endpointId] permette di risolvere il catechistId del ricevente anche
+  /// quando non è ancora noto nell'handshake pendente (late binding).
+  void _updateClassAfterPairing({String? endpointId}) {
     try {
       final box = LocalDatabase.classes();
       const localId = AuthService.localUserId;
       final localCatechistId = AuthService.getCatechistId();
-      final remoteCatechistId = _pendingHandshakeRemoteCatechistId;
       final remoteRole = _pendingHandshakeRemoteRole;
 
-      // Per un ALTRO catechista aggiorniamo SOLO le classi scelte durante
-      // l'associazione (se presenti). Per un dispositivo della stessa persona
-      // ("Mio Dispositivo") tutte le classi.
+      // Risoluzione tardiva del catechistId del ricevente: handshake →
+      // endpoint corrente → profilo remoto inserito dall'inviante.
+      String? remoteCatechistId;
+      if (_pendingHandshakeRemoteCatechistId?.isNotEmpty == true) {
+        remoteCatechistId = _pendingHandshakeRemoteCatechistId;
+      } else if (endpointId != null) {
+        final viaEndpoint = _endpointRemoteCatechistId[endpointId];
+        if (viaEndpoint?.isNotEmpty == true) remoteCatechistId = viaEndpoint;
+      }
+      if (remoteCatechistId == null || remoteCatechistId.isEmpty) {
+        final fromProfile = _associationRemoteProfile['catechistId'];
+        if (fromProfile is String && fromProfile.isNotEmpty) {
+          remoteCatechistId = fromProfile;
+        }
+      }
+
+      // Per un ALTRO catechista/responsabile aggiorniamo SOLO le classi
+      // scelte durante l'associazione (se presenti). Per un dispositivo
+      // della stessa persona ("Mio Dispositivo") tutte le classi.
       final sharedClassIds = _associationSharedClassIds;
+      final isMioDispositivo = remoteRole == P2PSyncRole.mioDispositivo;
+
+      // Idempotenza per endpoint: senza catechistId noto non c'è nulla da
+      // aggiungere (l'aggiunta avverrà alla conferma account); con
+      // endpointId valorizzato l'aggiunta è gestita qui una sola volta in
+      // base allo stato effettivo delle classi.
+      if (!isMioDispositivo && endpointId != null) {
+        if (remoteCatechistId == null || remoteCatechistId.isEmpty) {
+          addLog(
+            'WARN',
+            'CatechistId del ricevente non ancora noto: aggiunta alla classe '
+            'rinviata alla conferma account',
+          );
+          return;
+        }
+      } else if (!isMioDispositivo &&
+          (remoteCatechistId == null || remoteCatechistId.isEmpty)) {
+        addLog(
+          'WARN',
+          'CatechistId del ricevente non ancora noto: aggiunta alla classe '
+          'rinviata alla conferma account',
+        );
+      }
 
       for (final key in box.keys) {
         final data = LocalDatabase.toStringDynamicMap(box.get(key));
@@ -3720,7 +3760,7 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
             (data['associatedCatechistIds'] as List? ?? [])
                 .map((e) => e.toString())
                 .contains(localCatechistId);
-        if (remoteRole == P2PSyncRole.altroCatechista) {
+        if (!isMioDispositivo) {
           if (sharedClassIds.isNotEmpty) {
             if (!sharedClassIds.contains(key.toString())) continue;
           } else if (!isLocalClass) {
@@ -3749,17 +3789,20 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
             'INFO',
             'Incrementato conteggio dispositivi per $localCatechistId a ${counts[localCatechistId]}',
           );
-        } else if (remoteRole == P2PSyncRole.altroCatechista &&
-            remoteCatechistId != null) {
-          if (!associatedIds.contains(remoteCatechistId)) {
+        } else if (!isMioDispositivo &&
+            remoteCatechistId != null &&
+            remoteCatechistId.isNotEmpty &&
+            remoteCatechistId != localCatechistId) {
+          final alreadyAssociated = associatedIds.contains(remoteCatechistId);
+          if (!alreadyAssociated) {
             associatedIds.add(remoteCatechistId);
+            final current = counts[remoteCatechistId] ?? 0;
+            counts[remoteCatechistId] = current + 1;
+            addLog(
+              'INFO',
+              'Aggiunto catechista $remoteCatechistId alla classe ${data['name']}',
+            );
           }
-          final current = counts[remoteCatechistId] ?? 0;
-          counts[remoteCatechistId] = current + 1;
-          addLog(
-            'INFO',
-            'Aggiunto catechista $remoteCatechistId alla classe ${data['name']}',
-          );
 
           if ((data['creatorCatechistId'] as String? ?? '').isEmpty) {
             data['creatorCatechistId'] = localCatechistId;
@@ -5411,10 +5454,22 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
     }
     // Step 1: aggiungi catechista alla classe localmente (idempotente)
     try {
-      _updateClassAfterPairing();
+      _updateClassAfterPairing(endpointId: endpointId);
       addLog('INFO', 'Handshake ordinato: catechista aggiunto alla classe locale');
     } catch (e) {
       addLog('WARN', 'Errore aggiunta catechista alla classe: $e');
+    }
+
+    // Diagnostica: un peer che non dichiara supporto canale classe/parrocchia
+    // è probabilmente una versione precedente senza handshake ordinato.
+    if (_endpointSupportsClassChannel[endpointId] != true ||
+        _endpointSupportsParishChannel[endpointId] != true) {
+      addLog(
+        'WARN',
+        'Peer $endpointId senza supporto handshake/canali dichiarato: '
+        'possibile versione app precedente, la conferma account potrebbe '
+        'non arrivare',
+      );
     }
 
     _associationHandshakeStep[endpointId] = 'accountSent';
@@ -5583,6 +5638,10 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
       'type': 'p2p_account_config_ack',
       'accepted': accepted,
       'reason': reason,
+      // Identificativo effettivo del ricevente (anche dopo eventuale adozione):
+      // consente all'inviante di associare il catechista del ricevente alla
+      // classe condivisa selezionata.
+      'catechistId': AuthService.getCatechistId(),
       'timestamp': DateTime.now().millisecondsSinceEpoch,
     });
     try {
@@ -5621,6 +5680,21 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
     _updateState(
       _state.copyWith(associationHandshakeStep: 'accountConfirmed'),
     );
+
+    // Late binding: memorizza il catechistId effettivo del ricevente e
+    // aggiorna la/e classe condivisa/e selezionata aggiungendolo.
+    final remoteCatechistId = (message['catechistId'] as String?)?.trim() ?? '';
+    if (remoteCatechistId.isNotEmpty) {
+      _endpointRemoteCatechistId[endpointId] = remoteCatechistId;
+      if (_pendingHandshakeRemoteCatechistId?.isNotEmpty != true) {
+        _pendingHandshakeRemoteCatechistId = remoteCatechistId;
+      }
+      try {
+        _updateClassAfterPairing(endpointId: endpointId);
+      } catch (e) {
+        addLog('WARN', 'Errore aggiornamento classe con catechista ricevente: $e');
+      }
+    }
 
     // Step 3: invia informazioni classe
     _associationHandshakeStep[endpointId] = 'classSent';

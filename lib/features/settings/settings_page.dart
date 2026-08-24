@@ -524,6 +524,22 @@ class SettingsPage extends ConsumerWidget {
 
               const SizedBox(height: 12),
 
+              SwitchListTile(
+                title: const Text('Feedback remoto'),
+                subtitle: const Text(
+                  'Consenti l\'invio di feedback e segnalazioni bug tramite Wiredash',
+                ),
+                value: privacy.allowRemoteFeedback,
+                activeThumbColor: const Color(0xFF174A7E),
+                onChanged: (value) {
+                  ref
+                      .read(privacySettingsProvider.notifier)
+                      .setAllowRemoteFeedback(value);
+                },
+              ),
+
+              const SizedBox(height: 12),
+
               _SettingsItem(
                 icon: Icons.feedback_rounded,
                 title: 'Invia Feedback',

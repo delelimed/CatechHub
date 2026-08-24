@@ -3672,12 +3672,16 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
     if (ok) {
       addLog('INFO', 'Account configurato con i dati del mittente');
       // Identità stabile opzionale (es. rubrica del Responsabile): adottata
-      // DOPO la configurazione dell'account, così il catechistId coincide con
-      // le assegnazioni già presenti nelle classi ricevute.
+      // DOPO la configurazione dell'account SOLO se i due dispositivi appartengono
+      // alla stessa persona ("Mio Dispositivo"). In tutti gli altri casi (altro
+      // catechista / responsabile) il ricevente mantiene il proprio catechistId,
+      // che verrà rispedito al mittente per l'aggiunta alla classe condivisa.
       final adoptedId = profile['catechistId'];
-      if (adoptedId != null && adoptedId.isNotEmpty) {
+      final isSamePerson = _pendingHandshakeRemoteRole == P2PSyncRole.mioDispositivo &&
+          _state.role == P2PSyncRole.mioDispositivo;
+      if (adoptedId != null && adoptedId.isNotEmpty && isSamePerson) {
         AuthService.adoptCatechistId(adoptedId);
-        addLog('INFO', 'CatechistId adottato dal profilo condiviso');
+        addLog('INFO', 'CatechistId adottato dal profilo condiviso (stessa persona)');
         await _security.refreshIdentityName();
         await _security.refreshIdentityAnagrafica();
       }
@@ -5496,17 +5500,26 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
     );
     await _sendAccountConfig(endpointId);
 
-    // Watchdog: se la conferma account non arriva entro timeout, ritenta o fallisce
+    // Watchdog: se la conferma account non arriva entro timeout, ritenta o
+    // fallisce. Se il catechistId del ricevente è però già noto (es. dal
+    // messaggio p2p_association_confirmed), l'handshake prosegue comunque
+    // invece di abortire l'intera sincronizzazione.
     _handshakeTimeoutTimers[endpointId]?.cancel();
     _handshakeTimeoutTimers[endpointId] = Timer(_accountAckTimeout, () {
       final step = _associationHandshakeStep[endpointId];
       if (step == 'accountSent') {
         addLog('WARN', 'Timeout conferma account per $endpointId, ritento invio');
         _sendAccountConfig(endpointId);
-        // Re-arm second timeout → errore
+        // Re-arm second timeout → errore O fallback
         _handshakeTimeoutTimers[endpointId]?.cancel();
         _handshakeTimeoutTimers[endpointId] = Timer(_accountAckTimeout, () {
-          if (_associationHandshakeStep[endpointId] == 'accountSent') {
+          if (_associationHandshakeStep[endpointId] != 'accountSent') return;
+          final knownReceiverId = _endpointRemoteCatechistId[endpointId] ?? '';
+          if (knownReceiverId.isNotEmpty) {
+            addLog('WARN', 'ACK account non ricevuto per $endpointId, ma il '
+                'catechistId del ricevente è noto: proseguo con l\'handshake');
+            _proceedToClassInfoAfterAccount(endpointId);
+          } else {
             addLog('ERROR', 'Handshake ordinato fallito: nessuna conferma account');
             _failOrderedHandshake(endpointId, 'Timeout conferma configurazione account');
           }
@@ -5598,13 +5611,22 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
             createClass: false,
           );
           if (ok) {
-            if (catechistId.isNotEmpty) {
+            // Il ricevente genera il proprio account (proprio catechistId).
+            // Adotta l'id del mittente SOLO se i due dispositivi appartengono
+            // alla stessa persona ("Mio Dispositivo"): in tutti gli altri casi
+            // (altro catechista / responsabile) il ricevente mantiene il proprio
+            // id, che verrà rispedito al mittente per l'aggiunta alla classe.
+            final senderRoleStr = message['senderRole'] as String? ?? '';
+            final isSamePerson = senderRoleStr == P2PSyncRole.mioDispositivo.name &&
+                _state.role == P2PSyncRole.mioDispositivo;
+            if (catechistId.isNotEmpty && isSamePerson) {
               AuthService.adoptCatechistId(catechistId);
               await _security.refreshIdentityName();
               await _security.refreshIdentityAnagrafica();
             }
             accepted = true;
-            addLog('INFO', 'Account configurato dal ricevente con dati inviante');
+            addLog('INFO', 'Account configurato dal ricevente con dati inviante '
+                '(id ${isSamePerson ? 'adottato' : 'proprio'} ${AuthService.getCatechistId()})');
           } else {
             reason = 'Impossibile configurare account';
           }
@@ -5690,16 +5712,34 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
     }
 
     addLog('INFO', 'Conferma account POSITIVA ricevuta da $endpointId');
-    _associationHandshakeStep[endpointId] = 'accountConfirmed';
-    _updateState(
-      _state.copyWith(associationHandshakeStep: 'accountConfirmed'),
-    );
 
     // Late binding: memorizza il catechistId effettivo del ricevente e
     // aggiorna la/e classe condivisa/e selezionata aggiungendolo.
     final remoteCatechistId = (message['catechistId'] as String?)?.trim() ?? '';
     if (remoteCatechistId.isNotEmpty) {
       _endpointRemoteCatechistId[endpointId] = remoteCatechistId;
+      if (_pendingHandshakeRemoteCatechistId?.isNotEmpty != true) {
+        _pendingHandshakeRemoteCatechistId = remoteCatechistId;
+      }
+    }
+
+    // Prosegui con l'invio delle informazioni classe (step 3).
+    await _proceedToClassInfoAfterAccount(endpointId);
+  }
+
+  /// Prosegue l'handshake ordinato dopo la conferma account: aggiunge il
+  /// catechista ricevente alla classe condivisa e invia le informazioni classe.
+  /// Usato sia alla ricezione dell'ACK positivo, sia come fallback se l'ACK
+  /// non arriva ma il catechistId del ricevente è già noto (es. dal messaggio
+  /// `p2p_association_confirmed`).
+  Future<void> _proceedToClassInfoAfterAccount(String endpointId) async {
+    _associationHandshakeStep[endpointId] = 'accountConfirmed';
+    _updateState(
+      _state.copyWith(associationHandshakeStep: 'accountConfirmed'),
+    );
+
+    final remoteCatechistId = _endpointRemoteCatechistId[endpointId] ?? '';
+    if (remoteCatechistId.isNotEmpty) {
       if (_pendingHandshakeRemoteCatechistId?.isNotEmpty != true) {
         _pendingHandshakeRemoteCatechistId = remoteCatechistId;
       }

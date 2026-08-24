@@ -715,10 +715,14 @@ class MyApp extends ConsumerWidget {
               ),
             );
 
-            // Wrappa l'app con Wiredash SE l'utente ha acconsentito al feedback
-            // remoto E il progetto Wiredash è configurato correttamente.
+            // Wrappa l'app con Wiredash SE il progetto è configurato.
+            // Il consenso (privacy.allowRemoteFeedback) è gestito a runtime
+            // dall'UI (il tasto "Invia Feedback" mostra Wiredash solo se
+            // abilitato), quindi Wiredash resta sempre nell'albero in modo
+            // che l'ancestor sia disponibile anche se l'utente abilita il
+            // consenso successivamente, senza richiedere il riavvio.
             // Wiredash permette all'utente di inviare feedback e segnalare bug.
-            if (privacy.allowRemoteFeedback && _wiredashConfigured) {
+            if (_wiredashConfigured) {
               app = Wiredash(
                 projectId: _wiredashProjectId,
                 secret: _wiredashSecret,

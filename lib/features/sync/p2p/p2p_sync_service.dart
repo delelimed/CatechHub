@@ -1897,6 +1897,13 @@ Future(() async {
         'sharedClassIds': _handshakeSharedClassIds(),
         'catechistId': AuthService.getCatechistId(),
         'hasClasses': _hasCatechistIdentity(AuthService.getCatechistId()),
+        // H2/H4: capacità dei canali per-classe e parrocchiale. Devon
+        // viaggiare anche nell'identità cifrata perché _handleIdentity le
+        // riapplica: senza questi flag il ricevente le azzerava (il payload
+        // handshake le aveva impostate a true), causando l'omissione dei
+        // record di classe e l'assenza del catechista remoto dalla classe.
+        'supportsClassChannel': true,
+        'supportsParishChannel': true,
         if (assocPub.isNotEmpty) 'assocPub': assocPub,
         // Profilo anagrafico dell'altro catechista (ruolo "Altro Catechista"):
         // il ricevente lo usa per configurare il proprio account.
@@ -2685,11 +2692,18 @@ Future(() async {
       if (ackRemoteCatechistId != null && ackRemoteCatechistId.isNotEmpty) {
         _endpointRemoteCatechistId[endpointId] = ackRemoteCatechistId;
       }
-      _endpointRemoteHasClasses[endpointId] = message['hasClasses'] == true;
+    _endpointRemoteHasClasses[endpointId] = message['hasClasses'] == true;
+    // Non declassare le capacità già stabilite dall'handshake: se l'identità
+    // non riporta il flag (peer che lo omette), mantieni il valore precedente
+    // invece di azzerarlo a false.
+    if (message.containsKey('supportsClassChannel')) {
       _endpointSupportsClassChannel[endpointId] =
           message['supportsClassChannel'] == true;
+    }
+    if (message.containsKey('supportsParishChannel')) {
       _endpointSupportsParishChannel[endpointId] =
           message['supportsParishChannel'] == true;
+    }
       final ackSharedClasses = _resolveSharedClassIdsForEndpoint(
         endpointId,
         (message['sharedClassIds'] as List<dynamic>? ?? [])

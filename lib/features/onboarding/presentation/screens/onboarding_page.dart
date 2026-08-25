@@ -1,15 +1,19 @@
 // ══════════════════════════════════════════════════════════════════════════════
 // onboarding_page.dart — CatechHub (flusso di primo avvio)
 //
-// Struttura a 2 schermate:
+// Struttura a 4 schermate:
 //   STEP 0 — Informativa e richiesta permessi CONTESTUALI:
 //     illustra i permessi necessari (Notifiche, P2P/Bluetooth, Fotocamera,
 //     Foto/media) SENZA attivarli in blocco: la richiesta nativa del sistema
 //     operativo parte esclusivamente al click dell'utente sul relativo pulsante.
-//   STEP 1 — Selezione della modalità operativa (3 pulsanti):
+//   STEP 1 — Creazione del profilo (TUTTI i dispositivi):
+//     nome, cognome e telefono; genera l'id univoco del catechista
+//     (deterministico da nome e cognome, condiviso su tutti i dispositivi).
+//   STEP 2 — Selezione della modalità operativa (3 pulsanti):
 //     [Modalità Responsabile Catechistico]
-//     [Modalità Normale (Senza Responsabile)]
-//     [Associa a Classe Esistente]
+//     [Modalità Autonoma]
+//     [Modalità Associato]
+//   STEP 3 — Dati della parrocchia (solo Modalità Responsabile).
 //
 // A seconda della modalità scelta vengono salvati ruolo, modalità operativa
 // (app_mode) e configurazione parrocchiale, poi l'utente viene reindirizzato
@@ -27,6 +31,7 @@ import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/services/bluetooth_permission_service.dart';
+import '../../../../core/auth/auth_service.dart';
 import '../../../../core/storage/local_database.dart';
 import '../../../../features/responsabile/parish_config_repository.dart';
 import '../../../../shared/models/user_role.dart';
@@ -52,10 +57,6 @@ class OnboardingPage extends ConsumerStatefulWidget {
 }
 
 class _OnboardingPageState extends ConsumerState<OnboardingPage> {
-  /// 0 = permessi contestuali, 1 = selezione modalità,
-  /// 2 = dati della parrocchia (solo Modalità Responsabile).
-  int _step = 0;
-
   @override
   void initState() {
     super.initState();
@@ -75,16 +76,28 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   bool _bluetoothRequested = false;
   bool _photosRequested = false;
 
+  /// 0 = permessi contestuali, 1 = creazione profilo (tutti i dispositivi),
+  /// 2 = selezione modalità, 3 = dati della parrocchia (solo Responsabile).
+  int _step = 0;
+
   String? _errorMessage;
 
   _OnboardingMode? _selectedMode;
 
+  final _firstNameCtrl = TextEditingController();
+  final _lastNameCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _classNameCtrl = TextEditingController();
   final _nomeParrocchiaCtrl = TextEditingController();
   final _diocesiCtrl = TextEditingController();
   final _annoCatechisticoCtrl = TextEditingController();
 
   @override
   void dispose() {
+    _firstNameCtrl.dispose();
+    _lastNameCtrl.dispose();
+    _phoneCtrl.dispose();
+    _classNameCtrl.dispose();
     _nomeParrocchiaCtrl.dispose();
     _diocesiCtrl.dispose();
     _annoCatechisticoCtrl.dispose();
@@ -229,6 +242,38 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     });
   }
 
+  /// Salva il profilo anagrafico (nome, cognome, telefono) e genera
+  /// l'id univoco del catechista (deterministico da nome e cognome) che
+  /// identifica la persona su tutti i suoi dispositivi. Poi passa alla
+  /// scelta della modalità operativa.
+  Future<void> _confirmProfile() async {
+    final first = _firstNameCtrl.text.trim();
+    final last = _lastNameCtrl.text.trim();
+    if (first.isEmpty || last.isEmpty) {
+      setState(() => _errorMessage = 'Nome e cognome sono obbligatori.');
+      return;
+    }
+
+    final id = AuthService.generateCatechistId(
+      first,
+      last,
+      _phoneCtrl.text.trim(),
+    );
+    final box = LocalDatabase.auth();
+    await box.put('first_name', first);
+    await box.put('last_name', last);
+    await box.put(
+      'phone_number',
+      _phoneCtrl.text.trim().replaceAll(RegExp(r'\s+'), ' '),
+    );
+    AuthService.storeCatechistId(id);
+
+    setState(() {
+      _step = 2;
+      _errorMessage = null;
+    });
+  }
+
   /// Applica ruolo, app_mode e configurazione parrocchiale in base alla
   /// modalità scelta, poi reindirizza al flusso successivo.
   Future<void> _confirmMode() async {
@@ -238,49 +283,49 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       return;
     }
 
-    // In Modalità Responsabile si chiede subito il nome della parrocchia,
-    // la diocesi e l'anno catechistico corrente (STEP 2).
+    // In Modalità Responsabile si chiede il nome della parrocchia (STEP 3);
+    // in Modalità Autonoma si chiede il nome della classe da creare (STEP 4).
     if (mode == _OnboardingMode.responsabile) {
       setState(() {
-        _step = 2;
+        _step = 3;
         _errorMessage = null;
       });
-      return;
+    } else if (mode == _OnboardingMode.normal) {
+      setState(() {
+        _step = 4;
+        _errorMessage = null;
+      });
+    } else {
+      // Modalità Associato: nessun dato aggiuntivo, si passa all'associazione.
+      await _finalizeProfile(createClass: false, role: UserRole.catechista);
     }
-
-    await _applyMode(mode);
   }
 
-  /// Salva ruolo, app_mode e configurazione parrocchiale, poi reindirizza.
-  Future<void> _applyMode(_OnboardingMode mode) async {
+  /// Finalizza il profilo (nome/cognome/telefono + ruolo + modalità) e crea
+  /// eventualmente la classe iniziale, poi rimanda al login. Il login mostrerà
+  /// così SOLO il pulsante di sblocco con le credenziali Android (nessuna
+  /// richiesta di nome/cognome, già raccolti in onboarding).
+  Future<void> _finalizeProfile({
+    required bool createClass,
+    String? groupName,
+    required UserRole role,
+  }) async {
+    final auth = AuthService();
+    await auth.setupInitialProfile(
+      firstName: _firstNameCtrl.text.trim(),
+      lastName: _lastNameCtrl.text.trim(),
+      phoneNumber: _phoneCtrl.text.trim(),
+      createClass: createClass,
+      groupName: groupName,
+      role: role,
+    );
+
     final box = LocalDatabase.auth();
-    final configRepo = ParishConfigRepository();
-
-    switch (mode) {
-      case _OnboardingMode.responsabile:
-        await UserRole.setCurrent(UserRole.responsabile);
-        await box.put('setup_mode', 'responsabile');
-        await configRepo.forceResponsabileMode(true);
-      case _OnboardingMode.normal:
-        await UserRole.setCurrent(UserRole.catechista);
-        await box.put('setup_mode', 'create');
-        await configRepo.forceResponsabileMode(false);
-      case _OnboardingMode.join:
-        await UserRole.setCurrent(UserRole.catechista);
-        await box.put('setup_mode', 'join');
-        await configRepo.forceResponsabileMode(false);
-    }
-
-    await box.put('app_mode', switch (mode) {
-      _OnboardingMode.responsabile => 'RESPONSABILE',
-      _OnboardingMode.normal => 'NORMAL',
-      _OnboardingMode.join => 'REPLICATED_PEER',
-    });
     await box.put('onboarding_completed', true);
 
     if (!mounted) return;
-    if (mode == _OnboardingMode.join) {
-      // Nessun form anagrafico: si apre direttamente l'associazione P2P.
+    // La Modalità Associato apre direttamente l'associazione P2P.
+    if (role == UserRole.catechista && !createClass) {
       context.go('/onboarding-sync');
     } else {
       context.go('/login');
@@ -310,7 +355,23 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       ),
     );
 
-    await _applyMode(_OnboardingMode.responsabile);
+    // Il profilo viene finalizzato qui: il login mostrerà solo lo sblocco.
+    await _finalizeProfile(createClass: false, role: UserRole.responsabile);
+  }
+
+  /// Conferma il nome della classe (Modalità Autonoma) e crea la classe
+  /// iniziale, poi rimanda al login (che mostrerà solo lo sblocco).
+  Future<void> _confirmClassName() async {
+    final name = _classNameCtrl.text.trim();
+    if (name.isEmpty) {
+      setState(() => _errorMessage = 'Inserisci il nome della classe.');
+      return;
+    }
+    await _finalizeProfile(
+      createClass: true,
+      groupName: name,
+      role: UserRole.catechista,
+    );
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -325,11 +386,15 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           children: [
             _buildTopBar(),
             Expanded(
-              child: _step == 0
-                  ? _buildPermissionsStep()
-                  : _step == 1
-                  ? _buildModeStep()
-                  : _buildParishStep(),
+      child: _step == 0
+          ? _buildPermissionsStep()
+          : _step == 1
+          ? _buildProfileStep()
+          : _step == 2
+          ? _buildModeStep()
+          : _step == 3
+          ? _buildParishStep()
+          : _buildClassNameStep(),
             ),
           ],
         ),
@@ -350,14 +415,16 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             )
           else
             const SizedBox(width: 48),
-          Expanded(
-            child: Center(
-              child: Text(
-                switch (_step) {
-                  0 => 'Benvenuto in CatechHub',
-                  1 => 'Scegli la modalità',
-                  _ => 'Dati della parrocchia',
-                },
+            Expanded(
+              child: Center(
+                child: Text(
+                  switch (_step) {
+                    0 => 'Benvenuto in CatechHub',
+                    1 => 'Crea il tuo profilo',
+                    2 => 'Scegli la modalità',
+                    3 => 'Dati della parrocchia',
+                    _ => 'Nome della classe',
+                  },
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -648,7 +715,142 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     );
   }
 
-  // ─── STEP 1: SELEZIONE MODALITÀ OPERATIVA ──────────────────────────────────
+  // ─── STEP 1: CREAZIONE PROFILO (TUTTI I DISPOSITIVI) ──────────────────────
+
+  Widget _buildProfileStep() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 430),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 16),
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: const Color(0xFF174A7E).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(
+                Icons.person_rounded,
+                size: 40,
+                color: Color(0xFF174A7E),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Creа il tuo profilo',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF174A7E),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Inserisci i tuoi dati: verranno usati per generare un id '
+              'univoco del catechista (basato su nome e cognome) condiviso '
+              'su tutti i tuoi dispositivi.',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade700,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _firstNameCtrl,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(
+                labelText: 'Nome *',
+                hintText: 'Es. Mario',
+                prefixIcon: const Icon(Icons.person_rounded),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _lastNameCtrl,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(
+                labelText: 'Cognome *',
+                hintText: 'Es. Rossi',
+                prefixIcon: const Icon(Icons.person_outline_rounded),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _phoneCtrl,
+              keyboardType: TextInputType.phone,
+              textInputAction: TextInputAction.done,
+              decoration: InputDecoration(
+                labelText: 'Numero di telefono (facoltativo)',
+                hintText: 'Es. 333 1234567',
+                prefixIcon: const Icon(Icons.phone_rounded),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                isDense: true,
+              ),
+              onSubmitted: (_) => _confirmProfile(),
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Text(
+                  _errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: _confirmProfile,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF174A7E),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 2,
+                ),
+                icon: const Icon(Icons.arrow_forward_rounded, size: 20),
+                label: const Text(
+                  'Continua',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── STEP 2: SELEZIONE MODALITÀ OPERATIVA ──────────────────────────────────
 
   Widget _buildModeStep() {
     return SingleChildScrollView(
@@ -689,7 +891,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             _buildModeCard(
               mode: _OnboardingMode.normal,
               icon: Icons.menu_book_rounded,
-              title: 'Modalità Normale (Senza Responsabile)',
+              title: 'Modalità Autonoma',
               description:
                   'Uso autonomo del singolo catechista: crea la tua '
                   'classe e gestisci il registro in modo indipendente.',
@@ -697,11 +899,11 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             _buildModeCard(
               mode: _OnboardingMode.join,
               icon: Icons.group_add_rounded,
-              title: 'Associa a Classe Esistente',
+              title: 'Modalità Associato',
               description:
                   'Configura rapidamente un nuovo dispositivo ricevendo '
                   'account e classe direttamente da un altro catechista o dal '
-                  'Responsabile via P2P.',
+                  'Responsabile via P2P (Nearby Share).',
             ),
             if (_errorMessage != null) ...[
               const SizedBox(height: 8),
@@ -965,6 +1167,109 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                 icon: const Icon(Icons.arrow_forward_rounded, size: 20),
                 label: const Text(
                   'Continua',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── STEP 4: NOME DELLA CLASSE (SOLO MODALITÀ AUTONOMA) ──────────────────
+
+  Widget _buildClassNameStep() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 430),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 16),
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: const Color(0xFF174A7E).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(
+                Icons.groups_rounded,
+                size: 40,
+                color: Color(0xFF174A7E),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Crea la tua classe',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF174A7E),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'In Modalità Autonoma crei subito la tua classe di catechismo. '
+              'Potrai aggiungerne altre e gestire i catechisti in seguito.',
+              style: TextStyle(
+                fontSize: 13.5,
+                color: Colors.grey.shade700,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _classNameCtrl,
+              textInputAction: TextInputAction.done,
+              decoration: InputDecoration(
+                labelText: 'Nome della classe *',
+                hintText: 'Es. Prima elementare, Cresima 2026',
+                prefixIcon: const Icon(Icons.groups_rounded),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                isDense: true,
+              ),
+              onSubmitted: (_) => _confirmClassName(),
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Text(
+                  _errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: _confirmClassName,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF174A7E),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 2,
+                ),
+                icon: const Icon(Icons.arrow_forward_rounded, size: 20),
+                label: const Text(
+                  'Crea classe e accedi',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),

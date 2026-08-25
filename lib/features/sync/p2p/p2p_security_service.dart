@@ -7,6 +7,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive/hive.dart';
 
 import '../../../core/services/crypto_utils.dart';
+import '../../../core/auth/auth_service.dart';
 import '../../../core/storage/local_database.dart';
 import '../data/association_models.dart';
 
@@ -35,6 +36,7 @@ class P2PIdentity {
   final String connectionEndpoint;
   final String firstName;
   final String lastName;
+  final String? catechistId;
 
   const P2PIdentity({
     required this.deviceId,
@@ -45,6 +47,7 @@ class P2PIdentity {
     required this.connectionEndpoint,
     this.firstName = '',
     this.lastName = '',
+    this.catechistId,
   });
 
   /// Chiave anagrafica normalizzata (nome+cognome, senza spazi, lowercase).
@@ -61,6 +64,7 @@ class P2PIdentity {
     'endpoint': connectionEndpoint,
     'firstName': firstName,
     'lastName': lastName,
+    if (catechistId != null) 'catechistId': catechistId,
     'v': 4,
   };
 
@@ -74,6 +78,7 @@ class P2PIdentity {
     String endpoint = json['endpoint'] as String? ?? deviceId;
     String firstName = json['firstName'] as String? ?? '';
     String lastName = json['lastName'] as String? ?? '';
+    String? catechistId = json['catechistId'] as String?;
 
     if (ver < 2) {
       deviceName = json['deviceName'] as String? ?? '';
@@ -104,6 +109,7 @@ class P2PIdentity {
       connectionEndpoint: endpoint,
       firstName: firstName,
       lastName: lastName,
+      catechistId: catechistId,
     );
   }
 
@@ -648,6 +654,7 @@ class P2PSecurityService {
       connectionEndpoint: identity.deviceId,
       firstName: _getFirstName(),
       lastName: _getLastName(),
+      catechistId: AuthService.getCatechistId(),
     );
     return updated.encode();
   }

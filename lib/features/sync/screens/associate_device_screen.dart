@@ -25,6 +25,9 @@ class P2PIdentityWithConnection extends P2PIdentity {
     required super.publicKeyBase64,
     required super.fingerprint,
     required super.connectionEndpoint,
+    super.firstName,
+    super.lastName,
+    super.catechistId,
   });
 
   factory P2PIdentityWithConnection.fromIdentity(P2PIdentity id) =>
@@ -35,6 +38,9 @@ class P2PIdentityWithConnection extends P2PIdentity {
         publicKeyBase64: id.publicKeyBase64,
         fingerprint: id.fingerprint,
         connectionEndpoint: id.connectionEndpoint,
+        firstName: id.firstName,
+        lastName: id.lastName,
+        catechistId: id.catechistId,
       );
 }
 
@@ -240,14 +246,10 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
   bool _validateCatechistData() {
     if (_selectedRole != P2PSyncRole.altroCatechista) return true;
     if (_isResponsabileMode) {
-      if (_selectedCatechistProfile == null) {
-        setState(() {
-          _errorMessage =
-              'Seleziona il catechista dalla rubrica parrocchiale '
-              'prima di procedere.';
-        });
-        return false;
-      }
+      // In Modalità Responsabile il catechista può essere scelto dalla rubrica
+      // OPPURE ricavato dallo scan del QR del dispositivo associato (che porta
+      // già id + anagrafica del catechista): in entrambi i casi non è
+      // obbligatorio pre-selezionarlo qui.
       return true;
     }
     if (_remoteFirstNameController.text.trim().isEmpty ||
@@ -851,7 +853,71 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
 
   Future<void> _registerCatechistInClass() async {
     addLog('INFO', 'Registro nuovo catechista nella classe');
+    // PRIMA di condividere la classe, il Responsabile (o autonomo) inserisce
+    // il catechista con il suo id nella rubrica parrocchiale: così l'identità
+    // risulta univoca e non vengono creati duplicati durante la sincronizzazione.
+    await _registerCatechistInRubrica();
     _ensureLocalCatechistInClass(sharedClassIds: _selectedSharedClassIds);
+  }
+
+  /// Inserisce (se non presente) il catechista remoto nella rubrica
+  /// parrocchiale, usando l'id univoco già generato sul suo dispositivo
+  /// (portato dal QR/scansione). Deve avvenire PRIMA della condivisione della
+  /// classe così che la sincronizzazione trovi l'identità già registrata.
+  ///
+  /// Funziona solo in Modalità Responsabile (l'unica abilitata alla scrittura
+  /// della rubrica). Negli altri casi la registrazione del catechista nella
+  /// classe è già gestita da [_ensureLocalCatechistInClass].
+  Future<void> _registerCatechistInRubrica() async {
+    if (_selectedRole != P2PSyncRole.altroCatechista) return;
+    if (!_isResponsabileMode) return;
+
+    final repo = CatechistsRepository();
+    if (!repo.canManage) return;
+
+    String? remoteId = _remoteIdentity?.catechistId;
+    String first = _remoteIdentity?.firstName ?? '';
+    String last = _remoteIdentity?.lastName ?? '';
+    String phone = '';
+
+    if (remoteId == null || remoteId.isEmpty) {
+      remoteId = _selectedCatechistProfile?.id;
+      first = first.isEmpty ? _selectedCatechistProfile?.firstName ?? '' : first;
+      last = last.isEmpty ? _selectedCatechistProfile?.lastName ?? '' : last;
+      phone = _selectedCatechistProfile?.phone ?? '';
+    }
+    if (remoteId == null || remoteId.isEmpty) {
+      final remoteProfile =
+          ref.read(nearbySyncServiceProvider).associationRemoteProfile;
+      remoteId = remoteProfile['catechistId'];
+      first = first.isEmpty ? (remoteProfile['firstName'] ?? '') : first;
+      last = last.isEmpty ? (remoteProfile['lastName'] ?? '') : last;
+      phone = remoteProfile['phoneNumber'] ?? '';
+    }
+
+    if (remoteId == null || remoteId.isEmpty) return;
+    if (first.trim().isEmpty || last.trim().isEmpty) return;
+
+    try {
+      if (repo.getById(remoteId) != null) {
+        addLog('INFO', 'Catechista $first $last già presente in rubrica');
+        return;
+      }
+      await repo.save(
+        CatechistProfile(
+          id: remoteId,
+          firstName: first.trim(),
+          lastName: last.trim(),
+          phone: phone.trim(),
+        ),
+      );
+      addLog(
+        'INFO',
+        'Catechista $first $last ($remoteId) aggiunto alla rubrica',
+      );
+    } catch (e) {
+      addLog('ERROR', 'Errore salvataggio catechista in rubrica: $e');
+    }
   }
 
   /// Aggiunge il dispositivo remoto (e il catechista locale) alle classi.

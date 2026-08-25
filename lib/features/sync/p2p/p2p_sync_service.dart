@@ -413,6 +413,12 @@ class P2PSyncService {
   /// con i dati inseriti da chi condivide.
   Map<String, String> _associationRemoteProfile = {};
 
+  /// Accesso in sola lettura al profilo anagrafico remoto impostato per
+  /// l'associazione ("Altro Catechista"). Usato dalla UI per registrare il
+  /// catechista nella rubrica prima di condividere la classe.
+  Map<String, String> get associationRemoteProfile =>
+      Map<String, String>.from(_associationRemoteProfile);
+
   /// Profilo anagrafico RICEVUTO dall'handshake del dispositivo remoto
   /// (caso "Altro Catechista"): il ricevente lo applica al proprio account
   /// al termine dell'associazione se non ha ancora un profilo configurato.

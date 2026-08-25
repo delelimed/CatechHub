@@ -92,6 +92,42 @@ class AuthService {
   /// Getter di istanza per il catechistId corrente.
   String get catechistId => getCatechistId();
 
+  /// Genera un identificativo catechista DETERMINISTICO a partire da nome e
+  /// cognome (e, se disponibile, dal numero di telefono).
+  ///
+  /// A differenza di [getCatechistId] (che usa un salt casuale per-device),
+  /// questo id dipende SOLO dall'anagrafica normalizzata, così la STESSA
+  /// persona ottiene lo stesso `catechistId` su tutti i suoi dispositivi
+  /// (utile durante l'associazione P2P: il Responsabile riconosce il catechista
+  /// e non crea duplicati). Due persone con dati diversi ottengono id diversi.
+  ///
+  /// Forma: `cat_<nomeNormalizzato>_<hash8>` dove `hash8` è un hash breve di
+  /// "nome|cognome|telefono" che garantisce unicità anche a fronte di omonimi.
+  static String generateCatechistId(
+    String firstName,
+    String lastName, [
+    String? phone,
+  ]) {
+    final norm = normalizeCatechistName('$firstName $lastName');
+    final phoneNorm =
+        (phone != null && phone.trim().isNotEmpty)
+        ? normalizeCatechistName(phone)
+        : '';
+    final material = phoneNorm.isNotEmpty ? '$norm|$phoneNorm' : norm;
+    final hash = sha256HexSync(material).substring(0, 8);
+    final prefix = norm.length > 24 ? norm.substring(0, 24) : norm;
+    return 'cat_${prefix}_$hash';
+  }
+
+  /// Persiste un `catechistId` esplicito (generato, ad esempio, durante
+  /// l'onboarding a partire da nome e cognome) così che [getCatechistId]
+  /// lo restituisca invece di rigenerarne uno con salt casuale.
+  static void storeCatechistId(String id) {
+    if (id.trim().isEmpty) return;
+    final box = LocalDatabase.auth();
+    box.put(_catechistIdKey, id.trim());
+  }
+
   /// Numero di telefono facoltativo del catechista (campo `phone_number`).
   static String getPhoneNumber() {
     final box = LocalDatabase.auth();

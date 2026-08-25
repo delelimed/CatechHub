@@ -8,6 +8,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../core/auth/auth_service.dart';
 import '../../../core/providers/current_class_provider.dart';
+import '../../../features/classes/classes_repository.dart';
 import '../../../core/providers/nearby_sync_provider.dart';
 import '../../../core/storage/local_database.dart';
 import '../../../features/responsabile/catechists_repository.dart';
@@ -164,7 +165,10 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
 
     if (role == P2PSyncRole.altroCatechista) {
       final current = ref.read(currentClassProvider);
-      final classes = ref.read(myClassesProvider);
+      final classes =
+          _isResponsabileMode
+              ? ClassesRepository().getClassesSync()
+              : ref.read(myClassesProvider);
       final valid =
           current != null &&
           current.isNotEmpty &&
@@ -876,14 +880,12 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
     try {
       final box = LocalDatabase.classes();
       const localId = AuthService.localUserId;
-      final localCatechistId = AuthService.getCatechistId();
       bool isShared(String key) =>
           sharedClassIds == null ||
           sharedClassIds.isEmpty ||
           sharedClassIds.contains(key);
 
       if (_remoteIdentity != null) {
-        final remoteDeviceId = _remoteIdentity!.deviceId;
         final remoteCatechistId = _remoteIdentity!.catechistId ?? '';
         for (final key in box.keys) {
           if (!isShared(key.toString())) continue;
@@ -892,15 +894,12 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
               .map((e) => e.toString())
               .toList();
           var changed = false;
-          // Id stabile del catechista associato (prioritario per il riconoscimento).
+          // Usa SOLO l'id stabile del catechista associato: il deviceId NON deve
+          // finire in catechistIds, altrimenti verrebbe mostrato come catechista
+          // duplicato (con il nome del dispositivo) nella lista della classe.
           if (remoteCatechistId.isNotEmpty &&
               !ids.contains(remoteCatechistId)) {
             ids.add(remoteCatechistId);
-            changed = true;
-          }
-          // Mantiene anche il deviceId per retrocompatibilità.
-          if (!ids.contains(remoteDeviceId)) {
-            ids.add(remoteDeviceId);
             changed = true;
           }
           if (changed) {
@@ -923,11 +922,6 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
         var changed = false;
         if (!ids.contains(localId)) {
           ids.add(localId);
-          changed = true;
-        }
-        // Id stabile del catechista locale (per il riconoscimento come membro).
-        if (localCatechistId.isNotEmpty && !ids.contains(localCatechistId)) {
-          ids.add(localCatechistId);
           changed = true;
         }
         if (changed) {
@@ -1289,7 +1283,10 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
   /// Selettore delle classi da condividere con l'altro catechista.
   /// Solo le classi selezionate verranno sincronizzate con il dispositivo remoto.
   Widget _buildSharedClassSelector(ThemeData theme, ColorScheme colorScheme) {
-    final myClasses = ref.watch(myClassesProvider);
+    final myClasses =
+        _isResponsabileMode
+            ? ClassesRepository().getClassesSync()
+            : ref.watch(myClassesProvider);
 
     return Container(
       width: double.infinity,

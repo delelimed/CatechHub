@@ -16,6 +16,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/security/privacy_settings.dart';
 import '../../core/security/security_service.dart';
 import '../../shared/widgets/app_scaffold.dart';
 
@@ -25,6 +26,7 @@ class PrivacySecurityPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final securityService = ref.watch(securityStatusProvider);
+    final privacy = ref.watch(privacySettingsProvider);
 
     return AppScaffold(
       title: 'Privacy e Sicurezza',
@@ -32,6 +34,22 @@ class PrivacySecurityPage extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           const _HeaderCard(),
+          const SizedBox(height: 16),
+          const _SectionLabel('Consensi e feedback'),
+          const SizedBox(height: 8),
+          SwitchListTile(
+            title: const Text('Feedback remoto'),
+            subtitle: const Text(
+              'Consenti l\'invio di feedback e segnalazioni bug tramite Wiredash',
+            ),
+            value: privacy.allowRemoteFeedback,
+            activeThumbColor: const Color(0xFF174A7E),
+            onChanged: (value) {
+              ref
+                  .read(privacySettingsProvider.notifier)
+                  .setAllowRemoteFeedback(value);
+            },
+          ),
           const SizedBox(height: 16),
           const _SectionLabel('I tuoi dati sono al sicuro'),
           const SizedBox(height: 8),

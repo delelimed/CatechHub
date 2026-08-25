@@ -3328,6 +3328,10 @@ Future(() async {
     });
     await _sendEncryptedPayload(endpointId, ack);
     _updateState(_state.copyWith(authenticatedByRemote: true));
+    // Avvia anche sul risponditore la sincronizzazione bidirezionale, così da
+    // garantire il riallineamento dei dati anche quando solo uno dei due
+    // dispositivi è stato riavviato e la connessione viene ripresa.
+    unawaited(_performBidirectionalSync(endpointId));
   }
 
   Future<void> _handleAuthResponse(

@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/auth/auth_service.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/utils/auth_utils.dart';
@@ -111,12 +112,17 @@ class _ClassiManagementPageState extends ConsumerState<ClassiManagementPage> {
 
   Future<void> _createClass(String nome, String? percorso) async {
     final repo = ClassesRepository();
+    final responsabileId = AuthService.getCatechistId();
     await repo.addClass(
       SchoolClass(
         id: LocalDatabase.newId('class'),
         name: nome,
         studentIds: [],
-        catechistIds: [],
+        catechistIds: [AuthService.localUserId],
+        creatorId: AuthService.localUserId,
+        creatorName: getCurrentCatechistName(),
+        creatorCatechistId: responsabileId,
+        catechistRoles: {responsabileId: ClassesRepository.roleTitolare},
         uniqueCode: generateClassUniqueCode(),
         percorso: percorso ?? '',
         annoCatechistico: currentCatechisticYear(),

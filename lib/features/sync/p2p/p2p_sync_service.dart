@@ -3822,6 +3822,28 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
             );
           }
 
+          // Il catechista deve comparire anche nell'ELENCO UFFICIALE della
+          // classe (catechistIds / catechistRoles), non solo in
+          // `associatedCatechistIds` (che serve esclusivamente allo scoping
+          // della sincronizzazione). Senza questo aggiornamento il nuovo
+          // catechista risulta "non inserito nella classe" pur essendo stato
+          // associato correttamente, e la UI/roster non lo elenca.
+          final rosterIds = (data['catechistIds'] as List? ?? [])
+              .map((e) => e.toString())
+              .toList();
+          if (!rosterIds.contains(remoteCatechistId)) {
+            rosterIds.add(remoteCatechistId);
+            data['catechistIds'] = rosterIds;
+          }
+          if (data['catechistRoles'] is! Map) {
+            data['catechistRoles'] = <String, String>{};
+          }
+          final roles = Map<String, String>.from(
+            data['catechistRoles'] as Map,
+          );
+          roles.putIfAbsent(remoteCatechistId, () => 'TITOLARE');
+          data['catechistRoles'] = roles;
+
           if ((data['creatorCatechistId'] as String? ?? '').isEmpty) {
             data['creatorCatechistId'] = localCatechistId;
           }
@@ -5551,6 +5573,13 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
         lastName = box.get('last_name', defaultValue: '') as String? ?? '';
         phone = box.get('phone_number', defaultValue: '') as String? ?? '';
       }
+      // `adoptCatechistId` indica al ricevente di adottare l'identità
+      // catechistica fornita anziché generarne una propria. Vero quando
+      // l'inviante conosce già l'id (es. modalità Responsabile con profilo
+      // pre‑registrato in rubrica); falso per "Altro Catechista" in modalità
+      // normale, dove il ricevente deve mantenere la propria identità.
+      final adoptCatechistId =
+          (_associationRemoteProfile['catechistId'] ?? '').isNotEmpty;
       final msg = jsonEncode({
         'type': 'p2p_account_config',
         'firstName': firstName,
@@ -5558,6 +5587,7 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
         'catechistId': catechistId,
         'phoneNumber': phone,
         'senderRole': _state.role.name,
+        'adoptCatechistId': adoptCatechistId,
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       });
       await _sendEncryptedPayload(endpointId, msg);
@@ -5612,14 +5642,21 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
           );
           if (ok) {
             // Il ricevente genera il proprio account (proprio catechistId).
-            // Adotta l'id del mittente SOLO se i due dispositivi appartengono
-            // alla stessa persona ("Mio Dispositivo"): in tutti gli altri casi
-            // (altro catechista / responsabile) il ricevente mantiene il proprio
-            // id, che verrà rispedito al mittente per l'aggiunta alla classe.
+            // Adotta l'id fornito dal mittente SOLO quando:
+            //  - i due dispositivi appartengono alla stessa persona
+            //    ("Mio Dispositivo"); oppure
+            //  - il mittente conosce già l'identità del ricevente
+            //    (modalità Responsabile con profilo pre‑registrato in rubrica),
+            //    segnalato dal flag `adoptCatechistId`.
+            // In tutti gli altri casi (Altro Catechista in modalità normale) il
+            // ricevente mantiene il proprio id, che verrà rispedito al mittente
+            // per l'aggiunta alla classe.
             final senderRoleStr = message['senderRole'] as String? ?? '';
             final isSamePerson = senderRoleStr == P2PSyncRole.mioDispositivo.name &&
                 _state.role == P2PSyncRole.mioDispositivo;
-            if (catechistId.isNotEmpty && isSamePerson) {
+            final shouldAdopt =
+                isSamePerson || message['adoptCatechistId'] == true;
+            if (catechistId.isNotEmpty && shouldAdopt) {
               AuthService.adoptCatechistId(catechistId);
               await _security.refreshIdentityName();
               await _security.refreshIdentityAnagrafica();
@@ -5642,13 +5679,16 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
             '($remoteKey vs $localKey) — non sovrascrivo',
           );
         }
-        // Se il catechistId ricevuto è diverso e il dispositivo non ha classi,
-        // adotto solo se è lo stesso individuo (mioDispositivo)
+        // Se il catechistId ricevuto è diverso, adotto se è lo stesso
+        // individuo (Mio Dispositivo) oppure se il mittente lo segnala come
+        // identità già nota (Responsabile con profilo in rubrica).
         if (catechistId.isNotEmpty && catechistId != AuthService.getCatechistId()) {
           final senderRoleStr = message['senderRole'] as String? ?? '';
           final isSamePerson = senderRoleStr == P2PSyncRole.mioDispositivo.name &&
               _state.role == P2PSyncRole.mioDispositivo;
-          if (isSamePerson && !_hasCatechistIdentity(AuthService.getCatechistId())) {
+          final shouldAdopt =
+              isSamePerson || message['adoptCatechistId'] == true;
+          if (shouldAdopt && !_hasCatechistIdentity(AuthService.getCatechistId())) {
             AuthService.adoptCatechistId(catechistId);
             addLog('INFO', 'CatechistId adottato da account config');
           }
@@ -5910,6 +5950,23 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
         if (!catechistIds.contains(localId)) {
           catechistIds.add(localId);
           data['catechistIds'] = catechistIds;
+        }
+        // Difesa: il catechista locale (identità stabile, hash) deve figurare
+        // nell'elenco ufficiale della classe. L'inviante lo aggiunge già durante
+        // il pairing, ma in caso di peer obsoleto o race tra sync continuo e
+        // handshake ordinato ci pensa il ricevente, così non risulta mai
+        // "non inserito nella classe".
+        final localCatechistId = AuthService.getCatechistId();
+        if (localCatechistId.isNotEmpty &&
+            !catechistIds.contains(localCatechistId)) {
+          catechistIds.add(localCatechistId);
+          data['catechistIds'] = catechistIds;
+          if (data['catechistRoles'] is! Map) {
+            data['catechistRoles'] = <String, String>{};
+          }
+          final roles = Map<String, String>.from(data['catechistRoles'] as Map);
+          roles.putIfAbsent(localCatechistId, () => 'TITOLARE');
+          data['catechistRoles'] = roles;
         }
         await box.put(id, data);
         applied++;

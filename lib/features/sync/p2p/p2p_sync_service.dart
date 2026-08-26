@@ -2140,56 +2140,91 @@ Future(() async {
     }
   }
 
+  /// Tenta di decifrare [rawMessage] con una delle chiavi in [keys].
+  /// Restituisce `(messaggio, true)` se la decifratura riesce, altrimenti null.
+  Future<(String, bool)?> _attemptDecrypt(
+    String endpointId,
+    String rawMessage,
+    List<_EndpointSessionKey> keys,
+  ) async {
+    // Tenta con tutte le chiavi della finestra corrente e precedente:
+    // i messaggi in transito al confine della rotazione sono decifrabili
+    // con la chiave della finestra in cui sono stati cifrati.
+    for (final entry in keys) {
+      try {
+        final encrypted = P2PEncryptedPayload.decode(rawMessage);
+        final decrypted = await _security.decryptPayload(
+          encrypted,
+          entry.key,
+        );
+        final wrapper = jsonDecode(decrypted);
+        if (wrapper is Map<String, dynamic>) {
+          final senderId = wrapper['senderId'] as String?;
+          final senderPublicKey = wrapper['senderPublicKey'] as String?;
+          final expectedDeviceId = _endpointConnIdMap[endpointId];
+          if (senderId != null &&
+              expectedDeviceId != null &&
+              senderId != expectedDeviceId) {
+            addLog(
+              'ERROR',
+              'Mittente non corrisponde: $senderId vs $expectedDeviceId',
+            );
+            return (rawMessage, false);
+          }
+          if (senderPublicKey != null && expectedDeviceId != null) {
+            final assoc = await _security.getAssociation(expectedDeviceId);
+            if (assoc != null &&
+                !P2PSecurityService.publicKeyMatchesAssociation(
+                  assoc,
+                  senderPublicKey,
+                )) {
+              addLog(
+                'ERROR',
+                'Chiave pubblica mittente non corrisponde per $senderId',
+              );
+              return (rawMessage, false);
+            }
+          }
+          final data = wrapper['data'] as String?;
+          if (data != null) return (data, true);
+        }
+        return (wrapper is String ? wrapper : decrypted, true);
+      } catch (_) {}
+    }
+    return null;
+  }
+
   Future<(String, bool)> _tryDecryptMessage(
     String endpointId,
     String rawMessage,
   ) async {
     final keys = _endpointSessionKeys[endpointId];
     if (keys != null && keys.isNotEmpty) {
-      // Tenta con tutte le chiavi della finestra corrente e precedente:
-      // i messaggi in transito al confine della rotazione sono decifrabili
-      // con la chiave della finestra in cui sono stati cifrati.
-      for (final entry in keys) {
-        try {
-          final encrypted = P2PEncryptedPayload.decode(rawMessage);
-          final decrypted = await _security.decryptPayload(
-            encrypted,
-            entry.key,
-          );
-          final wrapper = jsonDecode(decrypted);
-          if (wrapper is Map<String, dynamic>) {
-            final senderId = wrapper['senderId'] as String?;
-            final senderPublicKey = wrapper['senderPublicKey'] as String?;
-            final expectedDeviceId = _endpointConnIdMap[endpointId];
-            if (senderId != null &&
-                expectedDeviceId != null &&
-                senderId != expectedDeviceId) {
-              addLog(
-                'ERROR',
-                'Mittente non corrisponde: $senderId vs $expectedDeviceId',
-              );
-              return (rawMessage, false);
-            }
-            if (senderPublicKey != null && expectedDeviceId != null) {
-              final assoc = await _security.getAssociation(expectedDeviceId);
-              if (assoc != null &&
-                  !P2PSecurityService.publicKeyMatchesAssociation(
-                    assoc,
-                    senderPublicKey,
-                  )) {
-                addLog(
-                  'ERROR',
-                  'Chiave pubblica mittente non corrisponde per $senderId',
-                );
-                return (rawMessage, false);
-              }
-            }
-            final data = wrapper['data'] as String?;
-            if (data != null) return (data, true);
+      final res = await _attemptDecrypt(endpointId, rawMessage, keys);
+      if (res != null) return res;
+    }
+    // Lazy (re)derivazione della chiave di sessione: in una (re-)sincronizzazione
+    // con associazione già esistente il peer trasmette i propri messaggi cifrati
+    // (es. `p2p_identity`) immediatamente dopo l'handshake, spesso PRIMA che
+    // abbiamo derivato la nostra chiave di ricezione (che altrimenti verrebbe
+    // calcolata pigramente solo al primo invio). Senza questa chiave i messaggi
+    // resterebbero illeggibili e l'identità remota — e quindi l'appartenenza
+    // del catechista alla classe — non verrebbe mai riconosciuta.
+    // Ci limitiamo all'associazione già esistente per non interferire con il
+    // flusso di pairing (dove i nonce vanno derivati solo al momento opportuno).
+    final mappedDeviceId = _endpointConnIdMap[endpointId];
+    if (mappedDeviceId != null) {
+      try {
+        final hasAssoc = await _security.getAssociation(mappedDeviceId) != null;
+        if (hasAssoc) {
+          await _ensureSessionKey(endpointId);
+          final keys2 = _endpointSessionKeys[endpointId];
+          if (keys2 != null && keys2.isNotEmpty) {
+            final res = await _attemptDecrypt(endpointId, rawMessage, keys2);
+            if (res != null) return res;
           }
-          return (wrapper is String ? wrapper : decrypted, true);
-        } catch (_) {}
-      }
+        }
+      } catch (_) {}
     }
     return (rawMessage, false);
   }
@@ -2559,6 +2594,13 @@ Future(() async {
         localEphemeralPub.bytes,
       );
     }
+
+    // Deriva subito la chiave di sessione di ricezione: il peer può aver
+    // già accodato messaggi cifrati (es. p2p_identity) che arriverebbero
+    // prima del nostro primo invio, altrimenti illeggibili.
+    try {
+      await _ensureSessionKey(endpointId);
+    } catch (_) {}
 
     final localIdentity = await _security.getLocalIdentity();
 

@@ -97,6 +97,51 @@ class AppModeUtils {
     return true;
   }
 
+  /// True se l'account può consultare il calendario (pianificazione) di TUTTA
+  /// la parrocchia. Vale per il Responsabile e per i dispositivi "Associato"
+  /// quando la parrocchia usa la modalità Responsabile.
+  static bool canViewCalendarioParrocchia() {
+    if (UserRole.isResponsabile) return true;
+    if (isNormal) return false;
+    try {
+      final config = ParishConfigRepository().getConfig();
+      if (!config.isResponsabileModeActive) return false;
+    } catch (_) {
+      return false;
+    }
+    return true;
+  }
+
+  /// True se l'account può consultare le anagrafiche di OGNI ragazzo della
+  /// parrocchia (non solo della propria classe). Vale per il Responsabile e per
+  /// i dispositivi "Associato" quando la parrocchia usa la modalità Responsabile.
+  static bool canViewAnagraficheParrocchia() {
+    if (UserRole.isResponsabile) return true;
+    if (isNormal) return false;
+    try {
+      final config = ParishConfigRepository().getConfig();
+      if (!config.isResponsabileModeActive) return false;
+    } catch (_) {
+      return false;
+    }
+    return true;
+  }
+
+  /// True se l'account può consultare il registro assenze/presenze di OGNI
+  /// ragazzo della parrocchia. Vale per il Responsabile e per i dispositivi
+  /// "Associato" quando la parrocchia usa la modalità Responsabile.
+  static bool canViewRegistroAssenze() {
+    if (UserRole.isResponsabile) return true;
+    if (isNormal) return false;
+    try {
+      final config = ParishConfigRepository().getConfig();
+      if (!config.isResponsabileModeActive) return false;
+    } catch (_) {
+      return false;
+    }
+    return true;
+  }
+
   /// Rende coerenti tra loro tutte le variabili della modalità Responsabile
   /// (app_mode, user_role e configurazione parrocchiale). Da chiamare
   /// all'avvio: se l'account è in modalità Responsabile assicura che il

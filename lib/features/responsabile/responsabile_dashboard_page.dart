@@ -89,6 +89,32 @@ class ResponsabileDashboardPage extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
+                  Card(
+                    elevation: 1,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Padding(
+                      padding: EdgeInsets.all(14),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.visibility_rounded,
+                              color: Color(0xFF174A7E)),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Visibilità parrocchiale: puoi vedere il calendario, '
+                              'le anagrafiche di ogni ragazzo e il registro assenze '
+                              'di tutta la parrocchia. Nella sincronizzazione P2P il '
+                              'tuo dispositivo allinea tutte le classi.',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   Text(
                     'Funzioni rapide',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(

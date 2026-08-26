@@ -20,6 +20,7 @@ import '../parish_channel_service.dart';
 import 'p2p_security_service.dart';
 import 'hive_sync_engine.dart';
 import '../../../shared/models/class_model.dart' show generateClassUniqueCode;
+import '../../../shared/utils/app_mode.dart';
 
 enum P2PSyncRole { mioDispositivo, altroCatechista, responsabile }
 
@@ -1680,6 +1681,17 @@ Future(() async {
   /// Set vuoto = nessuna classe condivisa (nessun sync).
   Future<Set<String>?> _sharedClassIdsForEndpoint(String? endpointId) async {
     final localCatechistId = AuthService.getCatechistId();
+
+    // Modalità Responsabile: sincronizza TUTTE le classi della parrocchia, così
+    // il dispositivo responsabile può vedere il calendario, le anagrafiche di
+    // ogni ragazzo e il registro assenze di tutta la parrocchia.
+    if (AppModeUtils.isResponsabileMode) {
+      addLog(
+        'DEBUG',
+        'Sync scope: modalità Responsabile, tutte le classi della parrocchia',
+      );
+      return null;
+    }
 
     String? remoteCatechistId;
     Set<String>? remoteShared;
@@ -5484,9 +5496,16 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
   // ─────────────────────────────────────────────────────────────────────────
   // HANDSHAKE ORDINATO: account → classe → verifica sync continuo
   // Protocollo richiesto:
-  //  1. Inviante (normale/responsabile) aggiunge catechista alla classe e invia
-  //     informazioni account (nome, cognome, id, telefono) al ricevente.
-  //  2. Ricevente configura account e invia conferma (p2p_account_config_ack).
+  //  1. Inviante (normale/responsabile) aggiunge catechista alla classe.
+  //     L'invio della configurazione account al ricevente è CONDIZIONALE:
+  //     - "Mio Dispositivo" → sempre (unificazione identità).
+  //     - "Altro Catechista"/"Responsabile" → solo se il mittente possiede un
+  //       profilo remoto esplicito da applicare (ricevente da configurare).
+  //     - Se il ricevente gestisce il proprio account in autonomia (nessun
+  //       profilo remoto fornito), il mittente SALTA la configurazione account.
+  //  2. (Se inviata) Ricevente configura account e invia conferma
+  //     (p2p_account_config_ack); in modalità autonoma si passa direttamente al
+  //     punto 3.
   //  3. Inviante invia informazioni classe (p2p_class_info), ricevente registra.
   //  4. Ricevente invia conferma registrazione (p2p_class_info_ack).
   //  5. Verifica sincronizzazione costante con scambio stato inizio/fine.
@@ -5522,42 +5541,85 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
       );
     }
 
-    _associationHandshakeStep[endpointId] = 'accountSent';
-    _updateState(
-      _state.copyWith(
-        isAssociationHandshakeActive: true,
-        associationHandshakeStep: 'accountSent',
-        continuousSyncVerified: false,
-      ),
-    );
-    await _sendAccountConfig(endpointId);
+    if (_shouldSendAccountConfig()) {
+      _associationHandshakeStep[endpointId] = 'accountSent';
+      _updateState(
+        _state.copyWith(
+          isAssociationHandshakeActive: true,
+          associationHandshakeStep: 'accountSent',
+          continuousSyncVerified: false,
+        ),
+      );
+      await _sendAccountConfig(endpointId);
 
-    // Watchdog: se la conferma account non arriva entro timeout, ritenta o
-    // fallisce. Se il catechistId del ricevente è però già noto (es. dal
-    // messaggio p2p_association_confirmed), l'handshake prosegue comunque
-    // invece di abortire l'intera sincronizzazione.
-    _handshakeTimeoutTimers[endpointId]?.cancel();
-    _handshakeTimeoutTimers[endpointId] = Timer(_accountAckTimeout, () {
-      final step = _associationHandshakeStep[endpointId];
-      if (step == 'accountSent') {
-        addLog('WARN', 'Timeout conferma account per $endpointId, ritento invio');
-        _sendAccountConfig(endpointId);
-        // Re-arm second timeout → errore O fallback
-        _handshakeTimeoutTimers[endpointId]?.cancel();
-        _handshakeTimeoutTimers[endpointId] = Timer(_accountAckTimeout, () {
-          if (_associationHandshakeStep[endpointId] != 'accountSent') return;
-          final knownReceiverId = _endpointRemoteCatechistId[endpointId] ?? '';
-          if (knownReceiverId.isNotEmpty) {
-            addLog('WARN', 'ACK account non ricevuto per $endpointId, ma il '
-                'catechistId del ricevente è noto: proseguo con l\'handshake');
-            _proceedToClassInfoAfterAccount(endpointId);
-          } else {
-            addLog('ERROR', 'Handshake ordinato fallito: nessuna conferma account');
-            _failOrderedHandshake(endpointId, 'Timeout conferma configurazione account');
-          }
-        });
-      }
-    });
+      // Watchdog: se la conferma account non arriva entro timeout, ritenta o
+      // fallisce. Se il catechistId del ricevente è però già noto (es. dal
+      // messaggio p2p_association_confirmed), l'handshake prosegue comunque
+      // invece di abortire l'intera sincronizzazione.
+      _handshakeTimeoutTimers[endpointId]?.cancel();
+      _handshakeTimeoutTimers[endpointId] = Timer(_accountAckTimeout, () {
+        final step = _associationHandshakeStep[endpointId];
+        if (step == 'accountSent') {
+          addLog('WARN', 'Timeout conferma account per $endpointId, ritento invio');
+          _sendAccountConfig(endpointId);
+          // Re-arm second timeout → errore O fallback
+          _handshakeTimeoutTimers[endpointId]?.cancel();
+          _handshakeTimeoutTimers[endpointId] = Timer(_accountAckTimeout, () {
+            if (_associationHandshakeStep[endpointId] != 'accountSent') return;
+            final knownReceiverId =
+                _endpointRemoteCatechistId[endpointId] ?? '';
+            if (knownReceiverId.isNotEmpty) {
+              addLog('WARN', 'ACK account non ricevuto per $endpointId, ma il '
+                  'catechistId del ricevente è noto: proseguo con l\'handshake');
+              _proceedToClassInfoAfterAccount(endpointId);
+            } else {
+              addLog('ERROR',
+                  'Handshake ordinato fallito: nessuna conferma account');
+              _failOrderedHandshake(endpointId,
+                  'Timeout conferma configurazione account');
+            }
+          });
+        }
+      });
+    } else {
+      // Modalità autonoma: il dispositivo remoto configura il proprio account
+      // in autonomia. Il mittente NON invia alcuna configurazione account, ma
+      // si limita ad aggiungere il catechista remoto alla classe condivisa e a
+      // procedere con la sincronizzazione dei dati.
+      addLog(
+        'INFO',
+        'Handshake ordinato: account remoto gestito in autonomia dal '
+        'dispositivo remoto, nessuna configurazione account inviata',
+      );
+      _associationHandshakeStep[endpointId] = 'accountSkipped';
+      _updateState(
+        _state.copyWith(
+          isAssociationHandshakeActive: true,
+          associationHandshakeStep: 'accountSkipped',
+          continuousSyncVerified: false,
+        ),
+      );
+      await _proceedToClassInfoAfterAccount(endpointId);
+    }
+  }
+
+  /// Indica se il mittente deve inviare una configurazione account al
+  /// ricevente durante l'handshake ordinato.
+  ///
+  /// - Modalità Responsabile: il dispositivo remoto si configura SEMPRE in
+  ///   autonomia; il mittente NON invia MAI configurazione account.
+  /// - "Mio Dispositivo": il ricevente adotta l'identità del mittente
+  ///   (unificazione della stessa persona) → invia sempre, anche col profilo
+  ///   locale quando non c'è un profilo remoto esplicito.
+  /// - "Altro Catechista": invia SOLO se il mittente possiede un profilo
+  ///   remoto esplicito da applicare (es. dispositivo ricevente da configurare).
+  ///   Se il ricevente gestisce il proprio account in autonomia (nessun profilo
+  ///   remoto fornito), il mittente NON invia alcuna configurazione account:
+  ///   il ricevente si configura da solo.
+  bool _shouldSendAccountConfig() {
+    if (AppModeUtils.isResponsabileMode) return false;
+    if (_state.role == P2PSyncRole.mioDispositivo) return true;
+    return _associationRemoteProfile.isNotEmpty;
   }
 
   Future<void> _sendAccountConfig(String endpointId) async {

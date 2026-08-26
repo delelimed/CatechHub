@@ -933,8 +933,16 @@ Future(() async {
         _isSyncing = false;
         _lastSyncStartTime = null;
       } else {
-        addLog('DEBUG', 'Modifica locale ignorata: sync in corso');
-        return;
+        // Una sync completa bidirezionale è in corso: NON scartiamo la
+        // modifica locale (altrimenti andrebbe persa per sempre, perché il
+        // relativo `updatedAt` resterebbe sotto `p2p_last_sync_timestamp`).
+        // L'invio incrementale è un percorso indipendente (non tocca
+        // `_isSyncing`/`_endpointSyncPhase`) e idempotente: è sicuro
+        // propagarlo anche in parallelo alla sync completa.
+        addLog(
+          'DEBUG',
+          'Modifica locale inviata in incrementale parallelo alla sync in corso',
+        );
       }
     }
 
@@ -2132,7 +2140,7 @@ Future(() async {
     }
   }
 
-  Future<String> _tryDecryptMessage(
+  Future<(String, bool)> _tryDecryptMessage(
     String endpointId,
     String rawMessage,
   ) async {
@@ -2160,7 +2168,7 @@ Future(() async {
                 'ERROR',
                 'Mittente non corrisponde: $senderId vs $expectedDeviceId',
               );
-              return rawMessage;
+              return (rawMessage, false);
             }
             if (senderPublicKey != null && expectedDeviceId != null) {
               final assoc = await _security.getAssociation(expectedDeviceId);
@@ -2173,26 +2181,55 @@ Future(() async {
                   'ERROR',
                   'Chiave pubblica mittente non corrisponde per $senderId',
                 );
-                return rawMessage;
+                return (rawMessage, false);
               }
             }
             final data = wrapper['data'] as String?;
-            if (data != null) return data;
+            if (data != null) return (data, true);
           }
-          return wrapper is String ? wrapper : decrypted;
+          return (wrapper is String ? wrapper : decrypted, true);
         } catch (_) {}
       }
     }
-    return rawMessage;
+    return (rawMessage, false);
   }
+
+  /// Tipi di messaggio ammessi in chiaro (solo bootstrap della sessione: non
+  /// trasportano PII né dati di sync). TUTTI gli altri devono viaggiare
+  /// cifrati con la session key: se arrivano in chiaro vengono scartati per
+  /// garantire che lo scambio sia perennemente cifrato.
+  static const Set<String> _plaintextAllowedTypes = {
+    'p2p_handshake',
+    'p2p_handshake_ack',
+    'p2p_ready_for_verification',
+    'p2p_pairing_rejected',
+    'p2p_association_ack',
+  };
 
   Future<void> _handleMessage(String endpointId, String rawMessage) async {
     try {
-      final message = await _tryDecryptMessage(endpointId, rawMessage);
+      final (message, encrypted) = await _tryDecryptMessage(
+        endpointId,
+        rawMessage,
+      );
       final decoded = jsonDecode(message);
       if (decoded is! Map<String, dynamic>) return;
 
       final type = decoded['type'] as String?;
+
+      // Policy "scambio perennemente cifrato": ogni messaggio che non sia un
+      // bootstrap in chiaro DEVE essere arrivato decifrato. Se il decrypt è
+      // fallito (key di sessione assente/non corrispondente) e il tipo non è
+      // tra quelli ammessi in chiaro, scartiamo il messaggio: non processiamo
+      // MAI dati o PII fuori dalla sessione cifrata.
+      if (!encrypted && type != null && !_plaintextAllowedTypes.contains(type)) {
+        addLog(
+          'SECURITY',
+          'Messaggio "$type" ricevuto in chiaro/illegibile da $endpointId '
+          'scartato (richiesta cifratura)',
+        );
+        return;
+      }
 
       addLog('DEBUG', 'Messaggio ricevuto: $type da $endpointId');
 
@@ -4385,7 +4422,10 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
             scopes: receiveScope,
             secretKey: secretKey,
           );
-          await engine.saveLastSyncTimestamp(DateTime.now().toUtc());
+          // Non avanziamo `p2p_last_sync_timestamp` alla ricezione: quel
+          // marcatempo copre sole le modifiche IN USCITA. Avanzarlo qui
+          // shadowerebbe le nostre modifiche locali non ancora inviate
+          // (vedi HiveSyncEngine.applyRemoteRecords).
           addLog(
             'DEBUG',
             'Dati incrementali applicati: ${filtered.length} record',

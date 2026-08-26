@@ -805,7 +805,15 @@ class HiveSyncEngine {
       } catch (_) {}
     }
 
-    await saveLastSyncTimestamp(DateTime.now().toUtc());
+    // NOTA: qui NON aggiorniamo `p2p_last_sync_timestamp`. Quel marcatempo è
+    // l'high-water-mark delle MODIFICHE IN USCITA (i nostri record che abbiamo
+    // già propagato agli altri peer). Se lo avanzassimo alla ricezione di dati
+    // remoti, le nostre eventuali modifiche locali non ancora inviate — con
+    // `updatedAt` precedente a questo istante — verrebbero marchiate come "già
+    // sincronizzate" e NON verrebbero MAI più inviate (neanche dopo un riavvio).
+    // L'avanzamento di `lastSync` è responsabilità esclusiva di chi EFFETTIVA-
+    // MENTE invia le nostre modifiche (P2PSyncService._onLocalDataChanged e al
+    // termine di una sync completa bidirezionale).
 
     return SyncResult(
       success: true,

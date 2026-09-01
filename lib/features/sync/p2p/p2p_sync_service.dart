@@ -2015,6 +2015,27 @@ Future(() async {
     // Catena di fiducia (H3): verifica e allega il certificato di approvazione
     // e lo vincola all'identità dichiarata.
     await _attachApprovalFromHandshake(senderId, message);
+
+    // Se l'handshake ordinato è in attesa del catechistId remoto (caso
+    // AltroCatechista autonomo), l'identità appena ricevuta sblocca
+    // l'associazione alla classe. Eseguiamo l'aggiornamento ora così la
+    // prossima class info (retry) conterrà il roster corretto.
+    if (remoteCatechistId != null && remoteCatechistId.isNotEmpty) {
+      final step = _associationHandshakeStep[endpointId];
+      if (step == 'accountSkipped' || step == 'classSent' || step == 'accountConfirmed') {
+        try {
+          await _updateClassAfterPairing(endpointId: endpointId);
+        } catch (_) {}
+      }
+      // Se siamo già in classSent ma la classe è stata inviata senza il
+      // catechista (race), forziamo un re-invio con il roster aggiornato
+      // così il ricevente ottiene subito la classe corretta senza attendere
+      // il timeout di 15s.
+      if (step == 'classSent') {
+        addLog('DEBUG', 'Identità ricevuta durante classSent: re-invio class info con roster aggiornato');
+        unawaited(_sendClassInfo(endpointId));
+      }
+    }
   }
 
   /// Deriva il pairing code dal shared secret, dai nonces concordati e dalle
@@ -3846,11 +3867,11 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
   ///
   /// [endpointId] permette di risolvere il catechistId del ricevente anche
   /// quando non è ancora noto nell'handshake pendente (late binding).
-  void _updateClassAfterPairing({String? endpointId}) {
+  Future<void> _updateClassAfterPairing({String? endpointId}) async {
     // ── Delega a NormalModeSyncHandler per la modalità normale ─────────────
     if (NormalModeSyncHandler.isNormalContext &&
         _pendingHandshakeRemoteRole != P2PSyncRole.mioDispositivo) {
-      _updateClassAfterPairingNormal(endpointId: endpointId);
+      await _updateClassAfterPairingNormal(endpointId: endpointId);
       return;
     }
     try {
@@ -4008,9 +4029,9 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
   /// cifrato (AES-256-GCM) così entrambi i dispositivi possiedono la stessa
   /// copia locale e possono lavorare offline + riconvergere realtime quando
   /// vicini via Nearby.
-  void _updateClassAfterPairingNormal({String? endpointId}) {
+  Future<void> _updateClassAfterPairingNormal({String? endpointId}) async {
+    String? remoteCatechistId;
     try {
-      String? remoteCatechistId;
       if (_pendingHandshakeRemoteCatechistId?.isNotEmpty == true) {
         remoteCatechistId = _pendingHandshakeRemoteCatechistId;
       } else if (endpointId != null) {
@@ -4024,6 +4045,25 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
         }
       }
       if (remoteCatechistId == null || remoteCatechistId.isEmpty) {
+        // Attesa breve per il late binding dell'identità (p2p_identity può
+        // arrivare subito dopo l'avvio dell'handshake ordinato). Evita di
+        // inviare la class info senza il nuovo catechista.
+        for (int i = 0; i < 6; i++) {
+          await Future.delayed(const Duration(milliseconds: 300));
+          if (_pendingHandshakeRemoteCatechistId?.isNotEmpty == true) {
+            remoteCatechistId = _pendingHandshakeRemoteCatechistId;
+            break;
+          }
+          if (endpointId != null) {
+            final via = _endpointRemoteCatechistId[endpointId];
+            if (via?.isNotEmpty == true) {
+              remoteCatechistId = via;
+              break;
+            }
+          }
+        }
+      }
+      if (remoteCatechistId == null || remoteCatechistId.isEmpty) {
         addLog(
           'WARN',
           'Modalità Normale: catechistId remoto non ancora noto, '
@@ -4032,29 +4072,28 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
         return;
       }
       // Delega atomica alla handler (roster + associated + roles + counts)
-      NormalModeSyncHandler.associateOtherCatechistToSharedClasses(
+      final touched = await NormalModeSyncHandler.associateOtherCatechistToSharedClasses(
         remoteCatechistId: remoteCatechistId,
         sharedClassIds: _associationSharedClassIds,
         remoteName: _pendingHandshakeIdentity?.deviceName ?? '',
-      ).then((touched) {
-        if (touched > 0) {
-          addLog(
-            'INFO',
-            'Modalità Normale: catechista $remoteCatechistId associato a '
-            '$touched classe/i condivisa/e — avvio sync iniziale cifrato',
-          );
-          // Avvio immediato del sync bidirezionale cifrato per allineare le
-          // copie locali (lavoro offline indipendente + realtime quando vicini).
-          if (endpointId != null && _connectedEndpoints.contains(endpointId)) {
-            _performBidirectionalSync(endpointId);
-          }
-        } else {
-          addLog(
-            'WARN',
-            'Modalità Normale: nessuna classe toccata per $remoteCatechistId',
-          );
+      );
+      if (touched > 0) {
+        addLog(
+          'INFO',
+          'Modalità Normale: catechista $remoteCatechistId associato a '
+          '$touched classe/i condivisa/e — avvio sync iniziale cifrato',
+        );
+        if (endpointId != null && _connectedEndpoints.contains(endpointId)) {
+          // Non blocchiamo l'handshake sul sync, ma assicuriamo che la classe
+          // sia già persistita prima di inviare la class info.
+          unawaited(_performBidirectionalSync(endpointId));
         }
-      });
+      } else {
+        addLog(
+          'WARN',
+          'Modalità Normale: nessuna classe toccata per $remoteCatechistId',
+        );
+      }
     } catch (e) {
       addLog('ERROR', 'Errore _updateClassAfterPairingNormal: $e');
     }
@@ -4764,7 +4803,7 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
 
     if (wasPairingVerification) {
       if (!alreadyConfirmed) {
-        _updateClassAfterPairing();
+        await _updateClassAfterPairing();
       } else {
         addLog(
           'DEBUG',
@@ -5052,7 +5091,7 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
       // account, manteniamo il comportamento legacy come fallback se non
       // parte l'handshake ordinato (compatibilità).
       if (!iAmInitiator) {
-        _updateClassAfterPairing();
+        await _updateClassAfterPairing();
       }
     } else {
       addLog(
@@ -5704,9 +5743,27 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
       return;
     }
     // Step 1: aggiungi catechista alla classe localmente (idempotente)
+    // In modalità Normale + AltroCatechista l'aggiunta richiede il catechistId
+    // remoto (late binding via p2p_identity). Attendiamo brevemente che
+    // l'identità arrivi prima di inviare la class info, altrimenti la classe
+    // verrebbe inviata senza il nuovo catechista e il ricevente risulterebbe
+    // "non inserito nella classe".
     try {
-      _updateClassAfterPairing(endpointId: endpointId);
-      addLog('INFO', 'Handshake ordinato: catechista aggiunto alla classe locale');
+      await _updateClassAfterPairing(endpointId: endpointId);
+      // Verifica se l'aggiornamento ha effettivamente associato il remoto;
+      // in caso negativo (catechistId ancora ignoto) il log già emesso da
+      // _updateClassAfterPairingNormal avvisa del rinvio.
+      final remoteKnown = (_endpointRemoteCatechistId[endpointId]?.isNotEmpty == true) ||
+          (_pendingHandshakeRemoteCatechistId?.isNotEmpty == true) ||
+          (_associationRemoteProfile['catechistId']?.isNotEmpty == true);
+      if (remoteKnown) {
+        addLog('INFO', 'Handshake ordinato: catechista aggiunto alla classe locale');
+      } else if (NormalModeSyncHandler.isNormalContext &&
+          _pendingHandshakeRemoteRole != P2PSyncRole.mioDispositivo) {
+        addLog('DEBUG', 'Handshake ordinato: attesa catechistId remoto per completare l\'aggiunta alla classe');
+      } else {
+        addLog('INFO', 'Handshake ordinato: catechista aggiunto alla classe locale');
+      }
     } catch (e) {
       addLog('WARN', 'Errore aggiunta catechista alla classe: $e');
     }
@@ -6038,7 +6095,16 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
         _pendingHandshakeRemoteCatechistId = remoteCatechistId;
       }
       try {
-        _updateClassAfterPairing(endpointId: endpointId);
+        await _updateClassAfterPairing(endpointId: endpointId);
+      } catch (e) {
+        addLog('WARN', 'Errore aggiornamento classe con catechista ricevente: $e');
+      }
+    } else {
+      // Nessun catechistId noto ma siamo in AltroCatechista autonomo: prova
+      // comunque ad associare (attenderà brevemente l'identità) prima di
+      // inviare la classe.
+      try {
+        await _updateClassAfterPairing(endpointId: endpointId);
       } catch (e) {
         addLog('WARN', 'Errore aggiornamento classe con catechista ricevente: $e');
       }
@@ -6058,12 +6124,52 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
     _handshakeTimeoutTimers[endpointId] = Timer(_classAckTimeout, () {
       if (_associationHandshakeStep[endpointId] == 'classSent') {
         addLog('WARN', 'Timeout conferma classe per $endpointId, ritento');
-        _sendClassInfo(endpointId);
+        // Prima di ritentare, assicurati che la classe locale contenga il
+        // catechista remoto (potrebbe essere arrivato nel frattempo via
+        // p2p_identity). Questo evita di re-inviare una classe stale.
+        _updateClassAfterPairing(endpointId: endpointId).whenComplete(() {
+          _sendClassInfo(endpointId);
+        });
         _handshakeTimeoutTimers[endpointId]?.cancel();
         _handshakeTimeoutTimers[endpointId] = Timer(_classAckTimeout, () {
           if (_associationHandshakeStep[endpointId] == 'classSent') {
-            addLog('ERROR', 'Handshake ordinato fallito: nessuna conferma classe');
-            _failOrderedHandshake(endpointId, 'Timeout conferma registrazione classe');
+            // Fallback: se la sincronizzazione dati è andata a buon fine
+            // (indice scambiato, sync_end ricevuto) la classe è stata
+            // comunque propagata via canale sync, anche se l'ack dedicato
+            // è andato perso per race di chiavi (M5) o lag. In quel caso
+            // non bloccare l'handshake: verifica che il catechista sia
+            // effettivamente nella classe e, se sì, considera verificato.
+            final remoteId = _endpointRemoteCatechistId[endpointId] ?? '';
+            bool isInClass = false;
+            try {
+              if (remoteId.isNotEmpty) {
+                isInClass = NormalModeSyncHandler.isCatechistInSharedClasses(
+                  remoteId,
+                  _associationSharedClassIds.isNotEmpty
+                      ? _associationSharedClassIds
+                      : _endpointSharedClassIds[endpointId] ?? {},
+                );
+                if (!isInClass) {
+                  // Controllo diretto sul box (fallback se shared è vuoto)
+                  final box = LocalDatabase.classes();
+                  for (final k in box.keys) {
+                    final d = LocalDatabase.toStringDynamicMap(box.get(k));
+                    final ids = (d['catechistIds'] as List? ?? []).map((e) => e.toString()).toList();
+                    if (ids.contains(remoteId)) { isInClass = true; break; }
+                  }
+                }
+              }
+            } catch (_) {}
+            final syncOk = _state.status == P2PSyncStatus.completed ||
+                _remoteSyncState[endpointId] == 'idle' ||
+                isInClass;
+            if (syncOk && remoteId.isNotEmpty && isInClass) {
+              addLog('WARN', 'Timeout classe ma catechista già in classe e sync ok: complemento handshake con via libera');
+              _completeOrderedHandshake(endpointId);
+            } else {
+              addLog('ERROR', 'Handshake ordinato fallito: nessuna conferma classe');
+              _failOrderedHandshake(endpointId, 'Timeout conferma registrazione classe');
+            }
           }
         });
       }

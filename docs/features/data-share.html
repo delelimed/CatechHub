@@ -69,14 +69,14 @@
     <h3>4. Il destinatario importa</h3>
     <p>Il collega scansiona il QR, inserisce il PIN che gli hai comunicato a voce, e i dati vengono importati nel suo CatechHub. L'app gestisce automaticamente eventuali conflitti con i dati esistenti.</p>
 
-    <h2>Sicurezza</h2>
+    <h2>Sicurezza — verificata nel codice</h2>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
-      <li><strong>Crittografia end-to-end:</strong> AES-256-GCM con derivazione chiave PBKDF2-HMAC-SHA256 (350.000 iterazioni per i nuovi pacchetti; 60.000 "fast share" accettate solo in lettura per compatibilità)</li>
-      <li><strong>Protezione PIN a 12 cifre:</strong> PIN generato via Random.secure(), valido 3 minuti</li>
-      <li><strong>Chunking automatico:</strong> payload diviso in chunk JSON da max 1200 byte, ognuno con checksum SHA-256</li>
-      <li><strong>Sync differenziale:</strong> trasferisce solo i record nuovi/modificati (confronto indice per modulo)</li>
-      <li><strong>Niente internet:</strong> il trasferimento avviene solo tramite fotocamera, offline</li>
-      <li><strong>Scegli cosa condividere:</strong> decidi tu esattamente quali dati inviare</li>
+      <li><strong>AES-256-GCM + PBKDF2-HMAC-SHA256:</strong> 350k nuovi / 60k legacy read (<code>EncryptionService:22</code>), AAD <code>CatechHub_Context_QRShare_v1</code>, meta <code>createdAt/expiresAt</code> verificata (3 min, <code>QRDataService.extractPackageData:263</code>), rifiuto v1 legacy</li>
+      <li><strong>PIN 12 cifre:</strong> <code>Random.secure</code> (<code>QRDataService.generatePin:131</code>), pre-refill del PIN di sessione nella fase verifica (<code>DataShareReceivePage:207</code>), rate-limit all'import (5 errati → blocco 1 min)</li>
+      <li><strong>Chunking + integrità:</strong> Base64 JSON → 1200B chunk (<code>maxQRSize</code>) con <code>verifyChunkChecksum</code> (4 hex) + packet checksum 12 hex; segment/assemble con ordinamento e verifica</li>
+      <li><strong>Indice cifrato + differenziale:</strong> <code>buildDatabaseIndex</code> (solo <code>id+updatedAt</code>, no checksum in chiaro) → <code>encryptIndexToChunks</code> con PIN sessione (anti-metadata exposure) → <code>computeDiffExport</code> invia solo nuovi/più recenti (idem demo-PII esclusa)</li>
+      <li><strong>Minimizzazione:</strong> <code>DataShareOptions.classUniqueCode</code> limita a classe corrente se scelto; <code>prepareDataForShare</code> filtra per modulo (anagrafica/agenda/programmazione/documenti/note/catechesi/annotazioni)</li>
+      <li><strong>Offline + campo:</strong> PII decifrata solo sull’egresso P2P già cifrato (<code>FieldEncryptionService:154</code>), recifrata all’ingresso; niente internet</li>
     </ul>
 
   </div>

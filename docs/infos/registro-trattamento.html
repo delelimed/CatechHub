@@ -126,7 +126,7 @@
           <td>Tutti i dati presenti nel database al momento del backup</td>
           <td>Tutti gli interessati (minori, genitori)</td>
           <td>Fino alla cancellazione del file da parte dell'utente</td>
-          <td>PBKDF2-HMAC-SHA256 + AES-256-GCM: 350k iterazioni con anti-brute-force (5 tentativi / 30 min) per l'export conformità GDPR; 210k per i backup generali; PIN min 12 alfanumerici</td>
+          <td>PBKDF2-HMAC-SHA256 + AES-256-GCM: <strong>350k</strong> per tutti i nuovi backup <code>.catechhub</code> e per l'export conformità GDPR (anti-brute-force per-file 5 tentativi → 30 min, <code>BackupEncryptionService:49</code>); 210k/60k legacy solo in lettura; PIN min 12 alfanumerici (≥1 lettera+≥1 cifra)</td>
           <td>Obbligo di sicurezza (Art. 32 GDPR) — adempimento</td>
         </tr>
         <tr>
@@ -144,7 +144,7 @@
           <td>Box sincronizzabili: classi, studenti, presenze, documenti, delivery, allegati, note contatto, pianificazione</td>
           <td>Minori, genitori (dati condivisi tra catechisti autorizzati)</td>
           <td>N/A (dati sincronizzati, non conservati centralmente)</td>
-          <td>X25519 TripleDH + HKDF-SHA256 + AES-256-GCM per sessione, rotazione chiavi ogni 30 min, chiavi per dispositivo, canale classe cifrato per-classe, canale parrocchiale in chiaro (nessun dato personale), pairing code SHA-256 a 6 cifre anti-MitM, key pinning sulle riconnessioni, forward secrecy, certificati di approvazione Ed25519 (30 gg), trusted devices list, timeout sessione 30min</td>
+          <td>X25519 TripleDH (4 DH ordinati + HKDF <code>ForwardSecret_v1</code>) + HKDF <code>P2P_Session_v3</code> + AES-256-GCM con AAD <code>Context_P2P_v1</code> e rotazione finestra 30 min (keep corrente+precedente), heartbeat 30s, periodic 60s, watch 500 ms → realtime quando vicini; chiavi effimere per-sessione MAI persistite (forward secrecy), chiavi per-associazione, canale classe AES per-classe con AAD <code>ClassChannel_v1</code>, canale parrocchiale in chiaro (nessun dato personale), SAS 6 cifre su sharedSecret+nonce+efimere ordinate, pinning, modalità normale via <code>NormalModeSyncHandler</code> (Mio Dispositivo = <code>catechistId</code> + tutte le classi; Altro = solo condivise), certificati Ed25519 30 gg in Responsabile, timeout sessione 30 min</td>
           <td>Consenso interessati + autorizzazione parrocchia (Art. 6.1.a + 6.1.e)</td>
         </tr>
         <tr>
@@ -222,7 +222,7 @@
       <thead><tr><th>Categoria</th><th>Misure implementate</th></tr></thead>
       <tbody>
         <tr><td>Controllo accessi</td><td>Biometria / PIN, sessione in RAM, timeout 120s background</td></tr>
-        <tr><td>Crittografia</td><td>AES-256-GCM (a riposo, sync e field encryption), PBKDF2-HMAC-SHA256 (350k per nuovi QR ed export GDPR; 210k per backup generali; 60k legacy QR), X25519 TripleDH, HKDF-SHA256, Ed25519 (approvazioni e tombstone), pairing code anti-MitM</td></tr>
+        <tr><td>Crittografia</td><td>AES-256-GCM su 27 box + field (<code>cieI1:</code>) + sync (AAD), PBKDF2 350k nuovi / 210k-60k legacy read, TripleDH X25519 + HKDF (forward secrecy, rotazione 30 min, heartbeat 30s, SAS 6 cifre, pinning), Ed25519 per approvazioni/tombstone (solo Responsabile), <code>NormalModeSyncHandler</code> per normale</td></tr>
         <tr><td>Integrità</td><td>Tag GCM 128bit, checksum SHA-256 su backup e QR, message ID SHA-256, audit log HMAC-SHA256, tombstone firmati</td></tr>
         <tr><td>Disponibilità</td><td>Auto-recovery corruzione Hive (2 livelli), retry apertura box, snapshot immutabili archivio</td></tr>
         <tr><td>Riservatezza</td><td>FLAG_SECURE, AndroidKeyStore, freeRASP anti-tamper, canale classe cifrato per-classe</td></tr>

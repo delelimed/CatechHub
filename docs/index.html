@@ -146,7 +146,7 @@
         <tr><td><strong>Schermo</strong></td><td>Blocco screenshot e screen recording non autorizzati</td></tr>
         <tr><td><strong>Protezione runtime</strong></td><td>freeRASP: rilevamento root, emulatori, hooking, tampering</td></tr>
         <tr><td><strong>Sessione in background</strong></td><td>Blocco automatico dopo 2 minuti in background e 5 minuti di inattività in foreground</td></tr>
-        <tr><td><strong>Backup</strong></td><td>Protetto da password con PBKDF2 (210.000 iterazioni, PIN min 12 alfanumerici) + AES-256-GCM; l'export conformità GDPR usa 350.000 iterazioni con anti-brute-force (5 tentativi / 30 min)</td></tr>
+        <tr><td><strong>Backup</strong></td><td>Nuovi file <code>.catechhub</code> + export GDPR: PBKDF2 350.000 iterazioni, PIN 12 alfanumerici (≥1 lettera+≥1 cifra), AAD <code>Context_Backup_v1</code>, anti-brute-force per-file (5→30 min); 210k/60k legacy solo in lettura</td></tr>
         <tr><td><strong>GDPR</strong></td><td>Registro Trattamenti firmato HMAC-SHA256, consensi con scadenza ed evidenza del firmatario, retention automatica, tombstone firmati (HMAC + Ed25519) anti-resurrezione per la cancellazione</td></tr>
       </tbody>
     </table>

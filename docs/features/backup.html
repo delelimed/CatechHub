@@ -66,7 +66,7 @@
     <h2>Sicurezza</h2>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
       <li><strong>Crittografia AES-256-GCM:</strong> il file di backup è cifrato con lo standard militare</li>
-      <li><strong>Derivazione chiave PBKDF2-HMAC-SHA256:</strong> 210.000 iterazioni per i backup generali (60000/210000/350000 accettate in lettura a seconda del contesto del file)</li>
+      <li><strong>PBKDF2-HMAC-SHA256:</strong> <strong>350.000</strong> iterazioni per tutti i nuovi backup <code>.catechhub</code> (<code>BackupEncryptionService._iterations:32</code>, AAD <code>CatechHub_Context_Backup_v1</code>), 210k/60k legacy solo in lettura; PIN 12 alfanumerici (≥1 lettera+≥1 cifra) con verifica in <code>showBackupPinDialog</code></li>
       <li><strong>Autenticazione biometrica:</strong> serve l'impronta o il volto per avviare export e import</li>
       <li><strong>PIN obbligatorio (min 12 caratteri alfanumerici):</strong> senza il PIN giusto, il backup è illeggibile</li>
       <li><strong>Verifica integrità:</strong> prima di importare, l'app controlla che il file non sia corrotto o manomesso</li>

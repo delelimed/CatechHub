@@ -16,6 +16,7 @@ import '../../gdpr/tombstone_repository.dart';
 import '../../gdpr/tombstone_service.dart';
 import '../class_channel_service.dart';
 import '../data/association_models.dart';
+import '../normal/normal_mode_sync_handler.dart';
 import '../parish_channel_service.dart';
 import 'p2p_security_service.dart';
 import 'hive_sync_engine.dart';
@@ -3516,12 +3517,35 @@ Future(() async {
   /// `catechistId` del primario: diventa "come fosse il primario" (pieni
   /// diritti, sincronizzazione di tutte le classi) e NON incrementa il numero
   /// di catechisti della classe.
+  /// ─── MODALITÀ NORMALE: reingegnerizzata ──────────────────────────────────
+  /// In modalità normale il catechistId DEVE essere condiviso per "Mio
+  /// Dispositivo" (stessa persona → stessa identità, sync di TUTTE le classi).
+  /// La cifratura è sempre end-to-end (X25519 + AES-256-GCM + HKDF, forward
+  /// secrecy con efimere) — standard militare per dati particolari di minori.
   Future<void> _maybeAdoptRemoteCatechistId(String? remoteCatechistId) async {
     if (remoteCatechistId == null || remoteCatechistId.isEmpty) return;
+    // Delega alla handler di modalità normale quando NON siamo in responsabile.
+    // In modalità normale la condivisione catechistId è OBBLIGATORIA per
+    // "Mio Dispositivo" (contratto §1): il ricevente fresco adotta l'id del
+    // primario così che entrambi i device convergano sulla stessa identità.
+    if (NormalModeSyncHandler.isNormalContext) {
+      final adopted = await NormalModeSyncHandler.shareCatechistIdForMyDevice(
+        remoteCatechistId: remoteCatechistId,
+        localRole: _state.role,
+        remoteRole: _pendingHandshakeRemoteRole,
+      );
+      if (adopted) {
+        addLog(
+          'INFO',
+          'Modalità Normale: catechistId "$remoteCatechistId" adottato '
+          '(Mio Dispositivo — condivisione identità)',
+        );
+      }
+      return;
+    }
+
+    // — fallback: modalità Responsabile (invariata) —
     if (_state.role != P2PSyncRole.mioDispositivo) return;
-    // Adozione consentita solo se ANCHE il remoto è un "Mio Dispositivo":
-    // due dispositivi della stessa persona. Se il remoto è un altro
-    // catechista, l'identità resta separata.
     if (_pendingHandshakeRemoteRole != null &&
         _pendingHandshakeRemoteRole != P2PSyncRole.mioDispositivo) {
       return;
@@ -3809,9 +3833,26 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
     } catch (_) {}
   }
 
+  /// ─── MODALITÀ NORMALE: associazione classe per "Altro Catechista" ───────
+  /// Reingegnerizzata: in modalità normale l'associazione di un altro
+  /// catechista alla classe DEVE avvenire atomicamente e prima del primo sync,
+  /// così entrambi i catechisti possiedono la stessa copia locale della classe
+  /// e possono lavorare offline + riconvergere realtime quando vicini
+  /// (Nearby, Strategy.P2P_CLUSTER, solo P2P Bluetooth/WiFi Direct). Tutto il
+  /// payload è sempre AES-256-GCM con chiave ECDH X25519 + forward secrecy.
+  ///
+  /// In modalità Responsabile questo metodo resta NOP (delega alla handler
+  /// solo per normale; responsabile usa la catena di fiducia).
+  ///
   /// [endpointId] permette di risolvere il catechistId del ricevente anche
   /// quando non è ancora noto nell'handshake pendente (late binding).
   void _updateClassAfterPairing({String? endpointId}) {
+    // ── Delega a NormalModeSyncHandler per la modalità normale ─────────────
+    if (NormalModeSyncHandler.isNormalContext &&
+        _pendingHandshakeRemoteRole != P2PSyncRole.mioDispositivo) {
+      _updateClassAfterPairingNormal(endpointId: endpointId);
+      return;
+    }
     try {
       final box = LocalDatabase.classes();
       const localId = AuthService.localUserId;
@@ -3957,6 +3998,65 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
       }
     } catch (e) {
       addLog('ERROR', 'Errore aggiornamento classe dopo pairing: $e');
+    }
+  }
+
+  /// Implementazione dedicata alla modalità normale per l'associazione di un
+  /// altro catechista alla(e) classe(i) condivisa(e). Estrae il catechistId
+  /// remoto con late binding e delega l'atomica a NormalModeSyncHandler.
+  /// Dopo l'associazione avvia IMMEDIATAMENTE il primo sync bidirezionale
+  /// cifrato (AES-256-GCM) così entrambi i dispositivi possiedono la stessa
+  /// copia locale e possono lavorare offline + riconvergere realtime quando
+  /// vicini via Nearby.
+  void _updateClassAfterPairingNormal({String? endpointId}) {
+    try {
+      String? remoteCatechistId;
+      if (_pendingHandshakeRemoteCatechistId?.isNotEmpty == true) {
+        remoteCatechistId = _pendingHandshakeRemoteCatechistId;
+      } else if (endpointId != null) {
+        final viaEndpoint = _endpointRemoteCatechistId[endpointId];
+        if (viaEndpoint?.isNotEmpty == true) remoteCatechistId = viaEndpoint;
+      }
+      if (remoteCatechistId == null || remoteCatechistId.isEmpty) {
+        final fromProfile = _associationRemoteProfile['catechistId'];
+        if (fromProfile is String && fromProfile.isNotEmpty) {
+          remoteCatechistId = fromProfile;
+        }
+      }
+      if (remoteCatechistId == null || remoteCatechistId.isEmpty) {
+        addLog(
+          'WARN',
+          'Modalità Normale: catechistId remoto non ancora noto, '
+          'associazione alla classe rinviata',
+        );
+        return;
+      }
+      // Delega atomica alla handler (roster + associated + roles + counts)
+      NormalModeSyncHandler.associateOtherCatechistToSharedClasses(
+        remoteCatechistId: remoteCatechistId,
+        sharedClassIds: _associationSharedClassIds,
+        remoteName: _pendingHandshakeIdentity?.deviceName ?? '',
+      ).then((touched) {
+        if (touched > 0) {
+          addLog(
+            'INFO',
+            'Modalità Normale: catechista $remoteCatechistId associato a '
+            '$touched classe/i condivisa/e — avvio sync iniziale cifrato',
+          );
+          // Avvio immediato del sync bidirezionale cifrato per allineare le
+          // copie locali (lavoro offline indipendente + realtime quando vicini).
+          if (endpointId != null && _connectedEndpoints.contains(endpointId)) {
+            _performBidirectionalSync(endpointId);
+          }
+        } else {
+          addLog(
+            'WARN',
+            'Modalità Normale: nessuna classe toccata per $remoteCatechistId',
+          );
+        }
+      });
+    } catch (e) {
+      addLog('ERROR', 'Errore _updateClassAfterPairingNormal: $e');
     }
   }
 

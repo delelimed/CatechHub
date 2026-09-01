@@ -46,7 +46,7 @@
     <table class="sec-table">
       <thead><tr><th>Bene</th><th>Tipo</th><th>Classificazione</th><th>Supporto</th></tr></thead>
       <tbody>
-        <tr><td>Database Hive (29 box)</td><td>Dati strutturati</td><td>Critico / Riservato</td><td>Filesystem interno (cifrato AES-256-GCM, recovery per-box)</td></tr>
+        <tr><td>Database Hive (27 box, <code>LocalDatabase:191</code>)</td><td>Dati strutturati</td><td>Critico / Riservato</td><td>Filesystem interno (cifrato AES-256-GCM con chiave master TEE/StrongBox, recovery atomica per-box via <code>deleteBoxFromDisk</code>)</td></tr>
         <tr><td>Allegati (PDF, immagini)</td><td>Dati binari</td><td>Riservato</td><td>Filesystem interno (cifrato AES-256-GCM)</td></tr>
         <tr><td>Chiavi crittografiche</td><td>Materiale crittografico</td><td>Critico</td><td>AndroidKeyStore (hardware-backed)</td></tr>
         <tr><td>Dispositivo Android</td><td>Hardware</td><td>Critico</td><td>Protezione fisica + FLAG_SECURE</td></tr>
@@ -80,7 +80,7 @@
         <tr><td>RGS A2 — Intégrité</td><td>Tag GCM 128bit su tutti i dati. Checksum SHA-256 su backup.</td><td>&#9989; Conforme</td></tr>
         <tr><td>RGS A3 — Confidentialité</td><td>AES-256-GCM a riposo e in transito. X25519 TripleDH + HKDF + AES-256-GCM per sync P2P, rotazione chiavi ogni 30 min. Cifratura di campo per i dati sensibili.</td><td>&#9989; Conforme</td></tr>
         <tr><td>RGS A4 — Traçabilité</td><td>Registro Trattamenti in modalità Responsabile: audit log append-only firmato HMAC-SHA256 di ogni operazione rilevante, con verifica d'integrità in tempo reale. Campi createdAt/updatedAt/lastModifiedBy su tutti i record.</td><td>&#9989; Conforme</td></tr>
-        <tr><td>ANSSI — Chiffrement fort</td><td>AES-256-GCM, PBKDF2-HMAC-SHA256 (350k per nuovi QR ed export GDPR; 210k per backup generali; 60k legacy QR), X25519 TripleDH, HKDF-SHA256, Ed25519 (approvazioni e tombstone), pairing code anti-MitM.</td><td>&#9989; Conforme</td></tr>
+        <tr><td>ANSSI — Chiffrement fort</td><td>AES-256-GCM su 27 box + field (<code>cieI1:</code>), PBKDF2 350k nuovi / 210k-60k legacy read, X25519 TripleDH (4 DH ordinati + HKDF, forward secrecy, rotazione 30 min, heartbeat 30s, SAS 6 cifre, pinning, AAD), Ed25519 (solo Responsabile), <code>NormalModeSyncHandler</code> per normale.</td><td>&#9989; Conforme</td></tr>
         <tr><td>ANSSI — Gestion des clés</td><td>AndroidKeyStore (isolamento hardware). Chiavi mai esposte al livello Dart. Chiavi di sessione effimere mai persistite.</td><td>&#9989; Conforme</td></tr>
         <tr><td>ANSSI — Sécurité runtime</td><td>freeRASP: anti-root, anti-hooking, anti-emulator, app integrity. SecurityBlockScreen non bypassabile.</td><td>&#9989; Conforme</td></tr>
         <tr><td>ANSSI — Chiffrement de sessions</td><td>Session key derivata con HKDF per ogni coppia di dispositivi, rotazione ogni 30 minuti (forward secrecy).</td><td>&#9989; Conforme</td></tr>

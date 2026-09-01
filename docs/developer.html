@@ -60,11 +60,11 @@
         <tr><td>Linguaggio</td><td>Dart</td></tr>
         <tr><td>Framework</td><td>Flutter</td></tr>
         <tr><td>State management</td><td>Riverpod</td></tr>
-        <tr><td>Database locale</td><td>Hive con crittografia AES</td></tr>
-        <tr><td>Crittografia</td><td>cryptography (puro Dart)</td></tr>
-        <tr><td>Autenticazione</td><td>BiometricPrompt (Android)</td></tr>
-        <tr><td>Runtime security</td><td>freeRASP (Talsec)</td></tr>
-        <tr><td>Sincronizzazione</td><td>Google Nearby Connections (Bluetooth / WiFi Direct)</td></tr>
+        <tr><td>Database locale</td><td>27 box Hive cifrati <code>HiveAesCipher</code> (chiave master TEE/StrongBox, recovery atomica per-box via <code>LocalDatabase:294</code>)</td></tr>
+        <tr><td>Crittografia</td><td><code>cryptography</code> (puro Dart): AES-256-GCM (AAD per contesto), X25519 TripleDH (4 DH + HKDF, forward secrecy, rotazione 30 min, SAS 6 cifre, pinning), Ed25519, PBKDF2-HMAC-SHA256 350k nuovi / 210k-60k legacy read, HKDF-SHA256, HMAC-SHA256, FieldEncryption <code>cieI1:</code></td></tr>
+        <tr><td>Autenticazione</td><td>BiometricPrompt Android (<code>local_auth</code>, <code>biometricOnly:false</code> → fallback PIN/Pattern) + sessione solo RAM (blocco 120s background + 5 min foreground idle, <code>SessionLifecycleObserver</code>) + FLAG_SECURE</td></tr>
+        <tr><td>Runtime security</td><td>freeRASP (Talsec) v8 — 8 categorie (root, emulator, integrity, hooking/Frida/Xposed, Play Integrity, ADB, debugger, developer options), <code>SecurityBlockScreen</code></td></tr>
+        <tr><td>Sincronizzazione</td><td>Google Nearby Connections <code>P2P_CLUSTER</code> (solo BT/WiFi Direct, mai internet) — <code>P2PSyncService</code> 17 stati + <code>NormalModeSyncHandler</code> (Mio Dispositivo con <code>catechistId</code> + Altro Catechista con associazione atomica) + canali classe/parrocchiale + QR chunk 1200B</td></tr>
         <tr><td>Multigruppo</td><td>Class switcher, "I miei gruppi", copia contenuti tra classi</td></tr>
         <tr><td>QR code</td><td>mobile_scanner, qr_flutter</td></tr>
         <tr><td>PDF</td><td>pdf, printing</td></tr>

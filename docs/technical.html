@@ -38,10 +38,11 @@
       <h3>Indice</h3>
       <ul>
         <li><a href="#bootstrap">Architettura del bootstrap</a></li>
-        <li><a href="#hive">Hive Database Layer</a></li>
-        <li><a href="#encryption">EncryptionService</a></li>
-        <li><a href="#sync">Sync Engine (P2P Sync)</a></li>
-        <li><a href="#security">Security architecture</a></li>
+        <li><a href="#hive">Hive Database Layer (27 box)</a></li>
+        <li><a href="#encryption">EncryptionService (350k PBKDF2)</a></li>
+        <li><a href="#sync">Sync Engine — P2P + NormalModeSyncHandler</a></li>
+        <li><a href="../NORMAL_MODE_SYNC_REENGINEERING.md">Reingegnerizzazione Modalità Normale</a></li>
+        <li><a href="#security">Security architecture (TripleDH + AES-256-GCM)</a></li>
         <li><a href="#riverpod">Riverpod State Architecture</a></li>
         <li><a href="#export">Data Export/Backup format</a></li>
         <li><a href="#recovery">Hive corruption recovery</a></li>
@@ -79,7 +80,7 @@ Future&lt;void&gt; main() async {
     <h2 id="hive">2. Hive Database Layer</h2>
 
     <h3>2.1 Box e modelli</h3>
-    <p>I dati sono organizzati in <strong>29 box Hive cifrati</strong> (<code>HiveAesCipher</code>), aperti nel bootstrap con recovery atomica per-box: se un box è corrotto viene eliminato e ricreato vuoto; solo <code>registroBox</code> (auth) è critico e blocca l'avvio. Ogni box contiene record serializzati come mappe JSON (<code>Map&lt;String, dynamic&gt;</code>). I modelli Dart espongono <code>toMap()</code>/<code>fromMap()</code> per la serializzazione.</p>
+    <p>I dati sono organizzati in <strong>27 box Hive cifrati</strong> (<code>HiveAesCipher</code> con chiave master in AndroidKeyStore TEE/StrongBox via <code>SecurityManager</code>), aperti in <code>LocalDatabase.init()</code> con recovery atomica per-box (<code>_openBoxWithRecovery</code> → <code>deleteBoxFromDisk</code> + ricreazione vuota; solo <code>registroBox</code> è critico e blocca l'avvio su fallimento, <code>LocalDatabase:294</code>). Ogni box contiene record <code>Map&lt;String,dynamic&gt;</code>; i modelli espongono <code>toMap()</code>/<code>fromMap()</code>. Box: <code>registroBox</code>, <code>classes_box</code>, <code>students_box</code>, <code>planning_box</code>, <code>attendance_box</code>, <code>documents_box</code>, <code>document_deliveries_box</code>, <code>attachments_box</code>, <code>contact_notes_box</code>, <code>catechesi_box</code>, <code>meeting_catechesi_box</code>, <code>student_daily_notes_box</code>, <code>trusted_devices_box</code>, <code>meeting_notifications_box</code>, <code>avvisi_box</code>, <code>sync_conflicts_box</code>, <code>parish_config_box</code>, <code>audit_log_box</code>, <code>aula_box</code>, <code>tombstone_box</code>, <code>historical_records_box</code>, <code>catechists_box</code>, <code>class_channel_keys_box</code>, <code>class_channel_ciphertext_box</code>, <code>parish_events_box</code>, <code>substitute_delegations_box</code>, <code>substitute_lesson_notes_box</code>.</p>
 
     <h3>2.2 Identificatori</h3>
     <p>Ogni record ha un <strong>id</strong> univoco (stringa, generata via <code>LocalDatabase.newId()</code>). La classe <code>SchoolClass</code> (anagrafica gruppo) possiede inoltre un <strong>uniqueCode</strong>: stringa di 40 cifre decimali, generata via <code>Random.secure()</code> e persistita nel box alla creazione della classe. Questo codice identifica la classe in modo stabile anche dopo un ripristino da backup o una sincronizzazione P2P, ed è utilizzato come riferimento nelle associazioni P2P tra catechisti.</p>
@@ -92,12 +93,13 @@ Future&lt;void&gt; main() async {
     <h3>2.3 Indici di sincronizzazione</h3>
     <p>Per ogni box syncabile, <code>HiveSyncEngine.buildLocalIndex()</code> costruisce un indice con timestamp di modifica e checksum SHA-256 per ogni record. L'indice viene serializzato come <code>SyncIndexEntry</code> e scambiato tra dispositivi durante il sync differenziale. Il campo <code>isDeleted</code> in <code>SyncIndexEntry</code> tiene traccia delle cancellazioni per la propagazione CRDT tra dispositivi.</p>
 
-    <h3>3.4 HKDF — Session Key derivation</h3>
+    <h3>3.4 HKDF — Session Key derivation + rotazione</h3>
     <pre>
 final HKDF_INFO = 'CatechHub_P2P_Session_v3';
-// info = HKDF_INFO + nonce handshake + ID dispositivi (ordinati per ruolo)
+// P2PSecurityService:388 — info = "CatechHub_P2P_Session_v3:<ids ordinati>:w<windowIndex>" + handshakeNonce (P2PSecurityService:977)
+// window = now ~/ 30min (sessionWindowIndex), keep corrente+precedente per messaggi in transito (_ensureSessionKey:4047)
     </pre>
-    <p>Dopo lo scambio TripleDH (static↔static + statico↔effimero + effimero↔effimero), lo shared secret combinato viene derivato tramite HKDF con SHA-256 per produrre la chiave di sessione AES-256-GCM. L'info string include nonce di handshake e ID dei dispositivi per garantire chiavi uniche per coppia e per sessione (rotazione ogni 30 minuti).</p>
+    <p>Dopo lo scambio <strong>TripleDH</strong> (static↔static + static↔ephemeral×2 + ephemeral↔ephemeral, <code>P2PSecurityService.computeForwardSecretKey:834</code> — forward secrecy, efimere MAI persistite), lo shared secret è HKDF-SHA256 (RFC 5869, output 32B) con info <code>CatechHub_P2P_Session_v3:&lt;ids&gt;:&lt;windowId&gt;</code> + nonce concordato (combinazione ordinata dei due nonce 16B). Deriva sia la chiave di sessione AES-256-GCM (AAD <code>CatechHub_Context_P2P_v1</code>) sia il nonce di sessione. Rotazione ogni 30 min (<code>sessionKeyRotation</code>), heartbeat 30s, revoche e tombstone propagate ad ogni sync.</p>
 
     <h3>3.5 Rimozione del formato legacy (v1)</h3>
     <p>Il formato legacy v1 (AES-256-CBC senza MAC, KDF a singola iterazione) è stato <strong>rimosso</strong>: i pacchetti v1 non sono più accettati in lettura. Accettarli sarebbe una porta di downgrade che indebolisce la derivazione della chiave e perde l'integrità autenticata del ciphertext (padding oracle). <code>decryptData</code> rifiuta esplicitamente i pacchetti con <code>v != 2</code>.</p>
@@ -114,7 +116,7 @@ final HKDF_INFO = 'CatechHub_P2P_Session_v3';
   "data": "Y2l0ZXJv"    // ciphertext + tag base64
 }
     </pre>
-    <p>Il campo <code>iter</code> varia per contesto: <strong>350.000</strong> per i nuovi pacchetti QR ("secure share", <code>secureShareIterations</code>) e per l'export conformità GDPR (<code>BackupEncryptionService</code>); <strong>210.000</strong> (<code>defaultIterations</code> di <code>EncryptionService</code>) per i backup generali generati dalle versioni correnti; <strong>60.000</strong> (<code>fastShareIterations</code>) per i vecchi pacchetti QR, accettate solo in lettura. L'AAD (Additional Authenticated Data) lega il ciphertext al contesto d'uso (<code>CatechHub_Context_QRShare_v1</code>, <code>CatechHub_Context_PasswordData_v1</code>, <code>CatechHub_Context_Backup_v1</code>).</p>
+    <p>Il campo <code>iter</code> varia per contesto: <strong>350.000</strong> (<code>secureShareIterations</code> in <code>EncryptionService:22</code> e <code>BackupEncryptionService:32</code>) per <em>tutti</em> i nuovi pacchetti QR e per tutti i nuovi backup <code>.catechhub</code> + export GDPR; <strong>210.000</strong> (<code>defaultIterations</code> / <code>_legacyIterations</code>) e <strong>60.000</strong> (<code>fastShareIterations</code>) solo in lettura per compatibilità coi file già esistenti. AAD legato al contesto: <code>CatechHub_Context_QRShare_v1</code> (QR), <code>CatechHub_Context_PasswordData_v1</code> (legacy), <code>CatechHub_Context_Backup_v1</code> (backup), <code>CatechHub_Context_P2P_v1</code> (sync). Legacy v1 (AES-CBC senza MAC) rifiutato (<code>EncryptionService:132</code>).</p>
 
     <pre>
   Encryption/Decryption Flow
@@ -154,8 +156,13 @@ final HKDF_INFO = 'CatechHub_P2P_Session_v3';
 
     <p>CatechHub implementa due canali di sincronizzazione paralleli: <strong>Nearby P2P</strong> (real-time via Bluetooth/WiFi Direct) e <strong>QR Code</strong> (offline/on-demand).</p>
 
-    <h3>4.1 Nearby P2P Sync</h3>
-    <p>Utilizza Google <strong>Nearby Connections API</strong> con <code>Strategy.P2P_CLUSTER</code>, garantendo che zero dati transitino su internet — solo Bluetooth o WiFi Direct. Il servizio è implementato in <code>P2PSyncService</code> (singleton) con un protocollo a 7 fasi:</p>
+    <h3>4.1 Nearby P2P Sync — modalità normale reingegnerizzata</h3>
+    <p>Utilizza Google <strong>Nearby Connections API</strong> con <code>Strategy.P2P_CLUSTER</code> (log in <code>P2PSyncService:319</code> — <em>zero</em> dati su internet, solo Bluetooth/WiFi Direct). Singleton <code>P2PSyncService</code> + handler <code>NormalModeSyncHandler</code> (<code>lib/features/sync/normal/normal_mode_sync_handler.dart:1</code>, NOP in responsabile). Flusso normale:</p>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li><strong>Mio Dispositivo</strong>: condivide sempre <code>catechistId</code> (in <code>p2p_identity</code> cifrato) → se ricevente fresco adotta l'id → sync di <em>tutte</em> le classi, lavoro offline indipendente + realtime quando vicini.</li>
+      <li><strong>Altro Catechista</strong>: associa atomico a classi condivise (<code>catechistIds/associatedCatechistIds/catechistRoles/catechistDeviceCounts</code>) → sync solo classi condivise + <code>_performBidirectionalSync</code> immediato cifrato.</li>
+    </ul>
+    <p>Protocollo a stati (17 valori in <code>P2PSyncStatus:28</code> — <code>idle/pairing/discovering/advertising/pairingAdvertiseOnly/pairingDiscoverOnly/handshakeSent/handshakeReceived/pairingVerification/sessionEstablished/syncing/onboardingSync/completed/error/associationAccountConfig/associationClassInfo/associationVerifying</code>), handshake ordinato account→classe, verifica continuo. Dettaglio completo in <code>docs/NORMAL_MODE_SYNC_REENGINEERING.md</code>.</p>
 
     <pre>
   Handshake Protocol (7 message types)
@@ -172,11 +179,11 @@ final HKDF_INFO = 'CatechHub_P2P_Session_v3';
                                                                         box              composite key
     </pre>
 
-    <p><strong>Sync differenziale:</strong> Entrambi i lati costruiscono un indice locale (<code>HiveSyncEngine.buildLocalIndex()</code>) con timestamp e checksum per record. Ogni dispositivo calcola cosa gli serve dal remoto e cosa il remoto necessita da esso. I record vengono scambiati in modo bidirezionale fino al completamento (tracciato da una macchina a stati: <code>idle → sentIndex → sendDone → receiveDone → complete</code>).</p>
+    <p><strong>Sync differenziale:</strong> indice locale (<code>HiveSyncEngine.buildLocalIndex(scopes)</code>) con <code>updatedAt</code> + checksum SHA-256 (12 hex) + flag <code>isDeleted</code>; scope per-classe in modalità normale (solo classi condivise, minimizzazione), tutte le classi per Responsabile. Calcolo <code>computeNeededRecords</code> + CRDT LWW per <code>presence/presenceMeta</code> + tombstone (anti-resurrezione). Macchina a stati <code>_SyncPhase2: idle→indexSent→sendDone→receiveDone→complete</code> + watchdog 60s.</p>
 
-    <p><strong>Sync continua in background:</strong> All'avvio, se esistono associazioni, il servizio avvia advertising + discovery + sync periodico (ogni 60s). Ascolta le modifiche locali su Hive (debounce 500ms) e invia richieste di sync incrementali. Riconnessione automatica ogni 5 secondi per dispositivi noti. Un indicatore a pallino (8px) nell'app bar mostra lo stato (rosso=nessuna associazione, giallo=associazioni presenti, verde=sync in corso, ciano=dati aggiornati).</p>
+    <p><strong>Sync continua realtime (Nearby):</strong> se esistono associazioni, avvio advertising+discovery, watch Hive con debounce 500 ms (<code>_watchLocalChanges:912</code> → <code>_pushIncrementalSync</code> → <code>_sendEncryptedPayload</code> AES-256-GCM), periodic 60s (<code>_periodicSyncTimer</code>), heartbeat 30s (<code>_heartbeatInterval</code>), riconnessione 5s. Quando vicini, le modifiche locali sono inviate in incrementale anche durante una full-sync (fix race). Indicatore pallino 8px: rosso=nessuna ass., giallo=ass. presenti, verde=sync, ciano=aggiornato.</p>
 
-    <p><strong>Stati:</strong> 12 stati di sincronizzazione tracciati da <code>P2PSyncStatus</code> (idle, pairing, discovering, advertising, handshakeSent, handshakeReceived, <strong>pairingVerification</strong>, sessionEstablished, syncing, completed, error).</p>
+    <p><strong>Stati:</strong> 17 stati in <code>P2PSyncStatus:28</code> (vedi sopra). Handshake: <code>p2p_handshake</code> (in chiaro, solo bootstrap nonce+efimera) → <code>p2p_handshake_ack</code> → <code>p2p_identity</code> <em>cifrato</em> (tutte le PII: catechistId, classi, profilo, certificato) → <code>p2p_auth_request/response</code> (doppio consenso per Altro Catechista) → <code>p2p_sync_index/sync_request/sync_data/sync_ack/sync_complete</code> + account/class handshake ordinato.</p>
 
     <h4>4.1.6 Consent Protocol</h4>
 
@@ -201,7 +208,7 @@ final HKDF_INFO = 'CatechHub_P2P_Session_v3';
     <h3>4.2 QR Code Sync</h3>
     <p>Canale alternativo per dispositivi senza Bluetooth o per trasferimenti one-shot. Implementato in <code>QRDataService</code>:</p>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
-      <li><strong>Cifratura:</strong> AES-256-GCM con PIN a 12 cifre generato via <code>Random.secure()</code>, valido 3 minuti. Derivazione chiave con PBKDF2-HMAC-SHA256 a 350.000 iterazioni per i nuovi pacchetti (<code>secureShareIterations</code>); 60.000 (<code>fastShareIterations</code>) accettate solo in lettura per compatibilità.</li>
+      <li><strong>Cifratura:</strong> AES-256-GCM con PIN 12 cifre via <code>Random.secure()</code>, valido 3 min (meta <code>createdAt/expiresAt</code> verificata in <code>QRDataService.extractPackageData:263</code>). PBKDF2 350k nuovi / 60k legacy read, AAD <code>CatechHub_Context_QRShare_v1</code>. Indice DB <strong>cifrato con PIN di sessione</strong> (<code>encryptIndexToChunks/decryptIndexFromChunks:834</code>) — anti-metadata exposure; chunk 1200B con checksum 4 hex, packet checksum 12 hex.</li>
       <li><strong>Chunking:</strong> Payload diviso in chunk JSON di max 1200 byte, ognuno con checksum SHA-256 (prime 4 cifre esadecimali).</li>
       <li><strong>Integrità:</strong> Checksum SHA-256 dell'intero payload (prime 12 cifre hex) verificato dopo il riassemblaggio.</li>
       <li><strong>Sync differenziale:</strong> <code>buildDatabaseIndex()</code> crea un indice per modulo. <code>computeDiffExport()</code> confronta l'indice locale con quello remoto e trasferisce solo i record nuovi/modificati (risoluzione conflitti: local wins).</li>
@@ -211,15 +218,15 @@ final HKDF_INFO = 'CatechHub_P2P_Session_v3';
     <h3>4.3 P2P Security Service</h3>
     <p>Il modulo <code>P2PSecurityService</code> fornisce le fondamenta crittografiche per tutte le comunicazioni P2P:</p>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
-      <li><strong>Scambio chiavi — TripleDH:</strong> ogni dispositivo genera una coppia X25519 identità long-lived <strong>più una coppia per ogni dispositivo associato</strong> (chiavi per dispositivo salvate nell'associazione). La chiave di sessione è derivata combinando <strong>tre scambi Diffie-Hellman</strong> (statico↔statico, statico↔effimero, effimero↔effimero) in un ordine canonico, garantendo forward secrecy.</li>
-      <li><strong>Derivazione chiave di sessione:</strong> HKDF con HMAC-SHA256 (output 32 byte) con info <code>"CatechHub_P2P_Session_v3"</code>, nonce di handshake e identificativi dei dispositivi.</li>
-      <li><strong>Rotazione chiavi:</strong> la chiave di sessione viene <strong>ruotata ogni 30 minuti</strong> su finestre temporali condivise (<code>sessionWindowIndex</code>); le chiavi effimere non vengono mai persistite.</li>
-      <li><strong>Cifratura payload:</strong> AES-256-GCM con nonce 12 byte, AAD <code>CatechHub_Context_P2P_v1</code>. Wrapper <code>P2PEncryptedPayload</code> con nonce, ciphertext, MAC (128-bit).</li>
-      <li><strong>Forward secrecy:</strong> i componenti effimeri ECDHE sono mescolati nell'input HKDF — la compromissione della chiave statica non compromette le sessioni passate.</li>
-      <li><strong>Pairing code:</strong> codice SAS a 6 cifre derivato da SHA-256(aux input ‖ shared secret), con nonce e chiavi effimere ordinate. Entrambi i dispositivi calcolano lo stesso codice — l'utente verifica visivamente che corrispondano prima di confermare il pairing (anti-MitM).</li>
-      <li><strong>Key pinning:</strong> alla riconnessione, la chiave pubblica remota deve corrispondere all'associazione salvata (<code>publicKeyMatchesAssociation()</code>). Se differisce, allarme MitM e connessione interrotta.</li>
-      <li><strong>Catena di fiducia:</strong> certificati di approvazione <strong>Ed25519</strong> (firma asimmetrica) con validità 30 giorni e clock skew 5 minuti; trust root distribuita tramite QR di fiducia che trasporta <strong>solo la chiave pubblica</strong>; revoche firmate propagate peer-to-peer. In modalità Responsabile un dispositivo non approvato <strong>non può sincronizzare le classi</strong>.</li>
-      <li><strong>Associazioni:</strong> salvate in FlutterSecureStorage con prefisso <code>p2p_assoc_</code>; sessione valida max 30 minuti (<code>P2PSession.isValid</code>).</li>
+      <li><strong>Scambio chiavi — TripleDH + forward secrecy:</strong> ogni dispositivo ha coppia X25519 identità long-lived (<code>FlutterSecureStorage p2p_local_keypair</code>) + coppia per-associazione (<code>p2p_assoc_*_privkey</code>); per ogni sessione genera coppia effimera (<code>generateEphemeralKeyPair:487</code>, MAI persistita). Segreto = HKDF(SHA256(h(DH1‖DH2‖DH3‖DH4 ordinati)), salt 0, info <code>CatechHub_P2P_ForwardSecret_v1</code>) + fattore per-associazione opzionale (<code>mixAssociationFactor:915</code>). DH4 = ephemeral↔ephemeral → compromissione futura statiche non espone sessioni passate.</li>
+      <li><strong>Derivazione chiave di sessione:</strong> HKDF-SHA256 output 32B, info <code>CatechHub_P2P_Session_v3:&lt;ids&gt;:w&lt;window&gt;</code> + nonce concordato (sorted <code>localNonce+remoteNonce</code>). Sessione valida 30 min (<code>P2PSession.isValid</code>), finestra keep corrente+precedente (<code>_ensureSessionKey:4047</code>).</li>
+      <li><strong>Rotazione:</strong> <code>sessionKeyRotation=30min</code>, <code>sessionWindowIndex</code>, timer <code>_sessionKeyRotationTimer</code> + lazy derivation alla prima TX della nuova finestra.</li>
+      <li><strong>Cifratura payload:</strong> AES-256-GCM nonce 12B, AAD <code>CatechHub_Context_P2P_v1</code> (<code>P2PSecurityService:388</code>), wrapper <code>P2PEncryptedPayload:{nonce,ciphertext,mac,alg}</code> (128-bit MAC). Refuso <code>_plaintextAllowedTypes</code> (5 tipi) — tutto il resto scartato se in chiaro.</li>
+      <li><strong>Forward secrecy:</strong> vedi TripleDH sopra + chiave di classe per-classe con AAD <code>CatechHub_ClassChannel_v1</code> (<code>ClassChannelService:85</code>).</li>
+      <li><strong>Pairing code:</strong> SAS 6 cifre = SHA256(aux ‖ secret)[0..2] % 1M, aux = nonce concordato + efimere ordinate (<code>P2PSecurityService.computePairingCode:1348</code>); MitM su efimera → SAS diverge, persistito per device (<code>_pairingCodesByDeviceId</code>) across reconnect.</li>
+      <li><strong>Key pinning:</strong> <code>publicKeyMatchesAssociation</code> ad ogni riconnessione; se diverge → rifiuto (<code>_handleMessage:2173</code>).</li>
+      <li><strong>Catena di fiducia (solo Responsabile, invariata):</strong> Ed25519, validità 30 gg, skew 5 min (<code>_clockSkew</code>), trust root solo chiave pubblica via QR di fiducia, revoche firmate propagate.</li>
+      <li><strong>Associazioni:</strong> metadati in Hive <code>trusted_devices_box</code> (<code>toJson</code> senza segreti), segreti (<code>sharedSecret, privKey</code>) solo in <code>FlutterSecureStorage p2p_assoc_*_secret/_privkey</code> (migrazione legacy inclusa, <code>_hydrateSecrets:1140</code>).</li>
       <li><strong>Seed crittografico:</strong> <code>Random.secure()</code> di Dart per nonce e salt.</li>
     </ul>
 
@@ -251,12 +258,12 @@ final HKDF_INFO = 'CatechHub_P2P_Session_v3';
 // Each chunk:
 {"i": 0, "t": 3, "d": "&lt;base64 data&gt;", "c": "&lt;chunk checksum 4 hex&gt;"}
     </pre>
-    <p>I pacchetti QR usano un formato simile ma con chunking automatico. Ogni chunk contiene checksum individuale (prime 4 cifre SHA-256). Il PIN a 12 cifre ha validità 3 minuti. Derivazione chiave: PBKDF2-HMAC-SHA256 a 350.000 iterazioni per i nuovi pacchetti (secure share), 60.000 in lettura per i vecchi.</p>
+    <p>Pacchetti QR: <code>DataPackage {v:2, encryptedData, totalChunks, checksum(12 hex)}</code> → <code>compressData</code> (Base64 JSON) → <code>segmentData</code> 1200B → <code>QRChunk {i,t,d,c(4 hex)}</code> con <code>verifyChunkChecksum</code>. PIN 12 cifre validità 3 min (<code>meta createdAt/expiresAt</code> verificata). PBKDF2 350k nuovi / 60k legacy read. Indice DB cifrato con PIN di sessione (vedi §4.2).</p>
 
     <h2 id="security">5. Security architecture</h2>
 
-    <h3>5.0 Cifratura di campo (FieldEncryptionService)</h3>
-    <p>I dati più delicati (allergie, note sanitarie, uscite autonome) ricevono una <strong>cifratura di campo aggiuntiva</strong>: formato <code>cieI1:</code> + base64(nonce(12)‖ciphertext), AES-256-GCM, con una <strong>chiave per-dispositivo</strong> (32 byte casuali) conservata nel box cifrato. All'export/QR i campi vengono decifrati solo in uscita; un valore non decifrabile è restituito in chiaro senza errore (retrocompatibilità).</p>
+    <h3>5.0 Cifratura di campo (FieldEncryptionService — GDPR art.9)</h3>
+    <p>Dati particolari di minori: <code>studentSensitiveFields</code> (<code>field_encryption_service.dart:140</code>) = <code>noteAllergieSalute/allergies/autonomousExits/notes/birthDate/studentPhone/motherPhone/fatherPhone/parentEmail</code>. Formato <code>cieI1:</code> + base64(nonce 12‖ciphertext‖tag), AES-256-GCM, chiave 32B per-dispositivo in <code>registroBox</code> (già cifrato) + <code>deviceKey(): SHA256(seed)</code>. Egresso P2P/QR: <code>decryptStudentMapForTransport</code> prima di cifrare col canale (già E2EE); ingresso: <code>encryptStudentMapForStorage</code> prima di persistere (idempotente). Fallimento decifratura → valore in chiaro senza errore (retrocompatibilità).</p>
 
     <h3>5.1 Hardware-backed Master Key (AndroidKeyStore) — SecurityManager</h3>
     <p>A partire dalla versione 2.0, CatechHub richiede <strong>esclusivamente</strong> protezione hardware per la chiave master di cifratura Hive. Il modulo <code>SecurityManager</code> (singleton in <code>lib/core/security/security_manager.dart</code>):</p>

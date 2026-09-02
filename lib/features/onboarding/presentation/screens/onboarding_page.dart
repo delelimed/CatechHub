@@ -240,6 +240,163 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       _selectedMode = mode;
       _errorMessage = null;
     });
+    if (mode == _OnboardingMode.responsabile) {
+      // Mostra subito l'informativa beta non appena l'utente seleziona
+      // la modalità Responsabile.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        // Evita dialog multipli se già aperto rapidamente
+        if (_selectedMode != _OnboardingMode.responsabile) return;
+        _showResponsabileBetaDialog();
+      });
+    }
+  }
+
+  Future<void> _showResponsabileBetaDialog() async {
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.amber.shade100,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(Icons.construction_rounded,
+                  color: Colors.amber.shade800, size: 20),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Modalità Responsabile\n— versione beta',
+                style: TextStyle(fontSize: 16, height: 1.2),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.warning_amber_rounded,
+                        size: 14, color: Colors.orange.shade800),
+                    const SizedBox(width: 6),
+                    Text(
+                      'BETA — non completa',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange.shade800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'La Modalità Responsabile è attualmente in versione beta e non è ancora completa. '
+                'La sincronizzazione tra dispositivi in questa modalità non è ancora funzionante.',
+                style: TextStyle(
+                    fontSize: 13, color: Colors.grey.shade800, height: 1.45),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Ti invitiamo ad attendere la versione 2.0 per l\'uso reale e ad utilizzare nel frattempo la Modalità Normale, stabile e pienamente funzionante.',
+                style: TextStyle(
+                    fontSize: 13, color: Colors.grey.shade800, height: 1.45),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF174A7E).withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(12),
+                  border:
+                      Border.all(color: const Color(0xFF174A7E).withValues(alpha: 0.15)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.visibility_rounded,
+                        size: 16, color: Color(0xFF174A7E)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'La modalità Responsabile configurabile ora serve solo come anteprima per mostrare come sarà in futuro e per raccogliere consigli sulle funzionalità da integrare.',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade700,
+                            height: 1.4,
+                            fontStyle: FontStyle.italic),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('normale'),
+            child: const Text('Usa modalità normale'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF174A7E),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.of(ctx).pop('beta'),
+            child: const Text('Continua in anteprima'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) return;
+    if (result == 'normale') {
+      setState(() => _selectedMode = _OnboardingMode.normal);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Modalità Normale selezionata — stabile e con sincronizzazione funzionante.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } else if (result == 'beta') {
+      // Resta su Responsabile, ma informa con feedback leggero
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+                'Modalità Responsabile (beta) — sincronizzazione non disponibile fino alla v2.0.'),
+            backgroundColor: Colors.orange.shade800,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   /// Salva il profilo anagrafico (nome, cognome, telefono) e genera
@@ -960,6 +1117,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     required String description,
   }) {
     final isSelected = _selectedMode == mode;
+    final isResponsabileBeta = mode == _OnboardingMode.responsabile;
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(18),
@@ -1010,13 +1168,49 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                        color: Color(0xFF174A7E),
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: Color(0xFF174A7E),
+                            ),
+                          ),
+                        ),
+                        if (isResponsabileBeta) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border:
+                                  Border.all(color: Colors.orange.shade300),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.science_rounded,
+                                    size: 12, color: Colors.orange.shade800),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'BETA',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.orange.shade800,
+                                    letterSpacing: 0.6,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -1027,6 +1221,18 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                         height: 1.45,
                       ),
                     ),
+                    if (isResponsabileBeta) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'Versione beta non completa — sincronizzazione non funzionante fino alla v2.0. Solo anteprima per raccogliere feedback.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.orange.shade800,
+                          height: 1.35,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1088,6 +1294,47 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                 fontSize: 13.5,
                 color: Colors.grey.shade700,
                 height: 1.5,
+              ),
+            ),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline_rounded,
+                      size: 20, color: Colors.orange.shade800),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Anteprima beta — sincronizzazione non disponibile',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange.shade800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Questa modalità è una beta non completa. La sincronizzazione non funziona: attendi la versione 2.0 e usa nel frattempo la Modalità Normale. Questa configurazione serve solo come anteprima per raccogliere consigli su future funzionalità.',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: Colors.orange.shade900,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 20),

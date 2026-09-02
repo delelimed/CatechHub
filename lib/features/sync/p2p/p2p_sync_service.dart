@@ -3881,7 +3881,7 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
       final remoteRole = _pendingHandshakeRemoteRole;
 
       // Risoluzione tardiva del catechistId del ricevente: handshake →
-      // endpoint corrente → profilo remoto inserito dall'inviante.
+      // endpoint corrente → profilo remoto inserito dall'inviante → QR.
       String? remoteCatechistId;
       if (_pendingHandshakeRemoteCatechistId?.isNotEmpty == true) {
         remoteCatechistId = _pendingHandshakeRemoteCatechistId;
@@ -3893,6 +3893,18 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
         final fromProfile = _associationRemoteProfile['catechistId'];
         if (fromProfile is String && fromProfile.isNotEmpty) {
           remoteCatechistId = fromProfile;
+        }
+      }
+      if (remoteCatechistId == null || remoteCatechistId.isEmpty) {
+        final fromQr = _pendingHandshakeIdentity?.catechistId?.trim() ?? '';
+        if (fromQr.isNotEmpty) remoteCatechistId = fromQr;
+      }
+      if (remoteCatechistId == null || remoteCatechistId.isEmpty) {
+        if (endpointId != null) {
+          final hs = _pendingHandshakeData[endpointId];
+          if (hs?.remoteCatechistId?.isNotEmpty == true) {
+            remoteCatechistId = hs!.remoteCatechistId;
+          }
         }
       }
 
@@ -4044,11 +4056,25 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
           remoteCatechistId = fromProfile;
         }
       }
+      // Fallback: catechistId dal QR scansionato (pending identity) — è la fonte
+      // più immediata quando p2p_identity non è ancora stato scambiato.
+      if (remoteCatechistId == null || remoteCatechistId.isEmpty) {
+        final fromQr = _pendingHandshakeIdentity?.catechistId?.trim() ?? '';
+        if (fromQr.isNotEmpty) remoteCatechistId = fromQr;
+      }
+      if (remoteCatechistId == null || remoteCatechistId.isEmpty) {
+        if (endpointId != null) {
+          final hs = _pendingHandshakeData[endpointId];
+          if (hs?.remoteCatechistId?.isNotEmpty == true) {
+            remoteCatechistId = hs!.remoteCatechistId;
+          }
+        }
+      }
       if (remoteCatechistId == null || remoteCatechistId.isEmpty) {
         // Attesa breve per il late binding dell'identità (p2p_identity può
         // arrivare subito dopo l'avvio dell'handshake ordinato). Evita di
         // inviare la class info senza il nuovo catechista.
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < 10; i++) {
           await Future.delayed(const Duration(milliseconds: 300));
           if (_pendingHandshakeRemoteCatechistId?.isNotEmpty == true) {
             remoteCatechistId = _pendingHandshakeRemoteCatechistId;
@@ -4060,6 +4086,16 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
               remoteCatechistId = via;
               break;
             }
+            final hs = _pendingHandshakeData[endpointId];
+            if (hs?.remoteCatechistId?.isNotEmpty == true) {
+              remoteCatechistId = hs!.remoteCatechistId;
+              break;
+            }
+          }
+          final fromQrDelayed = _pendingHandshakeIdentity?.catechistId?.trim() ?? '';
+          if (fromQrDelayed.isNotEmpty) {
+            remoteCatechistId = fromQrDelayed;
+            break;
           }
         }
       }
@@ -4103,18 +4139,68 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
     try {
       final box = LocalDatabase.classes();
       const localId = AuthService.localUserId;
+      final localCatechistId = AuthService.getCatechistId();
       for (final key in box.keys) {
-        final data = LocalDatabase.toStringDynamicMap(box.get(key));
+        final raw = box.get(key);
+        if (raw == null) continue;
+        final data = LocalDatabase.toStringDynamicMap(raw);
+        var mutated = false;
         final ids = (data['catechistIds'] as List? ?? [])
             .map((e) => e.toString())
             .toList();
         if (!ids.contains(localId)) {
           ids.add(localId);
           data['catechistIds'] = ids;
+          mutated = true;
+        }
+        // Anche l'identità stabile deve essere presente in tutte le liste
+        // di appartenenza, non solo in catechistIds.
+        if (localCatechistId.isNotEmpty) {
+          if (!ids.contains(localCatechistId)) {
+            ids.add(localCatechistId);
+            data['catechistIds'] = ids;
+            mutated = true;
+          }
+          if (data['catechistRoles'] is! Map) {
+            data['catechistRoles'] = <String, String>{};
+          }
+          final roles = Map<String, String>.from(data['catechistRoles'] as Map);
+          if (!roles.containsKey(localCatechistId)) {
+            roles[localCatechistId] = 'TITOLARE';
+            data['catechistRoles'] = roles;
+            mutated = true;
+          }
+          var associated = (data['associatedCatechistIds'] as List? ?? [])
+              .map((e) => e.toString())
+              .toList();
+          if (!associated.contains(localCatechistId)) {
+            associated.add(localCatechistId);
+            data['associatedCatechistIds'] = associated;
+            mutated = true;
+          }
+          final counts = data['catechistDeviceCounts'] is Map
+              ? (data['catechistDeviceCounts'] as Map).map(
+                  (k, v) => MapEntry(k.toString(), (v as num).toInt()),
+                )
+              : <String, int>{};
+          if (!counts.containsKey(localCatechistId)) {
+            counts[localCatechistId] = 1;
+            data['catechistDeviceCounts'] = counts;
+            mutated = true;
+          }
+          if ((data['creatorCatechistId'] as String? ?? '').isEmpty) {
+            data['creatorCatechistId'] = localCatechistId;
+            mutated = true;
+          }
+          if (mutated) {
+            data['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+          }
+        }
+        if (mutated) {
           box.put(key, data);
           addLog(
             'INFO',
-            'Aggiunto catechista locale alla classe ${data['name']}',
+            'Aggiunto catechista locale alla classe ${data['name']} (roster completo)',
           );
         }
       }
@@ -6302,7 +6388,11 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
           data['uniqueCode'] ??= data['uniqueCode'] ?? _generateUniqueCode();
           data['nameLocked'] ??= true;
         }
-        // Assicura che il catechista locale sia incluso
+        // Assicura che il catechista locale sia incluso COMPLETAMENTE
+        // (tutte le strutture di roster). L'inviante lo aggiunge già durante
+        // il pairing, ma in caso di peer obsoleto o race tra sync continuo e
+        // handshake ordinato ci pensa il ricevente, così non risulta mai
+        // "non inserito nella classe" sul ricevente.
         const localId = AuthService.localUserId;
         final catechistIds = (data['catechistIds'] as List? ?? [])
             .map((e) => e.toString())
@@ -6311,22 +6401,47 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
           catechistIds.add(localId);
           data['catechistIds'] = catechistIds;
         }
-        // Difesa: il catechista locale (identità stabile, hash) deve figurare
-        // nell'elenco ufficiale della classe. L'inviante lo aggiunge già durante
-        // il pairing, ma in caso di peer obsoleto o race tra sync continuo e
-        // handshake ordinato ci pensa il ricevente, così non risulta mai
-        // "non inserito nella classe".
+        // Identità stabile del ricevente: deve figurare in TUTTE le liste
+        // che determinano l'appartenenza alla classe, non solo in catechistIds.
+        // _getClassIdsForCatechist e _isLocalClass usano creator/associated,
+        // quindi il ricevente deve essere aggiunto anche lì, altrimenti
+        // "non presente nella classe" nei successivi sync / guard UI.
         final localCatechistId = AuthService.getCatechistId();
-        if (localCatechistId.isNotEmpty &&
-            !catechistIds.contains(localCatechistId)) {
-          catechistIds.add(localCatechistId);
-          data['catechistIds'] = catechistIds;
+        if (localCatechistId.isNotEmpty) {
+          if (!catechistIds.contains(localCatechistId)) {
+            catechistIds.add(localCatechistId);
+            data['catechistIds'] = catechistIds;
+          }
           if (data['catechistRoles'] is! Map) {
             data['catechistRoles'] = <String, String>{};
           }
           final roles = Map<String, String>.from(data['catechistRoles'] as Map);
           roles.putIfAbsent(localCatechistId, () => 'TITOLARE');
           data['catechistRoles'] = roles;
+
+          var associated = (data['associatedCatechistIds'] as List? ?? [])
+              .map((e) => e.toString())
+              .toList();
+          if (!associated.contains(localCatechistId)) {
+            associated.add(localCatechistId);
+            data['associatedCatechistIds'] = associated;
+          }
+          // Conteggio dispositivi: se già presente non incrementare (idempotenza
+          // sul re-invio della stessa class info), altrimenti inizializza a 1.
+          final counts = data['catechistDeviceCounts'] is Map
+              ? (data['catechistDeviceCounts'] as Map).map(
+                  (k, v) => MapEntry(k.toString(), (v as num).toInt()),
+                )
+              : <String, int>{};
+          counts.putIfAbsent(localCatechistId, () => 1);
+          data['catechistDeviceCounts'] = counts;
+
+          if ((data['creatorCatechistId'] as String? ?? '').isEmpty) {
+            data['creatorCatechistId'] = data['creatorCatechistId']?.toString().isNotEmpty == true
+                ? data['creatorCatechistId']
+                : localCatechistId;
+          }
+          data['updatedAt'] = DateTime.now().toUtc().toIso8601String();
         }
         await box.put(id, data);
         applied++;

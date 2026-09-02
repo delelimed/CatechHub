@@ -774,6 +774,71 @@ class HiveSyncEngine {
           merged['nameLocked'] =
               (localData['nameLocked'] ?? true) ||
               (remote.data['nameLocked'] == true);
+
+          // Roster catechisti: merge ADDITIVO (unione) anziché LWW.
+          // Senza unione, il sync LWW può cancellare un catechista appena
+          // associato quando l'altro lato invia una versione con timestamp
+          // più recente ma roster incompleto (bug "non presente nella classe"
+          // in modalità normale tra due catechisti diversi).
+          // Uniamo catechistIds, associated, roles e deviceCounts.
+          final localIds = (localData['catechistIds'] as List? ?? [])
+              .map((e) => e.toString())
+              .toSet();
+          final remoteIds = (remote.data['catechistIds'] as List? ?? [])
+              .map((e) => e.toString())
+              .toSet();
+          final unionIds = {...localIds, ...remoteIds}.toList();
+          merged['catechistIds'] = unionIds;
+
+          final localAssoc = (localData['associatedCatechistIds'] as List? ?? [])
+              .map((e) => e.toString())
+              .toSet();
+          final remoteAssoc = (remote.data['associatedCatechistIds'] as List? ?? [])
+              .map((e) => e.toString())
+              .toSet();
+          merged['associatedCatechistIds'] = {...localAssoc, ...remoteAssoc}.toList();
+
+          final localRoles = localData['catechistRoles'] is Map
+              ? Map<String, String>.from(localData['catechistRoles'] as Map)
+              : <String, String>{};
+          final remoteRoles = remote.data['catechistRoles'] is Map
+              ? Map<String, String>.from(remote.data['catechistRoles'] as Map)
+              : <String, String>{};
+          final unionRoles = {...localRoles, ...remoteRoles};
+          // Local wins on conflict (mantiene ruolo locale), altrimenti prende remoto
+          for (final e in remoteRoles.entries) {
+            unionRoles.putIfAbsent(e.key, () => e.value);
+          }
+          merged['catechistRoles'] = unionRoles;
+
+          final localCounts = localData['catechistDeviceCounts'] is Map
+              ? (localData['catechistDeviceCounts'] as Map).map(
+                  (k, v) => MapEntry(k.toString(), (v as num).toInt()),
+                )
+              : <String, int>{};
+          final remoteCounts = remote.data['catechistDeviceCounts'] is Map
+              ? (remote.data['catechistDeviceCounts'] as Map).map(
+                  (k, v) => MapEntry(k.toString(), (v as num).toInt()),
+                )
+              : <String, int>{};
+          final unionCounts = Map<String, int>.from(localCounts);
+          for (final e in remoteCounts.entries) {
+            unionCounts[e.key] = (unionCounts[e.key] ?? 0) > e.value
+                ? unionCounts[e.key]!
+                : e.value;
+            // prendi max (se uno ha più device, resta il max)
+            if (!localCounts.containsKey(e.key)) {
+              unionCounts[e.key] = e.value;
+            }
+          }
+          merged['catechistDeviceCounts'] = unionCounts;
+
+          if ((merged['creatorCatechistId'] as String? ?? '').isEmpty) {
+            final localCreator = localData['creatorCatechistId']?.toString() ?? '';
+            final remoteCreator = remote.data['creatorCatechistId']?.toString() ?? '';
+            merged['creatorCatechistId'] =
+                localCreator.isNotEmpty ? localCreator : remoteCreator;
+          }
         }
 
         final now = DateTime.now().toUtc();

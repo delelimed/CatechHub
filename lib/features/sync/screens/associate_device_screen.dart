@@ -887,49 +887,129 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
 
       if (_remoteIdentity != null) {
         final remoteCatechistId = _remoteIdentity!.catechistId ?? '';
+        final localCatechistId = AuthService.getCatechistId();
         for (final key in box.keys) {
           if (!isShared(key.toString())) continue;
           final data = LocalDatabase.toStringDynamicMap(box.get(key));
+          var changed = false;
           final ids = (data['catechistIds'] as List? ?? [])
               .map((e) => e.toString())
               .toList();
-          var changed = false;
           // Usa SOLO l'id stabile del catechista associato: il deviceId NON deve
           // finire in catechistIds, altrimenti verrebbe mostrato come catechista
           // duplicato (con il nome del dispositivo) nella lista della classe.
           if (remoteCatechistId.isNotEmpty &&
               !ids.contains(remoteCatechistId)) {
             ids.add(remoteCatechistId);
+            data['catechistIds'] = ids;
             changed = true;
           }
+          // Roster completo per il remoto: associated, roles, counts
+          if (remoteCatechistId.isNotEmpty) {
+            if (data['catechistRoles'] is! Map) {
+              data['catechistRoles'] = <String, String>{};
+            }
+            final roles = Map<String, String>.from(data['catechistRoles'] as Map);
+            if (!roles.containsKey(remoteCatechistId)) {
+              roles[remoteCatechistId] = 'TITOLARE';
+              data['catechistRoles'] = roles;
+              changed = true;
+            }
+            var associated = (data['associatedCatechistIds'] as List? ?? [])
+                .map((e) => e.toString())
+                .toList();
+            if (!associated.contains(remoteCatechistId)) {
+              associated.add(remoteCatechistId);
+              data['associatedCatechistIds'] = associated;
+              changed = true;
+            }
+            final counts = data['catechistDeviceCounts'] is Map
+                ? (data['catechistDeviceCounts'] as Map).map(
+                    (k, v) => MapEntry(k.toString(), (v as num).toInt()),
+                  )
+                : <String, int>{};
+            if (!counts.containsKey(remoteCatechistId)) {
+              counts[remoteCatechistId] = 1;
+              data['catechistDeviceCounts'] = counts;
+              changed = true;
+            }
+            if ((data['creatorCatechistId'] as String? ?? '').isEmpty) {
+              data['creatorCatechistId'] = localCatechistId;
+              changed = true;
+            }
+          }
           if (changed) {
-            data['catechistIds'] = ids;
+            data['updatedAt'] = DateTime.now().toUtc().toIso8601String();
             box.put(key, data);
             addLog(
               'INFO',
               'Aggiunto catechista remoto ${_remoteIdentity!.username} '
-              '($remoteCatechistId) alla classe ${data['name']}',
+              '($remoteCatechistId) alla classe ${data['name']} (roster completo)',
             );
           }
         }
       }
       for (final key in box.keys) {
         if (!isShared(key.toString())) continue;
-        final data = LocalDatabase.toStringDynamicMap(box.get(key));
+        final raw = box.get(key);
+        if (raw == null) continue;
+        final data = LocalDatabase.toStringDynamicMap(raw);
+        var changed = false;
         final ids = (data['catechistIds'] as List? ?? [])
             .map((e) => e.toString())
             .toList();
-        var changed = false;
         if (!ids.contains(localId)) {
           ids.add(localId);
+          data['catechistIds'] = ids;
           changed = true;
         }
+        final localCatechistId = AuthService.getCatechistId();
+        if (localCatechistId.isNotEmpty) {
+          if (!ids.contains(localCatechistId)) {
+            ids.add(localCatechistId);
+            data['catechistIds'] = ids;
+            changed = true;
+          }
+          if (data['catechistRoles'] is! Map) {
+            data['catechistRoles'] = <String, String>{};
+          }
+          final roles = Map<String, String>.from(data['catechistRoles'] as Map);
+          if (!roles.containsKey(localCatechistId)) {
+            roles[localCatechistId] = 'TITOLARE';
+            data['catechistRoles'] = roles;
+            changed = true;
+          }
+          var associated = (data['associatedCatechistIds'] as List? ?? [])
+              .map((e) => e.toString())
+              .toList();
+          if (!associated.contains(localCatechistId)) {
+            associated.add(localCatechistId);
+            data['associatedCatechistIds'] = associated;
+            changed = true;
+          }
+          final counts = data['catechistDeviceCounts'] is Map
+              ? (data['catechistDeviceCounts'] as Map).map(
+                  (k, v) => MapEntry(k.toString(), (v as num).toInt()),
+                )
+              : <String, int>{};
+          if (!counts.containsKey(localCatechistId)) {
+            counts[localCatechistId] = 1;
+            data['catechistDeviceCounts'] = counts;
+            changed = true;
+          }
+          if ((data['creatorCatechistId'] as String? ?? '').isEmpty) {
+            data['creatorCatechistId'] = localCatechistId;
+            changed = true;
+          }
+          if (changed) {
+            data['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+          }
+        }
         if (changed) {
-          data['catechistIds'] = ids;
           box.put(key, data);
           addLog(
             'INFO',
-            'Aggiunto catechista locale alla classe ${data['name']}',
+            'Aggiunto catechista locale alla classe ${data['name']} (roster completo)',
           );
         }
       }

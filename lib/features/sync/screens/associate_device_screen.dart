@@ -662,6 +662,13 @@ class _AssociateDeviceScreenState extends ConsumerState<AssociateDeviceScreen> {
       await _registerCatechistInClass();
     }
 
+    // Associazione riuscita -> attiva di default la sincronizzazione
+    // automatica (requisito: appena si associa un dispositivo la sync
+    // automatica deve essere ON senza intervento manuale).
+    try {
+      await ref.read(nearbySyncDaemonProvider.notifier).enableAutoSync();
+    } catch (_) {}
+
     if (mounted) {
       setState(() {
         _currentStep = _AssociationStep.complete;

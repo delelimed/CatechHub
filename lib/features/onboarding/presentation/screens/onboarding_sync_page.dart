@@ -219,7 +219,11 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
             _errorMessage = null;
           });
         }
-      } else if (state.status == P2PSyncStatus.syncing && !_syncCompleted) {
+      } else if ((state.status == P2PSyncStatus.syncing ||
+              state.status == P2PSyncStatus.associationAccountConfig ||
+              state.status == P2PSyncStatus.associationClassInfo ||
+              state.status == P2PSyncStatus.associationVerifying) &&
+          !_syncCompleted) {
         _pairingTimeoutTimer?.cancel();
         _syncStarted = true;
         setState(() {
@@ -231,9 +235,28 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
         });
       } else if (state.status == P2PSyncStatus.completed) {
         _pairingTimeoutTimer?.cancel();
-        if (_syncStarted || _syncCompleted) {
+        // Ricevente: anche se non ha mai osservato `syncing` (flusso ordinato
+        // con accountSkipped → class info), se ha già ricevuto una classe
+        // deve comunque procedere oltre. Senza questo, resta bloccato su
+        // "Sincronizzazione in corso" nonostante le classi siano presenti.
+        if (_syncStarted || _syncCompleted || _isLocalUserInAnyClass()) {
+          _onSyncCompleted(state);
+        } else {
+          // Fallback: marca syncStarted e tenta comunque il completamento
+          // (gestisce race dove `completed` arriva prima di `syncing`).
+          _syncStarted = true;
+          setState(() {
+            _currentStep = _OnboardingStep.syncing;
+          });
           _onSyncCompleted(state);
         }
+      } else if (state.continuousSyncVerified && !_syncCompleted) {
+        // Via libera esplicita dell'handshake ordinato: anche se lo stato
+        // non è ancora `completed`, il ricevente ha la prova che il sync
+        // continuo funziona e le classi sono già state ricevute.
+        _pairingTimeoutTimer?.cancel();
+        _syncStarted = true;
+        _onSyncCompleted(state);
       } else if (state.status == P2PSyncStatus.sessionEstablished) {
         if (!_choseScanFirst && _currentStep == _OnboardingStep.showQr) {
           _pairingTimeoutTimer?.cancel();
@@ -341,7 +364,22 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
       }
     }
 
-    if (!found || !AuthService.hasLocalAnagrafica()) {
+    // Attesa anche per l'anagrafica: in modalità `accountSkipped` il
+    // ricevente configura l'account in modo autonomo (fallback su
+    // _peerFirstName) solo DOPO il completamento del sync. Diamo una
+    // finestra di attesa anche per questo, evitando il falso errore
+    // "account non configurato" quando le classi sono già presenti.
+    var hasAnagrafica = AuthService.hasLocalAnagrafica();
+    if (!hasAnagrafica && found) {
+      for (int i = 0; i < 20 && !hasAnagrafica; i++) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        hasAnagrafica = AuthService.hasLocalAnagrafica();
+        // Ripeti anche il controllo classe: potrebbe arrivare in ritardo
+        if (!found) found = _isLocalUserInAnyClass();
+      }
+    }
+
+    if (!found || !hasAnagrafica) {
       setState(() {
         _errorMessage = !found
             ? 'Sincronizzazione completata ma non risulti in '
@@ -356,6 +394,12 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
     }
 
     LocalDatabase.auth().put('onboarding_completed', true);
+
+    // Requisito: appena il dispositivo viene associato (anche in onboarding)
+    // la sincronizzazione automatica deve essere attiva di default.
+    try {
+      await ref.read(nearbySyncDaemonProvider.notifier).enableAutoSync();
+    } catch (_) {}
 
     _syncCompleted = true;
     setState(() {

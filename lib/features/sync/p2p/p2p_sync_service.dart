@@ -8,6 +8,7 @@ import 'package:cryptography/cryptography.dart';
 
 import '../../../core/auth/auth_service.dart';
 import '../../../core/services/bluetooth_permission_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/storage/encrypted_file_storage.dart';
 import '../../../core/storage/local_database.dart';
 import '../../gdpr/hard_delete_service.dart';
@@ -627,6 +628,21 @@ class P2PSyncService {
     _updateState(
       _state.copyWith(isBackgroundSyncActive: true, clearError: true),
     );
+    // Persistenza: se la modalità continua è stata avviata (associazione
+    // esistente o appena creata) la sincronizzazione automatica deve restare
+    // attiva di default. Scrive il flag `sync_permanently_enabled` così che
+    // il daemon la riavvii anche dopo background/foreground e riavvio app.
+    unawaited(_persistAutoSyncEnabled());
+  }
+
+  Future<void> _persistAutoSyncEnabled() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool('sync_permanently_enabled') != true) {
+        await prefs.setBool('sync_permanently_enabled', true);
+        addLog('INFO', 'Sincronizzazione automatica abilitata di default (associazione)');
+      }
+    } catch (_) {}
   }
 
   void _stopContinuousMode() {
@@ -3603,8 +3619,22 @@ Future(() async {
   Future<void> _performBidirectionalSync(String endpointId) async {
     final phase = _endpointSyncPhase[endpointId] ??= _SyncPhase2();
     if (!phase.isIdle && !phase.complete) {
-      addLog('DEBUG', 'Sync già in corso per $endpointId');
-      return;
+      // Se la fase è bloccata da >30s (es. verifica sync continuo durante
+      // handshake ordinato), resetta forzatamente invece di scartare il
+      // nuovo tentativo: evita deadlock tra i due peer che avviano il sync
+      // nello stesso istante (log: "Sync già in corso") e sblocca il ricevente.
+      if (_lastSyncStartTime != null &&
+          DateTime.now().difference(_lastSyncStartTime!).inSeconds > 30) {
+        addLog(
+          'WARN',
+          'Sync bloccato da >30s per $endpointId in _performBidirectionalSync, reset forzato',
+        );
+        phase.reset();
+        _isSyncing = false;
+      } else {
+        addLog('DEBUG', 'Sync già in corso per $endpointId');
+        return;
+      }
     }
 
     if (_isSyncing &&
@@ -6632,8 +6662,19 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
       if (_associationHandshakeStep[endpointId] == 'verifyingContinuous' &&
           !_continuousSyncVerified) {
         addLog('WARN', 'Timeout verifica sync continuo per $endpointId');
-        // Fallback: se il sync bidirezionale è comunque completato, considera verificato
-        if (_state.status == P2PSyncStatus.completed) {
+        // Fallback: se il sync bidirezionale è comunque completato, considera verificato.
+        // Fallback ulteriore per il ricevente: se le classi sono già state
+        // ricevute e applicate (handshake ordinato arrivato a classConfirmed),
+        // il ricevente può considerarsi sincronizzato anche senza pong,
+        // evitando lo stallo su "Sincronizzazione in corso" in onboarding.
+        final hasClasses = () {
+          try {
+            return LocalDatabase.classes().isNotEmpty;
+          } catch (_) {
+            return false;
+          }
+        }();
+        if (_state.status == P2PSyncStatus.completed || hasClasses) {
           _completeOrderedHandshake(endpointId);
         } else {
           _failOrderedHandshake(endpointId, 'Timeout verifica sincronizzazione costante');
@@ -6862,8 +6903,12 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
         'INFO',
         'Canale parrocchiale applicato: $applied record da $endpointId',
       );
-      // Risposta bidirezionale: il remoto riceve anche i nostri dati.
-      await sendParishChannel(endpointId);
+      // NOTA: non inviamo più automaticamente un parish_channel di risposta
+      // qui: causava un ping-pong infinito (ogni ricezione triggerava un
+      // nuovo invio su entrambi i lati, saturando il canale anche con
+      // payload vuoti). Lo scambio bidirezionale del canale parrocchiale
+      // avviene già in _handleSyncIndex (invio contestuale all'indice) e
+      // tramite sendParishChannelToAll/periodic sync: non serve echo.
     } catch (e) {
       addLog('ERROR', 'Errore applicazione canale parrocchiale: $e');
     }

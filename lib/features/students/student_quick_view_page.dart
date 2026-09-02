@@ -352,15 +352,17 @@ class _HeaderCard extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                Text(
-                  DateFormat('dd/MM/yyyy').format(student.birthDate),
-                  style: TextStyle(
-                    color: isDark
-                        ? colorScheme.onPrimaryContainer.withValues(alpha: 0.7)
-                        : Colors.white70,
-                    fontSize: 14,
+                if (student.birthDate != null)
+                  Text(
+                    DateFormat('dd/MM/yyyy').format(student.birthDate!),
+                    style: TextStyle(
+                      color: isDark
+                          ? colorScheme.onPrimaryContainer
+                              .withValues(alpha: 0.7)
+                          : Colors.white70,
+                      fontSize: 14,
+                    ),
                   ),
-                ),
                 LastModifiedInfo(
                   createdAt: student.createdAt,
                   updatedAt: student.updatedAt,
@@ -396,10 +398,11 @@ class _PersonalInfoCard extends StatelessWidget {
       children: [
         _InfoRow('Nome', student.name),
         _InfoRow('Cognome', student.surname),
-        _InfoRow(
-          'Data di nascita',
-          DateFormat('dd/MM/yyyy').format(student.birthDate),
-        ),
+        if (student.birthDate != null)
+          _InfoRow(
+            'Data di nascita',
+            DateFormat('dd/MM/yyyy').format(student.birthDate!),
+          ),
         if (student.studentPhone.isNotEmpty)
           _InfoRow('Cellulare', student.studentPhone, isPhone: true),
       ],

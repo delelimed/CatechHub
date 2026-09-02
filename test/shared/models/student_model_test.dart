@@ -127,11 +127,11 @@ void main() {
       expect(student.motherPhone, '');
       expect(student.fatherPhone, '');
       expect(student.studentPhone, '');
-      // La data di nascita deve defaultare a DateTime.now() se mancante
-      expect(student.birthDate, isNotNull);
+      // La data di nascita è facoltativa: se mancante resta null
+      expect(student.birthDate, isNull);
     });
 
-    test('fromMap gestisce data di nascita non valida con DateTime.now()', () {
+    test('fromMap gestisce data di nascita non valida come null', () {
       // Arrange: mappa con data non parsabile
       final map = {
         'name': 'Test',
@@ -140,13 +140,8 @@ void main() {
       };
       // Act: deserializza con data corrotta
       final student = Student.fromMap('s5', map);
-      // Assert: la data deve essere quella corrente (fallback)
-      expect(student.birthDate, isNotNull);
-      // La differenza con now deve essere minima (meno di 1 secondo)
-      expect(
-        DateTime.now().difference(student.birthDate).inSeconds,
-        lessThan(2),
-      );
+      // Assert: la data deve essere null (facoltativa)
+      expect(student.birthDate, isNull);
     });
 
     test('toMap/fromMap roundtrip conserva i campi GDPR di iscrizione', () {

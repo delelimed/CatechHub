@@ -262,19 +262,61 @@ class _OnboardingSyncPageState extends ConsumerState<OnboardingSyncPage> {
   }
 
   /// True se il catechista locale risulta in almeno una classe ricevuta.
+  /// Controlla sia il constant `local_catechist_id` (legacy/onboarding)
+  /// sia lo stabile `catechistId` (cat_...) via creator/associated per
+  /// gestire tutte le classi selezionate (anche multiple).
   bool _isLocalUserInAnyClass() {
     try {
       final classesBox = LocalDatabase.classes();
       const localId = AuthService.localUserId;
+      final localCat = AuthService.getCatechistId();
       for (final key in classesBox.keys) {
         final data = LocalDatabase.toStringDynamicMap(classesBox.get(key));
         final ids = (data['catechistIds'] as List? ?? [])
             .map((e) => e.toString())
             .toList();
-        if (ids.contains(localId)) return true;
+        if (ids.contains(localId) || ids.contains(localCat)) return true;
+        final creator = data['creatorCatechistId']?.toString() ?? '';
+        if (creator == localCat) return true;
+        final associated = (data['associatedCatechistIds'] as List? ?? [])
+            .map((e) => e.toString())
+            .toList();
+        if (associated.contains(localCat)) return true;
+        // Se la classe selezionata è stata ricevuta con tutte le sue
+        // proprietà, anche una sola corrispondenza basta per considerare
+        // il sync riuscito per "tutte le classi selezionate" dal mittente.
       }
     } catch (_) {}
     return false;
+  }
+
+  // Verifica tutte le classi condivise se necessario in futuro
+  // ignore: unused_element
+  bool _hasAllSharedClasses(List<String> expectedIds) {
+    if (expectedIds.isEmpty) return _isLocalUserInAnyClass();
+    try {
+      final box = LocalDatabase.classes();
+      for (final id in expectedIds) {
+        if (!box.containsKey(id)) return false;
+        final data = LocalDatabase.toStringDynamicMap(box.get(id));
+        final ids = (data['catechistIds'] as List? ?? [])
+            .map((e) => e.toString())
+            .toList();
+        final cat = AuthService.getCatechistId();
+        final creator = data['creatorCatechistId']?.toString() ?? '';
+        final associated = (data['associatedCatechistIds'] as List? ?? [])
+            .map((e) => e.toString())
+            .toList();
+        final inClass = ids.contains('local_catechist_id') ||
+            ids.contains(cat) ||
+            creator == cat ||
+            associated.contains(cat);
+        if (!inClass) return false;
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> _onSyncCompleted(P2PSyncState state) async {

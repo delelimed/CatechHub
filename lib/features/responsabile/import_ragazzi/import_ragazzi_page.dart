@@ -651,8 +651,8 @@ class _ImportRagazziPageState extends ConsumerState<ImportRagazziPage> {
           if (existing != null) ...[
             const SizedBox(height: 6),
             Text(
-              'Già presente: ${existing.name} ${existing.surname} '
-              '(${_formatDate(existing.birthDate)})',
+              'Già presente: ${existing.name} ${existing.surname}'
+              '${existing.birthDate != null ? ' (${_formatDate(existing.birthDate!)})' : ''}',
               style: TextStyle(
                 fontSize: 12,
                 color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
@@ -862,6 +862,6 @@ class _ImportRagazziPageState extends ConsumerState<ImportRagazziPage> {
     );
   }
 
-  String _formatDate(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+  String _formatDate(DateTime? d) =>
+      d == null ? '—' : '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 }

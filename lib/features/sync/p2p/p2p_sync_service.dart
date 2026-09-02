@@ -1822,15 +1822,32 @@ Future(() async {
     try {
       final box = LocalDatabase.classes();
       final ids = <String>{};
+      final isLocalCat = catechistId == AuthService.getCatechistId();
       for (final key in box.keys) {
         final data = LocalDatabase.toStringDynamicMap(box.get(key));
         final creator = data['creatorCatechistId']?.toString() ?? '';
         final associated = (data['associatedCatechistIds'] as List? ?? [])
             .map((e) => e.toString())
             .toList();
-        if (catechistId == creator || associated.contains(catechistId)) {
-          ids.add(key.toString());
+        final catechistIds = (data['catechistIds'] as List? ?? [])
+            .map((e) => e.toString())
+            .toList();
+        final creatorId = data['creatorId']?.toString() ?? '';
+        bool owned = catechistId == creator || associated.contains(catechistId);
+        // Legacy fallback: classi vecchie senza creatorCatechistId/associated
+        // ma con catechistIds = [local_catechist_id] o creatorId
+        if (!owned) {
+          if (catechistIds.contains(catechistId)) owned = true;
+          // Se è il catechista locale, considera anche la presenza del
+          // constant local_catechist_id (tutte le classi create in onboarding)
+          if (!owned && isLocalCat) {
+            if (catechistIds.contains(AuthService.localUserId) ||
+                creatorId == AuthService.localUserId) {
+              owned = true;
+            }
+          }
         }
+        if (owned) ids.add(key.toString());
       }
       return ids;
     } catch (_) {}
@@ -4340,9 +4357,12 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
 
   /// M5 — Applica il fattore di associazione alla chiave di sessione corrente
   /// dopo lo scambio della chiave per-associazione (payload `p2p_identity`).
-  /// La chiave aggiornata diventa quella attiva per l'INVIO; la chiave
-  /// precedente resta nel set di decifratura per i messaggi in transito, così
-  /// il passaggio non interrompe la comunicazione.
+  /// Per evitare race all'avvio (un peer invia subito con la chiave aggiornata
+  /// mentre l'altro non l'ha ancora derivata, con perdita di p2p_class_info e
+  /// assenza di ack → "non presente in classe"), la chiave precedente resta
+  /// come primaria per l'INVIO per qualche secondo; quella aggiornata è
+  /// immediatamente disponibile per la DECIFRATURA. Dopo un breve grace period
+  /// si promuove l'aggiornata a primaria.
   Future<void> _applyAssociationUpgrade(String endpointId) async {
     final deviceId = _endpointConnIdMap[endpointId];
     if (deviceId == null) return;
@@ -4371,12 +4391,37 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
           .where((k) => k.windowIndex == currentWindow)
           .toList();
       final others = keys.where((k) => k.windowIndex != currentWindow).toList();
+      // Grace period: vecchia chiave resta primaria per l'invio, nuova subito
+      // disponibile per la decifratura (evita perdita del primo p2p_class_info).
       _endpointSessionKeys[endpointId] = [
+        ...oldCurrent,
         _EndpointSessionKey(windowIndex: currentWindow, key: upgraded),
         ...others,
-        ...oldCurrent,
       ];
-      addLog('INFO', 'M5: fattore di associazione attivo per $endpointId');
+      addLog('INFO', 'M5: fattore di associazione attivo per $endpointId (grace period, invio ancora con vecchia)');
+      // Dopo 4s promuovi l'aggiornata a primaria, così entrambi i peer hanno
+      // avuto il tempo di riceverla.
+      Future.delayed(const Duration(seconds: 4), () {
+        final cur = _endpointSessionKeys[endpointId];
+        if (cur == null || cur.isEmpty) return;
+        // Se non contiene più la finestra corrente, uscita (rotazione avvenuta)
+        if (!cur.any((k) => k.windowIndex == currentWindow)) return;
+        // Promuovi: sposta l'ultima chiave della finestra corrente (quella
+        // aggiornata) in prima posizione.
+        final windowKeys = cur.where((k) => k.windowIndex == currentWindow).toList();
+        if (windowKeys.length < 2) return;
+        final otherWindows = cur.where((k) => k.windowIndex != currentWindow).toList();
+        // L'aggiornata è l'ultima aggiunta (indice 1), la vecchia è indice 0.
+        // Porta l'aggiornata davanti.
+        final promoted = windowKeys.last;
+        final remaining = windowKeys.where((k) => k != promoted).toList();
+        _endpointSessionKeys[endpointId] = [
+          promoted,
+          ...remaining,
+          ...otherWindows,
+        ];
+        addLog('INFO', 'M5: promozione chiave aggiornata a primaria per $endpointId');
+      });
     } catch (e) {
       addLog('WARN', 'M5: upgrade associazione fallito per $endpointId: $e');
     }
@@ -4470,11 +4515,16 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
       return;
     }
     final phase = _endpointSyncPhase[endpointId] ??= _SyncPhase2();
-    if (!phase.isIdle && !phase.complete) {
-      addLog('DEBUG', 'Sync index ignorato: sync già in corso per $endpointId');
-      return;
+    // Se un sync è già in corso, NON ignorare l'indice remoto: quando entrambi
+    // i peer avviano il sync nello stesso istante (log: entrambi inviano
+    // p2p_sync_index a pochi ms di distanza), l'ignorare causava deadlock e
+    // perdita dei dati della classe → "non presente in classe".
+    final wasInProgress = !phase.isIdle && !phase.complete;
+    if (wasInProgress) {
+      addLog('DEBUG', 'Sync index ricevuto mentre sync già in corso per $endpointId, procedo comunque (fix concorrenza)');
+    } else {
+      phase.reset();
     }
-    phase.reset();
     try {
       phase.indexSent = true;
       final engine = HiveSyncEngine();
@@ -6219,43 +6269,15 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
         _handshakeTimeoutTimers[endpointId]?.cancel();
         _handshakeTimeoutTimers[endpointId] = Timer(_classAckTimeout, () {
           if (_associationHandshakeStep[endpointId] == 'classSent') {
-            // Fallback: se la sincronizzazione dati è andata a buon fine
-            // (indice scambiato, sync_end ricevuto) la classe è stata
-            // comunque propagata via canale sync, anche se l'ack dedicato
-            // è andato perso per race di chiavi (M5) o lag. In quel caso
-            // non bloccare l'handshake: verifica che il catechista sia
-            // effettivamente nella classe e, se sì, considera verificato.
-            final remoteId = _endpointRemoteCatechistId[endpointId] ?? '';
-            bool isInClass = false;
-            try {
-              if (remoteId.isNotEmpty) {
-                isInClass = NormalModeSyncHandler.isCatechistInSharedClasses(
-                  remoteId,
-                  _associationSharedClassIds.isNotEmpty
-                      ? _associationSharedClassIds
-                      : _endpointSharedClassIds[endpointId] ?? {},
-                );
-                if (!isInClass) {
-                  // Controllo diretto sul box (fallback se shared è vuoto)
-                  final box = LocalDatabase.classes();
-                  for (final k in box.keys) {
-                    final d = LocalDatabase.toStringDynamicMap(box.get(k));
-                    final ids = (d['catechistIds'] as List? ?? []).map((e) => e.toString()).toList();
-                    if (ids.contains(remoteId)) { isInClass = true; break; }
-                  }
-                }
-              }
-            } catch (_) {}
-            final syncOk = _state.status == P2PSyncStatus.completed ||
-                _remoteSyncState[endpointId] == 'idle' ||
-                isInClass;
-            if (syncOk && remoteId.isNotEmpty && isInClass) {
-              addLog('WARN', 'Timeout classe ma catechista già in classe e sync ok: complemento handshake con via libera');
-              _completeOrderedHandshake(endpointId);
-            } else {
-              addLog('ERROR', 'Handshake ordinato fallito: nessuna conferma classe');
-              _failOrderedHandshake(endpointId, 'Timeout conferma registrazione classe');
-            }
+            // Non auto-completare più su isInClass locale: quel controllo è
+            // sempre vero sul mittente (ha già associato il remoto) e
+            // mascherava la perdita del p2p_class_info (M5 race) lasciando il
+            // ricevente senza classe → "non presente in classe".
+            // Se l'ack non arriva, si ritenta una volta in più e poi si
+            // fallisce esplicitamente, così il mittente non mostra un falso
+            // "via libera" mentre il ricevente è ancora vuoto.
+            addLog('ERROR', 'Handshake ordinato fallito: nessuna conferma classe dopo 2 tentativi (ack perso)');
+            _failOrderedHandshake(endpointId, 'Timeout conferma registrazione classe: il ricevente non ha confermato (verifica connessione e riprova)');
           }
         });
       }

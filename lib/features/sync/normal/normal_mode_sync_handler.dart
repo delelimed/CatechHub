@@ -306,13 +306,30 @@ class NormalModeSyncHandler {
     if (catechistId.isEmpty) return false;
     try {
       final box = LocalDatabase.classes();
+      final isLocalCat = catechistId == AuthService.getCatechistId();
       for (final key in box.keys) {
         final data = LocalDatabase.toStringDynamicMap(box.get(key));
         final creator = data['creatorCatechistId']?.toString() ?? '';
         final associated = (data['associatedCatechistIds'] as List? ?? [])
             .map((e) => e.toString())
             .toList();
-        if (catechistId == creator || associated.contains(catechistId)) {
+        final catechistIds = (data['catechistIds'] as List? ?? [])
+            .map((e) => e.toString())
+            .toList();
+        final creatorId = data['creatorId']?.toString() ?? '';
+        bool owned = catechistId == creator || associated.contains(catechistId);
+        if (!owned) {
+          if (catechistIds.contains(catechistId)) {
+            owned = true;
+          }
+          if (!owned && isLocalCat) {
+            if (catechistIds.contains(AuthService.localUserId) ||
+                creatorId == AuthService.localUserId) {
+              owned = true;
+            }
+          }
+        }
+        if (owned) {
           return true;
         }
       }
@@ -323,11 +340,31 @@ class NormalModeSyncHandler {
   static bool _isLocalClass(Map<String, dynamic> data, String localCatechistId) {
     if (localCatechistId.isEmpty) return false;
     final creator = data['creatorCatechistId']?.toString() ?? '';
-    if (creator == localCatechistId) return true;
+    if (creator == localCatechistId) {
+      return true;
+    }
     final associated = (data['associatedCatechistIds'] as List? ?? [])
         .map((e) => e.toString())
         .toList();
-    return associated.contains(localCatechistId);
+    if (associated.contains(localCatechistId)) {
+      return true;
+    }
+    // Legacy fallback: catechistIds con constant
+    final catechistIds = (data['catechistIds'] as List? ?? [])
+        .map((e) => e.toString())
+        .toList();
+    if (catechistIds.contains(localCatechistId)) {
+      return true;
+    }
+    if (localCatechistId == AuthService.getCatechistId()) {
+      if (catechistIds.contains(AuthService.localUserId)) {
+        return true;
+      }
+      if ((data['creatorId']?.toString() ?? '') == AuthService.localUserId) {
+        return true;
+      }
+    }
+    return false;
   }
 
   static Set<String> _getClassIdsForCatechist(String? catechistId) {
@@ -335,15 +372,30 @@ class NormalModeSyncHandler {
     final ids = <String>{};
     try {
       final box = LocalDatabase.classes();
+      final isLocalCat = catechistId == AuthService.getCatechistId();
       for (final key in box.keys) {
         final data = LocalDatabase.toStringDynamicMap(box.get(key));
         final creator = data['creatorCatechistId']?.toString() ?? '';
         final associated = (data['associatedCatechistIds'] as List? ?? [])
             .map((e) => e.toString())
             .toList();
-        if (catechistId == creator || associated.contains(catechistId)) {
-          ids.add(key.toString());
+        final catechistIds = (data['catechistIds'] as List? ?? [])
+            .map((e) => e.toString())
+            .toList();
+        final creatorId = data['creatorId']?.toString() ?? '';
+        bool owned = catechistId == creator || associated.contains(catechistId);
+        if (!owned) {
+          if (catechistIds.contains(catechistId)) {
+            owned = true;
+          }
+          if (!owned && isLocalCat) {
+            if (catechistIds.contains(AuthService.localUserId) ||
+                creatorId == AuthService.localUserId) {
+              owned = true;
+            }
+          }
         }
+        if (owned) ids.add(key.toString());
       }
     } catch (_) {}
     return ids;

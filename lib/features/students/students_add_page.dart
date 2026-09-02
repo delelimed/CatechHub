@@ -118,19 +118,31 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
               children: [
                 _Field(
                   name,
-                  'Nome',
+                  'Nome *',
                   capitalizeWords: true,
                   isDark: isDark,
                   colorScheme: colorScheme,
                 ),
                 _Field(
                   surname,
-                  'Cognome',
+                  'Cognome *',
                   capitalizeWords: true,
                   isDark: isDark,
                   colorScheme: colorScheme,
                 ),
-
+                Padding(
+                  padding: const EdgeInsets.only(left: 4, top: 4, bottom: 2),
+                  child: Text(
+                    'Solo nome e cognome obbligatori — tutto il resto è facoltativo e modificabile dopo.',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: isDark
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 10),
 
                 _DatePicker(
@@ -140,6 +152,7 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
                   },
                   isDark: isDark,
                   colorScheme: colorScheme,
+                  optional: true,
                 ),
               ],
             ),
@@ -280,10 +293,11 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 onPressed: () async {
-                  if (birthDate == null) {
+                  if (name.text.trim().isEmpty ||
+                      surname.text.trim().isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Seleziona la data di nascita'),
+                        content: Text('Nome e cognome sono obbligatori'),
                       ),
                     );
                     return;
@@ -319,23 +333,25 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
 
                   final student = Student(
                     id: studentId,
-                    name: name.text,
-                    surname: surname.text,
-                    birthDate: birthDate!,
+                    name: name.text.trim(),
+                    surname: surname.text.trim(),
+                    birthDate: birthDate,
                     classId: currentClass?.id,
                     classUniqueCode: currentClass?.uniqueCode,
-                    motherName: motherName.text,
-                    motherSurname: motherSurname.text,
-                    motherPhone: motherPhone.text,
-                    fatherName: fatherName.text,
-                    fatherSurname: fatherSurname.text,
-                    fatherPhone: fatherPhone.text,
-                    studentPhone: studentPhone.text,
-                    allergies: allergies.text.isNotEmpty
-                        ? allergies.text
+                    motherName: motherName.text.trim(),
+                    motherSurname: motherSurname.text.trim(),
+                    motherPhone: motherPhone.text.trim(),
+                    fatherName: fatherName.text.trim(),
+                    fatherSurname: fatherSurname.text.trim(),
+                    fatherPhone: fatherPhone.text.trim(),
+                    studentPhone: studentPhone.text.trim(),
+                    allergies: allergies.text.trim().isNotEmpty
+                        ? allergies.text.trim()
                         : null,
                     autonomousExits: autonomousExits,
-                    notes: notes.text,
+                    notes: notes.text.trim().isNotEmpty
+                        ? notes.text.trim()
+                        : null,
                   );
 
                   try {
@@ -841,13 +857,15 @@ class _DatePicker extends StatelessWidget {
   final DateTime? date;
   final bool isDark;
   final ColorScheme colorScheme;
-  final Function(DateTime) onPick;
+  final Function(DateTime?) onPick;
+  final bool optional;
 
   const _DatePicker({
     required this.date,
     required this.isDark,
     required this.colorScheme,
     required this.onPick,
+    this.optional = false,
   });
 
   @override
@@ -884,15 +902,29 @@ class _DatePicker extends StatelessWidget {
               color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
             ),
             const SizedBox(width: 10),
-            Text(
-              date == null
-                  ? 'Seleziona data nascita'
-                  : '${date!.day}/${date!.month}/${date!.year}',
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                color: isDark ? colorScheme.onSurface : null,
+            Expanded(
+              child: Text(
+                date == null
+                    ? (optional
+                        ? 'Data nascita (facoltativo)'
+                        : 'Seleziona data nascita')
+                    : '${date!.day}/${date!.month}/${date!.year}',
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: isDark ? colorScheme.onSurface : null,
+                ),
               ),
             ),
+            if (optional && date != null)
+              InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => onPick(null),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(Icons.clear_rounded,
+                      size: 18, color: Colors.grey.shade500),
+                ),
+              ),
           ],
         ),
       ),

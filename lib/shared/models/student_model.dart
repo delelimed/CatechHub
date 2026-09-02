@@ -48,8 +48,9 @@ class Student {
   /// anche in assenza di relazione diretta (utile per sync multi-classe).
   final String? classUniqueCode;
 
-  /// Data di nascita (formato ISO 8601).
-  final DateTime birthDate;
+  /// Data di nascita (formato ISO 8601). Facoltativa; può essere null se non
+  /// ancora inserita (solo nome/cognome obbligatori).
+  final DateTime? birthDate;
 
   // ─── Genitori: Madre ────────────────────────────────────────────────
   final String motherName;
@@ -146,14 +147,14 @@ class Student {
     required this.id,
     required this.name,
     required this.surname,
-    required this.birthDate,
-    required this.motherName,
-    required this.motherSurname,
-    required this.fatherName,
-    required this.fatherSurname,
-    required this.motherPhone,
-    required this.fatherPhone,
-    required this.studentPhone,
+    this.birthDate,
+    this.motherName = '',
+    this.motherSurname = '',
+    this.fatherName = '',
+    this.fatherSurname = '',
+    this.motherPhone = '',
+    this.fatherPhone = '',
+    this.studentPhone = '',
     this.parentEmail = '',
     this.classId,
     this.classUniqueCode,
@@ -187,9 +188,9 @@ class Student {
       id: id,
       name: data['name'] ?? '',
       surname: data['surname'] ?? '',
-      birthDate:
-          DateTime.tryParse(data['birthDate']?.toString() ?? '') ??
-          DateTime.now(),
+      birthDate: data['birthDate'] == null || data['birthDate'].toString().isEmpty
+          ? null
+          : DateTime.tryParse(data['birthDate'].toString()),
       classId: data['classId'],
       classUniqueCode: data['classUniqueCode'],
       motherName: data['motherName'] ?? '',
@@ -250,6 +251,7 @@ class Student {
   /// Pattern copyWith per aggiornamento immutabile dei campi.
   /// Usato in StudentsRepository._normalize() per applicare
   /// NameFormatting.capitalizeWords prima del salvataggio.
+  /// Per azzerare birthDate passare `birthDate: null` e `clearBirthDate: true`.
   Student copyWith({
     String? id,
     String? name,
@@ -257,6 +259,7 @@ class Student {
     String? classId,
     String? classUniqueCode,
     DateTime? birthDate,
+    bool clearBirthDate = false,
     String? motherName,
     String? motherSurname,
     String? fatherName,
@@ -290,7 +293,7 @@ class Student {
       id: id ?? this.id,
       name: name ?? this.name,
       surname: surname ?? this.surname,
-      birthDate: birthDate ?? this.birthDate,
+      birthDate: clearBirthDate ? null : (birthDate ?? this.birthDate),
       classId: classId ?? this.classId,
       classUniqueCode: classUniqueCode ?? this.classUniqueCode,
       motherName: motherName ?? this.motherName,
@@ -330,12 +333,12 @@ class Student {
   }
 
   /// Serializza in Map per salvataggio in Hive o trasmissione sync.
-  /// birthDate viene serializzato in ISO 8601.
+  /// birthDate viene serializzato in ISO 8601 se presente.
   Map<String, dynamic> toMap() {
     return {
       'name': name,
       'surname': surname,
-      'birthDate': birthDate.toIso8601String(),
+      'birthDate': birthDate?.toIso8601String(),
       'classId': classId,
       'classUniqueCode': classUniqueCode,
       'motherName': motherName,

@@ -365,8 +365,10 @@ class PdfExportService {
     return list;
   }
 
-  /// Nomi dei catechisti del gruppo: creatore, catechista corrente e ultimo
-  /// autore di una modifica, in ordine alfabetico e senza duplicati.
+  /// Nomi dei catechisti del gruppo: tutti quelli assegnati alla classe
+  /// (catechistIds) risolti via rubrica (CatechistProfile) per nome/cognome,
+  /// con fallback su creatore/ultimo autore se la rubrica non contiene il profilo.
+  /// Include anche i catechisti offline aggiunti manualmente.
   static List<String> _loadCatechists(SchoolClass schoolClass) {
     final names = <String>{};
     void add(String name) {
@@ -374,9 +376,57 @@ class PdfExportService {
       if (clean.isNotEmpty) names.add(clean);
     }
 
-    add(schoolClass.creatorName);
-    add(getCurrentCatechistName());
-    add(schoolClass.lastModifiedBy);
+    // Risolvi tutti i catechistIds del gruppo
+    for (final id in schoolClass.catechistIds) {
+      String? resolved;
+      if (id == 'local_catechist_id') {
+        resolved = getCurrentCatechistName();
+      } else {
+        try {
+          final raw = LocalDatabase.catechists().get(id);
+          if (raw != null) {
+            final p = LocalDatabase.toStringDynamicMap(raw);
+            final fn = (p['firstName'] ?? '').toString().trim();
+            final ln = (p['lastName'] ?? '').toString().trim();
+            final full = '$fn $ln'.trim();
+            if (full.isNotEmpty) resolved = full;
+          }
+        } catch (_) {}
+        // Se non trovato in rubrica, prova a vedere se id è cat_... con nome
+        // già presente in creatorName/lastModifiedBy come fallback
+      }
+      if (resolved != null && resolved.trim().isNotEmpty) {
+        add(resolved);
+      }
+    }
+
+    // Fallback: se nessun catechistId ha dato un nome (dati legacy),
+    // usa creatore / ultimo autore / corrente
+    if (names.isEmpty) {
+      add(schoolClass.creatorName);
+      add(getCurrentCatechistName());
+      add(schoolClass.lastModifiedBy);
+    } else {
+      // Aggiungi comunque questi per retrocompatibilità se non già presenti
+      // e se non sono duplicati di un profilo già risolto
+      // (non aggiunge ID grezzi)
+      if (schoolClass.creatorName.trim().isNotEmpty &&
+          !names.contains(schoolClass.creatorName.trim())) {
+        // solo se il creatorName non è già tra i nomi risolti
+        // e il creatorCatechistId non è già in lista
+        final creatorCat = schoolClass.creatorCatechistId;
+        if (creatorCat.isEmpty ||
+            !schoolClass.catechistIds.contains(creatorCat)) {
+          add(schoolClass.creatorName);
+        }
+      }
+    }
+
+    // Se dopo tutto è ancora vuoto (gruppo senza catechisti), mostra almeno il corrente
+    if (names.isEmpty) {
+      add(getCurrentCatechistName());
+    }
+
     final result = names.toList()
       ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
     return result;
@@ -820,10 +870,12 @@ class PdfExportService {
     final mother = _fullName(s.motherName, s.motherSurname);
     final father = _fullName(s.fatherName, s.fatherSurname);
 
-    row(
-      'Data di nascita',
-      '${_formatDate(s.birthDate)}  (${_age(s.birthDate)} anni)',
-    );
+    if (s.birthDate != null) {
+      row(
+        'Data di nascita',
+        '${_formatDate(s.birthDate)}  (${_age(s.birthDate)} anni)',
+      );
+    }
     row('Madre', mother);
     row('Tel. madre', s.motherPhone);
     row('Padre', father);
@@ -924,7 +976,7 @@ class PdfExportService {
                 _tableDataRow([
                   '${s.surname} ${s.name}'.trim(),
                   _formatDate(s.birthDate),
-                  '${_age(s.birthDate)} anni',
+                  s.birthDate != null ? '${_age(s.birthDate)} anni' : '—',
                 ]),
             ],
           ),
@@ -1685,7 +1737,8 @@ class PdfExportService {
     return full.isNotEmpty ? full : '';
   }
 
-  static String _formatDate(DateTime date) {
+  static String _formatDate(DateTime? date) {
+    if (date == null) return '—';
     return '${_two(date.day)}/${_two(date.month)}/${date.year}';
   }
 
@@ -1701,7 +1754,8 @@ class PdfExportService {
 
   static String _two(int v) => v.toString().padLeft(2, '0');
 
-  static int _age(DateTime birthDate) {
+  static int _age(DateTime? birthDate) {
+    if (birthDate == null) return 0;
     final now = DateTime.now();
     var age = now.year - birthDate.year;
     if (now.month < birthDate.month ||

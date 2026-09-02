@@ -309,7 +309,8 @@ class ImportRagazziService {
     return index;
   }
 
-  String _isoOnly(DateTime d) {
+  String? _isoOnly(DateTime? d) {
+    if (d == null) return null;
     final mm = d.month.toString().padLeft(2, '0');
     final dd = d.day.toString().padLeft(2, '0');
     return '${d.year}-$mm-$dd';
@@ -428,14 +429,17 @@ class ImportRagazziService {
   }
 
   /// Costruisce uno [Student] dalla riga normalizzata.
+  /// Solo nome/cognome obbligatori; birthDate facoltativo.
   Student _studentFromRow(ImportRow row, {required String id}) {
     final v = row.values;
+    final rawBirth = v['birthDate']?.toString().trim() ?? '';
+    final parsedBirth =
+        rawBirth.isEmpty ? null : DateTime.tryParse(rawBirth);
     return Student(
       id: id,
-      name: (v['name'] ?? '').toString(),
-      surname: (v['surname'] ?? '').toString(),
-      birthDate:
-          DateTime.tryParse(v['birthDate']?.toString() ?? '') ?? DateTime.now(),
+      name: (v['name'] ?? '').toString().trim(),
+      surname: (v['surname'] ?? '').toString().trim(),
+      birthDate: parsedBirth,
       classId: null,
       classUniqueCode: null,
       motherName: (v['motherName'] ?? '').toString(),

@@ -12,7 +12,7 @@ import '../../../shared/models/student_model.dart';
 enum ImportField {
   nome('Nome', required: true, dbKey: 'name'),
   cognome('Cognome', required: true, dbKey: 'surname'),
-  dataNascita('Data di nascita', required: true, dbKey: 'birthDate'),
+  dataNascita('Data di nascita', required: false, dbKey: 'birthDate'),
   madreNome('Nome madre', dbKey: 'motherName'),
   madreCognome('Cognome madre', dbKey: 'motherSurname'),
   padreNome('Nome padre', dbKey: 'fatherName'),

@@ -1545,6 +1545,7 @@ Future(() async {
     _remoteSyncState.remove(endpointId);
     _remoteSyncStartAt.remove(endpointId);
     _syncStateWatchdog.remove(endpointId)?.cancel();
+    _onboardingFinishedSent.remove(endpointId);
     _isSyncing = false;
     if (_pendingEndpointId == endpointId) {
       _pendingEndpointId = null;
@@ -1598,6 +1599,7 @@ Future(() async {
     _remoteSyncState.remove(endpointId);
     _remoteSyncStartAt.remove(endpointId);
     _syncStateWatchdog.remove(endpointId)?.cancel();
+    _onboardingFinishedSent.remove(endpointId);
     if (_pendingEndpointId == endpointId) {
       _pendingEndpointId = null;
     }
@@ -2399,6 +2401,12 @@ Future(() async {
           break;
         case 'p2p_continuous_sync_pong':
           await _handleContinuousSyncPong(endpointId, decoded);
+          break;
+        case 'p2p_onboarding_finished':
+          await _handleOnboardingFinished(endpointId, decoded);
+          break;
+        case 'p2p_sync_finished':
+          await _handleOnboardingFinished(endpointId, decoded);
           break;
       }
     } catch (e) {
@@ -3768,6 +3776,13 @@ Future(() async {
       );
 
       _updateAssociationLastSync(endpointId, now);
+      // Se la prima sincronizzazione dati è appena terminata dopo l'handshake
+      // ordinato, invia anche il segnale esplicito di termine onboarding per
+      // sbloccare il ricevente in modo deterministico.
+      if (_associationHandshakeStep[endpointId] == 'completed' ||
+          _continuousSyncVerified) {
+        unawaited(_sendOnboardingFinished(endpointId));
+      }
     }
   }
 
@@ -6735,6 +6750,73 @@ Future<void> _applyPendingRemoteProfileIfNeeded() async {
       ),
     );
     addLog('INFO', 'Handshake ordinato COMPLETATO con via libera per $endpointId — sincronizzazione costante funzionante');
+    // Segnale esplicito di termine per il ricevente (requisito onboarding):
+    // il mittente invia p2p_onboarding_finished così il dispositivo
+    // ricevente sa di preciso quando mostrare la schermata di conclusione,
+    // senza dover inferire da timeout o da continuousSyncVerified.
+    unawaited(_sendOnboardingFinished(endpointId));
+  }
+
+  final Set<String> _onboardingFinishedSent = {};
+
+  Future<void> _sendOnboardingFinished(String endpointId) async {
+    if (_onboardingFinishedSent.contains(endpointId)) return;
+    _onboardingFinishedSent.add(endpointId);
+    try {
+      final msg = jsonEncode({
+        'type': 'p2p_onboarding_finished',
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'reason': 'handshake_and_initial_sync_complete',
+      });
+      await _sendEncryptedPayload(endpointId, msg);
+      addLog('INFO', 'Segnale di termine onboarding inviato a $endpointId (p2p_onboarding_finished)');
+    } catch (e) {
+      addLog('WARN', 'Errore invio p2p_onboarding_finished a $endpointId: $e');
+      _onboardingFinishedSent.remove(endpointId);
+    }
+  }
+
+  Future<void> _handleOnboardingFinished(
+    String endpointId,
+    Map<String, dynamic> message,
+  ) async {
+    addLog('INFO', 'Segnale di termine onboarding ricevuto da $endpointId — sincronizzazione iniziale conclusa, mostro schermata conclusione');
+    _handshakeTimeoutTimers[endpointId]?.cancel();
+    _handshakeTimeoutTimers.remove(endpointId);
+    // Sblocca eventuale sync in corso bloccata
+    final phase = _endpointSyncPhase[endpointId];
+    if (phase != null && !phase.isIdle && !phase.complete) {
+      phase.receiveDone = true;
+      phase.sendDone = true;
+    }
+    _isSyncing = false;
+    _lastSyncStartTime = null;
+    _associationHandshakeStep[endpointId] = 'completed';
+    _continuousSyncVerified = true;
+    _onboardingFinishedSent.remove(endpointId);
+    // Assicura che il catechista locale sia correttamente inserito
+    _ensureLocalCatechistInClasses();
+    await _applyPendingRemoteProfileIfNeeded();
+    final now = DateTime.now();
+    _updateState(
+      _state.copyWith(
+        isAssociationHandshakeActive: false,
+        associationHandshakeStep: 'completed',
+        continuousSyncVerified: true,
+        status: P2PSyncStatus.completed,
+        lastSyncAt: now,
+        lastSyncEndedAt: now,
+      ),
+    );
+    await _updateAssociationLastSync(endpointId, now);
+    // Riscontro al mittente (idempotente)
+    try {
+      final ack = jsonEncode({
+        'type': 'p2p_sync_finished',
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      });
+      await _sendEncryptedPayload(endpointId, ack);
+    } catch (_) {}
   }
 
   // ── Scambio stato inizio/fine sync (anti-blocco) ────────────────────────

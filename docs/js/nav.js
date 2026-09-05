@@ -22,6 +22,7 @@
       <a href="#">Funzionalit\u00e0 \u25be</a>
       <ul class="dropdown-menu">
         ${li('features/students.html', 'Anagrafica ragazzi')}
+        ${li('features/gruppi.html', 'Gestione multigruppo')}
         ${li('features/attendance.html', 'Presenze e appello')}
         ${li('features/planning.html', 'Programmazione')}
         ${li('features/documents.html', 'Documenti')}
@@ -29,6 +30,7 @@
         ${li('features/catechesi.html', 'Biblioteca catechetica')}
         ${li('features/data-share.html', 'Condivisione QR')}
         ${li('features/backup.html', 'Backup')}
+        ${li('features/responsabile.html', 'Responsabile parrocchiale')}
         ${li('features/sync.html', 'Sync P2P')}
         ${li('features/allergies-exits.html', 'Allergie/Uscite')}
         ${li('features/pdf-printing.html', 'PDF/Stampa')}

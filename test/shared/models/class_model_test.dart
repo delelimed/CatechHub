@@ -65,9 +65,7 @@ void main() {
 
     test('fromMap gestisce liste nulli con liste vuote', () {
       // Arrange: mappa senza le liste di ID
-      final map = <String, dynamic>{
-        'name': 'Classe Vuota',
-      };
+      final map = <String, dynamic>{'name': 'Classe Vuota'};
       // Act: deserializza
       final schoolClass = SchoolClass.fromMap('c4', map);
       // Assert: le liste devono essere vuote, non null

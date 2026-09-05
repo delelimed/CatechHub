@@ -19,11 +19,37 @@ class AvvisiRepository {
   Box<Map> get _box => LocalDatabase.avvisi();
 
   List<AvvisoTemplate> getAll() {
-    return LocalDatabase.values(_box, (id, data) => AvvisoTemplate.fromMap(id, data));
+    return LocalDatabase.values(
+      _box,
+      (id, data) => AvvisoTemplate.fromMap(id, data),
+    );
   }
 
   Stream<List<AvvisoTemplate>> watchAll() {
-    return LocalDatabase.watchList(_box, (id, data) => AvvisoTemplate.fromMap(id, data));
+    return LocalDatabase.watchList(
+      _box,
+      (id, data) => AvvisoTemplate.fromMap(id, data),
+    );
+  }
+
+  /// Stream in tempo reale degli avvisi appartenenti alla classe
+  /// identificata dal [classUniqueCode].
+  Stream<List<AvvisoTemplate>> watchByClass(String classUniqueCode) {
+    return LocalDatabase.watchList(
+      _box,
+      (id, data) => AvvisoTemplate.fromMap(id, data),
+    ).map(
+      (templates) =>
+          templates.where((t) => t.classUniqueCode == classUniqueCode).toList(),
+    );
+  }
+
+  /// Lettura sincrona degli avvisi di una classe.
+  List<AvvisoTemplate> getByClassSync(String classUniqueCode) {
+    return LocalDatabase.values(
+      _box,
+      (id, data) => AvvisoTemplate.fromMap(id, data),
+    ).where((t) => t.classUniqueCode == classUniqueCode).toList();
   }
 
   Future<void> save(AvvisoTemplate template) async {

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestione Multigruppo — CatechHub</title>
+<meta name="description" content="Gestisci più gruppi di catechismo con CatechHub: crea, unisciti, cambia gruppo con un tap e copia i contenuti tra classi. Tutto offline e sicuro.">
+<link rel="icon" href="../logo.png" type="image/png">
+<link rel="stylesheet" href="../style.css">
+<script src="../js/version.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="../logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
+
+<section class="page-header">
+  <div class="container">
+    <h1>Gestione Multigruppo</h1>
+    <p>Un solo catechista, più gruppi. Tutti i tuoi gruppi di catechismo in un unico posto, organizzati e sicuri</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+
+    <div class="breadcrumb"><a href="../index.html">Home</a> / <a href="gruppi.html">Multigruppo</a> / Panoramica</div>
+
+    <h2>Che cos'è</h2>
+    <p>CatechHub ti permette di gestire <strong>più gruppi di catechismo</strong> con una sola app. Che tu sia l'unico catechista di più classi (Prima Comunione, Cresima, ecc.) o lavori con altri catechisti sullo stesso gruppo, puoi creare, unirti e passare da un gruppo all'altro con un semplice tap, senza duplicare nulla e mantenendo ogni dato al sicuro sul tuo dispositivo.</p>
+
+    <div class="alert alert-info">
+      Ogni gruppo resta <strong>indipendente e cifrato sul tuo telefono</strong>. Puoi decidere tu, di volta in volta, con quali catechisti sincronizzare ciascun gruppo e quali dati condividere. Nessuna informazione esce dal dispositivo senza il tuo consenso.
+    </div>
+
+    <h2>Cosa puoi fare</h2>
+
+    <h3>Creare nuovi gruppi</h3>
+    <p>Crea un nuovo gruppo di catechismo direttamente dall'app: gli dai un nome e cominci subito a inserire i ragazzi. Ogni gruppo ha la propria anagrafica, presenze, documenti e programmazione, mantenuti separati e ben organizzati.</p>
+
+    <h3>Unirti a gruppi esistenti</h3>
+    <p>Se un altro catechista ha già creato un gruppo, puoi unirti e condividere i dati del gruppo tramite sincronizzazione peer-to-peer. Più catechisti possono lavorare sullo stesso gruppo, ognuno dal proprio telefono, con crittografia end-to-end.</p>
+
+    <h3>Cambiare gruppo con un tap</h3>
+    <p>Da qualsiasi schermata puoi passare rapidamente da un gruppo all'altro grazie al selettore dedicato. L'app carica immediatamente i dati del gruppo selezionato: presenze, documenti, programmazione e statistiche.</p>
+
+    <h3>Copiare i contenuti tra gruppi</h3>
+    <p>Puoi copiare l'anagrafica (o altri contenuti) da un gruppo a un altro. Perfetto quando i bambini passano da una classe alla successiva: importi i dati esistenti e li adatti, evitando di reinserire tutto a mano. La copia è selettiva e controllata da te.</p>
+
+    <h3>Gestire i tuoi gruppi dalle Impostazioni</h3>
+    <p>La sezione <strong>"I miei gruppi"</strong> nelle Impostazioni ti mostra in un colpo d'occhio tutti i gruppi a cui appartieni. Da qui puoi rinominare, gestire i catechisti, abbandonare un gruppo o accedere alla sua gestione completa.</p>
+
+    <h2>Riepilogo delle funzioni</h2>
+    <table class="sec-table">
+      <thead><tr><th>Funzione</th><th>A cosa serve</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Creazione gruppo</strong></td><td>Crea un nuovo gruppo di catechismo in pochi tap</td></tr>
+        <tr><td><strong>Iscrizione a gruppo</strong></td><td>Unisciti a un gruppo esistente e condividi i dati con altri catechisti</td></tr>
+        <tr><td><strong>Cambio rapido</strong></td><td>Passa da un gruppo all'altro con un tap dal selettore</td></tr>
+        <tr><td><strong>Copia contenuti</strong></td><td>Importa anagrafica e contenuti da un gruppo a un altro (es. cambio classe)</td></tr>
+        <tr><td><strong>Gestione catechisti</strong></td><td>Aggiungi o rimuovi i catechisti di ogni gruppo</td></tr>
+        <tr><td><strong>I miei gruppi</strong></td><td>Panoramica di tutti i tuoi gruppi dalle Impostazioni</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Sicurezza e privacy</h2>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>Ogni gruppo è cifrato come gli altri dati, all'interno del database protetto</li>
+      <li>La condivisione con altri catechisti avviene solo tramite sync P2P sicuro (X25519 TripleDH + HKDF + AES-256-GCM, rotazione chiavi 30 min) con doppio consenso</li>
+      <li>Puoi decidere, gruppo per gruppo, con chi condividere i dati</li>
+      <li>La copia dei contenuti tra gruppi avviene localmente, sul tuo dispositivo</li>
+      <li>Nessun dato lascia il telefono senza la tua esplicita iniziativa</li>
+    </ul>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div>
+      <strong>CatechHub</strong> <span class="version-tag"></span> — Registro Elettronico di Catechismo<br>
+      <small>Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.</small>
+    </div>
+    <div>
+      <small>
+        &#128231; <a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a> &middot;
+        &#128247; Instagram (prossimamente) &middot;
+        &#9992; Telegram (prossimamente)
+      </small><br>
+      <a href="../privacy.html">Privacy</a> &middot;
+      <a href="../terms.html">Termini</a> &middot;
+      <a href="../infos/index.html">GDPR</a> &middot;
+      <a href="../developer.html">Sviluppatore</a> &middot;
+      <a href="https://github.com/delelimed/CatechHub" class="release-url">GitHub</a><br>
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/nav.js"></script></body>
+</html>

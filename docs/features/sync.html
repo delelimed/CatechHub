@@ -53,19 +53,41 @@
     <h3>3. Conflitti? Nessun problema</h3>
     <p>Se lo stesso ragazzo è stato modificato da entrambi i catechisti, CatechHub tiene automaticamente la versione più recente. Non si perdono mai dati: vince l'ultima modifica.</p>
 
-    <h2>Ruoli di sincronizzazione</h2>
-    <p>Quando aggiungi un dispositivo fidato, puoi scegliere come registrarlo:</p>
+    <h2>Ruoli di sincronizzazione — modalità normale reingegnerizzata</h2>
+    <p>Nella <strong>modalità normale</strong> (non Responsabile) la sync è gestita da <code>NormalModeSyncHandler</code> (<code>lib/features/sync/normal/normal_mode_sync_handler.dart</code>, NOP in responsabile); in responsabile vale la catena di fiducia Ed25519. Quando aggiungi un dispositivo fidato scegli:</p>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
-      <li><strong>Mio Dispositivo:</strong> la sincronizzazione è automatica. Ideale per i tuoi dispositivi personali (tablet, secondo telefono). Non è richiesta alcuna conferma.</li>
-      <li><strong>Altro Catechista:</strong> richiede la tua autorizzazione esplicita prima di ogni sincronizzazione. Perfetto per sincronizzarsi con altri catechisti.</li>
+      <li><strong>Mio Dispositivo:</strong> condivide <strong>anche il <code>catechistId</code></strong> (in <code>p2p_identity</code> cifrato). Se il dispositivo ricevente è fresco (nessuna classe legata al suo id), lo <strong>adotta</strong> → stessa persona su più device → sync di <em>tutte</em> le classi, lavoro offline indipendente + realtime quando vicini. Non richiesta conferma.</li>
+      <li><strong>Altro Catechista:</strong> il catechista remoto viene <strong>associato atomicamente</strong> alla(e) classe(i) scelta(e) (<code>catechistIds/associatedCatechistIds/catechistRoles/catechistDeviceCounts</code> in <code>NormalModeSyncHandler.associateOtherCatechistToSharedClasses:55</code>) → entrambi lavorano sulla stessa copia locale + sync realtime cifrato (Nearby <code>P2P_CLUSTER</code>) quando vicini. Richiede autorizzazione esplicita prima di ogni sync.</li>
     </ul>
+    <p>Dettaglio tecnico e garanzie militari/GDPR in <a href="../NORMAL_MODE_SYNC_REENGINEERING.md">docs/NORMAL_MODE_SYNC_REENGINEERING.md</a>.</p>
 
     <h3>Doppio consenso</h3>
-    <p>Quando due dispositivi sono entrambi registrati come <strong>Altro Catechista</strong>, la sincronizzazione richiede il consenso esplicito di entrambi. Un dialogo appare su entrambi i dispositivi con il riepilogo dei dati da sincronizzare e un pulsante <strong>"Procedi"</strong>. La sincronizzazione parte solo dopo che entrambi gli utenti hanno premuto <strong>"Procedi"</strong>.</p>
+    <p>Quando due dispositivi sono entrambi <strong>Altro Catechista</strong>, la sincronizzazione richiede il consenso su <em>entrambi</em> i lati (<code>p2p_auth_request/response</code> + <code>_sessionSyncAllowed</code>). Il dialogo appare su entrambi i dispositivi; la sessione parte solo dopo doppio “Procedi”. In <strong>Mio Dispositivo</strong> la sync è automatica (stessa persona).</p>
 
     <div class="alert alert-info">
       Il doppio consenso garantisce che nessun dato venga trasferito senza la piena consapevolezza di entrambi i catechisti.
     </div>
+
+    <h2>Sincronizzazione continua realtime (Nearby) — quando vicini</h2>
+    <p>Oltre al manuale, se attivi la sync permanente l'app cerca i dispositivi associati via <code>Nearby</code> (<code>Strategy.P2P_CLUSTER</code> solo Bluetooth/WiFi Direct) e scambia dati in automatico: advertising+discovery, watch Hive con debounce 500 ms → <code>_pushIncrementalSync</code> cifrato AES-256-GCM, periodic 60s, heartbeat 30s, riconnessione 5s. Le modifiche locali sono inviate in incrementale anche durante una full-sync. Lavoro offline indipendente + riconvergenza realtime quando i dispositivi tornano vicini. Pallino: verde=allineato, giallo=in corso, rosso=errore, ciano=dati aggiornati.</p>
+
+    <h2>Scope per classe (minimizzazione GDPR)</h2>
+    <p>Scegli quali classi condividere con ciascun dispositivo. Vengono scambiati <em>solo</em> i dati delle classi selezionate (anagrafica, presenze, programmazione, documenti, note, catechesi, note giornaliere). In modalità normale lo scope è enforced da <code>HiveSyncEngine.buildLocalIndex(scopes)</code> + <code>applyRemoteRecords(scopes)</code> con filtro <code>SyncClassScope</code> per <code>classId/uniqueCode</code> (supporto anche box associativi via lookup padre). Per <strong>Mio Dispositivo</strong> con stesso <code>catechistId</code> → tutte le classi; per <strong>Altro Catechista</strong> → solo condivise (se nessuna selezione → classi comuni). I dati fuori scope non sono mai nell'indice né nel payload.</p>
+
+    <h2>Catena di fiducia (modalità Responsabile)</h2>
+    <p>Quando la parrocchia è gestita in <strong>Modalità Responsabile</strong>, nessun dispositivo può sincronizzare le classi senza essere stato preventivamente <strong>approvato dal Responsabile</strong>. L'approvazione è un certificato asimmetrico firmato <strong>Ed25519</strong> (validità 30 giorni) che viaggia nell'handshake P2P:</p>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>Il Responsabile approva (o revoca) i dispositivi dal <strong>Centro approvazioni</strong>; le revoche sono firmate e propagate peer-to-peer.</li>
+      <li>La <strong>trust root</strong> viene distribuita tramite QR di fiducia che trasporta <strong>solo la chiave pubblica</strong>.</li>
+      <li>Se la modalità Responsabile è attiva, un dispositivo non approvato <strong>non può sincronizzarsi</strong>: la richiesta viene rifiutata.</li>
+      <li>I certificati si propagano peer-to-peer: un dispositivo approvato porta l'approvazione agli altri dispositivi della rete parrocchiale.</li>
+    </ul>
+
+    <h2>Canali di sincronizzazione</h2>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li><strong>Canale classe:</strong> i dati delle classi sono cifrati con una <strong>chiave per-classe</strong> (AES-256-GCM con AAD legato alla classe). I dispositivi "Senza Titolo" fungono solo da relay: ricevono blob opachi che non possono leggere.</li>
+      <li><strong>Canale parrocchiale:</strong> riunioni e avvisi della rete parrocchiale viaggiano in chiaro sulla rete associata — sono comunicazioni "pubbliche" della rete e non contengono dati personali.</li>
+    </ul>
 
     <h2>Tracciabilità delle modifiche</h2>
     <p>Ogni record in CatechHub ora mostra chi lo ha modificato e quando. Questa tracciabilità completa permette di sapere sempre chi ha apportato l'ultima modifica a un ragazzo, una presenza o un incontro, garantendo piena trasparenza tra i catechisti.</p>
@@ -76,15 +98,19 @@
 
     <h2>Cosa si sincronizza</h2>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
-      <li>Anagrafica ragazzi</li>
+      <li>Anagrafica ragazzi e classi (scope per classe)</li>
       <li>Presenze e appello</li>
       <li>Programmazione incontri</li>
       <li>Documenti e consegne</li>
       <li>Note di contatto</li>
+      <li>Catechesi e note giornaliere dei ragazzi</li>
+      <li>Logistica parrocchiale (aule, stanze e slot settimanali)</li>
+      <li>Certificati di approvazione della catena di fiducia</li>
+      <li>Tombstone di cancellazione (impediscono che i dati eliminati "risorgano" da backup o altri dispositivi)</li>
     </ul>
 
     <h2>Cosa NON si sincronizza</h2>
-    <p>La <strong>Biblioteca Catechetica</strong> (testi, schede, materiale didattico) non viene sincronizzata per rispettare la privacy e il copyright. Ogni catechista ha la sua biblioteca personale. Se vuoi, puoi comunque condividere una risorsa specifica con la <a href="data-share.html">Condivisione QR</a>.</p>
+    <p>La <strong>Biblioteca Catechetica</strong> (testi, schede, materiale didattico) non viene sincronizzata per rispettare la privacy e il copyright. Ogni catechista ha la sua biblioteca personale. Se vuoi, puoi comunque condividere una risorsa specifica con la <a href="data-share.html">Condivisione QR</a>. Il <strong>Registro Trattamenti</strong> (audit log GDPR) resta locale al dispositivo su cui l'operazione è avvenuta: è firmato con una chiave per dispositivo e non può essere verificato da altri apparecchi.</p>
 
     <h2>Dispositivi fidati</h2>
     <p>L'app tiene un elenco dei dispositivi con cui ti sei sincronizzato. Puoi vedere nome, data di prima associazione e data ultima sincronizzazione. Se non ti fidi più di un dispositivo, puoi rimuoverlo con un tap.</p>
@@ -93,16 +119,18 @@
       <img src="../screen/Home.jpg" alt="Menu laterale Home" class="screenshot" style="max-width:300px;">
     </div>
 
-    <h2>Sicurezza</h2>
+    <h2>Sicurezza — standard militare per dati particolari di minori</h2>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
-      <li><strong>Crittografia end-to-end:</strong> X25519 ECDH + HKDF + AES-256-GCM — i dati sono cifrati prima di essere trasmessi</li>
-      <li><strong>Pairing code anti-MitM:</strong> durante l'associazione, un codice a 6 cifre derivato dalla chiave condivisa permette di verificare che non ci siano intercettatori</li>
-      <li><strong>Key pinning:</strong> alla riconnessione, la chiave pubblica del dispositivo remoto viene verificata contro l'associazione salvata</li>
-      <li><strong>Forward secrecy:</strong> ogni sessione usa chiavi effimere — anche se una chiave viene compromessa, le sessioni passate restano sicure</li>
-      <li><strong>Associazione tramite QR:</strong> solo i dispositivi che hanno scambiato il QR possono sincronizzarsi</li>
-      <li><strong>Niente internet:</strong> i dati non passano mai da server esterni</li>
-      <li><strong>Controllo totale:</strong> puoi decidere con chi e quando sincronizzarti</li>
-      <li>Puoi rimuovere un dispositivo fidato in qualsiasi momento</li>
+      <li><strong>End-to-end:</strong> TripleDH X25519 (4 DH ordinati + HKDF <code>CatechHub_P2P_Session_v3</code> + AES-256-GCM con AAD <code>CatechHub_Context_P2P_v1</code>), wrapper <code>P2PEncryptedPayload</code>; 5 tipi in chiaro (solo bootstrap), resto scartato se non decifrabile</li>
+      <li><strong>Rotazione 30 min:</strong> <code>sessionWindowIndex</code> keep corrente+precedente, <code>_ensureSessionKey</code> lazy + timer</li>
+      <li><strong>SAS anti-MitM:</strong> pairing code 6 cifre = <code>SHA256(aux ‖ secret)[0..2] % 1M</code>, aux = nonce concordato + efimere ordinate (<code>computePairingCode</code>); persistito per device across reconnect</li>
+      <li><strong>Key pinning:</strong> <code>publicKeyMatchesAssociation</code> ad ogni riconnessione; divergenza → rifiuto + log</li>
+      <li><strong>Forward secrecy:</strong> efimere per-sessione MAI persistite (<code>generateEphemeralKeyPair</code>) + HKDF <code>ForwardSecret_v1</code>; compromise future statiche non espone sessioni passate</li>
+      <li><strong>QR handshake:</strong> <code>p2p_handshake</code> solo bootstrap (nonce+efimera), tutte le PII (catechistId, classi, profilo, certificato) solo in <code>p2p_identity</code> cifrato</li>
+      <li><strong>Canale classe:</strong> chiave per-classe AES-256-GCM con AAD <code>CatechHub_ClassChannel_v1:&lt;uniqueCode&gt;</code> + <code>keyId</code>; relay opaco</li>
+      <li><strong>Minimizzazione + a riposo:</strong> 27 box Hive AES + cifratura di campo per allergie/note/telefoni; tombstone firmati anti-resurrezione</li>
+      <li><strong>Niente internet:</strong> <code>P2P_CLUSTER</code> = solo Bluetooth/WiFi Direct (log <code>:319</code>)</li>
+      <li><strong>Controllo totale:</strong> scegli con chi/quando; rimozione dispositivo in un tap, catena Ed25519 in Responsabile</li>
     </ul>
 
   </div>

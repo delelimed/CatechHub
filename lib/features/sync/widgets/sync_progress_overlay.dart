@@ -35,17 +35,11 @@ class _SyncProgressOverlayState extends ConsumerState<SyncProgressOverlay> {
     super.dispose();
   }
 
-  bool _showingSessionPermission = false;
-
   void _onStateChanged(P2PSyncState state) {
     if (!mounted) return;
     if (state.awaitingConfirmation && !_showingConfirmation) {
       _showingConfirmation = true;
       _showSyncConfirmation(state);
-    }
-    if (state.awaitingSessionPermission && !_showingSessionPermission) {
-      _showingSessionPermission = true;
-      _showSessionPermission(state);
     }
     if (state.largeSyncInProgress &&
         state.totalRecordsToExchange > 0 &&
@@ -87,7 +81,9 @@ class _SyncProgressOverlayState extends ConsumerState<SyncProgressOverlay> {
       const uid = 'local_catechist_id';
       for (final key in box.keys) {
         final data = Map<String, dynamic>.from(box.get(key) as Map);
-        final ids = (data['catechistIds'] as List? ?? []).map((e) => e.toString()).toList();
+        final ids = (data['catechistIds'] as List? ?? [])
+            .map((e) => e.toString())
+            .toList();
         if (ids.contains(uid)) {
           return data['name']?.toString() ?? 'Classe';
         }
@@ -125,12 +121,20 @@ class _SyncProgressOverlayState extends ConsumerState<SyncProgressOverlay> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.class_, size: 16, color: const Color(0xFF174A7E)),
+                    Icon(
+                      Icons.class_,
+                      size: 16,
+                      color: const Color(0xFF174A7E),
+                    ),
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
                         'Classe: $className',
-                        style: const TextStyle(fontSize: 13, color: Color(0xFF174A7E), fontWeight: FontWeight.w500),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF174A7E),
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ],
@@ -151,8 +155,7 @@ class _SyncProgressOverlayState extends ConsumerState<SyncProgressOverlay> {
                 _showingConfirmation = false;
                 service.rejectSync();
               },
-              child: const Text('Rifiuta',
-                  style: TextStyle(color: Colors.red)),
+              child: const Text('Rifiuta', style: TextStyle(color: Colors.red)),
             ),
             FilledButton(
               onPressed: () {
@@ -166,85 +169,6 @@ class _SyncProgressOverlayState extends ConsumerState<SyncProgressOverlay> {
         );
       },
     ).then((_) => _showingConfirmation = false);
-  }
-
-  void _showSessionPermission(P2PSyncState state) {
-    final service = ref.read(nearbySyncServiceProvider);
-    final className = _getCurrentClassName();
-    final deviceName = state.pendingSessionDeviceName ?? 'Dispositivo sconosciuto';
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        return AlertDialog(
-          icon: Icon(
-            Icons.person_search,
-            size: 48,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          title: const Text('Dispositivo rilevato'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'È stato rilevato il dispositivo del catechista $deviceName.\n\n'
-                'Vuoi procedere con la sincronizzazione?\n\n'
-                'La sincronizzazione richiede l\'autorizzazione di entrambi i catechisti.\n'
-                'La connessione partirà solo dopo che entrambi avranno acconsentito.',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF174A7E).withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.class_, size: 16, color: const Color(0xFF174A7E)),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        'Classe: $className',
-                        style: const TextStyle(fontSize: 13, color: Color(0xFF174A7E), fontWeight: FontWeight.w500),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'La sincronizzazione Bluetooth avviene solo tra dispositivi della stessa classe.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                _showingSessionPermission = false;
-                service.denySessionPermission();
-              },
-              child: const Text('Annulla',
-                  style: TextStyle(color: Colors.red)),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                _showingSessionPermission = false;
-                service.grantSessionPermission();
-                service.startBackgroundSync();
-              },
-              child: const Text('Procedi'),
-            ),
-          ],
-        );
-      },
-    ).then((_) => _showingSessionPermission = false);
   }
 
   void _showConflictNotification(int count) {
@@ -351,13 +275,17 @@ class _SyncProgressContentState extends ConsumerState<_SyncProgressContent> {
             ),
           ),
           const SizedBox(height: 20),
-          Icon(Icons.sync, size: 40, color: Theme.of(context).colorScheme.primary),
+          Icon(
+            Icons.sync,
+            size: 40,
+            color: Theme.of(context).colorScheme.primary,
+          ),
           const SizedBox(height: 12),
           Text(
             'Sincronizzazione in corso',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 4),
           Text(

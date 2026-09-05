@@ -13,6 +13,7 @@ import 'package:wiredash/wiredash.dart';
 
 import 'app/router.dart';
 import 'core/auth/auth_provider.dart';
+import 'core/auth/hard_lock_screen.dart';
 import 'core/auth/session_lifecycle_observer.dart';
 import 'core/navigation/back_button_handler.dart';
 import 'core/providers/nearby_sync_provider.dart';
@@ -27,6 +28,9 @@ import 'core/services/update_service.dart';
 import 'core/services/meeting_notification_service.dart';
 import 'core/storage/local_database.dart';
 import 'core/config/env_config.dart';
+import 'features/guide/demo_guide_service.dart';
+import 'shared/utils/app_mode.dart';
+import 'features/gdpr/gdpr_retention_service.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // main.dart — CatechHub (punto di ingresso Dart)
@@ -160,11 +164,23 @@ Future<void> main() async {
       // PRIMA di questa riga provoca un crash fatale:
       //   "Binding has not yet been initialized"
       //
-// NOTA: FlutterError.onError viene impostato DOPO ensureInitialized()
+      // NOTA: FlutterError.onError viene impostato DOPO ensureInitialized()
       // perché il binding deve essere attivo prima di poter registrare
       // handler custom per gli errori del framework.
       // ══════════════════════════════════════════════════════════════════════
       WidgetsFlutterBinding.ensureInitialized();
+
+      // ─────────────────────────────────────────────────────────────────────
+      // SICUREZZA LOG IN RELEASE: nessun debugPrint in produzione.
+      //
+      // L'app gestisce dati sensibili di minori: in release le schermate di
+      // log debug (che possono contenere dati personali, PIN e segreti) NON
+      // devono finire su logcat / console di sistema. debugPrint viene quindi
+      // reso no-op nei build di release, pur restando attivo in debug.
+      // ─────────────────────────────────────────────────────────────────────
+      if (kReleaseMode) {
+        debugPrint = (String? message, {int? wrapWidth}) {};
+      }
 
       // ══════════════════════════════════════════════════════════════════════
       // FASE 0.5 - INIZIALIZZAZIONE FREERASP (SICUREZZA RUNTIME)
@@ -186,12 +202,15 @@ Future<void> main() async {
       } catch (e, stack) {
         debugPrint('[MAIN] ERRORE FATALE inizializzazione freeRASP: $e');
         debugPrint('$stack');
-        runApp(_FatalErrorApp(
-          message: 'Errore di inizializzazione sicurezza (freeRASP).\n'
-              'L\'app non può avviarsi senza le protezioni runtime.\n\n'
-              'Dettaglio: $e\n\n'
-              'Contattare l\'amministratore o reinstallare l\'app.',
-        ));
+        runApp(
+          _FatalErrorApp(
+            message:
+                'Errore di inizializzazione sicurezza (freeRASP).\n'
+                'L\'app non può avviarsi senza le protezioni runtime.\n\n'
+                'Dettaglio: $e\n\n'
+                'Contattare l\'amministratore o reinstallare l\'app.',
+          ),
+        );
         return;
       }
 
@@ -259,7 +278,9 @@ Future<void> main() async {
         await Hive.initFlutter();
       } catch (hiveInitError) {
         debugPrint('[MAIN] Hive.initFlutter() fallito: $hiveInitError');
-        debugPrint('[MAIN] Tentativo di recovery: eliminazione file .lock residui...');
+        debugPrint(
+          '[MAIN] Tentativo di recovery: eliminazione file .lock residui...',
+        );
 
         // Tentativo di recovery: elimina i file .lock residui da crash precedenti.
         // I file .lock vengono creati da Hive quando un Box non viene chiuso
@@ -273,7 +294,9 @@ Future<void> main() async {
             int deletedCount = 0;
             await for (final entity in hiveDir.list()) {
               if (entity is File && entity.path.endsWith('.lock')) {
-                debugPrint('[MAIN] Eliminazione lock file residuo: ${entity.path}');
+                debugPrint(
+                  '[MAIN] Eliminazione lock file residuo: ${entity.path}',
+                );
                 await entity.delete();
                 deletedCount++;
               }
@@ -283,7 +306,9 @@ Future<void> main() async {
 
           // Riprova l'inizializzazione dopo la pulizia dei lock
           await Hive.initFlutter();
-          debugPrint('[MAIN] Hive.initFlutter() recovery completato con successo');
+          debugPrint(
+            '[MAIN] Hive.initFlutter() recovery completato con successo',
+          );
         } catch (retryError) {
           // ─────────────────────────────────────────────────────────────────
           // ERRORE FATALE: Hive NON si inizializza neanche dopo la pulizia.
@@ -297,15 +322,18 @@ Future<void> main() async {
           // Mostra schermata di errore fatale con istruzioni per l'utente.
           // ─────────────────────────────────────────────────────────────────
           debugPrint('[MAIN] Hive.initFlutter() retry fallito: $retryError');
-          runApp(_FatalErrorApp(
-            message: 'Impossibile inizializzare il database locale.\n'
-                'Errore di inizializzazione Hive: $retryError\n\n'
-                'Possibili cause:\n'
-                '- Spazio di archiviazione esaurito\n'
-                '- Permessi di archiviazione negati\n'
-                '- Filesystem corrotto\n\n'
-                'Prova a disinstallare e reinstallare l\'applicazione.',
-          ));
+          runApp(
+            _FatalErrorApp(
+              message:
+                  'Impossibile inizializzare il database locale.\n'
+                  'Errore di inizializzazione Hive: $retryError\n\n'
+                  'Possibili cause:\n'
+                  '- Spazio di archiviazione esaurito\n'
+                  '- Permessi di archiviazione negati\n'
+                  '- Filesystem corrotto\n\n'
+                  'Prova a disinstallare e reinstallare l\'applicazione.',
+            ),
+          );
           return;
         }
       }
@@ -375,23 +403,29 @@ Future<void> main() async {
         // REQUISITO: NESSUN FALLBACK SOFTWARE. L'app DEVE bloccarsi.
         // ─────────────────────────────────────────────────────────────────────
         debugPrint('[MAIN] BLOCCO SICUREZZA HARDWARE: $e');
-        runApp(MaterialApp(
-          debugShowCheckedModeBanner: false,
-          home: SecurityBlockScreen(
-            message: 'Impossibile avviare l\'applicazione.\n\n'
-                '${e.userMessage}\n\n'
-                'Dopo aver configurato un metodo di sblocco, riavvia l\'app.',
+        runApp(
+          MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: SecurityBlockScreen(
+              message:
+                  'Impossibile avviare l\'applicazione.\n\n'
+                  '${e.userMessage}\n\n'
+                  'Dopo aver configurato un metodo di sblocco, riavvia l\'app.',
+            ),
           ),
-        ));
+        );
         return;
       } catch (e) {
         // Qualsiasi altro errore imprevisto durante l'inizializzazione sicurezza
         debugPrint('[MAIN] Errore imprevisto inizializzazione sicurezza: $e');
-        runApp(_FatalErrorApp(
-          message: 'Errore di inizializzazione sicurezza imprevisto.\n'
-              'Dettaglio: $e\n\n'
-              'Contattare l\'amministratore o reinstallare l\'app.',
-        ));
+        runApp(
+          _FatalErrorApp(
+            message:
+                'Errore di inizializzazione sicurezza imprevisto.\n'
+                'Dettaglio: $e\n\n'
+                'Contattare l\'amministratore o reinstallare l\'app.',
+          ),
+        );
         return;
       }
 
@@ -419,14 +453,27 @@ Future<void> main() async {
         // L'app NON può funzionare senza il database.
         // ─────────────────────────────────────────────────────────────────────
         debugPrint('[MAIN] Errore fatale database: $e');
-        runApp(_FatalErrorApp(
-          message: 'Impossibile inizializzare il database locale.\n'
-              'L\'app ha provato a riparare i dati corrotti ma non è riuscita.\n'
-              'Prova a disinstallare e reinstallare l\'applicazione.\n\n'
-              'Dettaglio: $e',
-        ));
+        runApp(
+          _FatalErrorApp(
+            message:
+                'Impossibile inizializzare il database locale.\n'
+                'L\'app ha provato a riparare i dati corrotti ma non è riuscita.\n'
+                'Prova a disinstallare e reinstallare l\'applicazione.\n\n'
+                'Dettaglio: $e',
+          ),
+        );
         return;
       }
+
+      // Guida live post-onboarding: se nella sessione precedente erano presenti
+      // dati di esempio (guida in corso o non completata), vengono rimossi al
+      // riavvio per lasciare spazio ai dati reali.
+      await DemoGuideService.handleAppStart();
+
+      // Coerenza della modalità Responsabile: assicura che app_mode,
+      // user_role e configurazione parrocchiale siano allineati, così la
+      // dashboard parrocchiale non mostra "Accesso riservato" all'avvio.
+      await AppModeUtils.ensureConsistency();
 
       // ═══════════════════════════════════════════════════════════════════════
       // FASE 4 - IMPOSTAZIONI PRIVACY
@@ -499,6 +546,16 @@ Future<void> main() async {
           ),
         ),
       );
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // FASE 7 - ENFORCEMENT GDPR (non fatale)
+      //
+      // Job periodico che applica il termine di conservazione dei dati dei
+      // minori (dataScadenzaTrattamento): marca come RITIRATO gli studenti
+      // con trattamento scaduto e registra la scadenza nel Registro
+      // Trattamenti. Non è distruttivo e non deve mai bloccare l'avvio.
+      // ═══════════════════════════════════════════════════════════════════════
+      GdprRetentionService.start();
     },
     // ─────────────────────────────────────────────────────────────────────────
     // CATCH GLOBALE DEL runZonedGuarded:
@@ -572,7 +629,8 @@ class MyApp extends ConsumerWidget {
 
     // Verifica se l'utente è attualmente sulla route di login
     // (utilizzato per mostrare il caricamento senza splash screen)
-    final isLoginRoute = router.routeInformationProvider.value.uri.path.startsWith('/login');
+    final isLoginRoute = router.routeInformationProvider.value.uri.path
+        .startsWith('/login');
 
     // ═══════════════════════════════════════════════════════════════════════════
     // GESTIONE SICUREZZA freeRASP: ValueListenableBuilder per schermate di blocco
@@ -630,20 +688,26 @@ class MyApp extends ConsumerWidget {
                 data: (_) {
                   return BackButtonHandler(
                     router: router,
-                    child: Router(
-                      routerDelegate: router.routerDelegate,
-                      routeInformationParser: router.routeInformationParser,
-                      routeInformationProvider: router.routeInformationProvider,
+                    child: HardLockGuard(
+                      child: Router(
+                        routerDelegate: router.routerDelegate,
+                        routeInformationParser: router.routeInformationParser,
+                        routeInformationProvider:
+                            router.routeInformationProvider,
+                      ),
                     ),
                   );
                 },
                 loading: () => isLoginRoute
                     ? BackButtonHandler(
                         router: router,
-                        child: Router(
-                          routerDelegate: router.routerDelegate,
-                          routeInformationParser: router.routeInformationParser,
-                          routeInformationProvider: router.routeInformationProvider,
+                        child: HardLockGuard(
+                          child: Router(
+                            routerDelegate: router.routerDelegate,
+                            routeInformationParser: router.routeInformationParser,
+                            routeInformationProvider:
+                                router.routeInformationProvider,
+                          ),
                         ),
                       )
                     : const _LoadingScreen(),
@@ -651,10 +715,14 @@ class MyApp extends ConsumerWidget {
               ),
             );
 
-            // Wrappa l'app con Wiredash SE l'utente ha acconsentito al feedback
-            // remoto E il progetto Wiredash è configurato correttamente.
+            // Wrappa l'app con Wiredash SE il progetto è configurato.
+            // Il consenso (privacy.allowRemoteFeedback) è gestito a runtime
+            // dall'UI (il tasto "Invia Feedback" mostra Wiredash solo se
+            // abilitato), quindi Wiredash resta sempre nell'albero in modo
+            // che l'ancestor sia disponibile anche se l'utente abilita il
+            // consenso successivamente, senza richiedere il riavvio.
             // Wiredash permette all'utente di inviare feedback e segnalare bug.
-            if (privacy.allowRemoteFeedback && _wiredashConfigured) {
+            if (_wiredashConfigured) {
               app = Wiredash(
                 projectId: _wiredashProjectId,
                 secret: _wiredashSecret,
@@ -726,24 +794,30 @@ class MyApp extends ConsumerWidget {
   /// - denied: richiedi il permesso dopo conferma dell'utente
   ///
   /// Il permesso è necessario per le notifiche di aggiornamento dell'app.
-  Future<void> _requestNotificationPermissionIfNeeded(BuildContext context) async {
+  Future<void> _requestNotificationPermissionIfNeeded(
+    BuildContext context,
+  ) async {
     final authBox = LocalDatabase.auth();
     final notificationRequested =
-        authBox.get('notification_permission_requested', defaultValue: false) as bool;
+        authBox.get('notification_permission_requested', defaultValue: false)
+            as bool;
 
     final status = await UpdateService.notificationPermissionStatus();
-    if (status == PermissionStatus.granted || status == PermissionStatus.limited) {
+    if (status == PermissionStatus.granted ||
+        status == PermissionStatus.limited) {
       return;
     }
 
     if (!context.mounted) return;
 
-    if (status == PermissionStatus.permanentlyDenied || status == PermissionStatus.restricted) {
+    if (status == PermissionStatus.permanentlyDenied ||
+        status == PermissionStatus.restricted) {
       await _showNotificationSettingsDialog(context);
       return;
     }
 
-    final shouldRequest = !notificationRequested || status == PermissionStatus.denied;
+    final shouldRequest =
+        !notificationRequested || status == PermissionStatus.denied;
     if (!shouldRequest) return;
 
     final confirmation = await showDialog<bool>(
@@ -772,11 +846,14 @@ class MyApp extends ConsumerWidget {
     if (confirmation != true || !context.mounted) return;
 
     final newStatus = await UpdateService.requestNotificationPermission();
-    if (newStatus == PermissionStatus.granted || newStatus == PermissionStatus.limited) {
+    if (newStatus == PermissionStatus.granted ||
+        newStatus == PermissionStatus.limited) {
       return;
     }
 
-    if ((newStatus == PermissionStatus.permanentlyDenied || newStatus == PermissionStatus.restricted) && context.mounted) {
+    if ((newStatus == PermissionStatus.permanentlyDenied ||
+            newStatus == PermissionStatus.restricted) &&
+        context.mounted) {
       await _showNotificationSettingsDialog(context);
     }
   }
@@ -841,7 +918,8 @@ class MyApp extends ConsumerWidget {
       return;
     }
 
-    if ((newStatus.isPermanentlyDenied || newStatus.isRestricted) && context.mounted) {
+    if ((newStatus.isPermanentlyDenied || newStatus.isRestricted) &&
+        context.mounted) {
       await _showCameraSettingsDialog(context);
     }
   }
@@ -922,8 +1000,13 @@ class MyApp extends ConsumerWidget {
   /// - L'utente non ha acconsentito al feedback remoto
   /// - Wiredash non è configurato
   /// - Il contesto non è più montato
-  void _showMonthlyRandomPromoterSurvey(BuildContext context, PrivacySettings privacy) {
-    if (!privacy.allowRemoteFeedback || !_wiredashConfigured || !context.mounted) {
+  void _showMonthlyRandomPromoterSurvey(
+    BuildContext context,
+    PrivacySettings privacy,
+  ) {
+    if (!privacy.allowRemoteFeedback ||
+        !_wiredashConfigured ||
+        !context.mounted) {
       return;
     }
 
@@ -952,11 +1035,12 @@ class MyApp extends ConsumerWidget {
     try {
       Wiredash.of(context).showPromoterSurvey(inheritMaterialTheme: true);
       // Programma la prossima visualizzazione tra 30 e 45 giorni
-      final nextScheduledDate = now.add(Duration(days: 30 + Random().nextInt(15)));
+      final nextScheduledDate = now.add(
+        Duration(days: 30 + Random().nextInt(15)),
+      );
       box.put(nextSurveyKey, nextScheduledDate.toIso8601String());
     } catch (_) {}
   }
-
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1028,18 +1112,11 @@ class _FatalErrorApp extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.error_outline,
-                  color: Colors.red,
-                  size: 64,
-                ),
+                const Icon(Icons.error_outline, color: Colors.red, size: 64),
                 const SizedBox(height: 24),
                 const Text(
                   'Errore di Inizializzazione',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
                 Text(

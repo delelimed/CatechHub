@@ -12,8 +12,7 @@ import '../attachments/attachments_repository.dart';
 /// Definito a livello di file (non più in planning_provider.dart) per
 /// coerenza modulare. Fornisce l'istanza condivisa del repository
 /// dei meeting a tutti i widget della sezione Programmazione.
-final planningRepositoryProvider =
-    Provider<PlanningRepository>((ref) {
+final planningRepositoryProvider = Provider<PlanningRepository>((ref) {
   return PlanningRepository();
 });
 
@@ -50,6 +49,22 @@ class PlanningRepository {
     );
   }
 
+  /// Stream dei meeting filtrati per classe.
+  Stream<List<PlanningMeeting>> getPlanningByClass(String classId) {
+    return LocalDatabase.watchList(
+      _box,
+      (id, data) => PlanningMeeting.fromMap(id, data),
+    ).map((meetings) => meetings.where((m) => m.classId == classId).toList());
+  }
+
+  /// Lista sincrona dei meeting filtrati per classe.
+  List<PlanningMeeting> getPlanningByClassSync(String classId) {
+    return LocalDatabase.values(
+      _box,
+      (id, data) => PlanningMeeting.fromMap(id, data),
+    ).where((m) => m.classId == classId).toList();
+  }
+
   /// Aggiunge un nuovo meeting dopo aver verificato che non esista già
   /// un altro evento della stessa tipologia (giornata/riunione) per la
   /// stessa classe nella stessa data.
@@ -61,7 +76,9 @@ class PlanningRepository {
     final id = m.id.isEmpty ? LocalDatabase.newId('meeting') : m.id;
     final catechistName = getCurrentCatechistName();
     final now = DateTime.now();
-    final code = m.classUniqueCode.isNotEmpty ? m.classUniqueCode : _lookupClassUniqueCode(m.classId);
+    final code = m.classUniqueCode.isNotEmpty
+        ? m.classUniqueCode
+        : _lookupClassUniqueCode(m.classId);
     final data = m.copyWith(classUniqueCode: code).toMap();
     data['lastModifiedBy'] = catechistName;
     data['createdAt'] = now.toIso8601String();
@@ -93,7 +110,9 @@ class PlanningRepository {
     }
     final code = m.classUniqueCode.isNotEmpty
         ? m.classUniqueCode
-        : (existingUniqueCode?.isNotEmpty == true ? existingUniqueCode! : _lookupClassUniqueCode(m.classId));
+        : (existingUniqueCode?.isNotEmpty == true
+              ? existingUniqueCode!
+              : _lookupClassUniqueCode(m.classId));
     final data = m.copyWith(classUniqueCode: code).toMap();
     data['lastModifiedBy'] = getCurrentCatechistName();
     data['createdAt'] = existingCreatedAt ?? data['createdAt'];

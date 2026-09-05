@@ -51,7 +51,8 @@ class MigrationBlockException implements Exception {
   const MigrationBlockException(this.userMessage, {this.technicalDetail});
 
   @override
-  String toString() => 'MigrationBlockException: $userMessage'
+  String toString() =>
+      'MigrationBlockException: $userMessage'
       '${technicalDetail != null ? ' (Dettaglio: $technicalDetail)' : ''}';
 }
 
@@ -61,10 +62,15 @@ class MigrationBoxException implements Exception {
   final String message;
   final String? technicalDetail;
 
-  const MigrationBoxException(this.boxName, this.message, {this.technicalDetail});
+  const MigrationBoxException(
+    this.boxName,
+    this.message, {
+    this.technicalDetail,
+  });
 
   @override
-  String toString() => 'MigrationBoxException[$boxName]: $message'
+  String toString() =>
+      'MigrationBoxException[$boxName]: $message'
       '${technicalDetail != null ? ' (Dettaglio: $technicalDetail)' : ''}';
 }
 
@@ -77,7 +83,8 @@ class MigrationManager {
   static MigrationManager get instance => _instance;
 
   /// Chiave nel SecureStorage per il flag di migrazione completata.
-  static const String _migrationCompletedFlag = 'migration_zero_data_loss_completed';
+  static const String _migrationCompletedFlag =
+      'migration_zero_data_loss_completed';
 
   /// Elenco dei Box da migrare (nomi legacy → nomi definitivi).
   /// I nomi definitivi coincidono con quelli in LocalDatabase.
@@ -129,7 +136,9 @@ class MigrationManager {
     } catch (e) {
       // Se non possiamo leggere il flag, assumiamo migrazione NON completata
       // per sicurezza (meglio rimigrare che perdere dati).
-      debugPrint('[MigrationManager] Errore lettura flag migrazione: $e');
+      if (kDebugMode) {
+        debugPrint('[MigrationManager] Errore lettura flag migrazione: $e');
+      }
       return false;
     }
   }
@@ -148,13 +157,15 @@ class MigrationManager {
       throw MigrationBlockException(
         'Dispositivo non supporta autenticazione biometrica/PIN. '
         'Impossibile procedere con la migrazione sicura.',
-        technicalDetail: 'canCheckBiometrics=$canCheckBiometrics, isDeviceSupported=$isDeviceSupported',
+        technicalDetail:
+            'canCheckBiometrics=$canCheckBiometrics, isDeviceSupported=$isDeviceSupported',
       );
     }
 
     // Tenta autenticazione
     final bool authenticated = await _localAuth.authenticate(
-      localizedReason: 'Autenticazione richiesta per migrare i dati sensibili '
+      localizedReason:
+          'Autenticazione richiesta per migrare i dati sensibili '
           'verso il nuovo storage cifrato hardware-backed (TEE/StrongBox).',
       biometricOnly: false,
       sensitiveTransaction: true,
@@ -199,11 +210,15 @@ class MigrationManager {
     // ═══════════════════════════════════════════════════════════════════════════
     final bool legacyExists = await Hive.boxExists(legacyBoxName);
     if (!legacyExists) {
-      debugPrint('[MigrationManager] Box legacy "$legacyBoxName" non esiste, salto.');
+      debugPrint(
+        '[MigrationManager] Box legacy "$legacyBoxName" non esiste, salto.',
+      );
       return; // Nessun dato da migrare per questo box
     }
 
-    debugPrint('[MigrationManager] Inizio migrazione Box: $legacyBoxName → $targetBoxName');
+    debugPrint(
+      '[MigrationManager] Inizio migrazione Box: $legacyBoxName → $targetBoxName',
+    );
 
     Box<dynamic>? legacyBox;
     Box<dynamic>? tempBox;
@@ -218,7 +233,9 @@ class MigrationManager {
       final Map<dynamic, dynamic> legacyData = legacyBox.toMap();
       final int legacyCount = legacyData.length;
 
-      debugPrint('[MigrationManager] Box "$legacyBoxName": estratti $legacyCount record');
+      debugPrint(
+        '[MigrationManager] Box "$legacyBoxName": estratti $legacyCount record',
+      );
 
       // Chiudi subito il Box legacy per rilasciare lock
       await legacyBox.close();
@@ -227,7 +244,10 @@ class MigrationManager {
       // ═══════════════════════════════════════════════════════════════════════════
       // PASSO C: Apri Box TEMPORANEO cifrato con AES-256 Hardware-Backed
       // ═══════════════════════════════════════════════════════════════════════════
-      tempBox = await Hive.openBox<dynamic>(tempBoxName, encryptionCipher: cipher);
+      tempBox = await Hive.openBox<dynamic>(
+        tempBoxName,
+        encryptionCipher: cipher,
+      );
 
       // ═══════════════════════════════════════════════════════════════════════════
       // PASSO D: Inserimento atomico TUTTI i record via putAll()
@@ -246,8 +266,10 @@ class MigrationManager {
         // PASSO F: ROLLBACK DI SICUREZZA — MISMATCH CONTEGGIO
         // Elimina SOLO il Box temporaneo, NON toccare il vecchio Box originale
         // ═══════════════════════════════════════════════════════════════════════════
-        debugPrint('[MigrationManager] ERRORE: Mismatch conteggio per "$legacyBoxName": '
-            'legacy=$legacyCount, temp=$tempCount. ROLLBACK.');
+        debugPrint(
+          '[MigrationManager] ERRORE: Mismatch conteggio per "$legacyBoxName": '
+          'legacy=$legacyCount, temp=$tempCount. ROLLBACK.',
+        );
 
         await tempBox.close();
         await Hive.deleteBoxFromDisk(tempBoxName);
@@ -256,11 +278,14 @@ class MigrationManager {
           legacyBoxName,
           'Verifica integrità fallita: conteggio record non corrisponde '
           '(legacy: $legacyCount, temp: $tempCount). Migrazione annullata per sicurezza.',
-          technicalDetail: 'Count mismatch: legacy=$legacyCount vs temp=$tempCount',
+          technicalDetail:
+              'Count mismatch: legacy=$legacyCount vs temp=$tempCount',
         );
       }
 
-      debugPrint('[MigrationManager] Verifica integrità OK per "$legacyBoxName": $tempCount record');
+      debugPrint(
+        '[MigrationManager] Verifica integrità OK per "$legacyBoxName": $tempCount record',
+      );
 
       // ═══════════════════════════════════════════════════════════════════════════
       // PASSO G: CONSOLIDAMENTO ED ERADICAZIONE DATI OBSOLETI
@@ -274,14 +299,22 @@ class MigrationManager {
       // G.2: ERADICAZIONE DEFINITIVA — Elimina vecchio Box legacy dal disco
       // Questo rimuove fisicamente i file .hive e .lock non sicuri
       await Hive.deleteBoxFromDisk(legacyBoxName);
-      debugPrint('[MigrationManager] ERADICATO Box legacy non sicuro: $legacyBoxName');
+      debugPrint(
+        '[MigrationManager] ERADICATO Box legacy non sicuro: $legacyBoxName',
+      );
 
       // G.3: Apri nuovo Box DEFINITIVO con nome originale + cifratura AES-256
-      newBox = await Hive.openBox<dynamic>(targetBoxName, encryptionCipher: cipher);
+      newBox = await Hive.openBox<dynamic>(
+        targetBoxName,
+        encryptionCipher: cipher,
+      );
 
       // G.4: Copia dati dal Box temporaneo al nuovo Box definitivo
       // Riapri tempBox in sola lettura per copiare
-      tempBox = await Hive.openBox<dynamic>(tempBoxName, encryptionCipher: cipher);
+      tempBox = await Hive.openBox<dynamic>(
+        tempBoxName,
+        encryptionCipher: cipher,
+      );
       final Map<dynamic, dynamic> tempData = tempBox.toMap();
 
       if (tempData.isNotEmpty) {
@@ -312,9 +345,10 @@ class MigrationManager {
       await newBox.close();
       newBox = null;
 
-      debugPrint('[MigrationManager] ✅ Migrazione completata per: $legacyBoxName → $targetBoxName '
-          '($legacyCount record migrati, storage legacy eradicato)');
-
+      debugPrint(
+        '[MigrationManager] ✅ Migrazione completata per: $legacyBoxName → $targetBoxName '
+        '($legacyCount record migrati, storage legacy eradicato)',
+      );
     } on MigrationBoxException {
       // Rilancia eccezioni di migrazione già tipizzate
       rethrow;
@@ -322,7 +356,9 @@ class MigrationManager {
       // ═══════════════════════════════════════════════════════════════════════════
       // ROLLBACK GENERALE: Qualsiasi eccezione imprevista → pulizia sicura
       // ═══════════════════════════════════════════════════════════════════════════
-      debugPrint('[MigrationManager] ERRORE imprevisto migrazione "$legacyBoxName": $e');
+      debugPrint(
+        '[MigrationManager] ERRORE imprevisto migrazione "$legacyBoxName": $e',
+      );
       debugPrint('$stack');
 
       // Cleanup best-effort: chiudi ed elimina SOLO risorse temporanee/nuove
@@ -376,7 +412,9 @@ class MigrationManager {
     // ═══════════════════════════════════════════════════════════════════════════
     final bool alreadyDone = await isMigrationCompleted();
     if (alreadyDone) {
-      debugPrint('[MigrationManager] Migrazione già completata (flag=true), skip.');
+      debugPrint(
+        '[MigrationManager] Migrazione già completata (flag=true), skip.',
+      );
       return;
     }
 
@@ -424,16 +462,23 @@ class MigrationManager {
     );
 
     debugPrint('[MigrationManager] === MIGRAZIONE COMPLETATA CON SUCCESSO ===');
-    debugPrint('[MigrationManager] Flag migration_zero_data_loss_completed = true scritto in SecureStorage');
+    debugPrint(
+      '[MigrationManager] Flag migration_zero_data_loss_completed = true scritto in SecureStorage',
+    );
   }
 
   /// Reset del flag migrazione (SOLO PER TESTING/DEBUG).
   /// USARE CON ESTREMA CAUTEZZA: forza rimigrazione al prossimo avvio.
   Future<void> resetMigrationFlagForTesting() async {
     if (!kDebugMode) {
-      throw StateError('resetMigrationFlagForTesting() disponibile solo in debug mode');
+      throw StateError(
+        'resetMigrationFlagForTesting() disponibile solo in debug mode',
+      );
     }
-    await _secureStorage.delete(key: _migrationCompletedFlag, aOptions: _androidOptions);
+    await _secureStorage.delete(
+      key: _migrationCompletedFlag,
+      aOptions: _androidOptions,
+    );
     debugPrint('[MigrationManager] [TESTING] Flag migrazione resettato');
   }
 }

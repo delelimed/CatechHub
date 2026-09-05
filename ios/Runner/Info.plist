@@ -70,5 +70,13 @@
 	<string>La fotocamera è necessaria per scansionare il codice QR di pairing e collegare i dispositivi.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Autenticati con Face ID per sbloccare il Registro in modo rapido e sicuro.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Il Bluetooth consente la sincronizzazione sicura dei dati del Registro tra i dispositivi dei catechisti.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Il Bluetooth consente la sincronizzazione sicura dei dati del Registro tra i dispositivi dei catechisti.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>La rete locale consente la sincronizzazione dei dati del Registro tra dispositivi nella stessa parrocchia, solo con pairing autorizzato.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

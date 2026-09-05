@@ -48,13 +48,13 @@ import 'package:hive_flutter/hive_flutter.dart';
 /// errore fatale. Tutti gli altri Box sono recuperabili con perdita dati
 /// limitata al singolo dominio.
 class LocalDatabase {
-// ─────────────────────────────────────────────────────────────────────────
-// NOMI BOX HIVE
-// Ogni costante identifica un Box Hive su disco. I nomi sono versionati
-// implicitamente: se si cambia struttura dati, si apre un NUOVO Box con
-// nome diverso (es. students_box_v2) e si migrano i dati. Questo evita
-// conflitti di TypeAdapter tra versioni dell'app.
-// ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // NOMI BOX HIVE
+  // Ogni costante identifica un Box Hive su disco. I nomi sono versionati
+  // implicitamente: se si cambia struttura dati, si apre un NUOVO Box con
+  // nome diverso (es. students_box_v2) e si migrano i dati. Questo evita
+  // conflitti di TypeAdapter tra versioni dell'app.
+  // ─────────────────────────────────────────────────────────────────────────
   static const authBox = 'registroBox';
   static const classesBox = 'classes_box';
   static const studentsBox = 'students_box';
@@ -71,6 +71,37 @@ class LocalDatabase {
   static const meetingNotificationsBox = 'meeting_notifications_box';
   static const avvisiBox = 'avvisi_box';
   static const syncConflictsBox = 'sync_conflicts_box';
+  // ─── Box della modalità "Responsabile Catechistico" ─────────────────────
+
+  static const parishConfigBox = 'parish_config_box';
+  static const auditLogBox = 'audit_log_box';
+  static const aulaBox = 'aula_box';
+  static const tombstoneBox = 'tombstone_box';
+  static const historicalRecordsBox = 'historical_records_box';
+
+  /// Rubrica dei catechisti della parrocchia (nome, cognome, telefono).
+  static const catechistsBox = 'catechists_box';
+
+  // ─── Box della "Rete Catechistica Parrocchiale" ─────────────────────────
+
+  /// Chiavi di canale per-classe (Class_Encryption_Key) possedute da questo
+  /// dispositivo. Map, chiave = classId.
+  static const classChannelKeysBox = 'class_channel_keys_box';
+
+  /// Blob cifrati delle classi senza titolo ricevuti in relay. Map,
+  /// chiave = classUniqueCode. Vengono decifrati quando si ottiene il titolo.
+  static const classChannelCiphertextBox = 'class_channel_ciphertext_box';
+
+  /// Riunioni/eventi del canale parrocchiale globale (in chiaro per la rete).
+  static const parishEventsBox = 'parish_events_box';
+
+  // ─── Box del modulo "Supplenze Temporanee e Delega Sicura" ─────────────
+
+  /// Deleghe di supplenza (Map, chiave = delegationId).
+  static const substituteDelegationsBox = 'substitute_delegations_box';
+
+  /// Note di lezione registrate durante una supplenza (Map, chiave = noteId).
+  static const substituteLessonNotesBox = 'substitute_lesson_notes_box';
 
   static late final HiveAesCipher _cipher;
   static bool _initialized = false;
@@ -130,11 +161,16 @@ class LocalDatabase {
       const secureStorage = FlutterSecureStorage();
       const encryptionKeyName = 'secure_database_key';
 
-      var encryptionKeyString = await secureStorage.read(key: encryptionKeyName);
+      var encryptionKeyString = await secureStorage.read(
+        key: encryptionKeyName,
+      );
       if (encryptionKeyString == null) {
         final key = Hive.generateSecureKey();
         encryptionKeyString = base64UrlEncode(key);
-        await secureStorage.write(key: encryptionKeyName, value: encryptionKeyString);
+        await secureStorage.write(
+          key: encryptionKeyName,
+          value: encryptionKeyString,
+        );
       }
       _cipher = HiveAesCipher(base64Url.decode(encryptionKeyString));
     }
@@ -159,16 +195,62 @@ class LocalDatabase {
       _BoxDefinition(name: planningBox, isMap: true, isCritical: false),
       _BoxDefinition(name: attendanceBox, isMap: true, isCritical: false),
       _BoxDefinition(name: documentsBox, isMap: true, isCritical: false),
-      _BoxDefinition(name: documentDeliveriesBox, isMap: true, isCritical: false),
+      _BoxDefinition(
+        name: documentDeliveriesBox,
+        isMap: true,
+        isCritical: false,
+      ),
       _BoxDefinition(name: attachmentsBox, isMap: true, isCritical: false),
       _BoxDefinition(name: contactNotesBox, isMap: true, isCritical: false),
       _BoxDefinition(name: catechesiBox, isMap: true, isCritical: false),
-      _BoxDefinition(name: meetingCatechesiBox, isMap: false, isCritical: false),
-      _BoxDefinition(name: studentDailyNotesBox, isMap: true, isCritical: false),
+      _BoxDefinition(
+        name: meetingCatechesiBox,
+        isMap: false,
+        isCritical: false,
+      ),
+      _BoxDefinition(
+        name: studentDailyNotesBox,
+        isMap: true,
+        isCritical: false,
+      ),
       _BoxDefinition(name: trustedDevicesBox, isMap: true, isCritical: false),
-      _BoxDefinition(name: meetingNotificationsBox, isMap: true, isCritical: false),
+      _BoxDefinition(
+        name: meetingNotificationsBox,
+        isMap: true,
+        isCritical: false,
+      ),
       _BoxDefinition(name: avvisiBox, isMap: true, isCritical: false),
       _BoxDefinition(name: syncConflictsBox, isMap: true, isCritical: false),
+      // Box della modalità "Responsabile Catechistico"
+      _BoxDefinition(name: parishConfigBox, isMap: false, isCritical: false),
+      _BoxDefinition(name: auditLogBox, isMap: true, isCritical: false),
+      _BoxDefinition(name: aulaBox, isMap: true, isCritical: false),
+      _BoxDefinition(name: tombstoneBox, isMap: true, isCritical: false),
+      _BoxDefinition(
+        name: historicalRecordsBox,
+        isMap: true,
+        isCritical: false,
+      ),
+      _BoxDefinition(name: catechistsBox, isMap: true, isCritical: false),
+      // Box della "Rete Catechistica Parrocchiale"
+      _BoxDefinition(name: classChannelKeysBox, isMap: true, isCritical: false),
+      _BoxDefinition(
+        name: classChannelCiphertextBox,
+        isMap: true,
+        isCritical: false,
+      ),
+      _BoxDefinition(name: parishEventsBox, isMap: true, isCritical: false),
+      // Box del modulo "Supplenze Temporanee e Delega Sicura"
+      _BoxDefinition(
+        name: substituteDelegationsBox,
+        isMap: true,
+        isCritical: false,
+      ),
+      _BoxDefinition(
+        name: substituteLessonNotesBox,
+        isMap: true,
+        isCritical: false,
+      ),
     ];
 
     for (final definition in boxDefinitions) {
@@ -184,7 +266,9 @@ class LocalDatabase {
       await Hive.box(authBox).delete('isLoggedIn');
     } catch (e) {
       // Non fatale: il flag legacy potrebbe non esistere.
-      debugPrint('[LocalDatabase] Cleanup legacy isLoggedIn fallito (non fatale): $e');
+      debugPrint(
+        '[LocalDatabase] Cleanup legacy isLoggedIn fallito (non fatale): $e',
+      );
     }
 
     _initialized = true;
@@ -217,8 +301,12 @@ class LocalDatabase {
       // Causa probabile: file .hive corrotto, lock residuo, o TypeAdapter
       // disallineato rispetto alla struttura dati attuale.
       // ─────────────────────────────────────────────────────────────────────
-      debugPrint('[LocalDatabase] Box "${definition.name}" apertura fallita: $e');
-      debugPrint('[LocalDatabase] Tentativo di recovery per "${definition.name}"...');
+      debugPrint(
+        '[LocalDatabase] Box "${definition.name}" apertura fallita: $e',
+      );
+      debugPrint(
+        '[LocalDatabase] Tentativo di recovery per "${definition.name}"...',
+      );
 
       try {
         // 1. Chiudi eventuali riferimenti parziali a questo Box per
@@ -238,27 +326,35 @@ class LocalDatabase {
         //    manuale dei file, perche' gestisce correttamente i edge case
         //    come i lock temporanei e i file .tmp.
         await Hive.deleteBoxFromDisk(definition.name);
-        debugPrint('[LocalDatabase] Box "${definition.name}" eliminato da disco con deleteBoxFromDisk');
+        debugPrint(
+          '[LocalDatabase] Box "${definition.name}" eliminato da disco con deleteBoxFromDisk',
+        );
       } catch (deleteError) {
         // Se deleteBoxFromDisk fallisce, logghiamo ma continuiamo.
         // Il retry potrebbe comunque riuscire se il problema era solo
         // un lock transitorio.
-        debugPrint('[LocalDatabase] Eliminazione Box "${definition.name}" fallita: $deleteError');
+        debugPrint(
+          '[LocalDatabase] Eliminazione Box "${definition.name}" fallita: $deleteError',
+        );
       }
 
       try {
         // 3. Riapri il Box vuoto (i dati precedenti sono persi ma l'app
         //    non crasha e puo' continuare a funzionare).
         await _openSingleBox(definition);
-        debugPrint('[LocalDatabase] Recovery Box "${definition.name}" completato. '
-            'Dati precedenti persi, Box ricreato vuoto.');
+        debugPrint(
+          '[LocalDatabase] Recovery Box "${definition.name}" completato. '
+          'Dati precedenti persi, Box ricreato vuoto.',
+        );
       } catch (retryError) {
         // ───────────────────────────────────────────────────────────────────
         // ANCHE IL RETRY E' FALLITO per il Box: definition.name
         // Se il Box e' critico (authBox), propaghiamo l'errore.
         // Altrimenti logghiamo e continuiamo con gli altri Box.
         // ───────────────────────────────────────────────────────────────────
-        debugPrint('[LocalDatabase] Retry per "${definition.name}" fallito: $retryError');
+        debugPrint(
+          '[LocalDatabase] Retry per "${definition.name}" fallito: $retryError',
+        );
         if (definition.isCritical) {
           rethrow;
         }
@@ -294,9 +390,30 @@ class LocalDatabase {
   static Box meetingCatechesi() => Hive.box(meetingCatechesiBox);
   static Box<Map> studentDailyNotes() => Hive.box<Map>(studentDailyNotesBox);
   static Box<Map> trustedDevices() => Hive.box<Map>(trustedDevicesBox);
-  static Box<Map> meetingNotifications() => Hive.box<Map>(meetingNotificationsBox);
+  static Box<Map> meetingNotifications() =>
+      Hive.box<Map>(meetingNotificationsBox);
   static Box<Map> avvisi() => Hive.box<Map>(avvisiBox);
   static Box<Map> syncConflicts() => Hive.box<Map>(syncConflictsBox);
+
+  // ─── Accessori Box Responsabile Catechistico ─────────────────────────────
+  static Box parishConfig() => Hive.box(parishConfigBox);
+  static Box<Map> auditLog() => Hive.box<Map>(auditLogBox);
+  static Box<Map> aula() => Hive.box<Map>(aulaBox);
+  static Box<Map> tombstones() => Hive.box<Map>(tombstoneBox);
+  static Box<Map> historicalRecords() => Hive.box<Map>(historicalRecordsBox);
+  static Box<Map> catechists() => Hive.box<Map>(catechistsBox);
+
+  // ─── Accessori Box Rete Catechistica Parrocchiale ───────────────────────
+  static Box<Map> classChannelKeys() => Hive.box<Map>(classChannelKeysBox);
+  static Box<Map> classChannelCiphertext() =>
+      Hive.box<Map>(classChannelCiphertextBox);
+  static Box<Map> parishEvents() => Hive.box<Map>(parishEventsBox);
+
+  // ─── Accessori Box Modulo Supplenze ─────────────────────────────────────
+  static Box<Map> substituteDelegations() =>
+      Hive.box<Map>(substituteDelegationsBox);
+  static Box<Map> substituteLessonNotes() =>
+      Hive.box<Map>(substituteLessonNotesBox);
 
   // ─────────────────────────────────────────────────────────────────────────
   // UTILITÀ DI CIFRATURA BYTES
@@ -334,7 +451,8 @@ class LocalDatabase {
     yield _boxValues(box, mapper);
     var lastUpdate = DateTime.now();
     await for (final _ in box.watch()) {
-      if (DateTime.now().difference(lastUpdate) > const Duration(milliseconds: 500)) {
+      if (DateTime.now().difference(lastUpdate) >
+          const Duration(milliseconds: 500)) {
         yield _boxValues(box, mapper);
         lastUpdate = DateTime.now();
       }

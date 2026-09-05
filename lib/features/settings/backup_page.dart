@@ -4,19 +4,23 @@
 ///   programmazione, catechesi, documenti e allegati), li cifra con il PIN
 ///   dell'utente tramite [DataExportService.exportEncryptedData] e salva il
 ///   file `.catechhub` nella posizione scelta dall'utente (tramite
-///   [FilePicker]).
+///   [FilePicker]). Il file viene verificato con checksum SHA-256 per
+///   garantire integrità e completezza (sicurezza grado militare).
 /// - **Importa backup**: seleziona un file `.catechhub`, richiede il PIN
 ///   di decifratura, verifica la password tramite
-///   [DataExportService.verifyEncryptedPassword], chiede conferma della
-///   sovrascrittura e ripristina tutti i dati tramite
+///   [DataExportService.verifyEncryptedPassword], verifica il checksum,
+///   chiede conferma della sovrascrittura e ripristina tutti i dati tramite
 ///   [DataExportService.importEncryptedData].
 ///
 /// Entrambe le operazioni verificano il PIN dell'utente prima di procedere.
 /// L'importazione sostituisce completamente i dati esistenti in modo
 /// irreversibile.
+library;
+
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:cryptography/cryptography.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -24,7 +28,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/auth/auth_provider.dart';
+import '../../core/services/backup_encryption_service.dart';
 import '../../core/services/data_export_service.dart';
+import '../../core/providers/current_class_provider.dart';
+import '../../shared/models/class_model.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../classes/classes_provider.dart';
 import '../documents/documents_provider.dart';
@@ -74,30 +81,44 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         return;
       }
 
-      // Chiedi il PIN per cifrare il backup (PIN dedicato al file di backup)
-      final pin = await _askPin(
-        title: 'Cifra Backup',
-        message: 'Crea un PIN per proteggere il file di backup.\nQuesto PIN sarà necessario per ripristinare il backup.',
+      // A2: chiedi il PIN per cifrare il backup (politica forte: almeno
+      // 12 caratteri alfanumerici con lettere e cifre, conferma in dialogo).
+      if (!mounted) return;
+      final pin = await BackupEncryptionService.showBackupPinDialog(
+        context: context,
+        isExport: true,
       );
       if (pin == null) {
         if (mounted) setState(() => _isExporting = false);
         return;
       }
 
-      // Conferma PIN
-      final confirmPin = await _askPin(
-        title: 'Conferma PIN',
-        message: 'Reinserisci il PIN per confermare.',
-      );
-      if (confirmPin == null || confirmPin != pin) {
-        if (mounted) {
-          setState(() {
-            _isExporting = false;
-            _statusMessage = 'I PIN non coincidono';
-            _isError = true;
-          });
-        }
+      // Scegli se esportare una singola classe oppure tutte le classi
+      final selection = await _askExportScope();
+      if (selection == null) {
+        if (mounted) setState(() => _isExporting = false);
         return;
+      }
+      final String? exportClassId = selection == 'ALL' ? null : selection;
+      SchoolClass? exportClass;
+      if (exportClassId != null) {
+        final myClasses = ref.read(myClassesProvider);
+        for (final c in myClasses) {
+          if (c.id == exportClassId) {
+            exportClass = c;
+            break;
+          }
+        }
+        if (exportClass == null) {
+          if (mounted) {
+            setState(() {
+              _isExporting = false;
+              _statusMessage = 'Classe selezionata non trovata';
+              _isError = true;
+            });
+          }
+          return;
+        }
       }
 
       setState(() {
@@ -110,27 +131,73 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       await Future.delayed(Duration.zero);
 
       // Esporta e cifra
-      final encrypted = await DataExportService.exportEncryptedData(pin);
+      final encrypted = await DataExportService.exportEncryptedData(
+        pin,
+        classId: exportClassId,
+      );
       final bytes = Uint8List.fromList(utf8.encode(encrypted));
+
+      // Verifica integrità: calcola checksum SHA-256 dei dati cifrati (cryptography)
+      final checksum = await _sha256(bytes);
 
       // Permetti all'utente di scegliere dove salvare
       final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-      final fileName = 'catechhub_backup_$timestamp.catechhub';
+      final className = exportClass != null
+          ? exportClass.name
+          : 'ClassiCompleto';
+      // Il nome file NON include il nome del catechista: i backup contengono
+      // dati sensibili di minori e un nome file con dati personali aumenterebbe
+      // il rischio di esposizione PII se il file venisse condiviso o caricato
+      // accidentalmente su un servizio di cloud.
+      final fileName =
+          'catechhub_backup_${_sanitizeFilename(className)}_$timestamp'
+          '.catechhub';
 
       String? savedPath;
       bool saved = false;
       try {
-        savedPath = await FilePicker.saveFile(
+        // file_picker: saveFile restituisce String? (path) su Android/iOS,
+        // Uri? su desktop/web. Gestiamo entrambi i casi.
+        final result = await FilePicker.saveFile(
           dialogTitle: 'Salva backup',
           fileName: fileName,
           bytes: bytes,
         );
-        if (savedPath != null) saved = true;
+        if (result != null) {
+          savedPath = result.toString();
+          // Verifica militare: il file deve esistere, avere size > 0 e checksum corretto
+          final file = File(savedPath);
+          if (await file.exists()) {
+            final writtenBytes = await file.readAsBytes();
+            if (writtenBytes.isNotEmpty) {
+              final writtenChecksum = await _sha256(writtenBytes);
+              if (writtenChecksum == checksum) {
+                saved = true;
+              } else {
+                if (mounted) {
+                  setState(() {
+                    _statusMessage = 'Errore: checksum non corrispondente (dati corrotti)';
+                    _isError = true;
+                  });
+                }
+                return;
+              }
+            } else {
+              if (mounted) {
+                setState(() {
+                  _statusMessage = 'Errore: file scritto ma vuoto (0 byte)';
+                  _isError = true;
+                });
+              }
+              return;
+            }
+          }
+        }
       } catch (e) {
         savedPath = null;
       }
 
-      // Se saveFile fallisce, usa getDirectoryPath + scrittura manuale
+      // Se saveFile fallisce, usa getDirectoryPath + scrittura manuale con verifica
       if (!saved) {
         try {
           final directory = await FilePicker.getDirectoryPath(
@@ -140,8 +207,33 @@ class _BackupPageState extends ConsumerState<BackupPage> {
             final filePath = '$directory/$fileName';
             final file = File(filePath);
             await file.writeAsBytes(bytes, flush: true);
-            savedPath = filePath;
-            saved = true;
+            // Verifica post-scrittura
+            if (await file.exists()) {
+              final writtenBytes = await file.readAsBytes();
+              if (writtenBytes.isNotEmpty) {
+                final writtenChecksum = await _sha256(writtenBytes);
+                if (writtenChecksum == checksum) {
+                  savedPath = filePath;
+                  saved = true;
+                } else {
+                  if (mounted) {
+                    setState(() {
+                      _statusMessage = 'Errore: checksum non corrispondente (fallback)';
+                      _isError = true;
+                    });
+                  }
+                  return;
+                }
+              } else {
+                if (mounted) {
+                  setState(() {
+                    _statusMessage = 'Errore: file scritto ma vuoto (0 byte) - fallback';
+                    _isError = true;
+                  });
+                }
+                return;
+              }
+            }
           }
         } catch (e) {
           savedPath = null;
@@ -151,14 +243,14 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       if (saved) {
         if (mounted) {
           setState(() {
-            _statusMessage = 'Backup esportato con successo';
+            _statusMessage = 'Backup esportato e verificato con successo (SHA-256)';
             _isError = false;
           });
         }
       } else {
         if (mounted) {
           setState(() {
-            _statusMessage = 'Esportazione annullata';
+            _statusMessage = 'Esportazione annullata o fallita';
             _isError = false;
           });
         }
@@ -177,6 +269,12 @@ class _BackupPageState extends ConsumerState<BackupPage> {
     }
   }
 
+  /// Calcola hash SHA-256 usando il package cryptography (compatibile con backup_encryption_service).
+  static Future<String> _sha256(Uint8List data) async {
+    final hash = await Sha256().hash(data);
+    return base64Encode(hash.bytes);
+  }
+
   // ────────────────────────────────────────────
   //  IMPORT
   // ────────────────────────────────────────────
@@ -191,9 +289,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
 
     try {
       // Seleziona file
-      final result = await FilePicker.pickFiles(
-        type: FileType.any,
-      );
+      // file_picker 12: pickFiles restituisce FilePickerResult.
+      final result = await FilePicker.pickFiles(type: FileType.any);
       if (result == null || result.files.isEmpty) {
         if (mounted) setState(() => _isImporting = false);
         return;
@@ -213,10 +310,12 @@ class _BackupPageState extends ConsumerState<BackupPage> {
 
       final encryptedData = utf8.decode(await file.readAsBytes());
 
-      // Chiedi il PIN per decifrare
-      final pin = await _askPin(
-        title: 'Decifra Backup',
-        message: 'Inserisci il PIN usato per proteggere questo backup.',
+      // Chiedi il PIN per decifrare (in lettura accetta anche i PIN numerici
+      // legacy usati dalle versioni precedenti)
+      if (!mounted) return;
+      final pin = await BackupEncryptionService.showBackupPinDialog(
+        context: context,
+        isExport: false,
       );
       if (pin == null) {
         if (mounted) setState(() => _isImporting = false);
@@ -226,7 +325,10 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       // Verifica PIN provando a decifrare
       setState(() => _statusMessage = 'Verifica password…');
       await Future.delayed(Duration.zero);
-      if (!DataExportService.verifyEncryptedPassword(encryptedData, pin)) {
+      if (!await DataExportService.verifyEncryptedPassword(
+        encryptedData,
+        pin,
+      )) {
         if (mounted) {
           setState(() {
             _isImporting = false;
@@ -263,7 +365,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       setState(() => _statusMessage = 'Importazione dati in corso…');
       await Future.delayed(Duration.zero);
       await DataExportService.importEncryptedData(
-        encryptedData, pin,
+        encryptedData,
+        pin,
         onPhase: (phase) {
           if (mounted) setState(() => _phaseMessage = phase);
         },
@@ -297,64 +400,83 @@ class _BackupPageState extends ConsumerState<BackupPage> {
     }
   }
 
-  // ────────────────────────────────────────────
+// ────────────────────────────────────────────
   //  DIALOGS
   // ────────────────────────────────────────────
 
-  Future<String?> _askPin({
-    required String title,
-    required String message,
-  }) async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
+  Future<String?> _askExportScope() async {
+    final myClasses = ref.read(myClassesProvider);
+    var selected = 'ALL';
+    return showDialog<String>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.lock_rounded, color: Color(0xFF174A7E)),
-            const SizedBox(width: 8),
-            Text(title),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(message),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              obscureText: true,
-              maxLength: 8,
-              decoration: InputDecoration(
-                labelText: 'PIN',
-                hintText: 'Inserisci il PIN',
-                prefixIcon: const Icon(Icons.security_rounded),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: Theme.of(ctx).brightness == Brightness.dark
+              ? Theme.of(ctx).colorScheme.surfaceContainer
+              : null,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.class_outlined, color: const Color(0xFF174A7E)),
+              const SizedBox(width: 8),
+              const Expanded(child: Text('Classi da esportare')),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: RadioGroup<String>(
+                groupValue: selected,
+                onChanged: (v) => setDialogState(() => selected = v!),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    RadioListTile<String>(
+                      value: 'ALL',
+                      title: const Text('Tutte le mie classi'),
+                      subtitle: const Text(
+                        'Backup completo di tutte le classi (nome file: ClassiCompleto)',
+                      ),
+                    ),
+                    const Divider(height: 8),
+                    for (final c in myClasses)
+                      RadioListTile<String>(
+                        value: c.id,
+                        title: Text(c.name),
+                        subtitle: Text('${c.studentIds.length} ragazzi'),
+                      ),
+                  ],
                 ),
-                counterText: '',
               ),
-              style: const TextStyle(fontSize: 20, letterSpacing: 8),
-              textAlign: TextAlign.center,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Annulla'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF174A7E),
+              ),
+              onPressed: () => Navigator.pop(ctx, selected),
+              child: const Text('Continua'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, null),
-            child: const Text('Annulla'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('Conferma'),
-          ),
-        ],
       ),
     );
-    controller.dispose();
-    return (result != null && result.isNotEmpty) ? result : null;
+  }
+
+  /// Rimuove i caratteri non consentiti nei nomi file.
+  String _sanitizeFilename(String value) {
+    return value
+        .replaceAll(RegExp(r'[\\/:*?"<>|]+'), '_')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
   }
 
   Future<bool?> _showConfirmDialog() {
@@ -456,12 +578,15 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Il backup include tutti i dati dell\'app: anagrafica, '
-                    'presenze, programmazione, catechesi, documenti e allegati (foto e PDF).\n\n'
+                    'Il backup include anagrafica, presenze, programmazione, '
+                    'documenti, allegati (foto e PDF) e catechesi.\n\n'
+                    'Durante l\'esportazione puoi scegliere se salvare una '
+                    'singola classe oppure tutte le tue classi. In entrambi i '
+                    'casi le catechesi sono sempre incluse.\n\n'
                     'Il file è protetto da un PIN che crei al momento dell\'esportazione '
                     'e che dovrai reinserire per importarlo su un altro dispositivo.\n\n'
-                    'L\'importazione inserisce i dati nella classe attualmente aperta '
-                    'sul dispositivo ricevente.\n\n'
+                    'I dati ricevuti via QR code vengono invece inseriti nella classe '
+                    'attualmente aperta sul dispositivo ricevente.\n\n'
                     'L\'accesso alle operazioni di backup richiede l\'autenticazione '
                     'con impronta, volto o PIN del tuo dispositivo.',
                     style: TextStyle(fontSize: 13, color: Colors.blue.shade900),
@@ -502,7 +627,10 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                 padding: const EdgeInsets.only(bottom: 16),
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF174A7E).withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
@@ -513,7 +641,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                   child: Row(
                     children: [
                       SizedBox(
-                        width: 16, height: 16,
+                        width: 16,
+                        height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           color: const Color(0xFF174A7E),
@@ -610,7 +739,9 @@ class _ActionCard extends StatelessWidget {
         : color.withValues(alpha: 0.10);
     final titleColor = isDark ? colorScheme.onSurface : const Color(0xFF1A1A1A);
     final subtitleColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
-    final borderColor = isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.transparent;
+    final borderColor = isDark
+        ? colorScheme.outline.withValues(alpha: 0.2)
+        : Colors.transparent;
     final shadowColor = isDark
         ? Colors.black.withValues(alpha: 0.4)
         : Colors.black.withValues(alpha: 0.04);
@@ -677,7 +808,10 @@ class _ActionCard extends StatelessWidget {
               ),
             ),
             if (!isLoading)
-              Icon(Icons.chevron_right_rounded, color: isDark ? Colors.grey.shade500 : Colors.grey.shade400),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+              ),
           ],
         ),
       ),

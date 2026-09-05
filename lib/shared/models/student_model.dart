@@ -28,8 +28,10 @@
 // SORT: sortedBySurname() ordina A→Z per cognome, poi nome (case-insensitive)
 // ══════════════════════════════════════════════════════════════════════════════
 
+import 'historical_record.dart';
+
 class Student {
-  /// ID univoco (formato: "local_<microsecondsSinceEpoch>").
+  /// ID univoco (formato: `local_<microsecondsSinceEpoch>`).
   final String id;
 
   /// Nome del ragazzo (normalizzato in Title Case dal repository).
@@ -46,8 +48,9 @@ class Student {
   /// anche in assenza di relazione diretta (utile per sync multi-classe).
   final String? classUniqueCode;
 
-  /// Data di nascita (formato ISO 8601).
-  final DateTime birthDate;
+  /// Data di nascita (formato ISO 8601). Facoltativa; può essere null se non
+  /// ancora inserita (solo nome/cognome obbligatori).
+  final DateTime? birthDate;
 
   // ─── Genitori: Madre ────────────────────────────────────────────────
   final String motherName;
@@ -62,6 +65,9 @@ class Student {
   /// Recapito telefonico diretto del ragazzo (se disponibile).
   final String studentPhone;
 
+  /// Email del genitore/tutore (facoltativa, importata da Excel/CSV).
+  final String parentEmail;
+
   // ─── Dati sanitari e note ───────────────────────────────────────────
   /// Allergie alimentari o farmacologiche (testo libero). Dato critico
   /// per la sicurezza durante incontri con pasti/merende.
@@ -72,6 +78,61 @@ class Student {
 
   /// Note libere del catechista sullo studente.
   final String? notes;
+
+  // ─── Campi GDPR / privacy (modulo di iscrizione unificato) ─────────────
+
+  /// True se il modulo di iscrizione della famiglia è stato firmato
+  /// (equivalente permesso privacy) per il trattamento dei dati.
+  final bool consensoPrivacyFirmato;
+
+  /// Data di firma del modulo di iscrizione (data_firma_consenso).
+  final DateTime? dataFirmaConsenso;
+
+  /// Scadenza del trattamento dei dati, calcolata automaticamente
+  /// (data_firma_consenso + durata validità configurata in ParishConfig).
+  final DateTime? dataScadenzaTrattamento;
+
+  /// Nome del firmatario della scheda (genitore/tutore che ha firmato il
+  /// consenso al trattamento dei dati del minore). Evidenza del firmatario.
+  final String consensoFirmatario;
+
+  /// ID del catechista/responsabile che ha registrato la firma.
+  final String consensoRegistratoDaId;
+
+  /// Nome del catechista/responsabile che ha registrato la firma.
+  final String consensoRegistratoDaNome;
+
+  /// Consenso esplicito alle uscite autonome senza accompagnamento.
+  final bool consensoUsciteAutonome;
+
+  /// Contributo volontario versato in occasione dell'iscrizione.
+  final bool contributoVersato;
+
+  /// Importo (in euro, facoltativo) del contributo volontario.
+  final double contributoEuros;
+
+  /// Anno catechistico a cui si riferisce il contributo (es. "2026-2027").
+  final String annoContributo;
+
+  /// Note allergie/salute sensibili, cifrate a livello di campo via
+  /// [FieldEncryptionService] prima della persistenza.
+  final String? noteAllergieSalute;
+
+  // ─── Campi della modalità "Responsabile Catechistico" ──────────────────
+
+  /// Stato del percorso catechistico:
+  ///   "ATTIVO" | "FERMO" | "RITIRATO"
+  final String statoPercorso;
+
+  /// Anno catechistico di iscrizione (es. "2026-2027").
+  final String annoIscrizione;
+
+  // ─── Campi dell'archivio storico / progresso ─────────────────────────────
+
+  /// Sacramenti ricevuti dal ragazzo (Battesimo, Prima Confessione,
+  /// Comunione, Cresima). Aggiornati dal catechista/responsabile e
+  /// "fotografati" in ogni [HistoricalRecord] alla chiusura dell'anno.
+  final List<Sacrament> sacraments;
 
   /// Nome del catechista che ha modificato per ultimo questo record.
   final String lastModifiedBy;
@@ -86,24 +147,39 @@ class Student {
     required this.id,
     required this.name,
     required this.surname,
-    required this.birthDate,
-    required this.motherName,
-    required this.motherSurname,
-    required this.fatherName,
-    required this.fatherSurname,
-    required this.motherPhone,
-    required this.fatherPhone,
-    required this.studentPhone,
+    this.birthDate,
+    this.motherName = '',
+    this.motherSurname = '',
+    this.fatherName = '',
+    this.fatherSurname = '',
+    this.motherPhone = '',
+    this.fatherPhone = '',
+    this.studentPhone = '',
+    this.parentEmail = '',
     this.classId,
     this.classUniqueCode,
     this.allergies,
     this.autonomousExits,
     this.notes,
+    this.consensoPrivacyFirmato = false,
+    this.dataFirmaConsenso,
+    this.dataScadenzaTrattamento,
+    this.consensoFirmatario = '',
+    this.consensoRegistratoDaId = '',
+    this.consensoRegistratoDaNome = '',
+    this.consensoUsciteAutonome = false,
+    this.contributoVersato = false,
+    this.contributoEuros = 0,
+    this.annoContributo = '',
+    this.noteAllergieSalute,
+    this.statoPercorso = 'ATTIVO',
+    this.annoIscrizione = '',
+    this.sacraments = const [],
     this.lastModifiedBy = '',
     DateTime? createdAt,
     DateTime? updatedAt,
-  })  : createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now();
+  }) : createdAt = createdAt ?? DateTime.now(),
+       updatedAt = updatedAt ?? DateTime.now();
 
   /// Deserializza da Map (proveniente da Hive o da sync CRDT).
   /// I campi mancanti defaultano a stringa vuota o DateTime.now().
@@ -112,8 +188,9 @@ class Student {
       id: id,
       name: data['name'] ?? '',
       surname: data['surname'] ?? '',
-      birthDate: DateTime.tryParse(data['birthDate']?.toString() ?? '') ??
-          DateTime.now(),
+      birthDate: data['birthDate'] == null || data['birthDate'].toString().isEmpty
+          ? null
+          : DateTime.tryParse(data['birthDate'].toString()),
       classId: data['classId'],
       classUniqueCode: data['classUniqueCode'],
       motherName: data['motherName'] ?? '',
@@ -123,12 +200,35 @@ class Student {
       motherPhone: data['motherPhone'] ?? '',
       fatherPhone: data['fatherPhone'] ?? '',
       studentPhone: data['studentPhone'] ?? '',
+      parentEmail: data['parentEmail'] ?? '',
       allergies: data['allergies'],
       autonomousExits: data['autonomousExits'],
       notes: data['notes'],
+      consensoPrivacyFirmato: data['consensoPrivacyFirmato'] ?? false,
+      dataFirmaConsenso: DateTime.tryParse(
+        data['dataFirmaConsenso']?.toString() ?? '',
+      ),
+      dataScadenzaTrattamento: DateTime.tryParse(
+        data['dataScadenzaTrattamento']?.toString() ?? '',
+      ),
+      consensoFirmatario: data['consensoFirmatario'] ?? '',
+      consensoRegistratoDaId: data['consensoRegistratoDaId'] ?? '',
+      consensoRegistratoDaNome: data['consensoRegistratoDaNome'] ?? '',
+      consensoUsciteAutonome: data['consensoUsciteAutonome'] ?? false,
+      contributoVersato: data['contributoVersato'] ?? false,
+      contributoEuros: (data['contributoEuros'] as num?)?.toDouble() ?? 0,
+      annoContributo: data['annoContributo'] ?? '',
+      noteAllergieSalute: data['noteAllergieSalute'],
+      statoPercorso: data['statoPercorso'] ?? 'ATTIVO',
+      annoIscrizione: data['annoIscrizione'] ?? '',
+      sacraments: Sacrament.listFromStorage(data['sacraments']),
       lastModifiedBy: data['lastModifiedBy'] ?? '',
-      createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(data['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(data['updatedAt']?.toString() ?? '') ??
+          DateTime.now(),
     );
   }
 
@@ -136,7 +236,9 @@ class Student {
   /// Usato per ordinare la lista studenti in tutta l'app (dashboard,
   /// anagrafica, presenze, ecc.).
   static int compareBySurname(Student a, Student b) {
-    final bySurname = a.surname.toLowerCase().compareTo(b.surname.toLowerCase());
+    final bySurname = a.surname.toLowerCase().compareTo(
+      b.surname.toLowerCase(),
+    );
     if (bySurname != 0) return bySurname;
     return a.name.toLowerCase().compareTo(b.name.toLowerCase());
   }
@@ -149,6 +251,7 @@ class Student {
   /// Pattern copyWith per aggiornamento immutabile dei campi.
   /// Usato in StudentsRepository._normalize() per applicare
   /// NameFormatting.capitalizeWords prima del salvataggio.
+  /// Per azzerare birthDate passare `birthDate: null` e `clearBirthDate: true`.
   Student copyWith({
     String? id,
     String? name,
@@ -156,6 +259,7 @@ class Student {
     String? classId,
     String? classUniqueCode,
     DateTime? birthDate,
+    bool clearBirthDate = false,
     String? motherName,
     String? motherSurname,
     String? fatherName,
@@ -163,9 +267,24 @@ class Student {
     String? motherPhone,
     String? fatherPhone,
     String? studentPhone,
+    String? parentEmail,
     String? allergies,
     String? autonomousExits,
     String? notes,
+    bool? consensoPrivacyFirmato,
+    DateTime? dataFirmaConsenso,
+    DateTime? dataScadenzaTrattamento,
+    String? consensoFirmatario,
+    String? consensoRegistratoDaId,
+    String? consensoRegistratoDaNome,
+    bool? consensoUsciteAutonome,
+    bool? contributoVersato,
+    double? contributoEuros,
+    String? annoContributo,
+    String? noteAllergieSalute,
+    String? statoPercorso,
+    String? annoIscrizione,
+    List<Sacrament>? sacraments,
     String? lastModifiedBy,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -174,7 +293,7 @@ class Student {
       id: id ?? this.id,
       name: name ?? this.name,
       surname: surname ?? this.surname,
-      birthDate: birthDate ?? this.birthDate,
+      birthDate: clearBirthDate ? null : (birthDate ?? this.birthDate),
       classId: classId ?? this.classId,
       classUniqueCode: classUniqueCode ?? this.classUniqueCode,
       motherName: motherName ?? this.motherName,
@@ -184,9 +303,29 @@ class Student {
       motherPhone: motherPhone ?? this.motherPhone,
       fatherPhone: fatherPhone ?? this.fatherPhone,
       studentPhone: studentPhone ?? this.studentPhone,
+      parentEmail: parentEmail ?? this.parentEmail,
       allergies: allergies ?? this.allergies,
       autonomousExits: autonomousExits ?? this.autonomousExits,
       notes: notes ?? this.notes,
+      consensoPrivacyFirmato:
+          consensoPrivacyFirmato ?? this.consensoPrivacyFirmato,
+      dataFirmaConsenso: dataFirmaConsenso ?? this.dataFirmaConsenso,
+      dataScadenzaTrattamento:
+          dataScadenzaTrattamento ?? this.dataScadenzaTrattamento,
+      consensoFirmatario: consensoFirmatario ?? this.consensoFirmatario,
+      consensoRegistratoDaId:
+          consensoRegistratoDaId ?? this.consensoRegistratoDaId,
+      consensoRegistratoDaNome:
+          consensoRegistratoDaNome ?? this.consensoRegistratoDaNome,
+      consensoUsciteAutonome:
+          consensoUsciteAutonome ?? this.consensoUsciteAutonome,
+      contributoVersato: contributoVersato ?? this.contributoVersato,
+      contributoEuros: contributoEuros ?? this.contributoEuros,
+      annoContributo: annoContributo ?? this.annoContributo,
+      noteAllergieSalute: noteAllergieSalute ?? this.noteAllergieSalute,
+      statoPercorso: statoPercorso ?? this.statoPercorso,
+      annoIscrizione: annoIscrizione ?? this.annoIscrizione,
+      sacraments: sacraments ?? this.sacraments,
       lastModifiedBy: lastModifiedBy ?? this.lastModifiedBy,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -194,12 +333,12 @@ class Student {
   }
 
   /// Serializza in Map per salvataggio in Hive o trasmissione sync.
-  /// birthDate viene serializzato in ISO 8601.
+  /// birthDate viene serializzato in ISO 8601 se presente.
   Map<String, dynamic> toMap() {
     return {
       'name': name,
       'surname': surname,
-      'birthDate': birthDate.toIso8601String(),
+      'birthDate': birthDate?.toIso8601String(),
       'classId': classId,
       'classUniqueCode': classUniqueCode,
       'motherName': motherName,
@@ -209,9 +348,24 @@ class Student {
       'motherPhone': motherPhone,
       'fatherPhone': fatherPhone,
       'studentPhone': studentPhone,
+      'parentEmail': parentEmail,
       'allergies': allergies,
       'autonomousExits': autonomousExits,
       'notes': notes,
+      'consensoPrivacyFirmato': consensoPrivacyFirmato,
+      'dataFirmaConsenso': dataFirmaConsenso?.toIso8601String(),
+      'dataScadenzaTrattamento': dataScadenzaTrattamento?.toIso8601String(),
+      'consensoFirmatario': consensoFirmatario,
+      'consensoRegistratoDaId': consensoRegistratoDaId,
+      'consensoRegistratoDaNome': consensoRegistratoDaNome,
+      'consensoUsciteAutonome': consensoUsciteAutonome,
+      'contributoVersato': contributoVersato,
+      'contributoEuros': contributoEuros,
+      'annoContributo': annoContributo,
+      'noteAllergieSalute': noteAllergieSalute,
+      'statoPercorso': statoPercorso,
+      'annoIscrizione': annoIscrizione,
+      'sacraments': sacraments.map((s) => s.storageValue).toList(),
       'lastModifiedBy': lastModifiedBy,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),

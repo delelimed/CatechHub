@@ -148,8 +148,10 @@ class _SettingsAssociationScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sincronizzazione Nearby',
-            style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Sincronizzazione Nearby',
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: colorScheme.primary,
       ),
       body: _isLoading
@@ -159,8 +161,6 @@ class _SettingsAssociationScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildBetaWarning(theme, colorScheme),
-                  const SizedBox(height: 12),
                   _buildClassInfoBanner(theme, colorScheme),
                   const SizedBox(height: 16),
                   _buildStatusLegend(theme, colorScheme),
@@ -171,7 +171,11 @@ class _SettingsAssociationScreenState
                   const SizedBox(height: 20),
                   _buildAssociateButton(theme, colorScheme),
                   const SizedBox(height: 20),
-                  _buildSectionHeader(theme, Icons.devices, 'Dispositivi associati'),
+                  _buildSectionHeader(
+                    theme,
+                    Icons.devices,
+                    'Dispositivi associati',
+                  ),
                   const SizedBox(height: 8),
                   _buildAssociatedDevicesSection(theme, colorScheme),
                   const SizedBox(height: 20),
@@ -186,15 +190,16 @@ class _SettingsAssociationScreenState
     );
   }
 
-  Widget _buildSectionHeader(
-      ThemeData theme, IconData icon, String title) {
+  Widget _buildSectionHeader(ThemeData theme, IconData icon, String title) {
     return Row(
       children: [
-        Icon(icon, size: 20, color: Theme.of(icon == Icons.devices
-                ? context
-                : context)
-            .colorScheme
-            .primary),
+        Icon(
+          icon,
+          size: 20,
+          color: Theme.of(
+            icon == Icons.devices ? context : context,
+          ).colorScheme.primary,
+        ),
         const SizedBox(width: 8),
         Text(
           title,
@@ -206,45 +211,6 @@ class _SettingsAssociationScreenState
     );
   }
 
-  Widget _buildBetaWarning(ThemeData theme, ColorScheme colorScheme) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.amber.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.info_outline, color: Colors.amber[800], size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Sync Nearby in fase beta',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.amber[900],
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'La sincronizzazione Bluetooth è ancora in fase di sviluppo. '
-                  'Potrebbero verificarsi occasionali problemi, che vi chiedo di segnalare mediante le funzioni apposite. Grazie! ',
-                  style: TextStyle(fontSize: 13, color: Colors.amber[900]),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildClassInfoBanner(ThemeData theme, ColorScheme colorScheme) {
     return Container(
       width: double.infinity,
@@ -252,7 +218,9 @@ class _SettingsAssociationScreenState
       decoration: BoxDecoration(
         color: const Color(0xFF174A7E).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF174A7E).withValues(alpha: 0.3)),
+        border: Border.all(
+          color: const Color(0xFF174A7E).withValues(alpha: 0.3),
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -274,7 +242,10 @@ class _SettingsAssociationScreenState
                 Text(
                   'La sincronizzazione Bluetooth avviene solo tra dispositivi '
                   'della stessa classe.',
-                  style: TextStyle(fontSize: 13, color: const Color(0xFF174A7E)),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: const Color(0xFF174A7E),
+                  ),
                 ),
               ],
             ),
@@ -332,22 +303,19 @@ class _SettingsAssociationScreenState
         Container(
           width: 8,
           height: 8,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 4),
-        Text(
-          label,
-          style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-        ),
+        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
       ],
     );
   }
 
   Widget _buildSyncToggle(
-      ThemeData theme, ColorScheme colorScheme, bool isEnabled) {
+    ThemeData theme,
+    ColorScheme colorScheme,
+    bool isEnabled,
+  ) {
     final daemonController = ref.read(nearbySyncDaemonProvider.notifier);
 
     return Card(
@@ -408,7 +376,10 @@ class _SettingsAssociationScreenState
   }
 
   Widget _buildManualSyncButton(
-      ThemeData theme, ColorScheme colorScheme, bool isSyncing) {
+    ThemeData theme,
+    ColorScheme colorScheme,
+    bool isSyncing,
+  ) {
     final daemonController = ref.read(nearbySyncDaemonProvider.notifier);
 
     return SizedBox(
@@ -432,11 +403,15 @@ class _SettingsAssociationScreenState
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(
-                    strokeWidth: 2, color: Colors.white),
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
               )
             : const Icon(Icons.sync, size: 22),
         label: Text(
-          isSyncing ? 'Sincronizzazione in corso...' : 'Avvia sincronizzazione manuale',
+          isSyncing
+              ? 'Sincronizzazione in corso...'
+              : 'Avvia sincronizzazione manuale',
         ),
         style: FilledButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 14),
@@ -522,7 +497,9 @@ class _SettingsAssociationScreenState
   }
 
   Widget _buildAssociatedDevicesSection(
-      ThemeData theme, ColorScheme colorScheme) {
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
     if (_associations.isEmpty) {
       return Container(
         width: double.infinity,
@@ -566,7 +543,10 @@ class _SettingsAssociationScreenState
   }
 
   Widget _buildAssociationCard(
-      P2PDeviceAssociation assoc, ThemeData theme, ColorScheme colorScheme) {
+    P2PDeviceAssociation assoc,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
     final daysLeft = assoc.daysRemaining;
     final isExpiring = daysLeft <= 5;
     final isExpired = daysLeft == 0;
@@ -577,15 +557,15 @@ class _SettingsAssociationScreenState
         color: isExpired
             ? Colors.red.withValues(alpha: 0.05)
             : isExpiring
-                ? Colors.orange.withValues(alpha: 0.05)
-                : Colors.green.withValues(alpha: 0.05),
+            ? Colors.orange.withValues(alpha: 0.05)
+            : Colors.green.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isExpired
               ? Colors.red.withValues(alpha: 0.2)
               : isExpiring
-                  ? Colors.orange.withValues(alpha: 0.2)
-                  : Colors.green.withValues(alpha: 0.2),
+              ? Colors.orange.withValues(alpha: 0.2)
+              : Colors.green.withValues(alpha: 0.2),
         ),
       ),
       child: Padding(
@@ -597,19 +577,19 @@ class _SettingsAssociationScreenState
               backgroundColor: isExpired
                   ? Colors.red.withValues(alpha: 0.15)
                   : isExpiring
-                      ? Colors.orange.withValues(alpha: 0.15)
-                      : Colors.green.withValues(alpha: 0.15),
+                  ? Colors.orange.withValues(alpha: 0.15)
+                  : Colors.green.withValues(alpha: 0.15),
               child: Icon(
                 isExpired
                     ? Icons.block
                     : isExpiring
-                        ? Icons.timer
-                        : Icons.check_circle,
+                    ? Icons.timer
+                    : Icons.check_circle,
                 color: isExpired
                     ? Colors.red
                     : isExpiring
-                        ? Colors.orange
-                        : Colors.green,
+                    ? Colors.orange
+                    : Colors.green,
                 size: 22,
               ),
             ),
@@ -628,8 +608,11 @@ class _SettingsAssociationScreenState
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.calendar_today,
-                          size: 12, color: Colors.grey[500]),
+                      Icon(
+                        Icons.calendar_today,
+                        size: 12,
+                        color: Colors.grey[500],
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         'Associato il $assocDate',
@@ -640,13 +623,15 @@ class _SettingsAssociationScreenState
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      Icon(Icons.hourglass_bottom,
-                          size: 12,
-                          color: isExpired
-                              ? Colors.red[400]
-                              : isExpiring
-                                  ? Colors.orange[400]
-                                  : Colors.grey[500]),
+                      Icon(
+                        Icons.hourglass_bottom,
+                        size: 12,
+                        color: isExpired
+                            ? Colors.red[400]
+                            : isExpiring
+                            ? Colors.orange[400]
+                            : Colors.grey[500],
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         isExpired
@@ -657,10 +642,11 @@ class _SettingsAssociationScreenState
                           color: isExpired
                               ? Colors.red[600]
                               : isExpiring
-                                  ? Colors.orange[700]
-                                  : Colors.grey[600],
-                          fontWeight:
-                              isExpiring ? FontWeight.w500 : FontWeight.normal,
+                              ? Colors.orange[700]
+                              : Colors.grey[600],
+                          fontWeight: isExpiring
+                              ? FontWeight.w500
+                              : FontWeight.normal,
                         ),
                       ),
                     ],
@@ -668,14 +654,21 @@ class _SettingsAssociationScreenState
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      Icon(Icons.sync,
-                          size: 12, color: assoc.lastSyncAt != null ? Colors.green[400] : Colors.grey[500]),
+                      Icon(
+                        Icons.sync,
+                        size: 12,
+                        color: assoc.lastSyncAt != null
+                            ? Colors.green[400]
+                            : Colors.grey[500],
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         _lastSyncLabel(assoc),
                         style: TextStyle(
                           fontSize: 12,
-                          color: assoc.lastSyncAt != null ? Colors.green[700] : Colors.grey[600],
+                          color: assoc.lastSyncAt != null
+                              ? Colors.green[700]
+                              : Colors.grey[600],
                         ),
                       ),
                     ],

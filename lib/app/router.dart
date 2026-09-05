@@ -8,6 +8,9 @@ import '../features/auth/login_page.dart';
 import '../features/classes/my_group_page.dart';
 import '../features/classes/group_management_page.dart';
 import '../features/classes/view_groups_page.dart';
+import '../features/classes/class_selection_page.dart';
+import '../features/classes/class_switcher_page.dart';
+import '../features/classes/class_copy_page.dart';
 import '../features/dashboard/dashboard_page.dart';
 import '../features/dashboard/statistics_page.dart';
 import '../features/students/students_page.dart';
@@ -30,6 +33,7 @@ import '../features/settings/release_detail_page.dart';
 import '../features/settings/privacy.dart';
 import '../features/onboarding/presentation/screens/onboarding_page.dart';
 import '../features/onboarding/presentation/screens/onboarding_sync_page.dart';
+import '../features/onboarding/presentation/screens/onboarding_classes_page.dart';
 import '../core/storage/local_database.dart';
 import '../features/settings/backup_page.dart';
 import '../features/settings/delete_data_page.dart';
@@ -42,6 +46,7 @@ import '../features/update/update_page.dart';
 import '../features/data_share/data_share_selection_page.dart';
 import '../features/data_share/data_share_send_page.dart';
 import '../features/data_share/data_share_receive_page.dart';
+import '../features/sync/screens/approval_center_page.dart';
 import '../features/sync/screens/settings_association_screen.dart';
 import '../features/sync/screens/associate_device_screen.dart';
 import '../features/sync/screens/sync_log_page.dart';
@@ -50,6 +55,145 @@ import '../features/catechesi/catechesi_page.dart';
 import '../features/catechesi/catechesi_edit_page.dart';
 import '../features/catechesi/catechesi_detail_page.dart';
 import '../shared/models/catechesi_model.dart';
+import '../features/responsabile/responsabile_dashboard_page.dart';
+import '../features/responsabile/responsabile_admin_page.dart';
+import '../features/responsabile/admin_section_pages.dart';
+import '../features/responsabile/classe_detail_page.dart';
+import '../features/responsabile/catechisti_page.dart';
+import '../features/responsabile/audit_log_page.dart';
+import '../features/responsabile/consensi_page.dart';
+import '../features/responsabile/parish_network_page.dart';
+import '../features/responsabile/import_ragazzi/import_ragazzi_page.dart';
+import '../features/guide/guide_page.dart';
+import '../features/archive/pages/historical_archive_page.dart';
+import '../features/substitutes/substitute_center_page.dart';
+import '../features/substitutes/create_substitute_delegation_page.dart';
+import '../features/substitutes/scan_substitute_delegation_page.dart';
+import '../features/substitutes/substitute_register_page.dart';
+import '../shared/models/user_role.dart';
+import '../shared/utils/app_mode.dart';
+
+/// Restituisce gli ID delle classi a cui appartiene il catechista locale.
+///
+/// Centrale per il redirect: evita di duplicare la logica di lettura del box
+/// `classes` in più punti e rende coerente il trattamento di `current_class_id`
+/// (che viene considerato valido SOLO se appartiene ancora al catechista).
+///
+/// Include anche le classi oggetto di una «supplenza temporanea» attiva in cui
+/// il catechista locale è il Supplente: la delega rende temporaneamente
+/// visibili classi che NON compaiono in `catechistIds` (isolamento dati).
+List<String> _userClassIds() {
+  final classesBox = LocalDatabase.classes();
+  const localId = AuthService.localUserId;
+  final ids = <String>{};
+  for (final key in classesBox.keys) {
+    final data = LocalDatabase.toStringDynamicMap(classesBox.get(key));
+    final catechistIds = (data['catechistIds'] as List? ?? [])
+        .map((e) => e.toString())
+        .toList();
+    if (catechistIds.contains(localId)) ids.add(key.toString());
+  }
+
+  // Classi in supplenza temporanea (Supplente locale): la delega deve essere
+  // ancora visibile (attiva, o scaduta ma con dati non ancora acquisiti).
+  try {
+    final catechistId = AuthService.getCatechistId();
+    final now = DateTime.now().toUtc();
+    final delegationsBox = LocalDatabase.substituteDelegations();
+    for (final key in delegationsBox.keys) {
+      final data = LocalDatabase.toStringDynamicMap(delegationsBox.get(key));
+      final substituteCatechistId = data['substituteCatechistId']?.toString();
+      if (substituteCatechistId != catechistId) continue;
+      final status = data['status']?.toString() ?? 'active';
+      if (status == 'revoked' || status == 'completed') continue;
+      final validFrom = DateTime.tryParse(data['validFrom']?.toString() ?? '');
+      final validUntil = DateTime.tryParse(
+        data['validUntil']?.toString() ?? '',
+      );
+      if (validFrom != null && validUntil != null) {
+        final active = !now.isBefore(validFrom) && !now.isAfter(validUntil);
+        final expired =
+            now.isAfter(validUntil) && data['dataCollected'] != true;
+        if (active || (status == 'expired' && expired)) {
+          final classId = data['classId']?.toString();
+          if (classId != null && classId.isNotEmpty) ids.add(classId);
+        }
+      }
+    }
+  } catch (_) {}
+
+  return ids.toList();
+}
+
+/// True se la route corrente appartiene alla gestione parrocchiale del
+/// Responsabile Catechistico. Queste route NON richiedono una classe
+/// selezionata (gestione parrocchia-wide).
+bool _isParrocchiaRoute(String location) => location.startsWith('/parrocchia');
+
+/// Legge `current_class_id` e lo considera valido solo se non è vuoto e punta
+/// a una classe di cui l'utente fa ancora parte. Un id "stantio" (classe
+/// eliminata o a cui si è usciti) viene ignorato come nessuna selezione.
+String? _validatedCurrentClassId() {
+  final raw = LocalDatabase.auth().get('current_class_id');
+  if (raw is! String || raw.isEmpty) return null;
+  return _userClassIds().contains(raw) ? raw : null;
+}
+
+/// True durante la fase "Associa a Classe Esistente": la modalità operativa è
+/// REPLICATED_PEER e il profilo non è ancora configurato (verrà ricevuto via
+/// P2P dal dispositivo mittente). In questo stato la schermata /onboarding-sync
+/// è raggiungibile senza autenticazione.
+bool _isJoinPending() {
+  try {
+    final box = LocalDatabase.auth();
+    final mode = box.get('app_mode', defaultValue: 'NORMAL') as String;
+    if (mode != 'REPLICATED_PEER') return false;
+    return box.get('first_name') is! String;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// True se la "Guida live alle funzioni" è ancora da completare (post-onboarding).
+bool _isGuidePending() {
+  try {
+    return LocalDatabase.auth().get('guide_pending', defaultValue: false)
+        as bool;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Route raggiungibili durante la guida live per provare le funzioni reali.
+/// Tutte le altre (home, login, onboarding, class-selection) vengono
+/// reindirizzate alla guida finché non viene completata.
+bool _isGuideDemoRoute(String location) {
+  const allowed = {
+    '/parrocchia',
+    '/students',
+    '/student-detail',
+    '/attendance-meetings',
+    '/attendance',
+    '/attendance-grid',
+    '/planning',
+    '/documents',
+    '/document-detail',
+    '/contact-notes',
+    '/avvisi',
+    '/catechesi',
+    '/catechesi/edit',
+    '/catechesi/detail',
+    '/my-group',
+    '/view-groups',
+    '/allergies',
+    '/autonomous-exits',
+    '/verify-number',
+    '/statistics',
+    '/settings',
+  };
+  if (allowed.contains(location)) return true;
+  return location.startsWith('/parrocchia/');
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // router.dart — CatechHub (configurazione navigazione)
@@ -212,7 +356,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // L'onboarding spiega il funzionamento dell'app e richiede i
       // permessi uno per uno (notifiche, fotocamera, Bluetooth).
       // ─────────────────────────────────────────────────────────────────────
-      if (location != '/onboarding') {
+      if (location != '/onboarding' &&
+          location != '/class-selection' &&
+          location != '/onboarding-classes') {
         try {
           final onboardingDone =
               LocalDatabase.auth().get(
@@ -246,7 +392,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // NOTA: state.matchedLocation restituisce solo il path senza query
       // parameters, garantendo che il confronto sia preciso.
       // ─────────────────────────────────────────────────────────────────────
-      if (location == '/onboarding') return null;
+      if (location == '/onboarding' ||
+          location == '/class-selection' ||
+          location == '/onboarding-classes') {
+        return null;
+      }
 
       final authState = ref.read(authStateProvider);
       final isLoginPath = location == '/login';
@@ -254,39 +404,125 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       return authState.when(
         loading: () => null,
-        error: (_, __) => isLoginPath ? null : '/login',
+        error: (_, _) => isLoginPath ? null : '/login',
         data: (user) {
-          if (user == null && !isLoginPath) return '/login';
-          if (user != null) {
-            // Se l'utente ha scelto "unisciti" durante l'onboarding e
-            // non ha ancora classi, reindirizza all'associazione P2P.
-            // Questo controllo vale per OGNI navigazione, non solo /login,
-            // per impedire di lasciare l'onboarding senza essere in una classe.
-            if (!isOnboardingSyncPath) {
-              try {
-                final setupMode =
-                    LocalDatabase.auth().get('setup_mode', defaultValue: 'create');
-                if (setupMode == 'join') {
-                  final classesBox = LocalDatabase.classes();
-                  const localId = AuthService.localUserId;
-                  bool userInClass = false;
-                  for (final key in classesBox.keys) {
-                    final data = LocalDatabase.toStringDynamicMap(classesBox.get(key));
-                    final ids = (data['catechistIds'] as List? ?? [])
-                        .map((e) => e.toString())
-                        .toList();
-                    if (ids.contains(localId)) {
-                      userInClass = true;
-                      break;
-                    }
-                  }
-                  if (!userInClass) {
-                    return '/onboarding-sync';
-                  }
-                }
-              } catch (_) {}
+          if (user == null) {
+            // Fase "Associa a Classe Esistente": nessun form anagrafico, il
+            // profilo viene ricevuto via P2P. Finché la configurazione non è
+            // completata, /onboarding-sync è raggiungibile senza autenticazione.
+            if (isOnboardingSyncPath && _isJoinPending()) return null;
+            if (!isLoginPath) return '/login';
+            return null;
+          }
+
+          // Le supplenze sono consentite solo in modalità associato con
+          // modalità Responsabile attiva nella parrocchia: chiunque altro
+          // viene allontanato dalle route del modulo.
+          if (location.startsWith('/substitutes') &&
+              !AppModeUtils.supplenzeEnabled()) {
+            return UserRole.isResponsabile ? '/parrocchia' : '/';
+          }
+
+          // La gestione parrocchiale (/parrocchia/*) è riservata al
+          // Responsabile Catechistico. Un Catechista che tenta di accedere
+          // direttamente a una di queste route viene riportato alla home.
+          // Difesa a livello di router: la UI non è il confine di sicurezza.
+          if (_isParrocchiaRoute(location) && !UserRole.isResponsabile) {
+            return '/';
+          }
+
+          // Responsabile Catechistico: la home è la dashboard parrocchiale.
+          // Non passa mai dalla selezione classe né dalla gestione classi
+          // dell'onboarding (gestione centralizzata in /parrocchia).
+          if (UserRole.isResponsabile) {
+            if (_isGuidePending() &&
+                location != '/guide' &&
+                !_isGuideDemoRoute(location)) {
+              return '/guide';
             }
-            if (isLoginPath) return '/';
+            if (isLoginPath) return '/parrocchia';
+            if (location == '/' ||
+                location == '/class-selection' ||
+                location == '/onboarding-classes') {
+              return '/parrocchia';
+            }
+            return null;
+          }
+
+          // Se l'utente ha scelto "unisciti" durante l'onboarding e
+          // non ha ancora classi, reindirizza all'associazione P2P.
+          // Questo controllo vale per OGNI navigazione, non solo /login,
+          // per impedire di lasciare l'onboarding senza essere in una classe.
+          if (!isOnboardingSyncPath) {
+            try {
+              final setupMode = LocalDatabase.auth().get(
+                'setup_mode',
+                defaultValue: 'create',
+              );
+              if (setupMode == 'join') {
+                if (_userClassIds().isEmpty) {
+                  return '/onboarding-sync';
+                }
+              }
+            } catch (_) {}
+          }
+          if (isLoginPath) {
+            // Dopo il login si chiede SEMPRE quale classe aprire, anche se
+            // una classe è già salvata come corrente: la selezione viene
+            // proposta a ogni avvio dell'app (richiesta esplicita).
+            // La pagina /class-selection gestisce anche il caso in cui
+            // l'utente non faccia parte di alcun gruppo (empty state con
+            // "Crea nuovo gruppo").
+            try {
+              // Fase di onboarding multiclasse: finché non viene completata
+              // dal catechista, il router lo mantiene sulla schermata dedicata
+              // alla gestione delle classi (funziona anche senza classi).
+              final classesStepDone =
+                  LocalDatabase.auth().get(
+                        'onboarding_classes_completed',
+                        defaultValue: true,
+                      )
+                      as bool;
+              if (!classesStepDone) {
+                return '/onboarding-classes';
+              }
+              return '/class-selection';
+            } catch (_) {}
+            return '/class-selection';
+          }
+          // Se l'utente è autenticato ma non ha una classe selezionata e non è su class-selection
+          if (location != '/class-selection' &&
+              location != '/onboarding-sync' &&
+              location != '/onboarding-classes' &&
+              !_isParrocchiaRoute(location)) {
+            try {
+              final userClassIds = _userClassIds();
+              final hasClasses = userClassIds.isNotEmpty;
+              final currentClassId = _validatedCurrentClassId();
+
+              // Difesa in profondità: anche fuori da /login, se la gestione
+              // classi dell'onboarding non è stata completata si torna alla
+              // schermata dedicata (a meno di essere già su una route esclusa).
+              final classesStepDone =
+                  LocalDatabase.auth().get(
+                        'onboarding_classes_completed',
+                        defaultValue: true,
+                      )
+                      as bool;
+              if (!classesStepDone) {
+                return '/onboarding-classes';
+              }
+
+              if (hasClasses &&
+                  (currentClassId == null || currentClassId.isEmpty)) {
+                return '/class-selection';
+              }
+            } catch (_) {}
+          }
+          if (_isGuidePending() &&
+              location != '/guide' &&
+              !_isGuideDemoRoute(location)) {
+            return '/guide';
           }
           return null;
         },
@@ -329,6 +565,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
 
       // ═══════════════════════════════════════════════════════════════════
+      // ONBOARDING CLASSES - Gestione multiclasse durante l'onboarding
+      // ═══════════════════════════════════════════════════════════════════
+      GoRoute(
+        path: '/onboarding-classes',
+        builder: (context, state) => const OnboardingClassesPage(),
+      ),
+
+      // ═══════════════════════════════════════════════════════════════════
+      // CLASS SELECTION - Selezione classe post-login
+      // ══════════════════════════════════════════════════════════════════
+      GoRoute(
+        path: '/class-selection',
+        builder: (context, state) => const ClassSelectionPage(),
+      ),
+
+      // ══════════════════════════════════════════════════════════════════
       // AUTH - Schermata di sblocco (PIN/biometrico)
       // ═══════════════════════════════════════════════════════════════════
       GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
@@ -337,6 +589,105 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // DASHBOARD - Schermata principale
       // ═══════════════════════════════════════════════════════════════════
       GoRoute(path: '/', builder: (context, state) => const DashboardPage()),
+
+      // ═══════════════════════════════════════════════════════════════════
+      // GUIDE - Guida live post-onboarding (dati di esempio)
+      // ── review: richiamata dalle Impostazioni, usa i dati in memoria
+      //    e non effettua mai il purge dei dati di esempio.
+      // ═══════════════════════════════════════════════════════════════════
+      GoRoute(
+        path: '/guide',
+        builder: (context, state) {
+          final mode = state.uri.queryParameters['mode'] ?? 'first';
+          return GuidePage(reviewMode: mode == 'review');
+        },
+      ),
+
+      // ═══════════════════════════════════════════════════════════════════
+      // RESPONSABILE CATECHISTICO - Gestione parrocchiale
+      // ═══════════════════════════════════════════════════════════════════
+
+      /// Vista albero parrocchiale (Anno → Percorsi → Classi → Catechisti → Ragazzi)
+      GoRoute(
+        path: '/parrocchia',
+        builder: (context, state) => const ResponsabileDashboardPage(),
+      ),
+
+      /// Hub amministrativo del Responsabile (menu a schede).
+      GoRoute(
+        path: '/parrocchia/admin',
+        builder: (context, state) => const ResponsabileAdminPage(),
+      ),
+
+      /// Gestione classi e assegnazione catechisti (schermata autonoma).
+      GoRoute(
+        path: '/parrocchia/classi',
+        builder: (context, state) => const ClassiRoutePage(),
+      ),
+
+      /// Dettaglio di una classe: catechisti, ragazzi e azioni di gestione.
+      GoRoute(
+        path: '/parrocchia/classi/:classId',
+        builder: (context, state) =>
+            ClasseDetailPage(classId: state.pathParameters['classId'] ?? ''),
+      ),
+
+      /// Rubrica catechisti: anagrafica, telefono, classi e dispositivi.
+      GoRoute(
+        path: '/parrocchia/catechisti',
+        builder: (context, state) => const CatechistiPage(),
+      ),
+
+      /// Iscrizioni, censimento e passaggio d'anno (schermata autonoma).
+      GoRoute(
+        path: '/parrocchia/iscrizioni',
+        builder: (context, state) => const IscrizioniRoutePage(),
+      ),
+
+      /// Aule e orari settimanali (schermata autonoma).
+      GoRoute(
+        path: '/parrocchia/logistica',
+        builder: (context, state) => const LogisticaRoutePage(),
+      ),
+
+      /// Allarme assenze prolungate (schermata autonoma).
+      GoRoute(
+        path: '/parrocchia/allarmi',
+        builder: (context, state) => const AllarmiRoutePage(),
+      ),
+
+      /// Registro Trattamenti GDPR (audit log).
+      GoRoute(
+        path: '/parrocchia/audit',
+        builder: (context, state) => const AuditLogPage(),
+      ),
+
+      /// Gestione scheda di iscrizione firmata e contributi volontari.
+      GoRoute(
+        path: '/parrocchia/consensi',
+        builder: (context, state) => const ConsensiPage(),
+      ),
+
+      /// Rete Catechistica Parrocchiale: riunioni/avvisi globali e titoli
+      /// di classe (canale classe cifrato + QR handshake).
+      GoRoute(
+        path: '/parrocchia/rete',
+        builder: (context, state) => const ParishNetworkPage(),
+      ),
+
+      /// Archivio Storico e Progresso dei Ragazzi: snapshot immutabili di
+      /// ogni anno concluso + chiusura/promozione/archiviazione di fine anno.
+      GoRoute(
+        path: '/parrocchia/archivio',
+        builder: (context, state) => const HistoricalArchivePage(),
+      ),
+
+      /// Importazione massiva anagrafica ragazzi da file .csv / .xlsx
+      /// (riservata al profilo Responsabile).
+      GoRoute(
+        path: '/parrocchia/import-ragazzi',
+        builder: (context, state) => const ImportRagazziPage(),
+      ),
 
       // ═══════════════════════════════════════════════════════════════════
       // STUDENTS - Anagrafica studenti
@@ -505,10 +856,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
 
       /// Gestione avvisi e messaggi standard per genitori.
-      GoRoute(
-        path: '/avvisi',
-        builder: (context, state) => const AvvisiPage(),
-      ),
+      GoRoute(path: '/avvisi', builder: (context, state) => const AvvisiPage()),
 
       // ═══════════════════════════════════════════════════════════════════
       // CLASSES - Gestione gruppi di catechismo
@@ -625,6 +973,25 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SettingsAssociationScreen(),
       ),
 
+      /// Centro di controllo della Catena di Fiducia del Responsabile
+      /// (QR di fiducia + approvazione dispositivi).
+      GoRoute(
+        path: '/settings/approval-center',
+        builder: (context, state) => const ApprovalCenterPage(),
+      ),
+
+      /// Schermata per cambiare classe
+      GoRoute(
+        path: '/settings/class-switcher',
+        builder: (context, state) => const ClassSwitcherPage(),
+      ),
+
+      /// Schermata per copiare contenuti da un'altra classe
+      GoRoute(
+        path: '/settings/class-copy',
+        builder: (context, state) => const ClassCopyPage(),
+      ),
+
       /// Procedura guidata per associare un nuovo dispositivo.
       GoRoute(
         path: '/settings/associate-device',
@@ -641,6 +1008,42 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings/sync-conflicts',
         builder: (context, state) => const ConflictResolutionPage(),
+      ),
+
+      // ═══════════════════════════════════════════════════════════════════
+      // SUPPLENZE TEMPORANEE - Delega sicura del registro
+      // ═══════════════════════════════════════════════════════════════════
+
+      /// Hub del modulo: deleghe create (Titolare) e ricevute (Supplente).
+      GoRoute(
+        path: '/substitutes',
+        builder: (context, state) => const SubstituteCenterPage(),
+      ),
+
+      /// Creazione di una nuova delega (Titolare): scelta Supplente + durata
+      /// → QR Code di delega temporanea.
+      GoRoute(
+        path: '/substitutes/create',
+        builder: (context, state) => const CreateSubstituteDelegationPage(),
+      ),
+
+      /// Scansione del QR di delega (Supplente) e di consegna/revoca.
+      GoRoute(
+        path: '/substitutes/scan',
+        builder: (context, state) => const ScanSubstituteDelegationPage(),
+      ),
+
+      /// Registro supplenza: presenze + note di lezione, consegna dati.
+      GoRoute(
+        path: '/substitutes/register',
+        builder: (context, state) {
+          final extra = state.extra is Map<String, dynamic>
+              ? state.extra as Map<String, dynamic>
+              : const <String, dynamic>{};
+          return SubstituteRegisterPage(
+            delegationId: extra['delegationId'] as String?,
+          );
+        },
       ),
 
       // ═══════════════════════════════════════════════════════════════════

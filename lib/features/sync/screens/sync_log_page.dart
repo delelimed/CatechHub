@@ -106,8 +106,10 @@ class _SyncLogPageState extends ConsumerState<SyncLogPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Log di sincronizzazione',
-            style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Log di sincronizzazione',
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: colorScheme.primary,
         actions: [
           if (allLogs.isNotEmpty) ...[
@@ -116,8 +118,10 @@ class _SyncLogPageState extends ConsumerState<SyncLogPage> {
               tooltip: 'Copia tutti i log',
               onPressed: () {
                 final text = allLogs
-                    .map((e) =>
-                        '[${DateFormat('HH:mm:ss').format(e.timestamp)}] [${e.level}] ${e.message}')
+                    .map(
+                      (e) =>
+                          '[${DateFormat('HH:mm:ss').format(e.timestamp)}] [${e.level}] ${e.message}',
+                    )
                     .join('\n');
                 Clipboard.setData(ClipboardData(text: text));
                 if (context.mounted) {
@@ -145,8 +149,11 @@ class _SyncLogPageState extends ConsumerState<SyncLogPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.history, size: 64,
-                      color: isDark ? Colors.grey[700] : Colors.grey[300]),
+                  Icon(
+                    Icons.history,
+                    size: 64,
+                    color: isDark ? Colors.grey[700] : Colors.grey[300],
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'Nessun log disponibile',
@@ -179,7 +186,9 @@ class _SyncLogPageState extends ConsumerState<SyncLogPage> {
                           child: Text(
                             'Nessun log di livello "$_levelFilter"',
                             style: TextStyle(
-                              color: isDark ? Colors.grey[500] : Colors.grey[500],
+                              color: isDark
+                                  ? Colors.grey[500]
+                                  : Colors.grey[500],
                             ),
                           ),
                         )
@@ -197,20 +206,27 @@ class _SyncLogPageState extends ConsumerState<SyncLogPage> {
   }
 
   Widget _buildLogSummary(
-      List<SyncLogEntry> allLogs, Map<String, int> counts, bool isDark) {
+    List<SyncLogEntry> allLogs,
+    Map<String, int> counts,
+    bool isDark,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         color: isDark ? Colors.grey[900] : Colors.grey[50],
         border: Border(
           bottom: BorderSide(
-              color: isDark ? Colors.grey[800]! : Colors.grey[200]!),
+            color: isDark ? Colors.grey[800]! : Colors.grey[200]!,
+          ),
         ),
       ),
       child: Row(
         children: [
-          Icon(Icons.analytics_outlined,
-              size: 18, color: isDark ? Colors.grey[400] : Colors.grey[600]),
+          Icon(
+            Icons.analytics_outlined,
+            size: 18,
+            color: isDark ? Colors.grey[400] : Colors.grey[600],
+          ),
           const SizedBox(width: 8),
           Text(
             '${allLogs.length} eventi  ·  ',
@@ -236,7 +252,9 @@ class _SyncLogPageState extends ConsumerState<SyncLogPage> {
               setState(() => _autoScroll = !_autoScroll);
             },
             child: Icon(
-              _autoScroll ? Icons.vertical_align_bottom : Icons.vertical_align_top,
+              _autoScroll
+                  ? Icons.vertical_align_bottom
+                  : Icons.vertical_align_top,
               size: 18,
               color: _autoScroll
                   ? (isDark ? Colors.grey[400] : Colors.grey[600])
@@ -317,9 +335,11 @@ class _SyncLogPageState extends ConsumerState<SyncLogPage> {
 
     return InkWell(
       onLongPress: () {
-        Clipboard.setData(ClipboardData(
-          text: '$dateStr $timeStr [${entry.level}] ${entry.message}',
-        ));
+        Clipboard.setData(
+          ClipboardData(
+            text: '$dateStr $timeStr [${entry.level}] ${entry.message}',
+          ),
+        );
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Log copiato negli appunti'),
@@ -339,11 +359,7 @@ class _SyncLogPageState extends ConsumerState<SyncLogPage> {
           children: [
             Padding(
               padding: const EdgeInsets.only(top: 2),
-              child: Icon(
-                _levelIcon(entry.level),
-                size: 14,
-                color: color,
-              ),
+              child: Icon(_levelIcon(entry.level), size: 14, color: color),
             ),
             const SizedBox(width: 8),
             SizedBox(
@@ -381,12 +397,10 @@ class _SyncLogPageState extends ConsumerState<SyncLogPage> {
                   color: isError
                       ? (isDark ? Colors.red[300] : Colors.red[800])
                       : isWarn
-                          ? (isDark ? Colors.orange[300] : Colors.orange[900])
-                          : isDebug
-                              ? (isDark
-                                  ? Colors.blueGrey[300]
-                                  : Colors.blueGrey[700])
-                              : (isDark ? Colors.grey[300] : null),
+                      ? (isDark ? Colors.orange[300] : Colors.orange[900])
+                      : isDebug
+                      ? (isDark ? Colors.blueGrey[300] : Colors.blueGrey[700])
+                      : (isDark ? Colors.grey[300] : null),
                 ),
               ),
             ),

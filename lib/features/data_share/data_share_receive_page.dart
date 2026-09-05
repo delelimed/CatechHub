@@ -9,6 +9,7 @@ import '../../shared/widgets/app_scaffold.dart';
 import '../../core/services/qr_data_service.dart';
 import '../../core/services/data_export_service.dart';
 import '../../core/providers/data_share_provider.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../classes/classes_provider.dart';
 import '../documents/documents_provider.dart';
 import '../planning/planning_provider.dart';
@@ -23,7 +24,8 @@ class DataShareReceivePage extends ConsumerStatefulWidget {
   const DataShareReceivePage({super.key});
 
   @override
-  ConsumerState<DataShareReceivePage> createState() => _DataShareReceivePageState();
+  ConsumerState<DataShareReceivePage> createState() =>
+      _DataShareReceivePageState();
 }
 
 class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
@@ -34,6 +36,14 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
   int _currentIndexChunk = 0;
   Timer? _indexTimer;
   bool _isIndexPlaying = false;
+
+  // A9: il PIN di sessione (comunicato dal mittente all'inizio del flusso)
+  // cifra l'indice prima della trasmissione. L'indice non viaggia più in
+  // chiaro: un terzo che fotografasse i QR non leggerebbe nemmeno i metadati
+  // (id + timestamp) dei record.
+  String? _sessionPin;
+  bool _isPreparingIndex = false;
+  final TextEditingController _sessionPinController = TextEditingController();
 
   // Stato per la fase "scanData"
   final List<QRChunk> _receivedChunks = [];
@@ -47,40 +57,74 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
   String? _errorMessage;
   String? _phaseMessage;
 
+  // A1: rate-limit sulla verifica del PIN. L'app non limita i tentativi di
+  // decifratura (la KDF a 350k iterazioni è già costosa), ma un lockout dopo
+  // troppi errori consecutivi scoraggia il brute-force interattivo del PIN.
+  static const int _maxPinAttempts = 5;
+  static const Duration _pinLockoutDuration = Duration(minutes: 1);
+  int _pinAttempts = 0;
+  DateTime? _pinLockoutUntil;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _prepareIndex());
+    // A9: l'indice viene preparato (e cifrato) solo dopo che l'utente inserisce
+    // il PIN di sessione comunicato dal mittente, quindi non serve prepararlo
+    // qui all'apertura della pagina.
   }
 
   @override
   void dispose() {
     _indexTimer?.cancel();
     _pinController.dispose();
+    _sessionPinController.dispose();
     super.dispose();
   }
 
   Future<void> _prepareIndex() async {
-    final options = ref.read(dataShareOptionsProvider) ?? const DataShareOptions();
+    final pin = _sessionPinController.text.trim();
+    if (pin.length != QRDataService.pinLength) {
+      setState(
+        () => _errorMessage =
+            'Il PIN deve essere di ${QRDataService.pinLength} cifre',
+      );
+      return;
+    }
+    final options =
+        ref.read(dataShareOptionsProvider) ?? const DataShareOptions();
+    setState(() {
+      _sessionPin = pin;
+      _isPreparingIndex = true;
+      _errorMessage = null;
+    });
     try {
       final indexMap = QRDataService.buildDatabaseIndex(options);
       if (!mounted) return;
-      final chunkMaps = QRDataService.serializeIndexToChunks(indexMap);
+      final chunkMaps = await QRDataService.encryptIndexToChunks(indexMap, pin);
       if (!mounted) return;
-      final chunks = chunkMaps.map((m) => QRChunk.fromMap(Map<String, dynamic>.from(m))).toList();
+      final chunks = chunkMaps
+          .map((m) => QRChunk.fromMap(Map<String, dynamic>.from(m)))
+          .toList();
       setState(() {
         _indexChunks = chunks;
+        _isPreparingIndex = false;
         _startIndexAnimation();
       });
     } catch (e) {
-      setState(() => _errorMessage = 'Errore creazione indice: $e');
+      setState(() {
+        _isPreparingIndex = false;
+        _errorMessage = 'Errore creazione indice: $e';
+      });
     }
   }
 
   void _startIndexAnimation() {
     if (_indexChunks.isEmpty) return;
     _indexTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
-      if (!mounted) { timer.cancel(); return; }
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       setState(() {
         _currentIndexChunk = (_currentIndexChunk + 1) % _indexChunks.length;
         _isIndexPlaying = true;
@@ -101,6 +145,20 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
     _indexTimer?.cancel();
     setState(() {
       _phase = _ReceivePhase.scanData;
+      _errorMessage = null;
+    });
+  }
+
+  // A9: torna alla richiesta del PIN di sessione (es. PIN errato lato mittente).
+  void _resetIndex() {
+    _indexTimer?.cancel();
+    setState(() {
+      _sessionPin = null;
+      _sessionPinController.clear();
+      _indexChunks.clear();
+      _currentIndexChunk = 0;
+      _isIndexPlaying = false;
+      _isPreparingIndex = false;
       _errorMessage = null;
     });
   }
@@ -129,7 +187,9 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
           _receivedChunkIndices.add(chunk.chunkIndex);
           _errorMessage = null;
         });
-        if (_receivedChunkIndices.length == chunk.totalChunks) _allChunksReceived();
+        if (_receivedChunkIndices.length == chunk.totalChunks) {
+          _allChunksReceived();
+        }
       }
     } catch (e) {
       setState(() => _errorMessage = 'Errore QR: $e');
@@ -143,6 +203,9 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
       QRDataService.extractPackage(assembledData);
       setState(() {
         _assembledPackageData = assembledData;
+        // A9: il PIN di sessione è già noto (usato per l'indice): lo
+        // precompiliamo, l'utente deve solo confermare.
+        _pinController.text = _sessionPin ?? '';
         _phase = _ReceivePhase.pinVerification;
       });
     } catch (e) {
@@ -158,9 +221,23 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
       setState(() => _errorMessage = 'Pacchetto dati non disponibile');
       return;
     }
+    // A1: lockout dopo troppi tentativi non validi.
+    final now = DateTime.now();
+    if (_pinLockoutUntil != null && now.isBefore(_pinLockoutUntil!)) {
+      final remaining =
+          _pinLockoutUntil!.difference(now).inSeconds + 1;
+      setState(
+        () => _errorMessage =
+            'Troppi tentativi non validi. Riprova tra $remaining secondi.',
+      );
+      return;
+    }
     final inputPin = _pinController.text.trim();
-    if (inputPin.length != 8) {
-      setState(() => _errorMessage = 'Il PIN deve essere di 8 cifre');
+    if (inputPin.length != QRDataService.pinLength) {
+      setState(
+        () => _errorMessage =
+            'Il PIN deve essere di ${QRDataService.pinLength} cifre',
+      );
       return;
     }
     setState(() {
@@ -173,10 +250,16 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
   Future<void> _importData(String pin) async {
     try {
       setState(() => _phaseMessage = 'Decifratura dati…');
-      final receivedData = QRDataService.extractPackageData(_assembledPackageData!, pin);
+      final receivedData = await QRDataService.extractPackageData(
+        _assembledPackageData!,
+        pin,
+      );
 
       setState(() => _phaseMessage = 'Verifica integrità…');
-      if (!DataExportService.verifyDataIntegrity(receivedData, requireFullPackage: false)) {
+      if (!DataExportService.verifyDataIntegrity(
+        receivedData,
+        requireFullPackage: false,
+      )) {
         setState(() {
           _errorMessage = 'Integrità dei dati non valida';
           _phase = _ReceivePhase.scanData;
@@ -187,20 +270,50 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
       }
 
       setState(() => _phaseMessage = 'Importazione dati…');
-      await DataExportService.importData(receivedData, onPhase: (phase) {
-        if (mounted) setState(() => _phaseMessage = phase);
-      });
+
+      // I dati ricevuti vengono inseriti nella classe attualmente aperta.
+      final currentClass = ref.read(currentClassDetailsProvider);
+      if (currentClass != null && currentClass.id.isNotEmpty) {
+        await DataExportService.importDataIntoClass(
+          receivedData,
+          currentClass,
+          onPhase: (phase) {
+            if (mounted) setState(() => _phaseMessage = phase);
+          },
+        );
+      } else {
+        await DataExportService.importData(
+          receivedData,
+          onPhase: (phase) {
+            if (mounted) setState(() => _phaseMessage = phase);
+          },
+        );
+      }
 
       ref.invalidate(classesStreamProvider);
       ref.invalidate(documentsStreamProvider);
       ref.invalidate(planningRepoProvider);
       ref.invalidate(studentsRepoProvider);
 
-      setState(() { _phaseMessage = null; });
+      setState(() {
+        _pinAttempts = 0;
+        _pinLockoutUntil = null;
+        _phaseMessage = null;
+      });
       if (mounted) _showSuccessDialog();
     } catch (e) {
+      // A1: conta i tentativi non validi e applica il lockout dopo il massimo.
       setState(() {
-        _errorMessage = 'PIN non corretto o dati non validi';
+        _pinAttempts++;
+        if (_pinAttempts >= _maxPinAttempts) {
+          _pinLockoutUntil = DateTime.now().add(_pinLockoutDuration);
+          _pinAttempts = 0;
+          _errorMessage =
+              'Troppi tentativi non validi. Riprova tra '
+              '${_pinLockoutDuration.inMinutes} minuto.';
+        } else {
+          _errorMessage = 'PIN non corretto o dati non validi';
+        }
         _phase = _ReceivePhase.pinVerification;
         _phaseMessage = null;
       });
@@ -219,10 +332,15 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
             Text('Importazione Completata'),
           ],
         ),
-        content: const Text('I dati differenziali sono stati importati con successo.'),
+        content: const Text(
+          'I dati differenziali sono stati importati con successo.',
+        ),
         actions: [
           TextButton(
-            onPressed: () { Navigator.of(ctx).pop(); context.go('/'); },
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              context.go('/');
+            },
             child: const Text('OK'),
           ),
         ],
@@ -257,7 +375,9 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      title: _phase == _ReceivePhase.showIndex ? 'Mostra Indice Database' : 'Ricezione Dati',
+      title: _phase == _ReceivePhase.showIndex
+          ? 'Mostra Indice Database'
+          : 'Ricezione Dati',
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -284,7 +404,9 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
           decoration: BoxDecoration(
             color: const Color(0xFF174A7E).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF174A7E).withValues(alpha: 0.3)),
+            border: Border.all(
+              color: const Color(0xFF174A7E).withValues(alpha: 0.3),
+            ),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -297,7 +419,10 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
                   children: [
                     Text(
                       'I dati ricevuti verranno inseriti nella classe attualmente aperta.',
-                      style: TextStyle(fontSize: 13, color: const Color(0xFF174A7E)),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: const Color(0xFF174A7E),
+                      ),
                     ),
                   ],
                 ),
@@ -305,18 +430,28 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
             ],
           ),
         ),
-        _InfoBanner(
-          icon: Icons.qr_code_2_rounded,
-          message: 'Mostra questo QR code al mittente\nper consentirgli di confrontare i database',
-          color: const Color(0xFF174A7E),
-        ),
+        if (_sessionPin == null)
+          _buildSessionPinForm()
+        else ...[
+          _InfoBanner(
+            icon: Icons.qr_code_2_rounded,
+            message:
+                'Mostra questo QR code al mittente\nper consentirgli di confrontare i database',
+            color: const Color(0xFF174A7E),
+          ),
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 20, offset: const Offset(0, 10))],
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
             border: Border.all(color: const Color(0xFF174A7E), width: 2),
           ),
           child: Column(
@@ -335,11 +470,16 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
                     size: 380,
                     backgroundColor: Colors.white,
                     eyeStyle: const QrEyeStyle(color: Colors.black),
-                    dataModuleStyle: const QrDataModuleStyle(color: Colors.black),
+                    dataModuleStyle: const QrDataModuleStyle(
+                      color: Colors.black,
+                    ),
                   ),
                 )
               else
-                const SizedBox(height: 200, child: Center(child: CircularProgressIndicator())),
+                const SizedBox(
+                  height: 200,
+                  child: Center(child: CircularProgressIndicator()),
+                ),
               const SizedBox(height: 12),
               Text(
                 'Chunk ${_currentIndexChunk + 1} di ${_indexChunks.length}',
@@ -354,7 +494,9 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
           children: [
             if (_indexChunks.isNotEmpty) ...[
               _MiniButton(
-                icon: _isIndexPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                icon: _isIndexPlaying
+                    ? Icons.pause_rounded
+                    : Icons.play_arrow_rounded,
                 label: _isIndexPlaying ? 'Pausa' : 'Riprendi',
                 color: _isIndexPlaying ? Colors.orange : Colors.green,
                 onTap: _isIndexPlaying ? _pauseIndex : _resumeIndex,
@@ -369,14 +511,128 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
             ),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 8),
+        TextButton.icon(
+          onPressed: _resetIndex,
+          icon: const Icon(Icons.replay_rounded, size: 18),
+          label: const Text('PIN errato? Reinserisci'),
+        ),
+        const SizedBox(height: 16),
         _InstructionsCard(
           steps: [
             'Mostra questo QR al mittente per l\'analisi del database',
             'Dopo averlo scansionato, il mittente invierà solo i dati aggiornati',
             'Premi "Passa alla Ricezione" e inquadra i QR del mittente',
-            'Inserisci il PIN per completare l\'importazione',
+            'Il PIN inserito all\'inizio completa l\'importazione',
           ],
+        ),
+        ],
+      ],
+    );
+  }
+
+  // A9: form di inserimento del PIN di sessione mostrato dal mittente.
+  // L'indice viene cifrato SOLO dopo questo inserimento.
+  Widget _buildSessionPinForm() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _InfoBanner(
+          icon: Icons.pin_rounded,
+          message:
+              'Il mittente ti mostrerà un PIN di sicurezza.\nInseriscilo qui: l\'indice del database verrà cifrato prima della trasmissione.',
+          color: const Color(0xFF174A7E),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isDark ? colorScheme.surfaceContainer : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+            border: Border.all(color: const Color(0xFF174A7E), width: 1.5),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'PIN di sicurezza',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _sessionPinController,
+                keyboardType: TextInputType.number,
+                obscureText: true,
+                maxLength: QRDataService.pinLength,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 20,
+                  letterSpacing: 8,
+                  fontWeight: FontWeight.bold,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'PIN',
+                  hintText: '••••••••••••',
+                  prefixIcon: const Icon(Icons.lock_rounded),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  counterText: '',
+                ),
+              ),
+              if (_isPreparingIndex) ...[
+                const SizedBox(height: 12),
+                const Center(child: CircularProgressIndicator()),
+                const SizedBox(height: 8),
+                const Center(
+                  child: Text(
+                    'Preparazione indice cifrato…',
+                    style: TextStyle(fontSize: 13, color: Colors.grey),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        if (_errorMessage != null) ...[
+          const SizedBox(height: 12),
+          _ErrorMessage(message: _errorMessage!),
+        ],
+        const SizedBox(height: 16),
+        ElevatedButton.icon(
+          onPressed: _isPreparingIndex ? null : _prepareIndex,
+          icon: const Icon(Icons.qr_code_2_rounded),
+          label: Text(
+            _isPreparingIndex ? 'Preparazione…' : 'Cifra e mostra indice',
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF174A7E),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextButton.icon(
+          onPressed: () {
+            ref.read(dataShareOptionsProvider.notifier).state = null;
+            context.pop();
+          },
+          icon: const Icon(Icons.cancel_rounded),
+          label: const Text('Annulla'),
         ),
       ],
     );
@@ -413,14 +669,23 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
             child: _isScanning
                 ? MobileScanner(onDetect: _onQRCodeDetected)
                 : Container(
-                    color: isDark ? colorScheme.surfaceContainer : Colors.grey.shade200,
+                    color: isDark
+                        ? colorScheme.surfaceContainer
+                        : Colors.grey.shade200,
                     child: const Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.qr_code_scanner_rounded, size: 64, color: Colors.grey),
+                          Icon(
+                            Icons.qr_code_scanner_rounded,
+                            size: 64,
+                            color: Colors.grey,
+                          ),
                           SizedBox(height: 16),
-                          Text('Scansione in pausa', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                          Text(
+                            'Scansione in pausa',
+                            style: TextStyle(fontSize: 16, color: Colors.grey),
+                          ),
                         ],
                       ),
                     ),
@@ -440,8 +705,13 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
           children: [
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () => setState(() { _isScanning = !_isScanning; _errorMessage = null; }),
-                icon: Icon(_isScanning ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                onPressed: () => setState(() {
+                  _isScanning = !_isScanning;
+                  _errorMessage = null;
+                }),
+                icon: Icon(
+                  _isScanning ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                ),
                 label: Text(_isScanning ? 'Pausa' : 'Riprendi'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _isScanning ? Colors.orange : Colors.green,
@@ -483,7 +753,9 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
         Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: isDark ? Colors.green.withValues(alpha: 0.15) : Colors.green.withValues(alpha: 0.1),
+            color: isDark
+                ? Colors.green.withValues(alpha: 0.15)
+                : Colors.green.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
           ),
@@ -493,11 +765,15 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
               SizedBox(height: 16),
               Text(
                 'Tutti i chunk ricevuti!',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF174A7E),
+                ),
               ),
               SizedBox(height: 8),
               Text(
-                'Inserisci il PIN di 8 cifre fornito dal mittente',
+                'Inserisci il PIN di ${QRDataService.pinLength} cifre fornito dal mittente',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 14, color: Colors.grey),
               ),
@@ -508,12 +784,14 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
         TextField(
           controller: _pinController,
           keyboardType: TextInputType.number,
-          maxLength: 8,
+          maxLength: QRDataService.pinLength,
           decoration: const InputDecoration(
             labelText: 'PIN di sicurezza',
-            hintText: 'Inserisci 8 cifre',
+            hintText: 'Inserisci ${QRDataService.pinLength} cifre',
             prefixIcon: Icon(Icons.security_rounded),
-            border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+            ),
             counterText: '',
           ),
           style: const TextStyle(fontSize: 20, letterSpacing: 8),
@@ -553,7 +831,9 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
       padding: const EdgeInsets.all(32),
       child: Column(
         children: [
-          CircularProgressIndicator(color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+          CircularProgressIndicator(
+            color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+          ),
           const SizedBox(height: 24),
           const Text(
             'Importazione in corso...',
@@ -564,7 +844,11 @@ class _DataShareReceivePageState extends ConsumerState<DataShareReceivePage> {
             Text(
               _phaseMessage!,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF174A7E)),
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF174A7E),
+              ),
             ),
           ],
           const SizedBox(height: 8),
@@ -586,7 +870,11 @@ class _InfoBanner extends StatelessWidget {
   final String message;
   final Color color;
 
-  const _InfoBanner({required this.icon, required this.message, required this.color});
+  const _InfoBanner({
+    required this.icon,
+    required this.message,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -601,7 +889,9 @@ class _InfoBanner extends StatelessWidget {
         children: [
           Icon(icon, color: color, size: 24),
           const SizedBox(width: 12),
-          Expanded(child: Text(message, style: TextStyle(fontSize: 13, color: color))),
+          Expanded(
+            child: Text(message, style: TextStyle(fontSize: 13, color: color)),
+          ),
         ],
       ),
     );
@@ -614,7 +904,12 @@ class _MiniButton extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
 
-  const _MiniButton({required this.icon, required this.label, required this.color, required this.onTap});
+  const _MiniButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -646,13 +941,17 @@ class _ProgressInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final percentage = totalChunks > 0 ? (receivedCount / totalChunks * 100).toStringAsFixed(1) : '0';
+    final percentage = totalChunks > 0
+        ? (receivedCount / totalChunks * 100).toStringAsFixed(1)
+        : '0';
     return Column(
       children: [
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [Color(0xFF174A7E), Color(0xFF2E5A8F)]),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF174A7E), Color(0xFF2E5A8F)],
+            ),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -662,22 +961,51 @@ class _ProgressInfo extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 24),
+                      const Icon(
+                        Icons.qr_code_2_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
                       const SizedBox(width: 12),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          Text('$receivedCount${totalChunks > 0 ? '/$totalChunks' : ''}',
-                              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                          Text(
+                            label,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            '$receivedCount${totalChunks > 0 ? '/$totalChunks' : ''}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ],
                       ),
                     ],
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8)),
-                    child: Text('$percentage%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '$percentage%',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -688,7 +1016,9 @@ class _ProgressInfo extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: receivedCount / totalChunks,
                     backgroundColor: Colors.white.withValues(alpha: 0.3),
-                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      Colors.white,
+                    ),
                     minHeight: 6,
                   ),
                 ),
@@ -707,10 +1037,16 @@ class _ProgressInfo extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 20),
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.orange,
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
-                Text('Mancanti: #${missingChunkIndices.join(', #')}',
-                    style: const TextStyle(fontSize: 12, color: Colors.orange)),
+                Text(
+                  'Mancanti: #${missingChunkIndices.join(', #')}',
+                  style: const TextStyle(fontSize: 12, color: Colors.orange),
+                ),
               ],
             ),
           ),
@@ -737,7 +1073,12 @@ class _ErrorMessage extends StatelessWidget {
         children: [
           const Icon(Icons.error_outline, color: Colors.red, size: 20),
           const SizedBox(width: 8),
-          Expanded(child: Text(message, style: const TextStyle(color: Colors.red, fontSize: 13))),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(color: Colors.red, fontSize: 13),
+            ),
+          ),
         ],
       ),
     );
@@ -759,19 +1100,29 @@ class _InstructionsCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? colorScheme.surfaceContainer : Colors.blue.shade50,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.blue.shade200),
+        border: Border.all(
+          color: isDark
+              ? colorScheme.outline.withValues(alpha: 0.2)
+              : Colors.blue.shade200,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.info_rounded, color: isDark ? colorScheme.primary : Colors.blue.shade700),
+              Icon(
+                Icons.info_rounded,
+                color: isDark ? colorScheme.primary : Colors.blue.shade700,
+              ),
               const SizedBox(width: 8),
-              Text('Istruzioni',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? colorScheme.primary : Colors.blue.shade700)),
+              Text(
+                'Istruzioni',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? colorScheme.primary : Colors.blue.shade700,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -785,16 +1136,32 @@ class _InstructionsCard extends StatelessWidget {
                     width: 24,
                     height: 24,
                     decoration: BoxDecoration(
-                      color: isDark ? colorScheme.primary : Colors.blue.shade700,
+                      color: isDark
+                          ? colorScheme.primary
+                          : Colors.blue.shade700,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(
-                      child: Text('${i + 1}',
-                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                      child: Text(
+                        '${i + 1}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(steps[i], style: TextStyle(fontSize: 13, color: isDark ? colorScheme.onSurface : null))),
+                  Expanded(
+                    child: Text(
+                      steps[i],
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark ? colorScheme.onSurface : null,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),

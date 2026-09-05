@@ -83,13 +83,13 @@ class _SecurityCheckPageState extends ConsumerState<SecurityCheckPage>
       parent: _headerController,
       curve: Curves.easeOut,
     );
-    _headerSlideAnimation = Tween<Offset>(
-      begin: const Offset(0, -0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _headerController,
-      curve: Curves.easeOutCubic,
-    ));
+    _headerSlideAnimation =
+        Tween<Offset>(begin: const Offset(0, -0.3), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _headerController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
     _headerScaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(parent: _headerController, curve: Curves.elasticOut),
     );
@@ -325,7 +325,8 @@ class _SecurityCheckPageState extends ConsumerState<SecurityCheckPage>
     setState(() {
       for (final check in _checks) {
         final isBlocked = _mapThreatToBlockMessage(check.threatType, blockMsg);
-        final isWarned = check.isWarningOnly &&
+        final isWarned =
+            check.isWarningOnly &&
             _mapThreatToWarningMessage(check.threatType, warningMsg);
 
         if (isBlocked) {
@@ -427,7 +428,8 @@ class _SecurityCheckPageState extends ConsumerState<SecurityCheckPage>
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final hasActiveBlock = SecurityService.blockMessage.value != null;
-    final hasActiveWarning = SecurityService.developerOptionsWarningMessage.value != null;
+    final hasActiveWarning =
+        SecurityService.developerOptionsWarningMessage.value != null;
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -444,7 +446,10 @@ class _SecurityCheckPageState extends ConsumerState<SecurityCheckPage>
             backgroundColor: colorScheme.surface,
             surfaceTintColor: Colors.transparent,
             leading: IconButton(
-              icon: Icon(Icons.arrow_back_ios_new_rounded, color: colorScheme.onSurface),
+              icon: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: colorScheme.onSurface,
+              ),
               onPressed: () => Navigator.of(context).pop(),
             ),
             actions: [
@@ -454,10 +459,14 @@ class _SecurityCheckPageState extends ConsumerState<SecurityCheckPage>
                 child: AnimatedBuilder(
                   animation: _refreshController,
                   builder: (context, child) => Transform.rotate(
-                    angle: _isRefreshing ? _refreshRotationAnimation.value * 2 * 3.14159 : 0,
+                    angle: _isRefreshing
+                        ? _refreshRotationAnimation.value * 2 * 3.14159
+                        : 0,
                     child: IconButton(
                       icon: Icon(
-                        _isRefreshing ? Icons.refresh_rounded : Icons.refresh_rounded,
+                        _isRefreshing
+                            ? Icons.refresh_rounded
+                            : Icons.refresh_rounded,
                         color: colorScheme.primary,
                       ),
                       onPressed: _isRefreshing ? null : _onRefresh,
@@ -470,15 +479,26 @@ class _SecurityCheckPageState extends ConsumerState<SecurityCheckPage>
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: IconButton(
-                  icon: Icon(Icons.help_outline_rounded, color: colorScheme.onSurfaceVariant),
+                  icon: Icon(
+                    Icons.help_outline_rounded,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                   onPressed: () => _openDocs('https://freerasp.tech/docs'),
                   tooltip: 'Documentazione freeRASP',
                 ),
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
-              stretchModes: const [StretchMode.zoomBackground, StretchMode.fadeTitle],
-              background: _buildAnimatedHeader(context, isDark, hasActiveBlock, hasActiveWarning),
+              stretchModes: const [
+                StretchMode.zoomBackground,
+                StretchMode.fadeTitle,
+              ],
+              background: _buildAnimatedHeader(
+                context,
+                isDark,
+                hasActiveBlock,
+                hasActiveWarning,
+              ),
             ),
           ),
 
@@ -487,18 +507,22 @@ class _SecurityCheckPageState extends ConsumerState<SecurityCheckPage>
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
             sliver: SliverList.separated(
               itemCount: _checks.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 final check = _checks[index];
-                return _buildAnimatedCheckCard(context, check, index, colorScheme, isDark);
+                return _buildAnimatedCheckCard(
+                  context,
+                  check,
+                  index,
+                  colorScheme,
+                  isDark,
+                );
               },
             ),
           ),
 
           // ─── FOOTER INFO ───
-          SliverToBoxAdapter(
-            child: _buildFooter(context, colorScheme),
-          ),
+          SliverToBoxAdapter(child: _buildFooter(context, colorScheme)),
         ],
       ),
     );
@@ -586,14 +610,20 @@ class _SecurityCheckPageState extends ConsumerState<SecurityCheckPage>
                               borderRadius: BorderRadius.circular(22),
                               boxShadow: [
                                 BoxShadow(
-                                  color: headerStartColor.withValues(alpha: 0.4),
+                                  color: headerStartColor.withValues(
+                                    alpha: 0.4,
+                                  ),
                                   blurRadius: 30,
                                   spreadRadius: -5,
                                   offset: const Offset(0, 10),
                                 ),
                               ],
                             ),
-                            child: Icon(headerIcon, size: 36, color: Colors.white),
+                            child: Icon(
+                              headerIcon,
+                              size: 36,
+                              color: Colors.white,
+                            ),
                           ),
                           const SizedBox(height: 20),
                           // Titolo
@@ -603,25 +633,30 @@ class _SecurityCheckPageState extends ConsumerState<SecurityCheckPage>
                             ).createShader(bounds),
                             child: Text(
                               headerTitle,
-                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                                letterSpacing: -0.5,
-                              ),
+                              style: Theme.of(context).textTheme.headlineMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                    letterSpacing: -0.5,
+                                  ),
                             ),
                           ),
                           const SizedBox(height: 6),
                           Text(
                             headerSubtitle,
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              fontWeight: FontWeight.w400,
-                            ),
+                            style: Theme.of(context).textTheme.bodyLarge
+                                ?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  fontWeight: FontWeight.w400,
+                                ),
                           ),
                           const SizedBox(height: 16),
                           // Badge stato
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(20),
@@ -637,16 +672,16 @@ class _SecurityCheckPageState extends ConsumerState<SecurityCheckPage>
                                   color: hasActiveBlock
                                       ? Colors.red.shade300
                                       : hasActiveWarning
-                                          ? Colors.orange.shade300
-                                          : Colors.green.shade300,
+                                      ? Colors.orange.shade300
+                                      : Colors.green.shade300,
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
                                   hasActiveBlock
                                       ? 'BLOCCO ATTIVO'
                                       : hasActiveWarning
-                                          ? 'AVVISO ATTIVO'
-                                          : 'PROTETTO',
+                                      ? 'AVVISO ATTIVO'
+                                      : 'PROTETTO',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 12,
@@ -688,7 +723,8 @@ class _SecurityCheckPageState extends ConsumerState<SecurityCheckPage>
         final progress = _listController.value;
         double cardProgress = 0.0;
         if (progress >= animationStart && progress <= animationEnd) {
-          cardProgress = (progress - animationStart) / (animationEnd - animationStart);
+          cardProgress =
+              (progress - animationStart) / (animationEnd - animationStart);
           cardProgress = Curves.easeOutCubic.transform(cardProgress);
         } else if (progress > animationEnd) {
           cardProgress = 1.0;
@@ -742,10 +778,26 @@ class _SecurityCheckPageState extends ConsumerState<SecurityCheckPage>
             spacing: 12,
             runSpacing: 8,
             children: [
-              _LegendItem(color: Colors.green.shade600, label: 'Superato', icon: Icons.check_circle_rounded),
-              _LegendItem(color: Colors.orange.shade600, label: 'Avviso', icon: Icons.warning_amber_rounded),
-              _LegendItem(color: Colors.red.shade600, label: 'Bloccato', icon: Icons.cancel_rounded),
-              _LegendItem(color: Colors.grey.shade500, label: 'In verifica', icon: Icons.hourglass_empty_rounded),
+              _LegendItem(
+                color: Colors.green.shade600,
+                label: 'Superato',
+                icon: Icons.check_circle_rounded,
+              ),
+              _LegendItem(
+                color: Colors.orange.shade600,
+                label: 'Avviso',
+                icon: Icons.warning_amber_rounded,
+              ),
+              _LegendItem(
+                color: Colors.red.shade600,
+                label: 'Bloccato',
+                icon: Icons.cancel_rounded,
+              ),
+              _LegendItem(
+                color: Colors.grey.shade500,
+                label: 'In verifica',
+                icon: Icons.hourglass_empty_rounded,
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -778,12 +830,7 @@ enum ThreatType {
   devMode,
 }
 
-enum CheckStatus {
-  unknown,
-  passed,
-  warning,
-  failed,
-}
+enum CheckStatus { unknown, passed, warning, failed }
 
 class SecurityCheckItem {
   final String id;
@@ -896,8 +943,8 @@ class _SecurityCheckCardState extends State<_SecurityCheckCard>
             color: isFailed
                 ? statusColor.withValues(alpha: 0.3)
                 : isWarning
-                    ? statusColor.withValues(alpha: 0.3)
-                    : widget.colorScheme.outlineVariant.withValues(alpha: 0.5),
+                ? statusColor.withValues(alpha: 0.3)
+                : widget.colorScheme.outlineVariant.withValues(alpha: 0.5),
             width: isFailed || isWarning ? 1.5 : 1,
           ),
           boxShadow: [
@@ -936,14 +983,19 @@ class _SecurityCheckCardState extends State<_SecurityCheckCard>
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
-                                color: check.iconGradient.colors.first.withValues(alpha: 0.4),
+                                color: check.iconGradient.colors.first
+                                    .withValues(alpha: 0.4),
                                 blurRadius: 12,
                                 offset: const Offset(0, 4),
                                 spreadRadius: -2,
                               ),
                             ],
                           ),
-                          child: Icon(check.icon, color: Colors.white, size: 28),
+                          child: Icon(
+                            check.icon,
+                            color: Colors.white,
+                            size: 28,
+                          ),
                         ),
                       ),
                     ),
@@ -955,21 +1007,23 @@ class _SecurityCheckCardState extends State<_SecurityCheckCard>
                         children: [
                           Text(
                             check.title,
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: widget.colorScheme.onSurface,
-                              letterSpacing: -0.2,
-                            ),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: widget.colorScheme.onSurface,
+                                  letterSpacing: -0.2,
+                                ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 4),
                           Text(
                             check.description,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: widget.colorScheme.onSurfaceVariant,
-                              height: 1.4,
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: widget.colorScheme.onSurfaceVariant,
+                                  height: 1.4,
+                                ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -985,7 +1039,10 @@ class _SecurityCheckCardState extends State<_SecurityCheckCard>
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 300),
                           curve: Curves.easeOutCubic,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             color: statusColor.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(20),
@@ -1047,7 +1104,13 @@ class _SecurityCheckCardState extends State<_SecurityCheckCard>
                   child: child,
                 ),
               ),
-              child: _buildExpandedContent(context, check, statusColor, isFailed, isWarning),
+              child: _buildExpandedContent(
+                context,
+                check,
+                statusColor,
+                isFailed,
+                isWarning,
+              ),
             ),
           ],
         ),
@@ -1066,7 +1129,9 @@ class _SecurityCheckCardState extends State<_SecurityCheckCard>
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       decoration: BoxDecoration(
-        color: widget.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        color: widget.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.5,
+        ),
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(20),
           bottomRight: Radius.circular(20),
@@ -1093,7 +1158,9 @@ class _SecurityCheckCardState extends State<_SecurityCheckCard>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(
-                    isFailed ? Icons.error_outline_rounded : Icons.warning_amber_rounded,
+                    isFailed
+                        ? Icons.error_outline_rounded
+                        : Icons.warning_amber_rounded,
                     color: statusColor,
                     size: 22,
                   ),
@@ -1181,14 +1248,22 @@ class _SecurityCheckCardState extends State<_SecurityCheckCard>
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.green.shade50.withValues(alpha: widget.isDark ? 0.3 : 1),
+              color: Colors.green.shade50.withValues(
+                alpha: widget.isDark ? 0.3 : 1,
+              ),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.green.shade200.withValues(alpha: 0.5)),
+              border: Border.all(
+                color: Colors.green.shade200.withValues(alpha: 0.5),
+              ),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.lightbulb_outline_rounded, color: Colors.green.shade700, size: 20),
+                Icon(
+                  Icons.lightbulb_outline_rounded,
+                  color: Colors.green.shade700,
+                  size: 20,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -1392,7 +1467,8 @@ class _PulsingDot extends StatefulWidget {
   State<_PulsingDot> createState() => _PulsingDotState();
 }
 
-class _PulsingDotState extends State<_PulsingDot> with SingleTickerProviderStateMixin {
+class _PulsingDotState extends State<_PulsingDot>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _animation;
 
@@ -1403,9 +1479,10 @@ class _PulsingDotState extends State<_PulsingDot> with SingleTickerProviderState
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat(reverse: true);
-    _animation = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _animation = Tween<double>(
+      begin: 0.5,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -1464,7 +1541,11 @@ class _HeaderPatternPainter extends CustomPainter {
         if (dist < spacing * 0.7) {
           final opacity = (1 - dist / (spacing * 0.7)) * progress;
           paint.color = color.withValues(alpha: opacity * 0.5);
-          canvas.drawCircle(Offset(x, y), radius * (0.5 + progress * 0.5), paint);
+          canvas.drawCircle(
+            Offset(x, y),
+            radius * (0.5 + progress * 0.5),
+            paint,
+          );
         }
       }
     }

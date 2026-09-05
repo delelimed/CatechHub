@@ -26,17 +26,18 @@
 
 <section class="hero">
   <div class="badges">
-    <span class="badge version-tag">v1.0.3</span>
+    <span class="badge version-tag">v1.0.5</span>
     <span class="badge">100% offline</span>
     <span class="badge">Privacy by Design</span>
+    <span class="badge">GDPR by design</span>
     <span class="badge">Senza account</span>
     <span class="badge">Gratuita</span>
   </div>
   <h1>CatechHub: Il Tuo registro di Catechismo - Completamente offline</h1>
   <p>Niente più fogli volanti, elenchi persi o dati lasciati in giro. CatechHub è l'app creata da un catechista per altri catechisti: semplice, sicura, funziona sempre, anche senza internet.</p>
-  <p style="font-size:0.85rem;opacity:0.7;margin-top:0.5rem;">? Sviluppata in <strong>vibe coding</strong> con AI da un catechista studente di medicina, non da un programmatore</p>
+  <p style="font-size:0.85rem;opacity:0.7;margin-top:0.5rem;">Sviluppata interamente in <strong>vibe coding</strong> con intelligenza artificiale da un catechista — non da uno sviluppatore di professione. Il codice &egrave; aperto, verificabile e migliorabile da chiunque.</p>
   <div style="margin-top:1.5rem;">
-    <span class="badge" style="font-size:0.9rem;padding:0.4rem 1rem;">Ultima versione: <strong class="version-tag">v1.0.3</strong> &middot; <span class="download-count">0 download</span></span>
+    <span class="badge" style="font-size:0.9rem;padding:0.4rem 1rem;">Ultima versione: <strong class="version-tag">v1.0.5</strong> &middot; <span class="download-count">0 download</span></span>
   </div>
   <div style="margin-top:1rem;">
     <a href="https://github.com/delelimed/CatechHub/releases" class="btn btn-outline release-url download-btn" style="border-color:#fff;color:#fff;margin:0.25rem;">Scarica l'APK gratis</a>
@@ -130,7 +131,7 @@
 <section class="section-alt">
   <div class="container">
     <h2>I tuoi dati sono al sicuro</h2>
-    <p>CatechHub è pensato per proteggere i dati sensibili dei minori. Nessuna informazione lascia il tuo telefono senza il tuo esplicito consenso.</p>
+    <p>CatechHub è pensato per proteggere i dati sensibili dei minori. Nessuna informazione lascia il tuo telefono senza il tuo esplicito consenso. <strong>L'app non dispone di server, non condivide dati con nessuno e l'unico a gestire e decidere l'uso dei dati sei tu</strong> (in linea con i principi del GDPR). L'app funziona completamente offline: l'unica connessione opzionale è il controllo aggiornamenti (disattivabile) e il feedback volontario all'autore.</p>
 
     <table class="sec-table">
       <thead>
@@ -139,18 +140,19 @@
       <tbody>
         <tr><td><strong>Accesso all'app</strong></td><td>Impronta digitale, riconoscimento facciale o PIN del telefono</td></tr>
         <tr><td><strong>Blocco hardware</strong></td><td>Verifica TEE/StrongBox all'avvio — hardware di sicurezza obbligatorio, nessun fallback software</td></tr>
-        <tr><td><strong>Dati sul telefono</strong></td><td>Cifrati con AES-256-GCM — chiave master in AndroidKeyStore (TEE/StrongBox)</td></tr>
-        <tr><td><strong>Sync P2P Bluetooth/WiFi</strong></td><td>Crittografia end-to-end X25519 ECDH + HKDF + AES-256-GCM, pairing code a 6 cifre anti-MitM, key pinning per dispositivo, forward secrecy</td></tr>
-        <tr><td><strong>Condivisione QR</strong></td><td>AES-256-GCM con PIN a 8 cifre (valido 3 min), checksum SHA-256 per chunk, sync differenziale</td></tr>
+        <tr><td><strong>Dati sul telefono</strong></td><td>Cifrati con AES-256-GCM — chiave master in AndroidKeyStore (TEE/StrongBox); cifratura di campo aggiuntiva per i dati più sensibili</td></tr>
+        <tr><td><strong>Sync P2P Bluetooth/WiFi</strong></td><td>Crittografia end-to-end TripleDH X25519 + HKDF-SHA256 + AES-256-GCM, rotazione chiavi di sessione ogni 30 minuti, pairing code a 6 cifre anti-MitM, key pinning per dispositivo, forward secrecy, canale classe cifrato per-classe</td></tr>
+        <tr><td><strong>Condivisione QR</strong></td><td>AES-256-GCM con PIN a 12 cifre (valido 3 min, PBKDF2 350.000 iterazioni per i nuovi pacchetti), checksum SHA-256 per chunk, sync differenziale, rate-limit all'import</td></tr>
         <tr><td><strong>Schermo</strong></td><td>Blocco screenshot e screen recording non autorizzati</td></tr>
         <tr><td><strong>Protezione runtime</strong></td><td>freeRASP: rilevamento root, emulatori, hooking, tampering</td></tr>
-        <tr><td><strong>Sessione in background</strong></td><td>Blocco automatico dopo 2 minuti di inattività</td></tr>
-        <tr><td><strong>Backup</strong></td><td>Protetto da password con PBKDF2 (210.000 iterazioni) + AES-256-GCM</td></tr>
+        <tr><td><strong>Sessione in background</strong></td><td>Blocco automatico dopo 2 minuti in background e 5 minuti di inattività in foreground</td></tr>
+        <tr><td><strong>Backup</strong></td><td>Nuovi file <code>.catechhub</code> + export GDPR: PBKDF2 350.000 iterazioni, PIN 12 alfanumerici (≥1 lettera+≥1 cifra), AAD <code>Context_Backup_v1</code>, anti-brute-force per-file (5→30 min); 210k/60k legacy solo in lettura</td></tr>
+        <tr><td><strong>GDPR</strong></td><td>Registro Trattamenti firmato HMAC-SHA256, consensi con scadenza ed evidenza del firmatario, retention automatica, tombstone firmati (HMAC + Ed25519) anti-resurrezione per la cancellazione</td></tr>
       </tbody>
     </table>
 
     <div class="alert alert-info">
-      Nessun dato personale lascia il tuo telefono se non durante una sincronizzazione volontaria con un catechista di tua fiducia. Zero server, zero sorprese.
+      Nessun dato personale lascia il tuo telefono se non durante una sincronizzazione volontaria con un catechista di tua fiducia. Zero server, zero sorprese. Sei tu il titolare dei dati: l'app è solo il tuo strumento personale.
     </div>
   </div>
 </section>
@@ -162,6 +164,10 @@
       <a href="features/students.html" class="card" style="text-decoration:none;color:inherit;">
         <h3>&#128100; Anagrafica ragazzi</h3>
         <p>Aggiungi, modifica, cerca e organizza gli iscritti in gruppi. Gestisci contatti genitori, allergie e uscite autonome.</p>
+      </a>
+      <a href="features/gruppi.html" class="card" style="text-decoration:none;color:inherit;">
+        <h3>&#128101; Gestione multigruppo</h3>
+        <p>Crea, unisciti e gestisci più gruppi di catechismo. Cambia gruppo con un tap e copia i contenuti tra classi.</p>
       </a>
       <a href="features/attendance.html" class="card" style="text-decoration:none;color:inherit;">
         <h3>&#9989; Presenze e appello</h3>
@@ -195,13 +201,29 @@
         <h3>&#128260; Sync P2P Bluetooth</h3>
         <p>Sincronizza i dati con altri catechisti in modo sicuro e automatico, senza internet.</p>
       </a>
+      <a href="features/responsabile.html" class="card" style="text-decoration:none;color:inherit;">
+        <h3>&#128737; Responsabile parrocchiale</h3>
+        <p>Gestisci la parrocchia: classi, iscrizioni, consensi, aule, catechisti e Registro Trattamenti GDPR.</p>
+      </a>
       <a href="features/allergies-exits.html" class="card" style="text-decoration:none;color:inherit;">
         <h3>&#9888; Allergie e uscite</h3>
         <p>Registra allergie, intolleranze e autorizzazioni alle uscite autonome. Informazioni sempre disponibili.</p>
       </a>
       <a href="features/pdf-printing.html" class="card" style="text-decoration:none;color:inherit;">
         <h3>&#128424; PDF e stampa</h3>
-        <p>Genera report presenze, elenchi gruppi e statistiche in PDF. Stampa o condividi quando serve.</p>
+        <p>Genera report presenze, elenchi gruppi e statistiche in PDF. Esporta il report completo della classe con i moduli che preferisci. Stampa o condividi quando serve.</p>
+      </a>
+      <a href="features/responsabile.html" class="card" style="text-decoration:none;color:inherit;">
+        <h3>&#128193; Archivio storico</h3>
+        <p>Concludi l'anno catechistico conservando uno snapshot immutabile del percorso di ogni ragazzo, consultabile anno per anno.</p>
+      </a>
+      <a href="features/responsabile.html" class="card" style="text-decoration:none;color:inherit;">
+        <h3>&#128268; Supplenze</h3>
+        <p>Delega la tua classe a un collega con una delega crittografica via QR e registro supplenze dedicato.</p>
+      </a>
+      <a href="features/responsabile.html" class="card" style="text-decoration:none;color:inherit;">
+        <h3>&#128228; Import ragazzi</h3>
+        <p>Importa l'anagrafica dei ragazzi in blocco da CSV/XLSX per accelerare l'inserimento a inizio anno.</p>
       </a>
     </div>
   </div>
@@ -213,7 +235,7 @@
     <p>L'app è gratuita, open source e non richiede registrazione. Scarica l'APK, installalo sul tuo Android 10+ e inizia subito.</p>
     <div style="margin:1.5rem 0;">
       <span class="badge" style="background:#174A7E;color:#fff;padding:0.5rem 1.5rem;font-size:1.1rem;">
-        Versione <strong class="version-tag">v1.0.3</strong>
+        Versione <strong class="version-tag">v1.0.5</strong>
       </span>
       <span class="badge" style="background:#2e7d32;color:#fff;padding:0.5rem 1.5rem;font-size:1.1rem;margin-left:0.5rem;">
         <span class="download-count">0 download</span>
@@ -244,7 +266,7 @@
       <ul style="font-size:0.9rem;color:#444;line-height:1.8;padding-left:1.25rem;">
         <li><strong>Codice aperto e verificabile</strong> — L'intero codice sorgente è pubblico su <a href="https://github.com/delelimed/CatechHub">GitHub</a>. Chiunque può esaminarlo, compilarlo e confrontare gli hash.</li>
         <li><strong>Build riproducibile</strong> — Le release sono generate dai workflow ufficiali di GitHub Actions. Puoi vedere il log di build per ogni release.</li>
-        <li><strong>Nessun dato esce dal telefono</strong> — L'app non ha server, non raccoglie statistiche, non invia dati a terze parti. Tutto resta cifrato sul dispositivo.</li>
+        <li><strong>Nessun dato esce dal telefono</strong> — L'app non ha server, non raccoglie statistiche, non invia dati a terze parti. L'unico traffico di rete è il controllo aggiornamenti opzionale (disattivabile) verso GitHub. Tutto resta cifrato sul dispositivo.</li>
         <li><strong>Scarica solo da GitHub</strong> — L'unica fonte ufficiale è la pagina <a href="https://github.com/delelimed/CatechHub/releases">Releases</a> di GitHub. Non scaricare APK da siti terzi.</li>
         <li><strong>Protezione runtime</strong> — L'app include freeRASP che rileva manomissioni, root e tentativi di hacking.</li>
       </ul>
@@ -252,7 +274,7 @@
 
     <div class="alert alert-info" style="display:block;margin-top:2rem;max-width:600px;margin-left:auto;margin-right:auto;">
       <p style="margin-bottom:0.25rem;"><strong>Come &egrave; nato CatechHub</strong></p>
-      <p style="margin-bottom:0;">CatechHub &egrave; stato realizzato con l'ausilio di intelligenza artificiale e <em>vibe coding</em>. Non sono uno sviluppatore di professione: ho descritto all'IA cosa doveva fare l'app, e ho adattato il codice generato alle esigenze reali del catechismo. Il codice &egrave; aperto, verificabile e migliorabile da chiunque.</p>
+      <p style="margin-bottom:0;">CatechHub &egrave; stato sviluppato <strong>interamente in <em>vibe coding</em></strong>, con l'ausilio di intelligenza artificiale: ogni riga di codice &egrave; stata scritta e adattata con il supporto di un modello AI, partendo dalle descrizioni di un catechista (non di uno sviluppatore di professione). Il codice &egrave; aperto, verificabile e migliorabile da chiunque su GitHub.</p>
     </div>
   </div>
 </section>
@@ -265,13 +287,14 @@
       <tbody>
         <tr><td>Framework</td><td>Flutter &amp; Dart</td></tr>
         <tr><td>Gestione stato</td><td>Riverpod</td></tr>
-        <tr><td>Database locale</td><td>Hive (cifrato AES)</td></tr>
-        <tr><td>Crittografia</td><td>AES-256-GCM, PBKDF2, ECDH, HKDF</td></tr>
-        <tr><td>Sincronizzazione P2P</td><td>Google Nearby Connections (P2P_CLUSTER — Bluetooth/WiFi Direct) + sync differenziale</td></tr>
+        <tr><td>Database locale</td><td>Hive (cifrato AES-256-GCM, chiave hardware-backed)</td></tr>
+        <tr><td>Crittografia</td><td>AES-256-GCM, X25519 (TripleDH/ECDH), Ed25519, PBKDF2-HMAC-SHA256, HKDF-SHA256, HMAC-SHA256</td></tr>
+        <tr><td>Sincronizzazione P2P</td><td>Google Nearby Connections (P2P_CLUSTER — Bluetooth/WiFi Direct) + canale classe cifrato + canale parrocchiale</td></tr>
         <tr><td>Autenticazione</td><td>Biometria nativa Android</td></tr>
         <tr><td>QR Code</td><td>mobile_scanner, qr_flutter</td></tr>
         <tr><td>PDF</td><td>pdf, printing</td></tr>
-        <tr><td>Sicurezza runtime</td><td>freeRASP (Talsec)</td></tr>
+        <tr><td>Sicurezza runtime</td><td>freeRASP (Talsec) v8</td></tr>
+        <tr><td>GDPR</td><td>Registro Trattamenti firmato HMAC-SHA256, retention automatica, tombstone, export conformità</td></tr>
       </tbody>
     </table>
   </div>
@@ -287,18 +310,23 @@
     </div>
 
     <div class="faq-item">
+      <h3>L'app condivide i miei dati?</h3>
+      <p>No, <strong>mai</strong>. CatechHub non ha server, non utilizza cloud e non integra sistemi di analytics o pubblicità: nessun dato viene condiviso con nessuno. <strong>Sei tu a gestire i dati</strong>: li inserisci, li modifichi e li elimini direttamente dal tuo dispositivo. In ottica GDPR, l'utente è il titolare del trattamento — l'app è semplicemente il suo strumento personale, e la sincronizzazione con altri catechisti avviene solo su tua iniziativa, con crittografia end-to-end. Approfondisci nella <a href="privacy.html">Informativa Privacy</a> e nella sezione <a href="infos/index.html">GDPR</a>.</p>
+    </div>
+
+    <div class="faq-item">
       <h3>I dati sono sicuri?</h3>
-      <p>Assolutamente sì. CatechHub è stato progettato con la privacy al centro. I dati non vengono mai caricati su cloud o server esterni: restano <strong>solo sul tuo telefono</strong>. Il database è crittografato con AES-256-GCM, l'accesso è protetto da impronta digitale o PIN, e la sincronizzazione con altri catechisti avviene con crittografia end-to-end. In più, l'app blocca screenshot non autorizzati e si blocca automaticamente dopo 2 minuti di inattività.</p>
+      <p>Assolutamente sì. CatechHub è stato progettato con la privacy al centro. I dati non vengono mai caricati su cloud o server esterni: restano <strong>solo sul tuo telefono</strong>. Il database è crittografato con AES-256-GCM (chiave in AndroidKeyStore con hardware TEE/StrongBox), i dati più sensibili hanno una cifratura di campo aggiuntiva, l'accesso è protetto da impronta digitale o PIN, e la sincronizzazione con altri catechisti avviene con crittografia end-to-end. In più, l'app blocca screenshot non autorizzati e si blocca automaticamente dopo 2 minuti in background (o 5 minuti di inattività).</p>
     </div>
 
     <div class="faq-item">
       <h3>Posso usare l'app senza internet?</h3>
-      <p>Sì, CatechHub funziona <strong>completamente offline</strong>. Tutti i dati sono memorizzati sul telefono e non hai bisogno di connessione per nessuna operazione: aggiungere ragazzi, fare l'appello, gestire documenti, tutto funziona sempre. L'unica cosa che richiede una connessione è il download iniziale dell'APK e la sincronizzazione volontaria con altri catechisti (via Bluetooth, che non ha bisogno di internet).</p>
+      <p>Sì, CatechHub funziona <strong>completamente offline</strong>. Tutti i dati sono memorizzati sul telefono e non hai bisogno di connessione per nessuna operazione: aggiungere ragazzi, fare l'appello, gestire documenti, tutto funziona sempre. Le uniche attività che usano internet sono <strong>opzionali e disattivabili</strong>: il controllo aggiornamenti (da GitHub, con certificato verificato) e il feedback volontario all'autore (Wiredash, opt-in). La sincronizzazione con altri catechisti avviene via Bluetooth, che non ha bisogno di internet.</p>
     </div>
 
     <div class="faq-item">
       <h3>Come faccio a sincronizzare con altri catechisti?</h3>
-      <p>La sincronizzazione avviene <strong>peer-to-peer via Bluetooth/WiFi Direct</strong> (Google Nearby Connections). I dati sono crittografati end-to-end con X25519 ECDH + HKDF + AES-256-GCM. Ogni dispositivo ha un'associazione con chiavi dedicate e, durante il pairing, un codice a 6 cifre derivato dalla chiave condivisa permette di verificare visivamente che non ci sia un attacco MitM. Nessun server centrale, nessun account. Decidi tu con chi condividere e quali dati.</p>
+      <p>La sincronizzazione avviene <strong>peer-to-peer via Bluetooth/WiFi Direct</strong> (Google Nearby Connections). I dati sono crittografati end-to-end con TripleDH X25519 + HKDF + AES-256-GCM, con chiavi di sessione ruotate ogni 30 minuti e chiavi per dispositivo. Ogni dispositivo ha un'associazione con chiavi dedicate e, durante il pairing, un codice a 6 cifre derivato dalla chiave condivisa permette di verificare visivamente che non ci sia un attacco MitM. Nessun server centrale, nessun account. In modalità Responsabile, solo i dispositivi <strong>approvati</strong> (certificati crittografici Ed25519) possono sincronizzare le classi. Decidi tu con chi condividere e quali dati.</p>
     </div>
 
     <div class="faq-item">

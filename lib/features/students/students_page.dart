@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/providers/class_scoped_providers.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/widgets/last_modified_info.dart';
 import '../../shared/models/student_model.dart';
 import '../documents/documents_provider.dart';
-import 'student_quick_view_page.dart';
-import 'students_repository.dart';
-import 'students_add_page.dart';
-import 'edit_student_page.dart';
-
-final studentsRepoProvider = Provider((ref) => StudentsRepository());
+import 'student_quick_view_page.dart' hide studentsRepoProvider;
+import 'students_add_page.dart' hide studentsRepoProvider;
+import 'edit_student_page.dart' hide studentsRepoProvider;
+import 'students_provider.dart';
 
 /// Schermata principale dell'area ragazzi: elenco completo degli studenti
 /// con cards nominative, indicatori visivi di documenti mancanti (arancione)
 /// e menu contestuale (visualizza, modifica, elimina).
-/// Usa il modello [Student] tramite [StudentsRepository] (Box `students`).
+/// Usa il modello [Student] filtrato per la classe corrente.
 /// Punto di ingresso del flusso "Anagrafica": da qui si naviga verso
 /// [AddStudentPage], [EditStudentPage] e [StudentQuickViewPage].
 class StudentsPage extends ConsumerWidget {
@@ -23,74 +23,108 @@ class StudentsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final repo = ref.watch(studentsRepoProvider);
+    final currentClassId = ref.watch(currentClassProvider);
+    final studentsAsync = ref.watch(currentClassStudentsProvider);
 
     return AppScaffold(
       title: 'Ragazzi',
 
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color(0xFF174A7E),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('Nuovo ragazzo'),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const AddStudentPage(),
+      floatingActionButton: currentClassId == null
+          ? null
+          : FloatingActionButton.extended(
+              backgroundColor: const Color(0xFF174A7E),
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add),
+              label: const Text('Nuovo ragazzo'),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AddStudentPage()),
+                );
+              },
             ),
-          );
-        },
-      ),
 
-      child: StreamBuilder<List<Student>>(
-        stream: repo.getAllStudents(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      child: currentClassId == null
+          ? _NoClassSelected()
+          : studentsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Errore: $e')),
+              data: (students) {
+                if (students.isEmpty) {
+                  return _EmptyState();
+                }
 
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return _EmptyState();
-          }
+                return ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: students.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
+                  itemBuilder: (_, index) {
+                    final s = students[index];
 
-          final students = Student.sortedBySurname(snapshot.data!);
+                    return _StudentCard(
+                      student: s,
+                      onView: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => StudentQuickViewPage(student: s),
+                          ),
+                        );
+                      },
+                      onEdit: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => EditStudentPage(student: s),
+                          ),
+                        );
+                      },
+                      onDelete: () {
+                        final repo = ref.read(studentsRepoProvider);
+                        repo.deleteStudent(s.id);
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+    );
+  }
+}
 
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: students.length,
-            separatorBuilder: (_, __) =>
-                const SizedBox(height: 12),
-            itemBuilder: (_, index) {
-              final s = students[index];
+class _NoClassSelected extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
-              return _StudentCard(
-                student: s,
-                onView: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          StudentQuickViewPage(student: s),
-                    ),
-                  );
-                },
-                onEdit: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          EditStudentPage(student: s),
-                    ),
-                  );
-                },
-                onDelete: () {
-                  repo.deleteStudent(s.id);
-                },
-              );
-            },
-          );
-        },
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.class_outlined,
+            size: 70,
+            color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Nessuna classe selezionata',
+            style: TextStyle(
+              color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Vai in Impostazioni > Cambia classe per selezionare una classe',
+            style: TextStyle(
+              color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
+              fontSize: 13,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }
@@ -119,11 +153,15 @@ class _StudentCard extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
     final colorScheme = theme.colorScheme;
 
-    final gradientStart = isDark ? colorScheme.surfaceContainerLowest : Colors.white;
+    final gradientStart = isDark
+        ? colorScheme.surfaceContainerLowest
+        : Colors.white;
     final gradientEnd = isDark
         ? colorScheme.primaryContainer.withValues(alpha: 0.15)
         : Colors.blue.shade50.withValues(alpha: 0.35);
-    final borderColor = isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.blue.shade100;
+    final borderColor = isDark
+        ? colorScheme.outline.withValues(alpha: 0.2)
+        : Colors.blue.shade100;
     final shadowColor = isDark
         ? Colors.black.withValues(alpha: 0.4)
         : Colors.black.withValues(alpha: 0.04);
@@ -140,9 +178,7 @@ class _StudentCard extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [gradientStart, gradientEnd],
-          ),
+          gradient: LinearGradient(colors: [gradientStart, gradientEnd]),
           borderRadius: BorderRadius.circular(22),
           border: Border.all(color: borderColor),
           boxShadow: [
@@ -193,12 +229,15 @@ class _StudentCard extends ConsumerWidget {
                       // Indicatore documenti mancanti
                       docsAsync.when(
                         loading: () => const SizedBox(),
-                        error: (_, __) => const SizedBox(),
+                        error: (_, _) => const SizedBox(),
                         data: (documents) {
                           if (documents.isEmpty) return const SizedBox();
 
                           // Controlla se questo studente ha documenti mancanti
-                          return _DocumentWarningIndicator(studentId: student.id, documents: documents);
+                          return _DocumentWarningIndicator(
+                            studentId: student.id,
+                            documents: documents,
+                          );
                         },
                       ),
                     ],
@@ -208,18 +247,12 @@ class _StudentCard extends ConsumerWidget {
 
                   Text(
                     'Madre: ${student.motherName} ${student.motherSurname}',
-                    style: TextStyle(
-                      color: subtitleColor,
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: subtitleColor, fontSize: 13),
                   ),
 
                   Text(
                     'Padre: ${student.fatherName} ${student.fatherSurname}',
-                    style: TextStyle(
-                      color: subtitleColor,
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: subtitleColor, fontSize: 13),
                   ),
                   const SizedBox(height: 4),
                   LastModifiedInfo(
@@ -302,7 +335,7 @@ class _DocumentWarningIndicator extends ConsumerWidget {
 
       deliveriesAsync.when(
         loading: () {},
-        error: (_, __) {},
+        error: (_, _) {},
         data: (deliveries) {
           final delivery = deliveries[studentId];
           if (delivery == null || delivery['receivedAt'] == null) {
@@ -316,7 +349,9 @@ class _DocumentWarningIndicator extends ConsumerWidget {
 
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final bgColor = isDark ? Colors.orange.shade900.withValues(alpha: 0.3) : Colors.orange.shade100;
+    final bgColor = isDark
+        ? Colors.orange.shade900.withValues(alpha: 0.3)
+        : Colors.orange.shade100;
     final iconColor = isDark ? Colors.orange.shade300 : Colors.orange.shade800;
     final textColor = isDark ? Colors.orange.shade300 : Colors.orange.shade800;
 
@@ -329,11 +364,7 @@ class _DocumentWarningIndicator extends ConsumerWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.warning_rounded,
-            color: iconColor,
-            size: 16,
-          ),
+          Icon(Icons.warning_rounded, color: iconColor, size: 16),
           const SizedBox(width: 4),
           Text(
             '$missingDocs ${missingDocs == 1 ? "doc" : "doc"}',
@@ -364,18 +395,11 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.people_outline,
-            size: 70,
-            color: iconColor,
-          ),
+          Icon(Icons.people_outline, size: 70, color: iconColor),
           const SizedBox(height: 12),
           Text(
             'Nessun ragazzo presente',
-            style: TextStyle(
-              color: textColor,
-              fontSize: 16,
-            ),
+            style: TextStyle(color: textColor, fontSize: 16),
           ),
         ],
       ),

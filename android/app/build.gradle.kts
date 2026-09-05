@@ -3,14 +3,8 @@ import java.io.FileInputStream
 
 // ══════════════════════════════════════════════════════════════════════════════
 // build.gradle.kts — CatechHub (modulo app Android)
-//
-// Configurazione Gradle del modulo principale dell'applicazione CatechHub,
-// un registro elettronico di catechismo costruito con Flutter per Android.
 // ══════════════════════════════════════════════════════════════════════════════
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CARICAMENTO LOCAL.PROPERTIES
-// ─────────────────────────────────────────────────────────────────────────────
 val localProperties = Properties()
 val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
@@ -19,13 +13,12 @@ if (localPropertiesFile.exists()) {
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
     namespace = "com.delelimed.catechhub"
-    compileSdk = 36
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -52,38 +45,32 @@ android {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // CONFIGURAZIONE FIRMA (SIGNING) - OTTIMIZZATA PER PC LOCALE & GITHUB ACTIONS
+    // CONFIGURAZIONE FIRMA (SIGNING)
     // ─────────────────────────────────────────────────────────────────────────
-signingConfigs {
-    create("sharedConfig") {
-        val isCodespace = System.getenv("CODESPACES") == "true"
-        val envKeystorePath = System.getenv("SIGNING_KEYSTORE_PATH")
-        
-        if (isCodespace) {
-            // 1. Configurazione specifica per GitHub Codespaces
-            // Il file viene creato dal postStartCommand in questo percorso esatto
-            storeFile = file("app_release_key.jks") 
-            storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
-            keyAlias = System.getenv("ANDROID_KEY_ALIAS")
-            keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+    signingConfigs {
+        create("sharedConfig") {
+            val isCodespace = System.getenv("CODESPACES") == "true"
+            val envKeystorePath = System.getenv("SIGNING_KEYSTORE_PATH")
             
-        } else if (envKeystorePath != null) {
-            // 2. Configurazione per GitHub Actions
-            storeFile = file(envKeystorePath)
-            storePassword = System.getenv("SIGNING_KEYSTORE_PASSWORD")
-            keyAlias = System.getenv("SIGNING_KEY_ALIAS")
-            keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
-            
-        } else {
-            // 3. Configurazione locale Windows (dal tuo file local.properties)
-            val keyFile = localProperties.getProperty("keystore.file")
-            storeFile = if (keyFile != null) file(keyFile) else null
-            storePassword = localProperties.getProperty("keystore.password")
-            keyAlias = localProperties.getProperty("keystore.alias")
-            keyPassword = localProperties.getProperty("keystore.alias.password")
+            if (isCodespace) {
+                storeFile = file("app_release_key.jks") 
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            } else if (envKeystorePath != null) {
+                storeFile = file(envKeystorePath)
+                storePassword = System.getenv("SIGNING_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+            } else {
+                val keyFile = localProperties.getProperty("keystore.file")
+                storeFile = if (keyFile != null) file(keyFile) else null
+                storePassword = localProperties.getProperty("keystore.password")
+                keyAlias = localProperties.getProperty("keystore.alias")
+                keyPassword = localProperties.getProperty("keystore.alias.password")
+            }
         }
     }
-}
 
     buildTypes {
         debug {
@@ -93,16 +80,20 @@ signingConfigs {
 
         release {
             signingConfig = signingConfigs.getByName("sharedConfig")
+            
+            // Abilita la riduzione e l'ottimizzazione del codice
             isMinifyEnabled = true
             isShrinkResources = true
 
-            file("proguard-rules.pro").let { proguardFile ->
-                if (proguardFile.exists()) {
-                    proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), proguardFile)
-                } else {
-                    proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
-                }
+            // Rimuove completamente le tabelle di debug DWARF dai file .so nativi
+            ndk {
+                debugSymbolLevel = "NONE"
             }
+
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 
@@ -119,7 +110,13 @@ signingConfigs {
             )
         }
         jniLibs {
-            keepDebugSymbols.clear() 
+            keepDebugSymbols.clear()
+            // Comprime le librerie native (.so) dentro l'APK invece di
+            // memorizzarle allineate e non compresse (default AGP 3.6+ con
+            // minSdk >= 23). Con minSdk 30 tutte le librerie vengono estratte
+            // in installazione: l'APK pesa molto meno (~30-40% sulle .so)
+            // senza alcuna riduzione di sicurezza.
+            useLegacyPackaging = true
         }
     }
 }

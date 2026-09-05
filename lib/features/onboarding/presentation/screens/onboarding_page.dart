@@ -1,4 +1,28 @@
-import 'dart:async';
+// ══════════════════════════════════════════════════════════════════════════════
+// onboarding_page.dart — CatechHub (flusso di primo avvio)
+//
+// Struttura a 4 schermate:
+//   STEP 0 — Informativa e richiesta permessi CONTESTUALI:
+//     illustra i permessi necessari (Notifiche, P2P/Bluetooth, Fotocamera,
+//     Foto/media) SENZA attivarli in blocco: la richiesta nativa del sistema
+//     operativo parte esclusivamente al click dell'utente sul relativo pulsante.
+//   STEP 1 — Creazione del profilo (TUTTI i dispositivi):
+//     nome, cognome e telefono; genera l'id univoco del catechista
+//     (deterministico da nome e cognome, condiviso su tutti i dispositivi).
+//   STEP 2 — Selezione della modalità operativa (3 pulsanti):
+//     [Modalità Responsabile Catechistico]
+//     [Modalità Autonoma]
+//     [Modalità Associato]
+//   STEP 3 — Dati della parrocchia (solo Modalità Responsabile).
+//
+// A seconda della modalità scelta vengono salvati ruolo, modalità operativa
+// (app_mode) e configurazione parrocchiale, poi l'utente viene reindirizzato
+// al flusso successivo (login/profilo oppure associazione P2P).
+//
+// MODALITÀ RESPONSABILE:
+//   Prima di procedere al login viene chiesto subito il NOME della parrocchia,
+//   la DIOCESI e l'ANNO CATECHISTICO corrente (passo "Dati della parrocchia").
+// ══════════════════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,7 +31,23 @@ import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/services/bluetooth_permission_service.dart';
+import '../../../../core/auth/auth_service.dart';
 import '../../../../core/storage/local_database.dart';
+import '../../../../features/responsabile/parish_config_repository.dart';
+import '../../../../shared/models/user_role.dart';
+import '../../../../shared/utils/anno_catechistico.dart';
+
+/// Modalità operativa scelta durante l'onboarding (spec: app_mode).
+enum _OnboardingMode {
+  /// Gestione centralizzata della parrocchia (ruolo Responsabile).
+  responsabile,
+
+  /// Uso autonomo del singolo catechista (creazione classe).
+  normal,
+
+  /// Il dispositivo riceve account e classe da un altro dispositivo via P2P.
+  join,
+}
 
 class OnboardingPage extends ConsumerStatefulWidget {
   const OnboardingPage({super.key});
@@ -17,37 +57,56 @@ class OnboardingPage extends ConsumerStatefulWidget {
 }
 
 class _OnboardingPageState extends ConsumerState<OnboardingPage> {
-  final _pageController = PageController();
-  int _currentPage = 0;
+  @override
+  void initState() {
+    super.initState();
+    // Precompila l'anno catechistico corrente (es. "2026-2027").
+    _annoCatechisticoCtrl.text = currentCatechisticYear();
+  }
 
   bool _notificationGranted = false;
   bool _cameraGranted = false;
   bool _locationGranted = false;
   bool _bluetoothGranted = false;
+  bool _photosGranted = false;
 
   bool _notificationRequested = false;
   bool _cameraRequested = false;
   bool _locationRequested = false;
   bool _bluetoothRequested = false;
+  bool _photosRequested = false;
+
+  /// 0 = permessi contestuali, 1 = creazione profilo (tutti i dispositivi),
+  /// 2 = selezione modalità, 3 = dati della parrocchia (solo Responsabile).
+  int _step = 0;
 
   String? _errorMessage;
 
-  static const _totalPages = 9;
+  _OnboardingMode? _selectedMode;
+
+  final _firstNameCtrl = TextEditingController();
+  final _lastNameCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _classNameCtrl = TextEditingController();
+  final _nomeParrocchiaCtrl = TextEditingController();
+  final _diocesiCtrl = TextEditingController();
+  final _annoCatechisticoCtrl = TextEditingController();
 
   @override
   void dispose() {
-    _pageController.dispose();
+    _firstNameCtrl.dispose();
+    _lastNameCtrl.dispose();
+    _phoneCtrl.dispose();
+    _classNameCtrl.dispose();
+    _nomeParrocchiaCtrl.dispose();
+    _diocesiCtrl.dispose();
+    _annoCatechisticoCtrl.dispose();
     super.dispose();
   }
 
-  void _goToNextPage() {
-    if (_currentPage < _totalPages - 1) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeInOut,
-      );
-    }
-  }
+  // ─────────────────────────────────────────────────────────────────────────────
+  // RICHIESTA PERMESSI (OS prompt SOLO su interazione utente)
+  // ─────────────────────────────────────────────────────────────────────────────
 
   Future<void> _requestNotificationPermission() async {
     HapticFeedback.lightImpact();
@@ -57,10 +116,10 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     });
 
     final status = await Permission.notification.request();
-    if (status.isGranted || status.isLimited) {
+    if (mounted && (status.isGranted || status.isLimited)) {
       setState(() => _notificationGranted = true);
-    } else if (status.isPermanentlyDenied || status.isRestricted) {
-      if (mounted) await _showSettingsDialog(
+    } else if (mounted && (status.isPermanentlyDenied || status.isRestricted)) {
+      await _showSettingsDialog(
         'Notifiche disattivate',
         'Per ricevere avvisi di aggiornamento, attiva le notifiche dalle impostazioni del dispositivo.',
       );
@@ -75,10 +134,10 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     });
 
     final status = await Permission.camera.request();
-    if (status.isGranted || status.isLimited) {
+    if (mounted && (status.isGranted || status.isLimited)) {
       setState(() => _cameraGranted = true);
-    } else if (status.isPermanentlyDenied || status.isRestricted) {
-      if (mounted) await _showSettingsDialog(
+    } else if (mounted && (status.isPermanentlyDenied || status.isRestricted)) {
+      await _showSettingsDialog(
         'Fotocamera non autorizzata',
         'Per scansionare i codici QR di associazione o condivisione offline, attiva la fotocamera dalle impostazioni del dispositivo.',
       );
@@ -93,13 +152,13 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     });
 
     final status = await Permission.locationWhenInUse.request();
-    if (status.isGranted || status.isLimited) {
+    if (mounted && (status.isGranted || status.isLimited)) {
       setState(() => _locationGranted = true);
-    } else if (status.isPermanentlyDenied || status.isRestricted) {
-      if (mounted) await _showSettingsDialog(
+    } else if (mounted && (status.isPermanentlyDenied || status.isRestricted)) {
+      await _showSettingsDialog(
         'Posizione non autorizzata',
         'Per la sincronizzazione Bluetooth tra catechisti, autorizza la posizione dalle impostazioni del dispositivo. '
-        'CatechHub non usa la tua posizione per geolocalizzazione.',
+            'CatechHub non usa la tua posizione per geolocalizzazione.',
       );
     }
   }
@@ -115,16 +174,34 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       context: context,
     );
 
+    if (!mounted) return;
     if (result.allGranted) {
       setState(() => _bluetoothGranted = true);
     } else if (result.hasPermanentlyDenied) {
-      if (mounted) {
-        await _showSettingsDialog(
-          'Permessi non autorizzati',
-          result.errorMessage ??
-              'Per sincronizzare i dati con altri catechisti, attiva i permessi nelle impostazioni del dispositivo.',
-        );
-      }
+      await _showSettingsDialog(
+        'Permessi non autorizzati',
+        result.errorMessage ??
+            'Per sincronizzare i dati con altri catechisti, attiva i permessi nelle impostazioni del dispositivo.',
+      );
+    }
+  }
+
+  Future<void> _requestPhotosPermission() async {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _photosRequested = true;
+      _errorMessage = null;
+    });
+
+    final status = await Permission.photos.request();
+    if (mounted && (status.isGranted || status.isLimited)) {
+      setState(() => _photosGranted = true);
+    } else if (mounted && (status.isPermanentlyDenied || status.isRestricted)) {
+      await _showSettingsDialog(
+        'Galleria non autorizzata',
+        'Per allegare foto di ragazzi, documenti e verbali dagli allegati, '
+            'autorizza l\'accesso alla galleria dalle impostazioni del dispositivo.',
+      );
     }
   }
 
@@ -153,11 +230,310 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     );
   }
 
-  Future<void> _completeOnboarding() async {
+  // ─────────────────────────────────────────────────────────────────────────────
+  // SELEZIONE MODALITÀ OPERATIVA
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  void _selectMode(_OnboardingMode mode) {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _selectedMode = mode;
+      _errorMessage = null;
+    });
+    if (mode == _OnboardingMode.responsabile) {
+      // Mostra subito l'informativa beta non appena l'utente seleziona
+      // la modalità Responsabile.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        // Evita dialog multipli se già aperto rapidamente
+        if (_selectedMode != _OnboardingMode.responsabile) return;
+        _showResponsabileBetaDialog();
+      });
+    }
+  }
+
+  Future<void> _showResponsabileBetaDialog() async {
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.amber.shade100,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(Icons.construction_rounded,
+                  color: Colors.amber.shade800, size: 20),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Modalità Responsabile\n— versione beta',
+                style: TextStyle(fontSize: 16, height: 1.2),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.warning_amber_rounded,
+                        size: 14, color: Colors.orange.shade800),
+                    const SizedBox(width: 6),
+                    Text(
+                      'BETA — non completa',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange.shade800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'La Modalità Responsabile è attualmente in versione beta e non è ancora completa. '
+                'La sincronizzazione tra dispositivi in questa modalità non è ancora funzionante.',
+                style: TextStyle(
+                    fontSize: 13, color: Colors.grey.shade800, height: 1.45),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Ti invitiamo ad attendere la versione 2.0 per l\'uso reale e ad utilizzare nel frattempo la Modalità Normale, stabile e pienamente funzionante.',
+                style: TextStyle(
+                    fontSize: 13, color: Colors.grey.shade800, height: 1.45),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF174A7E).withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(12),
+                  border:
+                      Border.all(color: const Color(0xFF174A7E).withValues(alpha: 0.15)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.visibility_rounded,
+                        size: 16, color: Color(0xFF174A7E)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'La modalità Responsabile configurabile ora serve solo come anteprima per mostrare come sarà in futuro e per raccogliere consigli sulle funzionalità da integrare.',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade700,
+                            height: 1.4,
+                            fontStyle: FontStyle.italic),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('normale'),
+            child: const Text('Usa modalità normale'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF174A7E),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.of(ctx).pop('beta'),
+            child: const Text('Continua in anteprima'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) return;
+    if (result == 'normale') {
+      setState(() => _selectedMode = _OnboardingMode.normal);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Modalità Normale selezionata — stabile e con sincronizzazione funzionante.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } else if (result == 'beta') {
+      // Resta su Responsabile, ma informa con feedback leggero
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+                'Modalità Responsabile (beta) — sincronizzazione non disponibile fino alla v2.0.'),
+            backgroundColor: Colors.orange.shade800,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  /// Salva il profilo anagrafico (nome, cognome, telefono) e genera
+  /// l'id univoco del catechista (deterministico da nome e cognome) che
+  /// identifica la persona su tutti i suoi dispositivi. Poi passa alla
+  /// scelta della modalità operativa.
+  Future<void> _confirmProfile() async {
+    final first = _firstNameCtrl.text.trim();
+    final last = _lastNameCtrl.text.trim();
+    if (first.isEmpty || last.isEmpty) {
+      setState(() => _errorMessage = 'Nome e cognome sono obbligatori.');
+      return;
+    }
+
+    final id = AuthService.generateCatechistId(
+      first,
+      last,
+      _phoneCtrl.text.trim(),
+    );
+    final box = LocalDatabase.auth();
+    await box.put('first_name', first);
+    await box.put('last_name', last);
+    await box.put(
+      'phone_number',
+      _phoneCtrl.text.trim().replaceAll(RegExp(r'\s+'), ' '),
+    );
+    AuthService.storeCatechistId(id);
+
+    setState(() {
+      _step = 2;
+      _errorMessage = null;
+    });
+  }
+
+  /// Applica ruolo, app_mode e configurazione parrocchiale in base alla
+  /// modalità scelta, poi reindirizza al flusso successivo.
+  Future<void> _confirmMode() async {
+    final mode = _selectedMode;
+    if (mode == null) {
+      setState(() => _errorMessage = 'Seleziona una modalità per continuare.');
+      return;
+    }
+
+    // In Modalità Responsabile si chiede il nome della parrocchia (STEP 3);
+    // in Modalità Autonoma si chiede il nome della classe da creare (STEP 4).
+    if (mode == _OnboardingMode.responsabile) {
+      setState(() {
+        _step = 3;
+        _errorMessage = null;
+      });
+    } else if (mode == _OnboardingMode.normal) {
+      setState(() {
+        _step = 4;
+        _errorMessage = null;
+      });
+    } else {
+      // Modalità Associato: nessun dato aggiuntivo, si passa all'associazione.
+      await _finalizeProfile(createClass: false, role: UserRole.catechista);
+    }
+  }
+
+  /// Finalizza il profilo (nome/cognome/telefono + ruolo + modalità) e crea
+  /// eventualmente la classe iniziale, poi rimanda al login. Il login mostrerà
+  /// così SOLO il pulsante di sblocco con le credenziali Android (nessuna
+  /// richiesta di nome/cognome, già raccolti in onboarding).
+  Future<void> _finalizeProfile({
+    required bool createClass,
+    String? groupName,
+    required UserRole role,
+  }) async {
+    final auth = AuthService();
+    await auth.setupInitialProfile(
+      firstName: _firstNameCtrl.text.trim(),
+      lastName: _lastNameCtrl.text.trim(),
+      phoneNumber: _phoneCtrl.text.trim(),
+      createClass: createClass,
+      groupName: groupName,
+      role: role,
+    );
+
     final box = LocalDatabase.auth();
     await box.put('onboarding_completed', true);
-    if (mounted) context.go('/login');
+
+    if (!mounted) return;
+    // La Modalità Associato apre direttamente l'associazione P2P.
+    if (role == UserRole.catechista && !createClass) {
+      context.go('/onboarding-sync');
+    } else {
+      context.go('/login');
+    }
   }
+
+  /// Conferma i dati della parrocchia (Modalità Responsabile) e procede
+  /// con il salvataggio del profilo.
+  Future<void> _confirmParishData() async {
+    final nome = _nomeParrocchiaCtrl.text.trim();
+    if (nome.isEmpty) {
+      setState(() => _errorMessage = 'Inserisci il nome della parrocchia.');
+      return;
+    }
+
+    // Salva i dati della parrocchia PRIMA di lasciare l'onboarding: la
+    // modalità Responsabile viene forzata così da superare il controllo
+    // di scrittura del repository (l'utente non è ancora autenticato).
+    await UserRole.setCurrent(UserRole.responsabile);
+    final configRepo = ParishConfigRepository();
+    await configRepo.forceResponsabileMode(true);
+    await configRepo.save(
+      configRepo.getConfig().copyWith(
+        nomeParrocchia: nome,
+        diocesi: _diocesiCtrl.text.trim(),
+        annoCatechisticoCorrente: _annoCatechisticoCtrl.text.trim(),
+      ),
+    );
+
+    // Il profilo viene finalizzato qui: il login mostrerà solo lo sblocco.
+    await _finalizeProfile(createClass: false, role: UserRole.responsabile);
+  }
+
+  /// Conferma il nome della classe (Modalità Autonoma) e crea la classe
+  /// iniziale, poi rimanda al login (che mostrerà solo lo sblocco).
+  Future<void> _confirmClassName() async {
+    final name = _classNameCtrl.text.trim();
+    if (name.isEmpty) {
+      setState(() => _errorMessage = 'Inserisci il nome della classe.');
+      return;
+    }
+    await _finalizeProfile(
+      createClass: true,
+      groupName: name,
+      role: UserRole.catechista,
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // UI
+  // ─────────────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -165,41 +541,17 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // Top bar with skip button and dots
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  if (_currentPage < _totalPages - 1)
-                    TextButton(
-                      onPressed: _completeOnboarding,
-                      child: const Text('Salta'),
-                    )
-                  else
-                    const SizedBox(width: 72),
-                  _buildPageDots(),
-                  const SizedBox(width: 72),
-                ],
-              ),
-            ),
-            // Page content
+            _buildTopBar(),
             Expanded(
-              child: PageView(
-                controller: _pageController,
-                onPageChanged: (page) => setState(() => _currentPage = page),
-                children: [
-                  _buildWelcomePage(),
-                  _buildHowItWorksPage(),
-                  _buildDataSensitivityPage(),
-                  _buildNotificationPermissionPage(),
-                  _buildCameraPermissionPage(),
-                  _buildLocationPermissionPage(),
-                  _buildBluetoothPermissionPage(),
-                  _buildReadyPage(),
-                  _buildLegalDisclaimerPage(),
-                ],
-              ),
+      child: _step == 0
+          ? _buildPermissionsStep()
+          : _step == 1
+          ? _buildProfileStep()
+          : _step == 2
+          ? _buildModeStep()
+          : _step == 3
+          ? _buildParishStep()
+          : _buildClassNameStep(),
             ),
           ],
         ),
@@ -207,907 +559,972 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     );
   }
 
-  Widget _buildPageDots() {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(_totalPages, (i) {
-        final isActive = i == _currentPage;
-        final status = _pageStatus(i);
-        final dotColor = status == 1
-            ? Colors.green
-            : isActive
-                ? const Color(0xFF174A7E)
-                : Colors.grey.shade300;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          margin: const EdgeInsets.symmetric(horizontal: 3),
-          width: isActive ? 24 : 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: dotColor,
-            borderRadius: BorderRadius.circular(4),
+  Widget _buildTopBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+      child: Row(
+        children: [
+          if (_step > 0)
+            IconButton(
+              onPressed: () => setState(() => _step = _step - 1),
+              icon: const Icon(Icons.arrow_back_rounded),
+              tooltip: 'Indietro',
+            )
+          else
+            const SizedBox(width: 48),
+            Expanded(
+              child: Center(
+                child: Text(
+                  switch (_step) {
+                    0 => 'Benvenuto in CatechHub',
+                    1 => 'Crea il tuo profilo',
+                    2 => 'Scegli la modalità',
+                    3 => 'Dati della parrocchia',
+                    _ => 'Nome della classe',
+                  },
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF174A7E),
+                ),
+              ),
+            ),
           ),
-        );
-      }),
+          if (_step == 0)
+            TextButton(
+              onPressed: () => setState(() => _step = 1),
+              child: const Text('Salta'),
+            )
+          else
+            const SizedBox(width: 48),
+        ],
+      ),
     );
   }
 
-  int _pageStatus(int index) {
-    if (index == 0 || index == 1 || index == 2 || index == _totalPages - 1) return 0;
-    if (index == 3 && _notificationGranted) return 1;
-    if (index == 4 && _cameraGranted) return 1;
-    if (index == 5 && _locationGranted) return 1;
-    if (index == 6 && _bluetoothGranted) return 1;
-    return index < _currentPage ? -1 : 0;
-  }
+  // ─── STEP 0: PERMESSI CONTESTUALI ──────────────────────────────────────────
 
-  Widget _buildPageContainer(Widget child) {
+  Widget _buildPermissionsStep() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 28),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 430),
-        child: child,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 16),
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: const Color(0xFF174A7E).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(
+                Icons.menu_book_rounded,
+                size: 40,
+                color: Color(0xFF174A7E),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Prima di iniziare',
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF174A7E),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Per il corretto funzionamento CatechHub usa alcuni permessi '
+              'del dispositivo. Puoi attivarli ora oppure quando ti verranno '
+              'richiesti durante l\'uso.',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade700,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 20),
+            _buildPermissionCard(
+              icon: Icons.notifications_rounded,
+              title: 'Notifiche',
+              description:
+                  'Avvisi di aggiornamento e promemoria degli incontri.',
+              granted: _notificationGranted,
+              requested: _notificationRequested,
+              buttonLabel: 'Attiva le notifiche',
+              onRequest: _requestNotificationPermission,
+            ),
+            _buildPermissionCard(
+              icon: Icons.bluetooth_rounded,
+              title: 'Connessione locale (P2P)',
+              description:
+                  'Sincronizzazione diretta tra catechisti via Bluetooth '
+                  'e Nearby. Su Android richiede anche il permesso di posizione.',
+              granted: _locationGranted && _bluetoothGranted,
+              requested: _locationRequested && _bluetoothRequested,
+              buttonLabel: 'Attiva la connessione P2P',
+              onRequest: () async {
+                await _requestBluetoothPermission();
+                if (!_locationGranted && !_locationRequested) {
+                  await _requestLocationPermission();
+                }
+              },
+            ),
+            _buildPermissionCard(
+              icon: Icons.qr_code_scanner_rounded,
+              title: 'Fotocamera',
+              description:
+                  'Per scansionare i codici QR di associazione o '
+                  'condivisione dei dati tra catechisti.',
+              granted: _cameraGranted,
+              requested: _cameraRequested,
+              buttonLabel: 'Attiva la fotocamera',
+              onRequest: _requestCameraPermission,
+            ),
+            _buildPermissionCard(
+              icon: Icons.photo_library_rounded,
+              title: 'Foto e media',
+              description:
+                  'Per allegare foto di ragazzi, documenti e verbali '
+                  'dalla galleria del dispositivo.',
+              granted: _photosGranted,
+              requested: _photosRequested,
+              buttonLabel: 'Attiva l\'accesso alla galleria',
+              onRequest: _requestPhotosPermission,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed: () => setState(() => _step = 1),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF174A7E),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 2,
+                ),
+                child: const Text(
+                  'Continua',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
       ),
     );
   }
 
-  // ─── PAGE 1: WELCOME ───────────────────────────────────────────────
-
-  Widget _buildWelcomePage() {
-    return _buildPageContainer(
-      Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const SizedBox(height: 40),
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: const Color(0xFF174A7E).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(30),
-            ),
-            child: const Icon(Icons.menu_book_rounded, size: 72, color: Color(0xFF174A7E)),
+  Widget _buildPermissionCard({
+    required IconData icon,
+    required String title,
+    required String description,
+    required bool granted,
+    required bool requested,
+    required String buttonLabel,
+    required Future<void> Function() onRequest,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
-          const SizedBox(height: 32),
-          const Text(
-            'CatechHub',
-            style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Il tuo registro elettronico di catechismo\nprivacy-first, offline e sicuro',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 15, color: Colors.grey.shade700, height: 1.5),
-          ),
-          const SizedBox(height: 40),
-          _buildInfoCard(
-            Icons.lock_rounded,
-            'Privacy al primo posto',
-            'Tutti i dati restano sul tuo dispositivo, cifrati con AES-256-GCM. Nessun cloud, nessun server remoto.',
-          ),
-          const SizedBox(height: 12),
-          _buildInfoCard(
-            Icons.wifi_off_rounded,
-            '100% offline',
-            'Nessuna connessione internet necessaria. L\'app funziona sempre, anche in cantina o in montagna.',
-          ),
-          const SizedBox(height: 12),
-          _buildInfoCard(
-            Icons.bluetooth_rounded,
-            'Sincronizzazione P2P',
-            'Condividi i dati con altri catechisti direttamente via Bluetooth o con QR, senza passare da server esterni.',
-          ),
-          const SizedBox(height: 40),
-          _buildNextButton('Continua'),
-          const SizedBox(height: 20),
         ],
       ),
-    );
-  }
-
-  // ─── PAGE 2: HOW IT WORKS ──────────────────────────────────────────
-
-  Widget _buildHowItWorksPage() {
-    return _buildPageContainer(
-      Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 40),
-          const Icon(Icons.touch_app_rounded, size: 64, color: Color(0xFF174A7E)),
-          const SizedBox(height: 24),
-          const Text(
-            'Come funziona',
-            style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
-          ),
-          const SizedBox(height: 28),
-          _buildStepCard(
-            '1',
-            'Autenticazione',
-            'Sblocchi l\'app con impronta, volto o PIN del telefono. Niente password da ricordare.',
-          ),
-          const SizedBox(height: 12),
-          _buildStepCard(
-            '2',
-            'Gestione dati',
-            'Inserisci ragazzi, segna presenze, programma incontri e gestisci documenti. Tutto offline.',
-          ),
-          const SizedBox(height: 12),
-          _buildStepCard(
-            '3',
-            'Condivisione sicura',
-            'Scambia dati con altri catechisti via QR code o Bluetooth. I dati viaggiano cifrati.',
-          ),
-          const SizedBox(height: 12),
-          _buildStepCard(
-            '4',
-            'Backup cifrato',
-            'Esporta un backup con password dedicata. Solo tu puoi ripristinarlo.',
-          ),
-          const SizedBox(height: 32),
-          _buildNextButton('Continua'),
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-
-  // ─── PAGE 3: DATA SENSITIVITY AWARENESS ───────────────────────────
-
-  Widget _buildDataSensitivityPage() {
-    return _buildPageContainer(
-      Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const SizedBox(height: 40),
-          const Icon(Icons.shield_rounded, size: 64, color: Color(0xFF174A7E)),
-          const SizedBox(height: 24),
-          const Text(
-            'Gestione dati sensibili',
-            style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Con CatechHub gestisci dati di minori: dati sensibili che richiedono particolare attenzione.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, color: Colors.black87, height: 1.5),
-          ),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.orange.shade50,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.orange.shade200),
-            ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: granted
+                      ? Colors.green.shade50
+                      : const Color(0xFF174A7E).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(
+                  icon,
+                  color: granted
+                      ? Colors.green.shade700
+                      : const Color(0xFF174A7E),
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.info_outline_rounded, color: Colors.orange, size: 20),
-                    SizedBox(width: 8),
                     Text(
-                      'Cosa puoi fare per proteggere i dati:',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF174A7E)),
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: Color(0xFF174A7E),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: Colors.grey.shade700,
+                        height: 1.4,
+                      ),
                     ),
                   ],
                 ),
-                SizedBox(height: 16),
-                _SensitivityTip(
-                  icon: Icons.lock_outline_rounded,
-                  text: 'Tieni il telefono sempre bloccato con PIN, impronta o riconoscimento facciale',
-                ),
-                SizedBox(height: 10),
-                _SensitivityTip(
-                  icon: Icons.remove_red_eye_outlined,
-                  text: 'Non lasciare il dispositivo incustodito con l\'app aperta',
-                ),
-                SizedBox(height: 10),
-                _SensitivityTip(
-                  icon: Icons.share_outlined,
-                  text: 'Condividi dati solo con catechisti di cui ti fidi e che hanno diritto a trattare i dati a pari tuo, sempre tramite Bluetooth o QR code',
-                ),
-                SizedBox(height: 10),
-                _SensitivityTip(
-                  icon: Icons.backup_outlined,
-                  text: 'Fai backup periodici con password dedicata e conservali in un luogo sicuro',
-                ),
-                SizedBox(height: 10),
-                _SensitivityTip(
-                  icon: Icons.phone_iphone_rounded,
-                  text: 'Se cambi dispositivo, trasferisci i dati in modo sicuro e cancella quelli dal vecchio telefono',
-                ),
-                SizedBox(height: 10),
-                _SensitivityTip(
-                  icon: Icons.update_rounded,
-                  text: 'Mantieni l\'app aggiornata per avere sempre le ultime protezioni di sicurezza',
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF174A7E).withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.check_circle_outline_rounded, color: Color(0xFF174A7E), size: 20),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'I tuoi dati non escono mai dal dispositivo se non durante sincronizzazioni volontarie e cifrate.',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF174A7E), height: 1.4),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 28),
-          _buildNextButton('Continua'),
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-
-  // ─── PAGE 4: NOTIFICATION PERMISSION ───────────────────────────────
-
-  Widget _buildNotificationPermissionPage() {
-    return _buildPageContainer(
-      Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const SizedBox(height: 40),
-          Icon(
-            _notificationGranted ? Icons.check_circle_rounded : Icons.notifications_rounded,
-            size: 80,
-            color: _notificationGranted ? Colors.green : const Color(0xFF174A7E),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'Permesso: Notifiche',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 6))],
-            ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'A cosa serve:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF174A7E)),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Le notifiche permettono a CatechHub di avvisarti quando è disponibile un aggiornamento dell\'app.',
-                  style: TextStyle(fontSize: 14, color: Colors.black87, height: 1.5),
-                ),
-                SizedBox(height: 16),
-                Text(
-                  'Perché ne abbiamo bisogno:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF174A7E)),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Per garantire la sicurezza dei dati, è importante che tu abbia sempre l\'ultima versione dell\'app. '
-                  'Le notifiche ci permettono di informarti tempestivamente.',
-                  style: TextStyle(fontSize: 14, color: Colors.black87, height: 1.5),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
-          if (!_notificationGranted && !_notificationRequested)
-            _buildPermissionButton(
-              'Attiva notifiche',
-              _requestNotificationPermission,
-              false,
-            )
-          else if (!_notificationGranted && _notificationRequested)
-            const SizedBox(
-              width: 52,
-              height: 52,
-              child: CircularProgressIndicator(),
-            )
+          if (granted)
+            _buildGrantedBadge()
+          else if (requested)
+            _buildSettingsButton()
           else
-            _buildGrantedBadge(),
-          const SizedBox(height: 24),
-          if (_notificationGranted || _notificationRequested)
-            _buildNextButton('Continua')
-          else
-            Text(
-              'Puoi saltare e attivare le notifiche più tardi dalle Impostazioni.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-            ),
-          const SizedBox(height: 20),
+            _buildPermissionButton(buttonLabel, () => onRequest()),
         ],
       ),
     );
   }
 
-  // ─── PAGE 4: CAMERA PERMISSION ─────────────────────────────────────
-
-  Widget _buildCameraPermissionPage() {
-    return _buildPageContainer(
-      Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const SizedBox(height: 40),
-          Icon(
-            _cameraGranted ? Icons.check_circle_rounded : Icons.camera_alt_rounded,
-            size: 80,
-            color: _cameraGranted ? Colors.green : const Color(0xFF174A7E),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'Permesso: Fotocamera',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 6))],
-            ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'A cosa serve:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF174A7E)),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'La fotocamera serve per scansionare i codici QR durante la condivisione dei dati '
-                  'e il pairing Bluetooth con altri catechisti.',
-                  style: TextStyle(fontSize: 14, color: Colors.black87, height: 1.5),
-                ),
-                SizedBox(height: 16),
-                Text(
-                  'Perché ne abbiamo bisogno:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF174A7E)),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'I QR code sono il metodo più sicuro per scambiare chiavi crittografiche e dati '
-                  'tra dispositivi. La fotocamera è necessaria per leggerli. Nessuna foto o video '
-                  'viene mai registrato o inviato a server esterni.',
-                  style: TextStyle(fontSize: 14, color: Colors.black87, height: 1.5),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
-          if (!_cameraGranted)
-            _buildPermissionButton(
-              'Attiva fotocamera',
-              _requestCameraPermission,
-              _cameraRequested,
-            )
-          else
-            _buildGrantedBadge(),
-          const SizedBox(height: 24),
-          if (_cameraGranted || _cameraRequested)
-            _buildNextButton('Continua')
-          else
-            Text(
-              'Puoi saltare e attivare la fotocamera più tardi dalle Impostazioni.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-            ),
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-
-  // ─── PAGE 6: LOCATION PERMISSION ────────────────────────────────
-
-  Widget _buildLocationPermissionPage() {
-    return _buildPageContainer(
-      Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const SizedBox(height: 40),
-          Icon(
-            _locationGranted ? Icons.check_circle_rounded : Icons.location_on_rounded,
-            size: 80,
-            color: _locationGranted ? Colors.green : const Color(0xFF174A7E),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'Permesso: Posizione',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 6))],
-            ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'A cosa serve:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF174A7E)),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Il permesso di posizione è richiesto da Android per la sincronizzazione Bluetooth '
-                  'tra catechisti (Nearby Connections).',
-                  style: TextStyle(fontSize: 14, color: Colors.black87, height: 1.5),
-                ),
-                SizedBox(height: 16),
-                Text(
-                  'Perché ne abbiamo bisogno:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF174A7E)),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'CatechHub NON usa la tua posizione per geolocalizzazione. '
-                  'Android richiede questo permesso per permettere all\'app di rilevare e connettersi '
-                  'ad altri dispositivi nelle vicinanze tramite Bluetooth. '
-                  'La posizione non viene mai salvata, trasmessa o condivisa.',
-                  style: TextStyle(fontSize: 14, color: Colors.black87, height: 1.5),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
-          if (!_locationGranted)
-            _buildPermissionButton(
-              'Attiva posizione',
-              _requestLocationPermission,
-              _locationRequested,
-            )
-          else
-            _buildGrantedBadge(),
-          const SizedBox(height: 24),
-          if (_locationGranted || _locationRequested)
-            _buildNextButton('Continua')
-          else
-            Text(
-              'Puoi saltare e attivare la posizione più tardi dalle Impostazioni.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-            ),
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-
-  // ─── PAGE 7: CONNESSIONE PERMISSION ────────────────────────────────
-
-  Widget _buildBluetoothPermissionPage() {
-    return _buildPageContainer(
-      Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const SizedBox(height: 40),
-          Icon(
-            _bluetoothGranted ? Icons.check_circle_rounded : Icons.bluetooth_rounded,
-            size: 80,
-            color: _bluetoothGranted ? Colors.green : const Color(0xFF174A7E),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'Permessi: Connessione',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 6))],
-            ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'A cosa serve:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF174A7E)),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Bluetooth e Wi-Fi permettono la sincronizzazione diretta tra dispositivi di catechisti '
-                  'vicini, senza bisogno di internet.',
-                  style: TextStyle(fontSize: 14, color: Colors.black87, height: 1.5),
-                ),
-                SizedBox(height: 16),
-                Text(
-                  'Perché ne abbiamo bisogno:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF174A7E)),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'CatechHub sincronizza i dati tra catechisti in modalità peer-to-peer via Bluetooth e Wi-Fi Direct. '
-                  'I dati vengono cifrati end-to-end con chiavi ECDH. Nessun dato transita su internet. '
-                  'La connessione è attiva solo durante le sincronizzazioni volontarie.',
-                  style: TextStyle(fontSize: 14, color: Colors.black87, height: 1.5),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
-          if (!_bluetoothGranted)
-            _buildPermissionButton(
-              'Attiva connessioni',
-              _requestBluetoothPermission,
-              _bluetoothRequested,
-            )
-          else
-            _buildGrantedBadge(),
-          const SizedBox(height: 24),
-          if (_bluetoothGranted || _bluetoothRequested)
-            _buildNextButton('Continua')
-          else
-            Text(
-              'Puoi saltare e attivare le connessioni più tardi dalle Impostazioni.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-            ),
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-
-  // ─── PAGE 6: READY ─────────────────────────────────────────────────
-
-  Widget _buildReadyPage() {
-    final allGranted = _notificationGranted && _cameraGranted && _locationGranted && _bluetoothGranted;
-    final someSkipped = !_notificationGranted || !_cameraGranted || !_locationGranted || !_bluetoothGranted;
-
-    return _buildPageContainer(
-      Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const SizedBox(height: 40),
-          Icon(
-            allGranted ? Icons.celebration_rounded : Icons.rocket_launch_rounded,
-            size: 80,
-            color: const Color(0xFF174A7E),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            allGranted ? 'Tutto pronto!' : 'Pronto per iniziare!',
-            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 6))],
-            ),
-            child: Column(
-              children: [
-                _buildPermissionSummary('Notifiche', _notificationGranted),
-                const SizedBox(height: 8),
-                _buildPermissionSummary('Fotocamera', _cameraGranted),
-                const SizedBox(height: 8),
-                _buildPermissionSummary('Posizione', _locationGranted),
-                const SizedBox(height: 8),
-                _buildPermissionSummary('Connessione', _bluetoothGranted),
-              ],
-            ),
-          ),
-          if (someSkipped) ...[
-            const SizedBox(height: 16),
-            Text(
-              'Puoi attivare i permessi mancanti in qualsiasi momento dalle Impostazioni.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-            ),
-          ],
-          const SizedBox(height: 8),
-          if (_errorMessage != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
-            ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: ElevatedButton(
-              onPressed: _completeOnboarding,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF174A7E),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                elevation: 2,
-              ),
-              child: const Text(
-                'Inizia ad usare CatechHub',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-
-  // ─── PAGE 8: LEGAL DISCLAIMER ──────────────────────────────────────────
-
-  Widget _buildLegalDisclaimerPage() {
-    return _buildPageContainer(
-      Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const SizedBox(height: 40),
-          const Icon(Icons.gavel_rounded, size: 64, color: Color(0xFF174A7E)),
-          const SizedBox(height: 24),
-          const Text(
-            'Disclaimer legale',
-            style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF174A7E)),
-          ),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.blue.shade200),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Con l\'utilizzo di CatechHub, dichiari e confermi:',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF174A7E)),
-                ),
-                const SizedBox(height: 16),
-                _buildDisclaimerPoint(
-                  Icons.shield_rounded,
-                  'CatechHub non invia dati personali a server esterni. Tutti i dati rimangono esclusivamente sul tuo dispositivo, cifrati con AES-256-GCM.',
-                ),
-                const SizedBox(height: 12),
-                _buildDisclaimerPoint(
-                  Icons.person_outline_rounded,
-                  'Il titolare del trattamento dei dati dei minori seguiti sei TU (catechista/parroco). CatechHub è solo lo strumento tecnico che ti mette a disposizione.',
-                ),
-                const SizedBox(height: 12),
-                _buildDisclaimerPoint(
-                  Icons.shield_moon_rounded,
-                  'Ti assumi la piena responsabilità di proteggere il tuo dispositivo (PIN, impronta, volto, aggiornamenti OS, blocco schermo). La sicurezza dei dati dipende dalla custodia del tuo cellulare.',
-                ),
-                const SizedBox(height: 12),
-                _buildDisclaimerPoint(
-                  Icons.backup_rounded,
-                  'Sei responsabile di eseguito a effettuare backup cifrati periodici e a custodirne le password in luogo sicuro. La perdita del dispositivo senza backup comporta la perdita irreversibile dei dati.',
-                ),
-                const SizedBox(height: 12),
-                _buildDisclaimerPoint(
-                  Icons.gavel_rounded,
-                  'L\'uso di CatechHub non solleva da obblighi GDPR, normativa canonica e normative locali sulla tutela dei minori. Sei tenuto a rispettare ogni adempimento di legge.',
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
-          _buildNextButton('Accetto e inizio'),
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDisclaimerPoint(IconData icon, String text) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 22, color: const Color(0xFF174A7E)),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.5),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ─── HELPERS ────────────────────────────────────────────────────────
-
-  Widget _buildInfoCard(IconData icon, String title, String description) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 4))],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: const Color(0xFF174A7E).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: const Color(0xFF174A7E), size: 26),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF174A7E))),
-                const SizedBox(height: 4),
-                Text(description, style: TextStyle(fontSize: 13, color: Colors.grey.shade700, height: 1.4)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStepCard(String number, String title, String description) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 4))],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: const BoxDecoration(
-              color: Color(0xFF174A7E),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(number, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF174A7E))),
-                const SizedBox(height: 4),
-                Text(description, style: TextStyle(fontSize: 13, color: Colors.grey.shade700, height: 1.4)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPermissionButton(String label, VoidCallback onPressed, bool requested) {
+  Widget _buildPermissionButton(String label, VoidCallback onPressed) {
     return SizedBox(
       width: double.infinity,
-      height: 52,
+      height: 46,
       child: ElevatedButton.icon(
-        onPressed: requested ? null : onPressed,
+        onPressed: onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF174A7E),
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          elevation: 0,
         ),
-        icon: const Icon(Icons.toggle_on_rounded, size: 28),
-        label: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        icon: const Icon(Icons.toggle_on_rounded, size: 24),
+        label: Text(
+          label,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingsButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 46,
+      child: OutlinedButton.icon(
+        onPressed: openAppSettings,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color(0xFF174A7E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+        icon: const Icon(Icons.settings_rounded, size: 20),
+        label: const Text(
+          'Attiva dalle impostazioni',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }
 
   Widget _buildGrantedBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.green.shade50,
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.green.shade200),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.check_circle_rounded, color: Colors.green.shade700, size: 22),
-          const SizedBox(width: 8),
-          Text('Permesso concesso', style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w600, fontSize: 15)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNextButton(String label) {
-    return SizedBox(
-      width: double.infinity,
-      height: 52,
-      child: ElevatedButton(
-        onPressed: _goToNextPage,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF174A7E),
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          elevation: 2,
-        ),
-        child: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-      ),
-    );
-  }
-
-  Widget _buildPermissionSummary(String name, bool granted) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
-          granted ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-          color: granted ? Colors.green : Colors.grey.shade400,
-          size: 22,
+          Icons.check_circle_rounded,
+          color: Colors.green.shade700,
+          size: 20,
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 6),
         Text(
-          name,
+          'Permesso concesso',
           style: TextStyle(
-            fontSize: 15,
-            color: granted ? Colors.black87 : Colors.grey.shade500,
-          ),
-        ),
-        const Spacer(),
-        Text(
-          granted ? 'Concesso' : 'Saltato',
-          style: TextStyle(
-            fontSize: 13,
+            color: Colors.green.shade700,
             fontWeight: FontWeight.w600,
-            color: granted ? Colors.green.shade700 : Colors.grey.shade500,
+            fontSize: 13,
           ),
         ),
       ],
     );
   }
-}
 
-class _SensitivityTip extends StatelessWidget {
-  final IconData icon;
-  final String text;
+  // ─── STEP 1: CREAZIONE PROFILO (TUTTI I DISPOSITIVI) ──────────────────────
 
-  const _SensitivityTip({required this.icon, required this.text});
+  Widget _buildProfileStep() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 430),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 16),
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: const Color(0xFF174A7E).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(
+                Icons.person_rounded,
+                size: 40,
+                color: Color(0xFF174A7E),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Creа il tuo profilo',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF174A7E),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Inserisci i tuoi dati: verranno usati per generare un id '
+              'univoco del catechista (basato su nome e cognome) condiviso '
+              'su tutti i tuoi dispositivi.',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade700,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _firstNameCtrl,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(
+                labelText: 'Nome *',
+                hintText: 'Es. Mario',
+                prefixIcon: const Icon(Icons.person_rounded),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _lastNameCtrl,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(
+                labelText: 'Cognome *',
+                hintText: 'Es. Rossi',
+                prefixIcon: const Icon(Icons.person_outline_rounded),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _phoneCtrl,
+              keyboardType: TextInputType.phone,
+              textInputAction: TextInputAction.done,
+              decoration: InputDecoration(
+                labelText: 'Numero di telefono (facoltativo)',
+                hintText: 'Es. 333 1234567',
+                prefixIcon: const Icon(Icons.phone_rounded),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                isDense: true,
+              ),
+              onSubmitted: (_) => _confirmProfile(),
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Text(
+                  _errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: _confirmProfile,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF174A7E),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 2,
+                ),
+                icon: const Icon(Icons.arrow_forward_rounded, size: 20),
+                label: const Text(
+                  'Continua',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 18, color: const Color(0xFF174A7E)),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
+  // ─── STEP 2: SELEZIONE MODALITÀ OPERATIVA ──────────────────────────────────
+
+  Widget _buildModeStep() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 430),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 16),
+            Text(
+              'Come vuoi usare CatechHub?',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF174A7E),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Puoi cambiare modalità in qualsiasi momento dalle impostazioni.',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade700,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 20),
+            _buildModeCard(
+              mode: _OnboardingMode.responsabile,
+              icon: Icons.account_balance_rounded,
+              title: 'Modalità Responsabile Catechistico',
+              description:
+                  'Per chi gestisce la programmazione e la struttura '
+                  'dell\'intera parrocchia: classi, catechisti, luoghi, presenze '
+                  'aggregate e registro GDPR.',
+            ),
+            _buildModeCard(
+              mode: _OnboardingMode.normal,
+              icon: Icons.menu_book_rounded,
+              title: 'Modalità Autonoma',
+              description:
+                  'Uso autonomo del singolo catechista: crea la tua '
+                  'classe e gestisci il registro in modo indipendente.',
+            ),
+            _buildModeCard(
+              mode: _OnboardingMode.join,
+              icon: Icons.group_add_rounded,
+              title: 'Modalità Associato',
+              description:
+                  'Configura rapidamente un nuovo dispositivo ricevendo '
+                  'account e classe direttamente da un altro catechista o dal '
+                  'Responsabile via P2P (Nearby Share).',
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Text(
+                  _errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                ),
+              ),
+            ],
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: _confirmMode,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF174A7E),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 2,
+                ),
+                icon: const Icon(Icons.arrow_forward_rounded, size: 20),
+                label: Text(
+                  _selectedMode == null ? 'Continua' : 'Conferma modalità',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModeCard({
+    required _OnboardingMode mode,
+    required IconData icon,
+    required String title,
+    required String description,
+  }) {
+    final isSelected = _selectedMode == mode;
+    final isResponsabileBeta = mode == _OnboardingMode.responsabile;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => _selectMode(mode),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? const Color(0xFF174A7E).withValues(alpha: 0.06)
+                : Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: isSelected
+                  ? const Color(0xFF174A7E)
+                  : Colors.grey.shade200,
+              width: isSelected ? 2 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? const Color(0xFF174A7E)
+                      : const Color(0xFF174A7E).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  icon,
+                  color: isSelected ? Colors.white : const Color(0xFF174A7E),
+                  size: 27,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: Color(0xFF174A7E),
+                            ),
+                          ),
+                        ),
+                        if (isResponsabileBeta) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border:
+                                  Border.all(color: Colors.orange.shade300),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.science_rounded,
+                                    size: 12, color: Colors.orange.shade800),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'BETA',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.orange.shade800,
+                                    letterSpacing: 0.6,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: Colors.grey.shade700,
+                        height: 1.45,
+                      ),
+                    ),
+                    if (isResponsabileBeta) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'Versione beta non completa — sincronizzazione non funzionante fino alla v2.0. Solo anteprima per raccogliere feedback.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.orange.shade800,
+                          height: 1.35,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                isSelected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_off_rounded,
+                color: isSelected
+                    ? const Color(0xFF174A7E)
+                    : Colors.grey.shade400,
+              ),
+            ],
           ),
         ),
-      ],
+      ),
+    );
+  }
+
+  // ─── STEP 2: DATI DELLA PARROCCHIA (SOLO MODALITÀ RESPONSABILE) ──────────
+
+  Widget _buildParishStep() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 430),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 16),
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: const Color(0xFF174A7E).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(
+                Icons.account_balance_rounded,
+                size: 40,
+                color: Color(0xFF174A7E),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'La tua parrocchia',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF174A7E),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Per completare la configurazione da Responsabile Catechistico '
+              'inserisci le informazioni principali della parrocchia. Potrai '
+              'modificarle in qualsiasi momento dalle impostazioni.',
+              style: TextStyle(
+                fontSize: 13.5,
+                color: Colors.grey.shade700,
+                height: 1.5,
+              ),
+            ),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline_rounded,
+                      size: 20, color: Colors.orange.shade800),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Anteprima beta — sincronizzazione non disponibile',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange.shade800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Questa modalità è una beta non completa. La sincronizzazione non funziona: attendi la versione 2.0 e usa nel frattempo la Modalità Normale. Questa configurazione serve solo come anteprima per raccogliere consigli su future funzionalità.',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: Colors.orange.shade900,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _nomeParrocchiaCtrl,
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(
+                labelText: 'Nome della parrocchia *',
+                hintText: 'Es. Parrocchia San Francesco',
+                prefixIcon: const Icon(Icons.church_rounded),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _diocesiCtrl,
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(
+                labelText: 'Diocesi',
+                hintText: 'Es. Diocesi di Roma',
+                prefixIcon: const Icon(Icons.account_balance_rounded),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _annoCatechisticoCtrl,
+              textInputAction: TextInputAction.done,
+              decoration: InputDecoration(
+                labelText: 'Anno catechistico corrente',
+                hintText: 'Es. 2026-2027',
+                prefixIcon: const Icon(Icons.calendar_month_rounded),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                isDense: true,
+              ),
+              onSubmitted: (_) => _confirmParishData(),
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Text(
+                  _errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: _confirmParishData,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF174A7E),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 2,
+                ),
+                icon: const Icon(Icons.arrow_forward_rounded, size: 20),
+                label: const Text(
+                  'Continua',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── STEP 4: NOME DELLA CLASSE (SOLO MODALITÀ AUTONOMA) ──────────────────
+
+  Widget _buildClassNameStep() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 430),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 16),
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: const Color(0xFF174A7E).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(
+                Icons.groups_rounded,
+                size: 40,
+                color: Color(0xFF174A7E),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Crea la tua classe',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF174A7E),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'In Modalità Autonoma crei subito la tua classe di catechismo. '
+              'Potrai aggiungerne altre e gestire i catechisti in seguito.',
+              style: TextStyle(
+                fontSize: 13.5,
+                color: Colors.grey.shade700,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _classNameCtrl,
+              textInputAction: TextInputAction.done,
+              decoration: InputDecoration(
+                labelText: 'Nome della classe *',
+                hintText: 'Es. Prima elementare, Cresima 2026',
+                prefixIcon: const Icon(Icons.groups_rounded),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                isDense: true,
+              ),
+              onSubmitted: (_) => _confirmClassName(),
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Text(
+                  _errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: _confirmClassName,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF174A7E),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 2,
+                ),
+                icon: const Icon(Icons.arrow_forward_rounded, size: 20),
+                label: const Text(
+                  'Crea classe e accedi',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
     );
   }
 }

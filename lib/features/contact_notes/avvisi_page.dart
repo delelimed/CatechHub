@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/providers/class_scoped_providers.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../../shared/models/avviso_template_model.dart';
 import '../../shared/models/contact_note_model.dart';
 import '../../shared/models/planning_meeting.dart';
 import '../../shared/models/student_model.dart';
 import '../../core/storage/local_database.dart';
 import '../planning/planning_repository.dart';
-import '../students/students_repository.dart';
 import 'avvisi_repository.dart';
 import 'avvisi_utils.dart';
 import 'contact_notes_repository.dart';
@@ -16,21 +17,22 @@ class AvvisiPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final templatesAsync = ref.watch(avvisiTemplatesProvider);
+    final currentClass = ref.watch(currentClassProvider);
+    final templatesAsync = ref.watch(currentClassAvvisiProvider);
     final templates = templatesAsync.asData?.value ?? [];
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Condividi avviso'),
-      ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.lightBlue,
-        foregroundColor: Colors.white,
-        onPressed: () => _editTemplate(context, ref, null),
-        child: const Icon(Icons.add_rounded),
-      ),
+      appBar: AppBar(title: const Text('Condividi avviso')),
+      floatingActionButton: currentClass == null || currentClass.isEmpty
+          ? null
+          : FloatingActionButton(
+              backgroundColor: Colors.lightBlue,
+              foregroundColor: Colors.white,
+              onPressed: () => _editTemplate(context, ref, null),
+              child: const Icon(Icons.add_rounded),
+            ),
       body: templates.isEmpty
           ? Center(
               child: Padding(
@@ -48,7 +50,9 @@ class AvvisiPage extends ConsumerWidget {
                       'Nessun avviso',
                       style: TextStyle(
                         fontSize: 16,
-                        color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                        color: isDark
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade600,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -56,7 +60,9 @@ class AvvisiPage extends ConsumerWidget {
                       'Tocca + per creare un nuovo messaggio',
                       style: TextStyle(
                         fontSize: 14,
-                        color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+                        color: isDark
+                            ? Colors.grey.shade500
+                            : Colors.grey.shade400,
                       ),
                     ),
                   ],
@@ -72,7 +78,9 @@ class AvvisiPage extends ConsumerWidget {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: isDark ? theme.colorScheme.surfaceContainer : Colors.white,
+                      color: isDark
+                          ? theme.colorScheme.surfaceContainer
+                          : Colors.white,
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
@@ -99,7 +107,10 @@ class AvvisiPage extends ConsumerWidget {
                                   color: Colors.green.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: Icon(Icons.description_rounded, color: Colors.green.shade600),
+                                child: Icon(
+                                  Icons.description_rounded,
+                                  color: Colors.green.shade600,
+                                ),
                               ),
                               const SizedBox(width: 14),
                               Expanded(
@@ -111,7 +122,9 @@ class AvvisiPage extends ConsumerWidget {
                                       style: TextStyle(
                                         fontSize: 15,
                                         fontWeight: FontWeight.w600,
-                                        color: isDark ? theme.colorScheme.onSurface : const Color(0xFF1A1A1A),
+                                        color: isDark
+                                            ? theme.colorScheme.onSurface
+                                            : const Color(0xFF1A1A1A),
                                       ),
                                     ),
                                     const SizedBox(height: 4),
@@ -122,7 +135,9 @@ class AvvisiPage extends ConsumerWidget {
                                       style: TextStyle(
                                         fontSize: 13,
                                         height: 1.3,
-                                        color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                        color: isDark
+                                            ? Colors.grey.shade400
+                                            : Colors.grey.shade600,
                                       ),
                                     ),
                                   ],
@@ -138,21 +153,24 @@ class AvvisiPage extends ConsumerWidget {
                                 icon: Icons.share_rounded,
                                 label: 'Invia',
                                 color: Colors.green,
-                                onTap: () => _inviaTemplate(context, ref, template),
+                                onTap: () =>
+                                    _inviaTemplate(context, ref, template),
                               ),
                               const SizedBox(width: 8),
                               _ActionChip(
                                 icon: Icons.edit_rounded,
                                 label: 'Modifica',
                                 color: Colors.blue,
-                                onTap: () => _editTemplate(context, ref, template),
+                                onTap: () =>
+                                    _editTemplate(context, ref, template),
                               ),
                               const SizedBox(width: 8),
                               _ActionChip(
                                 icon: Icons.delete_outline,
                                 label: 'Elimina',
                                 color: Colors.red,
-                                onTap: () => _deleteTemplate(context, ref, template),
+                                onTap: () =>
+                                    _deleteTemplate(context, ref, template),
                               ),
                             ],
                           ),
@@ -178,7 +196,11 @@ class AvvisiPage extends ConsumerWidget {
     return _personSpecificPlaceholders.any((p) => text.contains(p));
   }
 
-  Future<void> _inviaTemplate(BuildContext context, WidgetRef ref, AvvisoTemplate template) async {
+  Future<void> _inviaTemplate(
+    BuildContext context,
+    WidgetRef ref,
+    AvvisoTemplate template,
+  ) async {
     if (!_hasStudentPlaceholders(template.text)) {
       final resolved = _resolveDateOnly(context, ref, template.text);
       openWhatsApp(null, resolved);
@@ -187,27 +209,38 @@ class AvvisiPage extends ConsumerWidget {
 
     final student = await _selectStudent(context, ref);
     if (student == null) return;
+    if (!context.mounted) return;
 
     final parentInfo = await _selectParent(context, student);
     if (parentInfo == null) return;
 
-    _openWhatsAppForTemplate(context, ref, template, student, parentInfo.$1, parentInfo.$2);
+    if (!context.mounted) return;
+    _openWhatsAppForTemplate(
+      context,
+      ref,
+      template,
+      student,
+      parentInfo.$1,
+      parentInfo.$2,
+    );
   }
 
   String _resolveDateOnly(BuildContext context, WidgetRef ref, String text) {
     if (!hasPlaceholders(text)) return text;
     try {
       String result = text;
-      final students = ref.read(studentsRepositoryProvider).getAllStudentsSync();
-      final classId = students.isNotEmpty ? students.first.classId : null;
+      final classId = ref.read(currentClassProvider);
 
-      final groupName = classId != null ? _getClassName(classId) : '';
+      final groupName = classId != null && classId.isNotEmpty
+          ? _getClassName(classId)
+          : '';
       final nextMeeting = _getNextMeeting(classId);
       if (groupName.isNotEmpty) {
         result = result.replaceAll('{nome_gruppo}', groupName);
       }
       if (nextMeeting != null) {
-        final meetingDate = '${nextMeeting.date.day.toString().padLeft(2, '0')}/${nextMeeting.date.month.toString().padLeft(2, '0')}/${nextMeeting.date.year}';
+        final meetingDate =
+            '${nextMeeting.date.day.toString().padLeft(2, '0')}/${nextMeeting.date.month.toString().padLeft(2, '0')}/${nextMeeting.date.year}';
         result = result.replaceAll('{data_incontro}', meetingDate);
       }
       return result;
@@ -217,26 +250,25 @@ class AvvisiPage extends ConsumerWidget {
   }
 
   Future<Student?> _selectStudent(BuildContext context, WidgetRef ref) async {
-    final students = ref.read(studentsRepositoryProvider).getAllStudentsSync();
+    final students = await ref.read(currentClassStudentsSyncProvider.future);
+    if (!context.mounted) return null;
     if (students.isEmpty) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Nessun ragazzo presente in anagrafica')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nessun ragazzo presente in anagrafica')),
+      );
       return null;
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     String query = '';
 
-    String? _studentMeetingDate(String classId) {
+    String? studentMeetingDate(String classId) {
       final m = _getNextMeeting(classId);
       if (m == null) return null;
       return '${m.date.day.toString().padLeft(2, '0')}/${m.date.month.toString().padLeft(2, '0')}/${m.date.year}';
     }
 
-    String _studentAbsenceInfo(Student s) {
+    String studentAbsenceInfo(Student s) {
       if (s.classId == null) return '';
       final data = computeAbsenceData(s.id, s.classId!);
       final parts = <String>[];
@@ -250,7 +282,9 @@ class AvvisiPage extends ConsumerWidget {
     final result = await showModalBottomSheet<Student>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: isDark ? Theme.of(context).colorScheme.surfaceContainer : null,
+      backgroundColor: isDark
+          ? Theme.of(context).colorScheme.surfaceContainer
+          : null,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -259,9 +293,17 @@ class AvvisiPage extends ConsumerWidget {
           builder: (context, setState) {
             final filtered = query.isEmpty
                 ? students
-                : students.where((s) =>
-                    s.name.toLowerCase().contains(query.toLowerCase()) ||
-                    s.surname.toLowerCase().contains(query.toLowerCase())).toList();
+                : students
+                      .where(
+                        (s) =>
+                            s.name.toLowerCase().contains(
+                              query.toLowerCase(),
+                            ) ||
+                            s.surname.toLowerCase().contains(
+                              query.toLowerCase(),
+                            ),
+                      )
+                      .toList();
 
             return Padding(
               padding: EdgeInsets.only(
@@ -279,7 +321,9 @@ class AvvisiPage extends ConsumerWidget {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? Theme.of(context).colorScheme.onSurface : null,
+                      color: isDark
+                          ? Theme.of(context).colorScheme.onSurface
+                          : null,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -287,7 +331,9 @@ class AvvisiPage extends ConsumerWidget {
                     decoration: InputDecoration(
                       hintText: 'Cerca ragazzo...',
                       prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     onChanged: (v) => setState(() => query = v),
                   ),
@@ -301,14 +347,21 @@ class AvvisiPage extends ConsumerWidget {
                       itemCount: filtered.length,
                       itemBuilder: (context, index) {
                         final s = filtered[index];
-                        final meetingDate = s.classId != null ? _studentMeetingDate(s.classId!) : null;
-                        final absInfo = _studentAbsenceInfo(s);
+                        final meetingDate = s.classId != null
+                            ? studentMeetingDate(s.classId!)
+                            : null;
+                        final absInfo = studentAbsenceInfo(s);
                         return ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: Colors.green.withValues(alpha: 0.1),
+                            backgroundColor: Colors.green.withValues(
+                              alpha: 0.1,
+                            ),
                             child: Text(
                               '${s.name[0]}${s.surname[0]}',
-                              style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w600),
+                              style: TextStyle(
+                                color: Colors.green.shade700,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                           title: Text('${s.name} ${s.surname}'),
@@ -318,19 +371,27 @@ class AvvisiPage extends ConsumerWidget {
                               if (s.classId != null)
                                 Text(
                                   _getClassName(s.classId!),
-                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade500,
+                                  ),
                                 ),
                               if (meetingDate != null || absInfo.isNotEmpty)
                                 Text(
                                   [
-                                    if (meetingDate != null) 'Incontro: $meetingDate',
+                                    if (meetingDate != null)
+                                      'Incontro: $meetingDate',
                                     if (absInfo.isNotEmpty) absInfo,
                                   ].join(' · '),
-                                  style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade400,
+                                  ),
                                 ),
                             ],
                           ),
-                          isThreeLine: meetingDate != null || absInfo.isNotEmpty,
+                          isThreeLine:
+                              meetingDate != null || absInfo.isNotEmpty,
                           onTap: () => Navigator.pop(ctx, s),
                         );
                       },
@@ -360,25 +421,44 @@ class AvvisiPage extends ConsumerWidget {
     return '';
   }
 
-  Future<(String, String)?> _selectParent(BuildContext context, Student student) async {
+  Future<(String, String)?> _selectParent(
+    BuildContext context,
+    Student student,
+  ) async {
     final contacts = <(String label, String name, String phone)>[];
 
     if (student.motherPhone.isNotEmpty) {
       final name = '${student.motherName} ${student.motherSurname}'.trim();
-      contacts.add(('Mamma', name.isNotEmpty ? name : student.motherName, student.motherPhone));
+      contacts.add((
+        'Mamma',
+        name.isNotEmpty ? name : student.motherName,
+        student.motherPhone,
+      ));
     }
     if (student.fatherPhone.isNotEmpty) {
       final name = '${student.fatherName} ${student.fatherSurname}'.trim();
-      contacts.add(('Papà', name.isNotEmpty ? name : student.fatherName, student.fatherPhone));
+      contacts.add((
+        'Papà',
+        name.isNotEmpty ? name : student.fatherName,
+        student.fatherPhone,
+      ));
     }
     if (student.studentPhone.isNotEmpty) {
-      contacts.add(('Ragazzo', '${student.name} ${student.surname}', student.studentPhone));
+      contacts.add((
+        'Ragazzo',
+        '${student.name} ${student.surname}',
+        student.studentPhone,
+      ));
     }
 
     if (contacts.isEmpty) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Nessun numero di telefono registrato per questo ragazzo')),
+          const SnackBar(
+            content: Text(
+              'Nessun numero di telefono registrato per questo ragazzo',
+            ),
+          ),
         );
       }
       return null;
@@ -393,7 +473,9 @@ class AvvisiPage extends ConsumerWidget {
 
     final result = await showModalBottomSheet<MapEntry<String, String>>(
       context: context,
-      backgroundColor: isDark ? Theme.of(context).colorScheme.surfaceContainer : null,
+      backgroundColor: isDark
+          ? Theme.of(context).colorScheme.surfaceContainer
+          : null,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -409,22 +491,29 @@ class AvvisiPage extends ConsumerWidget {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: isDark ? Theme.of(context).colorScheme.onSurface : null,
+                  color: isDark
+                      ? Theme.of(context).colorScheme.onSurface
+                      : null,
                 ),
               ),
               const SizedBox(height: 12),
-              ...contacts.map((c) => ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.green.withValues(alpha: 0.1),
-                      child: Icon(Icons.phone_android_rounded, color: Colors.green.shade600),
+              ...contacts.map(
+                (c) => ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.green.withValues(alpha: 0.1),
+                    child: Icon(
+                      Icons.phone_android_rounded,
+                      color: Colors.green.shade600,
                     ),
-                    title: Text(c.$1),
-                    subtitle: Text(
-                      '${c.$2} — ${c.$3}',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                    ),
-                    onTap: () => Navigator.pop(ctx, MapEntry(c.$2, c.$3)),
-                  )),
+                  ),
+                  title: Text(c.$1),
+                  subtitle: Text(
+                    '${c.$2} — ${c.$3}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                  ),
+                  onTap: () => Navigator.pop(ctx, MapEntry(c.$2, c.$3)),
+                ),
+              ),
             ],
           ),
         );
@@ -485,7 +574,9 @@ class AvvisiPage extends ConsumerWidget {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: isDark ? Theme.of(context).colorScheme.surfaceContainer : null,
+      backgroundColor: isDark
+          ? Theme.of(context).colorScheme.surfaceContainer
+          : null,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -498,14 +589,20 @@ class AvvisiPage extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  Icon(Icons.send_rounded, color: Colors.green.shade600, size: 24),
+                  Icon(
+                    Icons.send_rounded,
+                    color: Colors.green.shade600,
+                    size: 24,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'Invia messaggio',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? Theme.of(context).colorScheme.onSurface : null,
+                      color: isDark
+                          ? Theme.of(context).colorScheme.onSurface
+                          : null,
                     ),
                   ),
                 ],
@@ -543,7 +640,9 @@ class AvvisiPage extends ConsumerWidget {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green.shade600,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     icon: const Icon(Icons.open_in_new, size: 18),
                     label: const Text('Apri WhatsApp'),
@@ -551,7 +650,13 @@ class AvvisiPage extends ConsumerWidget {
                       Navigator.pop(ctx);
                       openWhatsApp(phone, finalMessage);
                       if (student != null) {
-                        _recordContactNote(ref, student, template.title, finalMessage, phone);
+                        _recordContactNote(
+                          ref,
+                          student,
+                          template.title,
+                          finalMessage,
+                          phone,
+                        );
                       }
                     },
                   ),
@@ -576,7 +681,11 @@ class AvvisiPage extends ConsumerWidget {
       for (final meeting in meetings) {
         if (meeting.isReunion) continue;
         if (classId != null && meeting.classId != classId) continue;
-        final meetingDate = DateTime(meeting.date.year, meeting.date.month, meeting.date.day);
+        final meetingDate = DateTime(
+          meeting.date.year,
+          meeting.date.month,
+          meeting.date.day,
+        );
         if (!meetingDate.isBefore(today)) {
           if (closest == null || meeting.date.isBefore(closest.date)) {
             closest = meeting;
@@ -589,7 +698,13 @@ class AvvisiPage extends ConsumerWidget {
     }
   }
 
-  void _recordContactNote(WidgetRef ref, Student student, String title, String message, String? phone) {
+  void _recordContactNote(
+    WidgetRef ref,
+    Student student,
+    String title,
+    String message,
+    String? phone,
+  ) {
     final note = ContactNote(
       id: '',
       studentId: student.id,
@@ -600,7 +715,11 @@ class AvvisiPage extends ConsumerWidget {
     ref.read(contactNotesRepoProvider).addNote(note);
   }
 
-  void _editTemplate(BuildContext context, WidgetRef ref, AvvisoTemplate? existing) {
+  void _editTemplate(
+    BuildContext context,
+    WidgetRef ref,
+    AvvisoTemplate? existing,
+  ) {
     final titleController = TextEditingController(text: existing?.title ?? '');
     final textController = TextEditingController(text: existing?.text ?? '');
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -608,7 +727,9 @@ class AvvisiPage extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: isDark ? Theme.of(context).colorScheme.surfaceContainer : null,
+      backgroundColor: isDark
+          ? Theme.of(context).colorScheme.surfaceContainer
+          : null,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -631,7 +752,9 @@ class AvvisiPage extends ConsumerWidget {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? Theme.of(context).colorScheme.onSurface : null,
+                      color: isDark
+                          ? Theme.of(context).colorScheme.onSurface
+                          : null,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -639,7 +762,9 @@ class AvvisiPage extends ConsumerWidget {
                     controller: titleController,
                     decoration: InputDecoration(
                       labelText: 'Titolo (es. Promemoria incontro)',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -647,7 +772,9 @@ class AvvisiPage extends ConsumerWidget {
                     'Segnaposto disponibili (tocca per inserire):',
                     style: TextStyle(
                       fontSize: 12,
-                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                      color: isDark
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -656,7 +783,10 @@ class AvvisiPage extends ConsumerWidget {
                     runSpacing: 6,
                     children: AvvisoTemplate.placeholders.map((ph) {
                       return ActionChip(
-                        label: Text(ph.code, style: const TextStyle(fontSize: 12)),
+                        label: Text(
+                          ph.code,
+                          style: const TextStyle(fontSize: 12),
+                        ),
                         visualDensity: VisualDensity.compact,
                         onPressed: () {
                           final pos = textController.selection.baseOffset;
@@ -664,8 +794,13 @@ class AvvisiPage extends ConsumerWidget {
                           if (pos < 0) {
                             textController.text = text + ph.code;
                           } else {
-                            textController.text = text.substring(0, pos) + ph.code + text.substring(pos);
-                            textController.selection = TextSelection.collapsed(offset: pos + ph.code.length);
+                            textController.text =
+                                text.substring(0, pos) +
+                                ph.code +
+                                text.substring(pos);
+                            textController.selection = TextSelection.collapsed(
+                              offset: pos + ph.code.length,
+                            );
                           }
                           setDialogState(() {});
                         },
@@ -678,8 +813,11 @@ class AvvisiPage extends ConsumerWidget {
                     maxLines: 6,
                     decoration: InputDecoration(
                       labelText: 'Testo del messaggio',
-                      hintText: 'Inserisci il testo con 😊 emoji e segnaposto...',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      hintText:
+                          'Inserisci il testo con 😊 emoji e segnaposto...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -695,14 +833,22 @@ class AvvisiPage extends ConsumerWidget {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green.shade600,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         onPressed: () {
-                          if (titleController.text.trim().isEmpty || textController.text.trim().isEmpty) return;
+                          if (titleController.text.trim().isEmpty ||
+                              textController.text.trim().isEmpty) {
+                            return;
+                          }
                           final template = AvvisoTemplate(
                             id: existing?.id ?? '',
                             title: titleController.text.trim(),
                             text: textController.text.trim(),
+                            classUniqueCode:
+                                existing?.classUniqueCode ??
+                                ref.read(currentClassUniqueCodeProvider),
                           );
                           ref.read(avvisiRepoProvider).save(template);
                           Navigator.pop(dialogContext);
@@ -721,7 +867,11 @@ class AvvisiPage extends ConsumerWidget {
     );
   }
 
-  void _deleteTemplate(BuildContext context, WidgetRef ref, AvvisoTemplate template) {
+  void _deleteTemplate(
+    BuildContext context,
+    WidgetRef ref,
+    AvvisoTemplate template,
+  ) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -737,7 +887,9 @@ class AvvisiPage extends ConsumerWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             onPressed: () {
               ref.read(avvisiRepoProvider).delete(template.id);

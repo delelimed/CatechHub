@@ -42,6 +42,26 @@ class CatechesiRepository {
     );
   }
 
+  /// Stream reattivo delle catechesi appartenenti alla classe identificata
+  /// dal [classUniqueCode].
+  Stream<List<Catechesi>> getCatechesiByClass(String classUniqueCode) {
+    return LocalDatabase.watchList(
+      _box,
+      (id, data) => Catechesi.fromMap(id, data),
+    ).map(
+      (list) =>
+          list.where((c) => c.classUniqueCode == classUniqueCode).toList(),
+    );
+  }
+
+  /// Lettura sincrona delle catechesi di una classe.
+  List<Catechesi> getCatechesiByClassSync(String classUniqueCode) {
+    return LocalDatabase.values(
+      _box,
+      (id, data) => Catechesi.fromMap(id, data),
+    ).where((c) => c.classUniqueCode == classUniqueCode).toList();
+  }
+
   /// Aggiunge una nuova scheda catechesi al database. Se l'ID è vuoto,
   /// genera automaticamente un nuovo identificativo tramite
   /// [LocalDatabase.newId].
@@ -93,8 +113,12 @@ class CatechesiRepository {
     return getCatechesiSync().where((c) {
       final matchesTitle = c.title.toLowerCase().contains(q);
       final matchesTag = c.tags.any((t) => t.toLowerCase().contains(q));
-      final matchesBiblical = c.biblicalReferences.any((b) => b.toLowerCase().contains(q));
-      final matchesWebsite = c.websiteReferences.any((w) => w.toLowerCase().contains(q));
+      final matchesBiblical = c.biblicalReferences.any(
+        (b) => b.toLowerCase().contains(q),
+      );
+      final matchesWebsite = c.websiteReferences.any(
+        (w) => w.toLowerCase().contains(q),
+      );
       return matchesTitle || matchesTag || matchesBiblical || matchesWebsite;
     }).toList();
   }

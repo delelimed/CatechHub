@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/auth/auth_service.dart';
+import '../../core/providers/class_scoped_providers.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/models/planning_meeting.dart';
-import '../classes/classes_provider.dart';
 import 'planning_provider.dart';
 import 'planning_edit_page.dart';
 
@@ -68,9 +68,9 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
   @override
   Widget build(BuildContext context) {
     final repo = ref.read(planningRepoProvider);
-    final classesAsync = ref.watch(classesStreamProvider);
+    final currentClassId = ref.watch(currentClassProvider);
+    final planningAsync = ref.watch(currentClassPlanningProvider);
 
-    const uid = AuthService.localUserId;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -78,405 +78,407 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
     return AppScaffold(
       title: 'Programmazione',
 
-      floatingActionButton: FloatingActionButton.extended(
-        elevation: 4,
-        backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-        foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text(
-          'Aggiungi',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-        onPressed: () => _showAddMenu(context),
-      ),
+      floatingActionButton: currentClassId == null
+          ? null
+          : FloatingActionButton.extended(
+              elevation: 4,
+              backgroundColor: isDark
+                  ? colorScheme.primary
+                  : const Color(0xFF174A7E),
+              foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text(
+                'Aggiungi',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              onPressed: () => _showAddMenu(context),
+            ),
 
-      child: classesAsync.when(
-        data: (classes) {
-          final myClass = classes.where((c) => c.catechistIds.contains(uid));
-
-          if (myClass.isEmpty) {
-            return _EmptyState(
+      child: currentClassId == null
+          ? _EmptyState(
               icon: Icons.groups_rounded,
-              title: 'Nessuna classe assegnata',
+              title: 'Nessuna classe selezionata',
               subtitle:
-                  'Non risulti ancora assegnato ad un gruppo di catechismo.',
-            );
-          }
+                  'Seleziona una classe per visualizzare la programmazione.',
+            )
+          : planningAsync.when(
+              data: (meetings) {
+                final now = DateTime.now();
+                final today = DateTime(now.year, now.month, now.day);
 
-          final classId = myClass.first.id;
+                var filteredMeetings = meetings;
 
-          return StreamBuilder<List<PlanningMeeting>>(
-            stream: repo.getMeetings(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
+                // Normalizza le date a mezzanotte locale per evitare problemi di fuso orario/DST
+                // (es. incontri creati in ora legale vs ora solare)
+                DateTime normalizeDate(DateTime dt) =>
+                    DateTime(dt.year, dt.month, dt.day);
 
-              final now = DateTime.now();
-              final today = DateTime(now.year, now.month, now.day);
-
-              var meetings = snapshot.data!
-                  .where((m) => m.classId == classId)
-                  .toList();
-
-              // Normalizza le date a mezzanotte locale per evitare problemi di fuso orario/DST
-              // (es. incontri creati in ora legale vs ora solare)
-              DateTime _normalizeDate(DateTime dt) =>
-                  DateTime(dt.year, dt.month, dt.day);
-
-              if (_showPast) {
-                meetings = meetings
-                    .where((m) => _normalizeDate(m.date).isBefore(today))
-                    .toList();
-                meetings.sort(
-                  (a, b) =>
-                      _normalizeDate(b.date).compareTo(_normalizeDate(a.date)),
-                );
-              } else {
-                meetings = meetings
-                    .where((m) => !_normalizeDate(m.date).isBefore(today))
-                    .toList();
-                meetings.sort(
-                  (a, b) =>
-                      _normalizeDate(a.date).compareTo(_normalizeDate(b.date)),
-                );
-              }
-
-              final groupedMeetings = <String, List<PlanningMeeting>>{};
-              final monthKeys = <String>[];
-              for (final m in meetings) {
-                final key = DateFormat(
-                  'MMMM yyyy',
-                  'it_IT',
-                ).format(_normalizeDate(m.date));
-                if (!groupedMeetings.containsKey(key)) {
-                  groupedMeetings[key] = [];
-                  monthKeys.add(key);
+                if (_showPast) {
+                  filteredMeetings = filteredMeetings
+                      .where((m) => normalizeDate(m.date).isBefore(today))
+                      .toList();
+                  filteredMeetings.sort(
+                    (a, b) =>
+                        normalizeDate(b.date).compareTo(normalizeDate(a.date)),
+                  );
+                } else {
+                  filteredMeetings = filteredMeetings
+                      .where((m) => !normalizeDate(m.date).isBefore(today))
+                      .toList();
+                  filteredMeetings.sort(
+                    (a, b) =>
+                        normalizeDate(a.date).compareTo(normalizeDate(b.date)),
+                  );
                 }
-                groupedMeetings[key]!.add(m);
-              }
 
-              // Pre-registra tutte le GlobalKey per i mesi PRIMA di costruire i chip,
-              // così _scrollToMonth trova sempre il context anche per i mesi non ancora renderizzati.
-              for (final mk in monthKeys) {
-                _getMonthKey(mk);
-              }
+                final groupedMeetings = <String, List<PlanningMeeting>>{};
+                final monthKeys = <String>[];
+                for (final m in filteredMeetings) {
+                  final key = DateFormat(
+                    'MMMM yyyy',
+                    'it_IT',
+                  ).format(normalizeDate(m.date));
+                  if (!groupedMeetings.containsKey(key)) {
+                    groupedMeetings[key] = [];
+                    monthKeys.add(key);
+                  }
+                  groupedMeetings[key]!.add(m);
+                }
 
-              return ListView(
-                controller: _scrollController,
-                padding: const EdgeInsets.only(bottom: 100),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: _CatechesiBanner(
-                      onTap: () => context.push('/catechesi'),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: 42,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      children: [
-                        _ToggleChip(
-                          label: _showPast ? 'Prossimi' : 'Passati',
-                          icon: _showPast
-                              ? Icons.upcoming_rounded
-                              : Icons.history_rounded,
-                          onTap: () {
-                            setState(() => _showPast = !_showPast);
-                          },
-                        ),
-                        if (monthKeys.isNotEmpty) const SizedBox(width: 8),
-                        ...monthKeys.map(
-                          (mk) => _MonthChip(
-                            label: mk[0].toUpperCase() + mk.substring(1),
-                            onTap: () =>
-                                _scrollToMonth(mk, monthKeys, groupedMeetings),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (meetings.isEmpty)
+                // Pre-registra tutte le GlobalKey per i mesi PRIMA di costruire i chip,
+                // così _scrollToMonth trova sempre il context anche per i mesi non ancora renderizzati.
+                for (final mk in monthKeys) {
+                  _getMonthKey(mk);
+                }
+
+                return ListView(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.only(bottom: 100),
+                  children: [
                     Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 60,
-                        horizontal: 24,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: _CatechesiBanner(
+                        onTap: () => context.push('/catechesi'),
                       ),
-                      child: Center(
-                        child: Text(
-                          _showPast
-                              ? 'Nessun incontro passato'
-                              : 'Nessun prossimo incontro',
-                          style: TextStyle(
-                            color: isDark
-                                ? Colors.grey.shade400
-                                : Colors.grey.shade600,
-                            fontSize: 15,
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: 42,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        children: [
+                          _ToggleChip(
+                            label: _showPast ? 'Prossimi' : 'Passati',
+                            icon: _showPast
+                                ? Icons.upcoming_rounded
+                                : Icons.history_rounded,
+                            onTap: () {
+                              setState(() => _showPast = !_showPast);
+                            },
+                          ),
+                          if (monthKeys.isNotEmpty) const SizedBox(width: 8),
+                          ...monthKeys.map(
+                            (mk) => _MonthChip(
+                              label: mk[0].toUpperCase() + mk.substring(1),
+                              onTap: () => _scrollToMonth(
+                                mk,
+                                monthKeys,
+                                groupedMeetings,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (filteredMeetings.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 60,
+                          horizontal: 24,
+                        ),
+                        child: Center(
+                          child: Text(
+                            _showPast
+                                ? 'Nessun incontro passato'
+                                : 'Nessun prossimo incontro',
+                            style: TextStyle(
+                              color: isDark
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
+                              fontSize: 15,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ...monthKeys.map((monthKey) {
-                    final monthMeetings = groupedMeetings[monthKey]!;
-                    return Column(
-                      key: _getMonthKey(monthKey),
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isDark
-                                      ? colorScheme.primaryContainer.withValues(
-                                          alpha: 0.3,
-                                        )
-                                      : const Color(
-                                          0xFF174A7E,
-                                        ).withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.calendar_month_rounded,
-                                      size: 16,
-                                      color: isDark
-                                          ? colorScheme.primary
-                                          : const Color(0xFF174A7E),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      monthKey[0].toUpperCase() +
-                                          monthKey.substring(1),
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
+                    ...monthKeys.map((monthKey) {
+                      final monthMeetings = groupedMeetings[monthKey]!;
+                      return Column(
+                        key: _getMonthKey(monthKey),
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isDark
+                                        ? colorScheme.primaryContainer
+                                              .withValues(alpha: 0.3)
+                                        : const Color(
+                                            0xFF174A7E,
+                                          ).withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.calendar_month_rounded,
+                                        size: 16,
                                         color: isDark
-                                            ? colorScheme.onSurface
+                                            ? colorScheme.primary
                                             : const Color(0xFF174A7E),
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        monthKey[0].toUpperCase() +
+                                            monthKey.substring(1),
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: isDark
+                                              ? colorScheme.onSurface
+                                              : const Color(0xFF174A7E),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        ...monthMeetings.map((m) {
-                          final isReunion = m.isReunion;
-                          final accentColor = isReunion
-                              ? Colors.deepPurple
-                              : const Color(0xFF174A7E);
-
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 6,
+                              ],
                             ),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(24),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        PlanningEditPage(existing: m),
-                                  ),
-                                );
-                              },
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 180),
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: isDark
-                                        ? [
-                                            colorScheme.surfaceContainer,
-                                            colorScheme.surfaceContainerHighest
-                                                .withValues(alpha: 0.5),
-                                          ]
-                                        : [
-                                            Colors.white,
-                                            Colors.blue.shade50.withValues(
-                                              alpha: 0.35,
-                                            ),
-                                          ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(24),
-                                  border: Border.all(
-                                    color: isDark
-                                        ? colorScheme.outline.withValues(
-                                            alpha: 0.2,
-                                          )
-                                        : Colors.blue.shade100,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: isDark
-                                          ? Colors.black.withValues(alpha: 0.3)
-                                          : Colors.black.withValues(
-                                              alpha: 0.04,
-                                            ),
-                                      blurRadius: 16,
-                                      offset: const Offset(0, 8),
+                          ),
+                          ...monthMeetings.map((m) {
+                            final isReunion = m.isReunion;
+                            final accentColor = isReunion
+                                ? Colors.deepPurple
+                                : const Color(0xFF174A7E);
+
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 6,
+                              ),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(24),
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          PlanningEditPage(existing: m),
                                     ),
-                                  ],
-                                ),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Container(
-                                      width: 56,
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 8,
+                                  );
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: isDark
+                                          ? [
+                                              colorScheme.surfaceContainer,
+                                              colorScheme
+                                                  .surfaceContainerHighest
+                                                  .withValues(alpha: 0.5),
+                                            ]
+                                          : [
+                                              Colors.white,
+                                              Colors.blue.shade50.withValues(
+                                                alpha: 0.35,
+                                              ),
+                                            ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(
+                                      color: isDark
+                                          ? colorScheme.outline.withValues(
+                                              alpha: 0.2,
+                                            )
+                                          : Colors.blue.shade100,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: isDark
+                                            ? Colors.black.withValues(
+                                                alpha: 0.3,
+                                              )
+                                            : Colors.black.withValues(
+                                                alpha: 0.04,
+                                              ),
+                                        blurRadius: 16,
+                                        offset: const Offset(0, 8),
                                       ),
-                                      decoration: BoxDecoration(
-                                        color: accentColor,
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                      child: Column(
-                                        children: [
-                                          Text(
-                                            DateFormat(
-                                              'dd',
-                                            ).format(_normalizeDate(m.date)),
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 17,
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        width: 56,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 8,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: accentColor,
+                                          borderRadius: BorderRadius.circular(
+                                            14,
                                           ),
-                                          Text(
-                                            DateFormat('MMM', 'it_IT')
-                                                .format(_normalizeDate(m.date))
-                                                .toUpperCase(),
-                                            style: const TextStyle(
-                                              color: Colors.white70,
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 10,
-                                            ),
-                                          ),
-                                          if (isReunion &&
-                                              m.time != null &&
-                                              m.time!.isNotEmpty) ...[
-                                            const SizedBox(height: 2),
+                                        ),
+                                        child: Column(
+                                          children: [
                                             Text(
-                                              m.time!,
+                                              DateFormat(
+                                                'dd',
+                                              ).format(normalizeDate(m.date)),
                                               style: const TextStyle(
-                                                color: Colors.white70,
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.w500,
+                                                color: Colors.white,
+                                                fontSize: 17,
+                                                fontWeight: FontWeight.bold,
                                               ),
                                             ),
-                                          ],
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            m.title,
-                                            style: theme.textTheme.titleMedium
-                                                ?.copyWith(
-                                                  fontWeight: FontWeight.bold,
-                                                  color: accentColor,
-                                                ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    PopupMenuButton<String>(
-                                      icon: const Icon(Icons.more_vert_rounded),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(18),
-                                      ),
-                                      onSelected: (v) async {
-                                        if (v == 'delete') {
-                                          await repo.deleteMeeting(m.id);
-                                        }
-                                        if (v == 'edit') {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) =>
-                                                  PlanningEditPage(existing: m),
+                                            Text(
+                                              DateFormat('MMM', 'it_IT')
+                                                  .format(normalizeDate(m.date))
+                                                  .toUpperCase(),
+                                              style: const TextStyle(
+                                                color: Colors.white70,
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 10,
+                                              ),
                                             ),
-                                          );
-                                        }
-                                      },
-                                      itemBuilder: (_) => const [
-                                        PopupMenuItem(
-                                          value: 'edit',
-                                          child: Row(
-                                            children: [
-                                              Icon(Icons.edit_rounded),
-                                              SizedBox(width: 10),
-                                              Text('Modifica'),
+                                            if (isReunion &&
+                                                m.time != null &&
+                                                m.time!.isNotEmpty) ...[
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                m.time!,
+                                                style: const TextStyle(
+                                                  color: Colors.white70,
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
                                             ],
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              m.title,
+                                              style: theme.textTheme.titleMedium
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: accentColor,
+                                                  ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      PopupMenuButton<String>(
+                                        icon: const Icon(
+                                          Icons.more_vert_rounded,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            18,
                                           ),
                                         ),
-                                        PopupMenuItem(
-                                          value: 'delete',
-                                          child: Row(
-                                            children: [
-                                              Icon(Icons.delete_rounded),
-                                              SizedBox(width: 10),
-                                              Text('Elimina'),
-                                            ],
+                                        onSelected: (v) async {
+                                          if (v == 'delete') {
+                                            await repo.deleteMeeting(m.id);
+                                          }
+                                          if (!context.mounted) return;
+                                          if (v == 'edit') {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) =>
+                                                    PlanningEditPage(
+                                                      existing: m,
+                                                    ),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                        itemBuilder: (_) => const [
+                                          PopupMenuItem(
+                                            value: 'edit',
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.edit_rounded),
+                                                SizedBox(width: 10),
+                                                Text('Modifica'),
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
+                                          PopupMenuItem(
+                                            value: 'delete',
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.delete_rounded),
+                                                SizedBox(width: 10),
+                                                Text('Elimina'),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ),
-                          );
-                        }).toList(),
-                      ],
-                    );
-                  }),
-                ],
-              );
-            },
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? colorScheme.errorContainer.withValues(alpha: 0.3)
-                  : Colors.red.shade50,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              'Errore: $e',
-              style: TextStyle(
-                color: isDark ? colorScheme.error : Colors.red.shade700,
-                fontWeight: FontWeight.w600,
+                            );
+                          }),
+                        ],
+                      );
+                    }),
+                  ],
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? colorScheme.errorContainer.withValues(alpha: 0.3)
+                        : Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Errore: $e',
+                    style: TextStyle(
+                      color: isDark ? colorScheme.error : Colors.red.shade700,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-      ),
     );
   }
 

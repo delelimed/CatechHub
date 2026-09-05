@@ -5,7 +5,6 @@ import 'students_repository.dart';
 /// del repository che opera sul Box `students` di Hive.
 /// Usato dalle pagine del feature students per accesso CRUD centralizzato.
 /// Dipende solo dal costruttore (nessuna dipendenza esterna).
-final studentsRepoProvider =
-    Provider<StudentsRepository>((ref) {
+final studentsRepoProvider = Provider<StudentsRepository>((ref) {
   return StudentsRepository();
 });

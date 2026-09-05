@@ -127,12 +127,18 @@ class Catechesi {
       classUniqueCode: data['classUniqueCode'],
       title: data['title'] ?? '',
       tags: (data['tags'] as List<dynamic>?)?.cast<String>() ?? [],
-      biblicalReferences: (data['biblicalReferences'] as List<dynamic>?)?.cast<String>() ?? [],
-      websiteReferences: (data['websiteReferences'] as List<dynamic>?)?.cast<String>() ?? [],
+      biblicalReferences:
+          (data['biblicalReferences'] as List<dynamic>?)?.cast<String>() ?? [],
+      websiteReferences:
+          (data['websiteReferences'] as List<dynamic>?)?.cast<String>() ?? [],
       photoIds: (data['photoIds'] as List<dynamic>?)?.cast<String>() ?? [],
       description: data['description'] ?? '',
-      createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(data['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(data['updatedAt']?.toString() ?? '') ??
+          DateTime.now(),
       lastModifiedBy: data['lastModifiedBy'] ?? '',
     );
   }

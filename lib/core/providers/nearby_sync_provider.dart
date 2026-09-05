@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/sync/widgets/sync_progress_overlay.dart';
 
+import '../../features/sync/p2p/p2p_security_service.dart';
 import '../../features/sync/p2p/p2p_sync_service.dart';
 import '../services/bluetooth_permission_service.dart';
 
@@ -42,6 +43,33 @@ class NearbySyncDaemonController extends StateNotifier<bool> {
     final enabled = prefs.getBool(_prefsKey) ?? false;
     if (enabled) {
       state = true;
+      return;
+    }
+    // Auto-enable se il dispositivo risulta già associato (persistenza Hive):
+    // soddisfa il requisito "se associo un dispositivo (oppure configuro il
+    // dispositivo come associato) la sincronizzazione automatica deve essere
+    // attiva di default" anche dopo reinstallazione del flag o primo avvio
+    // post-associazione senza intervento utente.
+    try {
+      final hasAssoc = await P2PSecurityService().hasValidAssociation();
+      if (hasAssoc) {
+        await prefs.setBool(_prefsKey, true);
+        state = true;
+      }
+    } catch (_) {}
+  }
+
+  /// Abilita in modo persistente la sincronizzazione automatica senza
+  /// richiedere interazione utente. Usato dopo una nuova associazione riuscita.
+  Future<void> enableAutoSync() async {
+    if (state) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefsKey, true);
+    state = true;
+    final permResult =
+        await BluetoothPermissionService.checkAndRequestPermissions();
+    if (permResult.allGranted) {
+      _service.startBackgroundSync();
     }
   }
 
@@ -85,9 +113,9 @@ class NearbySyncDaemonController extends StateNotifier<bool> {
 
 final nearbySyncDaemonProvider =
     StateNotifierProvider<NearbySyncDaemonController, bool>((ref) {
-  final service = ref.watch(nearbySyncServiceProvider);
-  return NearbySyncDaemonController(service);
-});
+      final service = ref.watch(nearbySyncServiceProvider);
+      return NearbySyncDaemonController(service);
+    });
 
 class NearbySyncLifecycleManager extends ConsumerStatefulWidget {
   final Widget child;
@@ -132,6 +160,14 @@ class _NearbySyncLifecycleManagerState
 
   void _onSyncStateChanged(P2PSyncState state) {
     if (!mounted) return;
+
+    // Se il servizio ha avviato la modalità continua (es. dopo associazione)
+    // ma il flag persistente è ancora spento, allineiamo il daemon: la sync
+    // automatica deve essere attiva di default appena si associa un dispositivo.
+    if (state.isBackgroundSyncActive && !ref.read(nearbySyncDaemonProvider)) {
+      // fire-and-forget: persiste e aggiorna lo switch senza bloccare UI
+      ref.read(nearbySyncDaemonProvider.notifier).enableAutoSync();
+    }
 
     if (state.expirationWarning != null && !_expirationWarningShown) {
       _expirationWarningShown = true;
@@ -183,7 +219,6 @@ class _NearbySyncLifecycleManagerState
   }
 
   @override
-  Widget build(BuildContext context) => SyncProgressOverlay(
-        child: widget.child,
-      );
+  Widget build(BuildContext context) =>
+      SyncProgressOverlay(child: widget.child);
 }

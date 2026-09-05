@@ -3,13 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../../core/providers/class_scoped_providers.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/attachment_parent_type.dart';
 import '../../shared/models/planning_meeting.dart';
 import '../attachments/widgets/attachments_section.dart';
 import '../catechesi/catechesi_repository.dart';
 import '../../shared/models/catechesi_model.dart';
-import '../classes/classes_provider.dart';
 import 'planning_provider.dart';
 import '../../shared/widgets/last_modified_info.dart';
 
@@ -26,11 +27,7 @@ class PlanningEditPage extends ConsumerStatefulWidget {
   /// Nuovo incontro: `false` = giornata con appello, `true` = riunione senza appello.
   final bool isReunion;
 
-  const PlanningEditPage({
-    super.key,
-    this.existing,
-    this.isReunion = false,
-  });
+  const PlanningEditPage({super.key, this.existing, this.isReunion = false});
 
   @override
   ConsumerState<PlanningEditPage> createState() => _PlanningEditPageState();
@@ -104,14 +101,18 @@ class _PlanningEditPageState extends ConsumerState<PlanningEditPage> {
   @override
   Widget build(BuildContext context) {
     final repo = ref.read(planningRepoProvider);
-    final classesAsync = ref.watch(classesStreamProvider);
+    final currentClass = ref.watch(currentClassProvider);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
     final scaffoldBgColor = isDark ? colorScheme.surface : Colors.grey.shade50;
-    final appBarBgColor = isDark ? colorScheme.primaryContainer : const Color(0xFF174A7E);
-    final appBarFgColor = isDark ? colorScheme.onPrimaryContainer : Colors.white;
+    final appBarBgColor = isDark
+        ? colorScheme.primaryContainer
+        : const Color(0xFF174A7E);
+    final appBarFgColor = isDark
+        ? colorScheme.onPrimaryContainer
+        : Colors.white;
 
     return Scaffold(
       backgroundColor: scaffoldBgColor,
@@ -126,272 +127,282 @@ class _PlanningEditPageState extends ConsumerState<PlanningEditPage> {
         actions: [
           if (widget.existing != null)
             IconButton(
-              icon: Icon(_readOnly ? Icons.lock_outline_rounded : Icons.lock_open_rounded),
+              icon: Icon(
+                _readOnly
+                    ? Icons.lock_outline_rounded
+                    : Icons.lock_open_rounded,
+              ),
               tooltip: _readOnly ? 'Abilita modifica' : 'Blocca',
               onPressed: () => setState(() => _readOnly = !_readOnly),
             ),
         ],
       ),
-      body: classesAsync.when(
-        data: (classes) {
-          final myClass = classes.where(
-            (c) => c.catechistIds.contains(AuthService.localUserId),
-          );
+      body: currentClass == null || currentClass.isEmpty
+          ? const Center(child: Text('Non sei assegnato a nessuna classe'))
+          : Builder(
+              builder: (context) {
+                final classId = currentClass;
+                final classUniqueCode = ref.watch(
+                  currentClassUniqueCodeProvider,
+                );
 
-          if (myClass.isEmpty) {
-            return const Center(
-              child: Text('Non sei assegnato a nessuna classe'),
-            );
-          }
-
-          final classId = myClass.first.id;
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                if (isReunion)
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? colorScheme.primaryContainer.withValues(alpha: 0.3)
-                          : Colors.deepPurple.shade50,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: isDark
-                            ? colorScheme.outline.withValues(alpha: 0.2)
-                            : Colors.deepPurple.shade100,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.groups_rounded,
-                          color: isDark ? colorScheme.primary : Colors.deepPurple.shade700,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Riunione: non compare nell\'appello presenze.',
-                            style: TextStyle(
-                              color: isDark ? colorScheme.onSurface : Colors.deepPurple.shade900,
-                              fontWeight: FontWeight.w600,
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      if (isReunion)
+                        Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? colorScheme.primaryContainer.withValues(
+                                    alpha: 0.3,
+                                  )
+                                : Colors.deepPurple.shade50,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isDark
+                                  ? colorScheme.outline.withValues(alpha: 0.2)
+                                  : Colors.deepPurple.shade100,
                             ),
                           ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.groups_rounded,
+                                color: isDark
+                                    ? colorScheme.primary
+                                    : Colors.deepPurple.shade700,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Riunione: non compare nell\'appello presenze.',
+                                  style: TextStyle(
+                                    color: isDark
+                                        ? colorScheme.onSurface
+                                        : Colors.deepPurple.shade900,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      _DatePickerCard(
+                        selectedDate: selectedDate,
+                        onTap: () {
+                          if (_readOnly) return;
+                          showDatePicker(
+                            context: context,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2100),
+                            builder: (context, child) {
+                              return Theme(
+                                data: Theme.of(context).copyWith(
+                                  colorScheme: const ColorScheme.light(
+                                    primary: Color(0xFF174A7E),
+                                  ),
+                                ),
+                                child: child!,
+                              );
+                            },
+                          ).then((date) {
+                            if (date != null) {
+                              setState(() => selectedDate = date);
+                            }
+                          });
+                        },
+                      ),
+                      if (isReunion) ...[
+                        const SizedBox(height: 14),
+                        _TimePickerCard(
+                          selectedTime: selectedTime,
+                          onTap: () {
+                            if (_readOnly) return;
+                            showTimePicker(
+                              context: context,
+                              initialTime: selectedTime ?? TimeOfDay.now(),
+                              builder: (context, child) {
+                                return Theme(
+                                  data: Theme.of(context).copyWith(
+                                    colorScheme: const ColorScheme.light(
+                                      primary: Color(0xFF174A7E),
+                                    ),
+                                  ),
+                                  child: child!,
+                                );
+                              },
+                            ).then((time) {
+                              if (time != null) {
+                                setState(() => selectedTime = time);
+                              }
+                            });
+                          },
                         ),
                       ],
-                    ),
-                  ),
-                _DatePickerCard(
-                  selectedDate: selectedDate,
-                  onTap: () {
-                    if (_readOnly) return;
-                    showDatePicker(
-                      context: context,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2100),
-                      builder: (context, child) {
-                        return Theme(
-                          data: Theme.of(context).copyWith(
-                            colorScheme: const ColorScheme.light(
-                              primary: Color(0xFF174A7E),
-                            ),
+                      if (!isReunion) ...[
+                        const SizedBox(height: 14),
+                        _MeetingNumberBadge(
+                          meetingId: meetingId,
+                          classId: classId,
+                        ),
+                      ],
+                      if (_readOnly && widget.existing != null) ...[
+                        const SizedBox(height: 14),
+                        LastModifiedInfo(
+                          createdAt: widget.existing!.createdAt,
+                          updatedAt: widget.existing!.updatedAt,
+                          lastModifiedBy: widget.existing!.lastModifiedBy,
+                        ),
+                      ],
+                      const SizedBox(height: 18),
+                      _ModernInputCard(
+                        icon: Icons.title_rounded,
+                        color: const Color(0xFF174A7E),
+                        child: TextField(
+                          controller: title,
+                          textInputAction: TextInputAction.next,
+                          readOnly: _readOnly,
+                          decoration: InputDecoration(
+                            hintText: isReunion
+                                ? 'Titolo riunione'
+                                : 'Titolo giornata',
+                            border: InputBorder.none,
                           ),
-                          child: child!,
-                        );
-                      },
-                    ).then((date) {
-                      if (date != null) {
-                        setState(() => selectedDate = date);
-                      }
-                    });
-                  },
-                ),
-                if (isReunion) ...[
-                  const SizedBox(height: 14),
-                  _TimePickerCard(
-                    selectedTime: selectedTime,
-                    onTap: () {
-                      if (_readOnly) return;
-                      showTimePicker(
-                        context: context,
-                        initialTime: selectedTime ?? TimeOfDay.now(),
-                        builder: (context, child) {
-                          return Theme(
-                            data: Theme.of(context).copyWith(
-                              colorScheme: const ColorScheme.light(
-                                primary: Color(0xFF174A7E),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _ModernInputCard(
+                        icon: Icons.menu_book_rounded,
+                        color: Colors.orange,
+                        child: TextField(
+                          controller: activity,
+                          maxLines: 6,
+                          readOnly: _readOnly,
+                          decoration: const InputDecoration(
+                            hintText: 'Attività / Argomenti',
+                            border: InputBorder.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _ModernInputCard(
+                        icon: Icons.notes_rounded,
+                        color: Colors.blue,
+                        child: TextField(
+                          controller: notes,
+                          maxLines: 3,
+                          readOnly: _readOnly,
+                          decoration: const InputDecoration(
+                            hintText: 'Note',
+                            border: InputBorder.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      AttachmentsSection(
+                        parentId: meetingId,
+                        parentType: AttachmentParentType.meeting,
+                        title: 'Foto e PDF dell\'incontro',
+                        readOnly: _readOnly,
+                      ),
+                      if (!isReunion) ...[
+                        const SizedBox(height: 20),
+                        _CatechesiAssociationSection(
+                          associatedIds: associatedCatechesiIds,
+                          onChanged: (ids) {
+                            setState(() => associatedCatechesiIds = ids);
+                          },
+                          readOnly: _readOnly,
+                          classUniqueCode: classUniqueCode,
+                        ),
+                      ],
+                      const SizedBox(height: 24),
+                      if (!_readOnly)
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF174A7E),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
                               ),
                             ),
-                            child: child!,
-                          );
-                        },
-                      ).then((time) {
-                        if (time != null) {
-                          setState(() => selectedTime = time);
-                        }
-                      });
-                    },
-                  ),
-                ],
-                if (!isReunion) ...[
-                  const SizedBox(height: 14),
-                  _MeetingNumberBadge(
-                    meetingId: meetingId,
-                    classId: classId,
-                  ),
-                ],
-                if (_readOnly && widget.existing != null) ...[
-                  const SizedBox(height: 14),
-                  LastModifiedInfo(
-                    createdAt: widget.existing!.createdAt,
-                    updatedAt: widget.existing!.updatedAt,
-                    lastModifiedBy: widget.existing!.lastModifiedBy,
-                  ),
-                ],
-                const SizedBox(height: 18),
-                _ModernInputCard(
-                  icon: Icons.title_rounded,
-                  color: const Color(0xFF174A7E),
-                  child: TextField(
-                    controller: title,
-                    textInputAction: TextInputAction.next,
-                    readOnly: _readOnly,
-                    decoration: InputDecoration(
-                      hintText: isReunion ? 'Titolo riunione' : 'Titolo giornata',
-                      border: InputBorder.none,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _ModernInputCard(
-                  icon: Icons.menu_book_rounded,
-                  color: Colors.orange,
-                  child: TextField(
-                    controller: activity,
-                    maxLines: 6,
-                    readOnly: _readOnly,
-                    decoration: const InputDecoration(
-                      hintText: 'Attività / Argomenti',
-                      border: InputBorder.none,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _ModernInputCard(
-                  icon: Icons.notes_rounded,
-                  color: Colors.blue,
-                  child: TextField(
-                    controller: notes,
-                    maxLines: 3,
-                    readOnly: _readOnly,
-                    decoration: const InputDecoration(
-                      hintText: 'Note',
-                      border: InputBorder.none,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                AttachmentsSection(
-                  parentId: meetingId,
-                  parentType: AttachmentParentType.meeting,
-                  title: 'Foto e PDF dell\'incontro',
-                  readOnly: _readOnly,
-                ),
-                if (!isReunion) ...[
-                  const SizedBox(height: 20),
-                  _CatechesiAssociationSection(
-                    associatedIds: associatedCatechesiIds,
-                    onChanged: (ids) {
-                      setState(() => associatedCatechesiIds = ids);
-                    },
-                    readOnly: _readOnly,
-                  ),
-                ],
-                const SizedBox(height: 24),
-                if (!_readOnly)
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF174A7E),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                    ),
-                    icon: const Icon(Icons.save_rounded),
-                    label: Text(
-                      isReunion ? 'Salva riunione' : 'Salva giornata',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    onPressed: () async {
-                      if (selectedDate == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Seleziona una data')),
-                        );
-                        return;
-                      }
-
-                      if (title.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              isReunion
-                                  ? 'Inserisci un titolo per la riunione'
-                                  : 'Inserisci un titolo per la giornata',
+                            icon: const Icon(Icons.save_rounded),
+                            label: Text(
+                              isReunion ? 'Salva riunione' : 'Salva giornata',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
+                            onPressed: () async {
+                              if (selectedDate == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Seleziona una data'),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              if (title.text.trim().isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      isReunion
+                                          ? 'Inserisci un titolo per la riunione'
+                                          : 'Inserisci un titolo per la giornata',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              final meeting = PlanningMeeting(
+                                id: meetingId,
+                                classId: classId,
+                                createdBy: AuthService.localUserId,
+                                date: selectedDate!,
+                                time: (isReunion && selectedTime != null)
+                                    ? '${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}'
+                                    : null,
+                                title: title.text.trim(),
+                                activity: activity.text.trim(),
+                                notes: notes.text.trim(),
+                                isReunion: isReunion,
+                              );
+
+                              try {
+                                if (widget.existing == null) {
+                                  await repo.addMeeting(meeting);
+                                } else {
+                                  await repo.updateMeeting(meeting.id, meeting);
+                                }
+                                await _saveAssociatedCatechesi();
+
+                                if (context.mounted) {
+                                  Navigator.pop(context);
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Errore: $e')),
+                                  );
+                                }
+                              }
+                            },
                           ),
-                        );
-                        return;
-                      }
-
-                      final meeting = PlanningMeeting(
-                        id: meetingId,
-                        classId: classId,
-                        createdBy: AuthService.localUserId,
-                        date: selectedDate!,
-                        time: (isReunion && selectedTime != null)
-                            ? '${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}'
-                            : null,
-                        title: title.text.trim(),
-                        activity: activity.text.trim(),
-                        notes: notes.text.trim(),
-                        isReunion: isReunion,
-                      );
-
-                      try {
-                        if (widget.existing == null) {
-                          await repo.addMeeting(meeting);
-                        } else {
-                          await repo.updateMeeting(meeting.id, meeting);
-                        }
-                        await _saveAssociatedCatechesi();
-
-                        if (context.mounted) {
-                          Navigator.pop(context);
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Errore: $e')),
-                          );
-                        }
-                      }
-                    },
+                        ),
+                    ],
                   ),
-                ),
-              ],
+                );
+              },
             ),
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Errore: $e')),
-      ),
     );
   }
 
@@ -409,10 +420,7 @@ class _DatePickerCard extends StatelessWidget {
   final DateTime? selectedDate;
   final VoidCallback onTap;
 
-  const _DatePickerCard({
-    required this.selectedDate,
-    required this.onTap,
-  });
+  const _DatePickerCard({required this.selectedDate, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -430,18 +438,23 @@ class _DatePickerCard extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: isSelected
-                ? [
-                    const Color(0xFF174A7E),
-                    const Color(0xFF2A6BB0),
-                  ]
+                ? [const Color(0xFF174A7E), const Color(0xFF2A6BB0)]
                 : [
                     isDark ? colorScheme.surfaceContainer : Colors.white,
-                    isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.blue.shade50.withValues(alpha: 0.4),
+                    isDark
+                        ? colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.3,
+                          )
+                        : Colors.blue.shade50.withValues(alpha: 0.4),
                   ],
           ),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: isSelected ? Colors.transparent : (isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.blue.shade100),
+            color: isSelected
+                ? Colors.transparent
+                : (isDark
+                      ? colorScheme.outline.withValues(alpha: 0.2)
+                      : Colors.blue.shade100),
           ),
           boxShadow: [
             BoxShadow(
@@ -450,7 +463,7 @@ class _DatePickerCard extends StatelessWidget {
                   : Colors.black.withValues(alpha: 0.05),
               blurRadius: 18,
               offset: const Offset(0, 10),
-            )
+            ),
           ],
         ),
         child: Row(
@@ -461,12 +474,16 @@ class _DatePickerCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isSelected
                     ? Colors.white.withValues(alpha: 0.15)
-                    : (isDark ? colorScheme.primaryContainer.withValues(alpha: 0.3) : Colors.blue.shade50),
+                    : (isDark
+                          ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+                          : Colors.blue.shade50),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
                 Icons.calendar_month_rounded,
-                color: isSelected ? Colors.white : (isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+                color: isSelected
+                    ? Colors.white
+                    : (isDark ? colorScheme.primary : const Color(0xFF174A7E)),
               ),
             ),
             const SizedBox(width: 14),
@@ -479,7 +496,11 @@ class _DatePickerCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: isSelected ? Colors.white70 : (isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                      color: isSelected
+                          ? Colors.white70
+                          : (isDark
+                                ? Colors.grey.shade400
+                                : Colors.grey.shade600),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -490,7 +511,11 @@ class _DatePickerCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: isSelected ? Colors.white : (isDark ? colorScheme.onSurface : const Color(0xFF174A7E)),
+                      color: isSelected
+                          ? Colors.white
+                          : (isDark
+                                ? colorScheme.onSurface
+                                : const Color(0xFF174A7E)),
                     ),
                   ),
                 ],
@@ -499,7 +524,9 @@ class _DatePickerCard extends StatelessWidget {
             Icon(
               Icons.arrow_forward_ios_rounded,
               size: 16,
-              color: isSelected ? Colors.white70 : (isDark ? Colors.grey.shade500 : Colors.grey),
+              color: isSelected
+                  ? Colors.white70
+                  : (isDark ? Colors.grey.shade500 : Colors.grey),
             ),
           ],
         ),
@@ -516,10 +543,7 @@ class _TimePickerCard extends StatelessWidget {
   final TimeOfDay? selectedTime;
   final VoidCallback onTap;
 
-  const _TimePickerCard({
-    required this.selectedTime,
-    required this.onTap,
-  });
+  const _TimePickerCard({required this.selectedTime, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -537,18 +561,23 @@ class _TimePickerCard extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: isSelected
-                ? [
-                    Colors.deepPurple.shade400,
-                    Colors.deepPurple.shade600,
-                  ]
+                ? [Colors.deepPurple.shade400, Colors.deepPurple.shade600]
                 : [
                     isDark ? colorScheme.surfaceContainer : Colors.white,
-                    isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.deepPurple.shade50.withValues(alpha: 0.4),
+                    isDark
+                        ? colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.3,
+                          )
+                        : Colors.deepPurple.shade50.withValues(alpha: 0.4),
                   ],
           ),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: isSelected ? Colors.transparent : (isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.deepPurple.shade100),
+            color: isSelected
+                ? Colors.transparent
+                : (isDark
+                      ? colorScheme.outline.withValues(alpha: 0.2)
+                      : Colors.deepPurple.shade100),
           ),
           boxShadow: [
             BoxShadow(
@@ -557,7 +586,7 @@ class _TimePickerCard extends StatelessWidget {
                   : Colors.black.withValues(alpha: 0.05),
               blurRadius: 18,
               offset: const Offset(0, 10),
-            )
+            ),
           ],
         ),
         child: Row(
@@ -568,12 +597,18 @@ class _TimePickerCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isSelected
                     ? Colors.white.withValues(alpha: 0.15)
-                    : (isDark ? colorScheme.primaryContainer.withValues(alpha: 0.3) : Colors.deepPurple.shade50),
+                    : (isDark
+                          ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+                          : Colors.deepPurple.shade50),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
                 Icons.access_time_rounded,
-                color: isSelected ? Colors.white : (isDark ? colorScheme.primary : Colors.deepPurple.shade700),
+                color: isSelected
+                    ? Colors.white
+                    : (isDark
+                          ? colorScheme.primary
+                          : Colors.deepPurple.shade700),
               ),
             ),
             const SizedBox(width: 14),
@@ -586,7 +621,11 @@ class _TimePickerCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: isSelected ? Colors.white70 : (isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                      color: isSelected
+                          ? Colors.white70
+                          : (isDark
+                                ? Colors.grey.shade400
+                                : Colors.grey.shade600),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -597,7 +636,11 @@ class _TimePickerCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: isSelected ? Colors.white : (isDark ? colorScheme.onSurface : Colors.deepPurple.shade700),
+                      color: isSelected
+                          ? Colors.white
+                          : (isDark
+                                ? colorScheme.onSurface
+                                : Colors.deepPurple.shade700),
                     ),
                   ),
                 ],
@@ -606,7 +649,9 @@ class _TimePickerCard extends StatelessWidget {
             Icon(
               Icons.arrow_forward_ios_rounded,
               size: 16,
-              color: isSelected ? Colors.white70 : (isDark ? Colors.grey.shade500 : Colors.grey),
+              color: isSelected
+                  ? Colors.white70
+                  : (isDark ? Colors.grey.shade500 : Colors.grey),
             ),
           ],
         ),
@@ -654,7 +699,7 @@ class _ModernInputCard extends StatelessWidget {
                 : Colors.black.withValues(alpha: 0.04),
             blurRadius: 16,
             offset: const Offset(0, 8),
-          )
+          ),
         ],
       ),
       child: Column(
@@ -677,22 +722,27 @@ class _CatechesiAssociationSection extends StatefulWidget {
   final List<String> associatedIds;
   final ValueChanged<List<String>> onChanged;
   final bool readOnly;
+  final String classUniqueCode;
 
   const _CatechesiAssociationSection({
     required this.associatedIds,
     required this.onChanged,
+    required this.classUniqueCode,
     this.readOnly = false,
   });
 
   @override
-  State<_CatechesiAssociationSection> createState() => _CatechesiAssociationSectionState();
+  State<_CatechesiAssociationSection> createState() =>
+      _CatechesiAssociationSectionState();
 }
 
-class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSection> {
+class _CatechesiAssociationSectionState
+    extends State<_CatechesiAssociationSection> {
   late List<String> _selectedIds;
 
-  /// Recupera tutte le catechesi disponibili dal repository.
-  List<Catechesi> _allCatechesi() => CatechesiRepository().getCatechesiSync();
+  /// Recupera le catechesi della classe corrente dal repository.
+  List<Catechesi> _allCatechesi() =>
+      CatechesiRepository().getCatechesiByClassSync(widget.classUniqueCode);
 
   @override
   void initState() {
@@ -716,7 +766,9 @@ class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSecti
         color: isDark ? colorScheme.surfaceContainer : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade200,
+          color: isDark
+              ? colorScheme.outline.withValues(alpha: 0.2)
+              : Colors.grey.shade200,
         ),
         boxShadow: [
           BoxShadow(
@@ -733,7 +785,12 @@ class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSecti
         children: [
           Row(
             children: [
-              Icon(Icons.menu_book_rounded, color: isDark ? colorScheme.primary : Colors.deepPurple.shade700),
+              Icon(
+                Icons.menu_book_rounded,
+                color: isDark
+                    ? colorScheme.primary
+                    : Colors.deepPurple.shade700,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -741,7 +798,9 @@ class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSecti
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
+                    color: isDark
+                        ? colorScheme.onSurface
+                        : const Color(0xFF174A7E),
                   ),
                 ),
               ),
@@ -754,7 +813,11 @@ class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSecti
                 Expanded(
                   child: Text(
                     'Nessuna catechesi associata',
-                    style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                    style: TextStyle(
+                      color: isDark
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
+                    ),
                   ),
                 ),
                 if (!widget.readOnly)
@@ -777,14 +840,22 @@ class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSecti
                         (x) => x.id == c.id,
                         orElse: () => c,
                       );
-                      context.push('/catechesi/detail', extra: {'catechesi': fullCatechesi});
+                      context.push(
+                        '/catechesi/detail',
+                        extra: {'catechesi': fullCatechesi},
+                      );
                     },
                     child: Container(
                       margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
                         color: isDark
-                            ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+                            ? colorScheme.primaryContainer.withValues(
+                                alpha: 0.3,
+                              )
                             : Colors.deepPurple.shade50,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
@@ -799,14 +870,18 @@ class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSecti
                             child: Text(
                               c.title,
                               style: TextStyle(
-                                color: isDark ? colorScheme.onSurface : Colors.deepPurple.shade900,
+                                color: isDark
+                                    ? colorScheme.onSurface
+                                    : Colors.deepPurple.shade900,
                               ),
                             ),
                           ),
                           if (!widget.readOnly)
                             IconButton(
                               icon: const Icon(Icons.close_rounded, size: 18),
-                              color: isDark ? colorScheme.primary : Colors.deepPurple.shade700,
+                              color: isDark
+                                  ? colorScheme.primary
+                                  : Colors.deepPurple.shade700,
                               onPressed: () {
                                 setState(() {
                                   _selectedIds.remove(c.id);
@@ -818,7 +893,7 @@ class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSecti
                       ),
                     ),
                   );
-                }).toList(),
+                }),
                 const SizedBox(height: 8),
                 if (!widget.readOnly)
                   Align(
@@ -842,7 +917,7 @@ class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSecti
     final isDark = theme.brightness == Brightness.dark;
 
     final repo = CatechesiRepository();
-    final all = repo.getCatechesiSync();
+    final all = repo.getCatechesiByClassSync(widget.classUniqueCode);
     final candidates = all.where((c) => !_selectedIds.contains(c.id)).toList();
 
     await showModalBottomSheet<List<String>>(
@@ -879,7 +954,11 @@ class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSecti
                     return ListTile(
                       title: Text(
                         c.title,
-                        style: TextStyle(color: isDark ? colorScheme.onSurface : Colors.black87),
+                        style: TextStyle(
+                          color: isDark
+                              ? colorScheme.onSurface
+                              : Colors.black87,
+                        ),
                       ),
                       subtitle: c.tags.isEmpty
                           ? null
@@ -888,18 +967,26 @@ class _CatechesiAssociationSectionState extends State<_CatechesiAssociationSecti
                               runSpacing: 6,
                               children: c.tags
                                   .take(3)
-                                  .map((t) => Chip(
-                                        label: Text(t, style: const TextStyle(fontSize: 11)),
-                                        visualDensity: VisualDensity.compact,
-                                        backgroundColor: isDark
-                                            ? colorScheme.primaryContainer.withValues(alpha: 0.3)
-                                            : Colors.blue.shade50,
-                                        side: BorderSide(
-                                          color: isDark
-                                              ? colorScheme.outline.withValues(alpha: 0.2)
-                                              : Colors.blue.shade100,
-                                        ),
-                                      ))
+                                  .map(
+                                    (t) => Chip(
+                                      label: Text(
+                                        t,
+                                        style: const TextStyle(fontSize: 11),
+                                      ),
+                                      visualDensity: VisualDensity.compact,
+                                      backgroundColor: isDark
+                                          ? colorScheme.primaryContainer
+                                                .withValues(alpha: 0.3)
+                                          : Colors.blue.shade50,
+                                      side: BorderSide(
+                                        color: isDark
+                                            ? colorScheme.outline.withValues(
+                                                alpha: 0.2,
+                                              )
+                                            : Colors.blue.shade100,
+                                      ),
+                                    ),
+                                  )
                                   .toList(),
                             ),
                       onTap: () {
@@ -928,10 +1015,7 @@ class _MeetingNumberBadge extends ConsumerWidget {
   final String meetingId;
   final String classId;
 
-  const _MeetingNumberBadge({
-    required this.meetingId,
-    required this.classId,
-  });
+  const _MeetingNumberBadge({required this.meetingId, required this.classId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -940,10 +1024,9 @@ class _MeetingNumberBadge extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     final meetings = ref.read(planningRepoProvider).getMeetingsSync();
-    final filtered = meetings
-        .where((m) => m.classId == classId && !m.isReunion)
-        .toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
+    final filtered =
+        meetings.where((m) => m.classId == classId && !m.isReunion).toList()
+          ..sort((a, b) => a.date.compareTo(b.date));
 
     final index = filtered.indexWhere((m) => m.id == meetingId);
     if (index == -1) return const SizedBox.shrink();
@@ -967,7 +1050,11 @@ class _MeetingNumberBadge extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.tag_rounded, size: 18, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+          Icon(
+            Icons.tag_rounded,
+            size: 18,
+            color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+          ),
           const SizedBox(width: 8),
           Text(
             'Incontro $numero di $totale',

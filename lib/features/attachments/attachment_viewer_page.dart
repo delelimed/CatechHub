@@ -11,6 +11,8 @@
 ///
 /// In caso di errore di lettura, mostra un messaggio in italiano
 /// ("Impossibile aprire il file") con il dettaglio dell'errore.
+library;
+
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -34,18 +36,16 @@ class _AttachmentViewerPageState extends ConsumerState<AttachmentViewerPage> {
   @override
   Widget build(BuildContext context) {
     final att = widget.attachment;
-    final bytesFuture =
-        ref.read(attachmentsRepositoryProvider).readBytes(att.id);
+    final bytesFuture = ref
+        .read(attachmentsRepositoryProvider)
+        .readBytes(att.id);
 
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: const Color(0xFF174A7E),
         foregroundColor: Colors.white,
-        title: Text(
-          att.name,
-          overflow: TextOverflow.ellipsis,
-        ),
+        title: Text(att.name, overflow: TextOverflow.ellipsis),
         actions: [
           if (att.isPdf)
             IconButton(
@@ -85,9 +85,7 @@ class _AttachmentViewerPageState extends ConsumerState<AttachmentViewerPage> {
           final bytes = snapshot.data!;
           if (att.isImage) {
             return InteractiveViewer(
-              child: Center(
-                child: Image.memory(bytes, fit: BoxFit.contain),
-              ),
+              child: Center(child: Image.memory(bytes, fit: BoxFit.contain)),
             );
           }
 

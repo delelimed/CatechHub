@@ -21,12 +21,14 @@
 /// Ogni allegato è associato a un'entità padre tramite [parentId] e [parentType],
 /// permettendo di recuperare tutti gli allegati di una pratica, fattura, o altra
 /// entità del gestionale CateREG.
+library;
+
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:crypto/crypto.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/services/crypto_utils.dart';
 import '../../core/storage/attachment_optimizer.dart';
 import '../../core/storage/encrypted_file_storage.dart';
 import '../../core/storage/local_database.dart';
@@ -100,7 +102,8 @@ class AttachmentsRepository {
     await EncryptedFileStorage.write(id, optimized.bytes);
 
     final now = DateTime.now();
-    final code = classUniqueCode ?? _lookupClassUniqueCode(parentId, parentType);
+    final code =
+        classUniqueCode ?? _lookupClassUniqueCode(parentId, parentType);
     final attachment = Attachment(
       id: id,
       parentId: parentId,
@@ -110,7 +113,7 @@ class AttachmentsRepository {
       size: optimized.savedBytes,
       createdAt: now,
       updatedAt: now,
-      fileHash: sha256.convert(optimized.bytes).toString(),
+      fileHash: sha256HexBytesSync(optimized.bytes),
       classUniqueCode: code,
       description: description,
       lastModifiedBy: getCurrentCatechistName(),
@@ -179,7 +182,8 @@ class AttachmentsRepository {
   }
 
   Future<void> deleteAttachment(String attachmentId) async {
-    await EncryptedFileStorage.delete(attachmentId);
+    // Fase 3 — item 8: wipe sicuro del file vault (sovrascrittura + delete).
+    await EncryptedFileStorage.deleteSecure(attachmentId);
     await _box.delete(attachmentId);
   }
 

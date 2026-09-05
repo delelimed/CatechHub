@@ -19,6 +19,10 @@
 ///
 /// Il parametro [readOnly] disabilita tutte le azioni modificative (aggiungi,
 /// rinomina, elimina), utile in contesti di sola consultazione.
+library;
+
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -78,7 +82,9 @@ class AttachmentsSection extends ConsumerWidget {
                 children: [
                   Icon(
                     Icons.lock_rounded,
-                    color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                    color: isDark
+                        ? colorScheme.primary
+                        : const Color(0xFF174A7E),
                     size: 20,
                   ),
                   const SizedBox(width: 8),
@@ -88,7 +94,9 @@ class AttachmentsSection extends ConsumerWidget {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                        color: isDark
+                            ? colorScheme.primary
+                            : const Color(0xFF174A7E),
                       ),
                     ),
                   ),
@@ -97,14 +105,19 @@ class AttachmentsSection extends ConsumerWidget {
                       tooltip: 'Aggiungi',
                       onPressed: () => _showAddMenu(context, ref),
                       icon: const Icon(Icons.add_circle_outline_rounded),
-                      color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                      color: isDark
+                          ? colorScheme.primary
+                          : const Color(0xFF174A7E),
                     ),
                 ],
               ),
               const SizedBox(height: 4),
               Text(
                 'Salvati cifrati e compressi (foto max 1600px, JPEG).',
-                style: TextStyle(fontSize: 12, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                ),
               ),
               const SizedBox(height: 12),
               if (snapshot.connectionState == ConnectionState.waiting &&
@@ -113,7 +126,9 @@ class AttachmentsSection extends ConsumerWidget {
               else if (attachments.isEmpty)
                 Text(
                   'Nessun allegato',
-                  style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade500),
+                  style: TextStyle(
+                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
+                  ),
                 )
               else
                 ...attachments.map(
@@ -225,6 +240,7 @@ class AttachmentsSection extends ConsumerWidget {
         : 'file_${DateTime.now().millisecondsSinceEpoch}';
 
     // Chiedi all'utente di confermare o modificare il nome
+    if (!context.mounted) return;
     final finalName = await _askForFileName(context, fileName);
 
     final repo = ref.read(attachmentsRepositoryProvider);
@@ -235,6 +251,10 @@ class AttachmentsSection extends ConsumerWidget {
       name: finalName,
       mimeType: _mimeFromPath(file.path, fallback: 'image/jpeg'),
     );
+    // Privacy: il picker copia la foto nella cache dell'app. Dopo aver
+    // trasferito i byte nello storage cifrato, elimina la copia temporanea
+    // in chiaro per evitare che resti su disco (dati sensibili di minori).
+    await _deletePickerTemp(file.path);
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -244,6 +264,7 @@ class AttachmentsSection extends ConsumerWidget {
   }
 
   Future<void> _pickPdf(BuildContext context, WidgetRef ref) async {
+    // file_picker 12: pickFiles restituisce FilePickerResult.
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf'],
@@ -254,10 +275,11 @@ class AttachmentsSection extends ConsumerWidget {
     final path = file.path;
 
     // Chiedi all'utente di confermare o modificare il nome
+    if (!context.mounted) return;
     final finalName = await _askForFileName(context, file.name);
 
     final repo = ref.read(attachmentsRepositoryProvider);
-    final saved;
+    final Attachment saved;
     if (path != null) {
       saved = await repo.addFromPath(
         parentId: parentId,
@@ -266,6 +288,9 @@ class AttachmentsSection extends ConsumerWidget {
         name: finalName,
         mimeType: 'application/pdf',
       );
+      // Privacy: elimina la copia temporanea del picker dopo il trasferimento
+      // nello storage cifrato (stesso motivo della foto).
+      await _deletePickerTemp(path);
     } else {
       final bytes = await file.readAsBytes();
       saved = await repo.addFromBytes(
@@ -314,6 +339,22 @@ class AttachmentsSection extends ConsumerWidget {
     );
     controller.dispose();
     return result?.trim().isNotEmpty == true ? result! : defaultName;
+  }
+
+  /// Elimina la copia temporanea del picker (foto/PDF) rimasta nella cache
+  /// dell'app dopo il trasferimento dei byte nello storage cifrato.
+  /// Un errore di cancellazione non deve bloccare il flusso: il file
+  /// temporaneo verrà comunque rimosso dal sistema alla prossima pulizia.
+  Future<void> _deletePickerTemp(String path) async {
+    if (path.isEmpty) return;
+    try {
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {
+      // Ignora: cancellazione best-effort.
+    }
   }
 
   Future<void> _renameAttachment(
@@ -473,9 +514,14 @@ class _AttachmentTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 0,
-      color: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.grey.shade50,
+      color: isDark
+          ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
+          : Colors.grey.shade50,
       child: ListTile(
-        leading: Icon(icon, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+        leading: Icon(
+          icon,
+          color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+        ),
         title: Text(
           attachment.name,
           maxLines: 1,

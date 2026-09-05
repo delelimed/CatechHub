@@ -72,10 +72,7 @@ class SecurityBlockScreen extends StatefulWidget {
   final String message;
 
   /// Costruttore costante per rebuild efficienti.
-  const SecurityBlockScreen({
-    super.key,
-    required this.message,
-  });
+  const SecurityBlockScreen({super.key, required this.message});
 
   @override
   State<SecurityBlockScreen> createState() => _SecurityBlockScreenState();
@@ -116,7 +113,10 @@ class _SecurityBlockScreenState extends State<SecurityBlockScreen>
       vsync: this,
     )..repeat(reverse: true);
 
-    _fadeAnimation = CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeOut,
+    );
     _scaleAnimation = Tween<double>(begin: 0.6, end: 1.0).animate(
       CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut),
     );
@@ -129,7 +129,10 @@ class _SecurityBlockScreenState extends State<SecurityBlockScreen>
 
     // Avvia animazioni in sequenza
     _fadeController.forward();
-    Future.delayed(const Duration(milliseconds: 100), () => _scaleController.forward());
+    Future.delayed(
+      const Duration(milliseconds: 100),
+      () => _scaleController.forward(),
+    );
     Future.delayed(const Duration(milliseconds: 500), () => _startShakeLoop());
 
     // Attiva immersive sticky mode per nascondere system UI
@@ -198,7 +201,9 @@ class _SecurityBlockScreenState extends State<SecurityBlockScreen>
       ..writeln()
       ..writeln('--- DESCRIZIONE UTENTE ---')
       ..writeln()
-      ..writeln('(descrivi qui cosa stavi facendo quando hai ricevuto l\'avviso)')
+      ..writeln(
+        '(descrivi qui cosa stavi facendo quando hai ricevuto l\'avviso)',
+      )
       ..writeln();
 
     final Uri emailUri = Uri(
@@ -262,42 +267,51 @@ class _SecurityBlockScreenState extends State<SecurityBlockScreen>
 
                         // ─── ICONA LUCCHETTO ANIMATA (SCALE + SHAKE + PULSE) ───
                         AnimatedBuilder(
-                          animation: Listenable.merge([_scaleController, _shakeController, _pulseController]),
+                          animation: Listenable.merge([
+                            _scaleController,
+                            _shakeController,
+                            _pulseController,
+                          ]),
                           builder: (context, child) => Transform.scale(
-                            scale: _scaleAnimation.value * _pulseAnimation.value,
+                            scale:
+                                _scaleAnimation.value * _pulseAnimation.value,
                             child: Transform.translate(
                               offset: Offset(_shakeAnimation.value * 8, 0),
                               child: Container(
                                 width: 110,
                                 height: 110,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.4),
-                                    blurRadius: 24,
-                                    offset: const Offset(0, 8),
-                                    spreadRadius: -4,
-                                  ),
-                                  BoxShadow(
-                                    color: Colors.red.shade900.withValues(alpha: 0.5),
-                                    blurRadius: 40,
-                                    offset: const Offset(0, 16),
-                                    spreadRadius: -8,
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.lock_outline_rounded,
-                                size: 96,
-                                color: Colors.white,
-                                semanticLabel: 'Blocco sicurezza attivo',
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.4,
+                                      ),
+                                      blurRadius: 24,
+                                      offset: const Offset(0, 8),
+                                      spreadRadius: -4,
+                                    ),
+                                    BoxShadow(
+                                      color: Colors.red.shade900.withValues(
+                                        alpha: 0.5,
+                                      ),
+                                      blurRadius: 40,
+                                      offset: const Offset(0, 16),
+                                      spreadRadius: -8,
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.lock_outline_rounded,
+                                  size: 96,
+                                  color: Colors.white,
+                                  semanticLabel: 'Blocco sicurezza attivo',
+                                ),
                               ),
                             ),
                           ),
                         ),
-                        ),
-                        
+
                         const SizedBox(height: 28),
 
                         // ─── TITOLO "SICUREZZA VIOLATA" ───
@@ -324,7 +338,10 @@ class _SecurityBlockScreenState extends State<SecurityBlockScreen>
 
                         // ─── MESSAGGIO SPECIFICO MINACCIA ───
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 14,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.black.withValues(alpha: 0.18),
                             borderRadius: BorderRadius.circular(14),
@@ -379,7 +396,9 @@ class _SecurityBlockScreenState extends State<SecurityBlockScreen>
                                     width: 36,
                                     height: 36,
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.15),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.15,
+                                      ),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Icon(
@@ -458,7 +477,9 @@ class _SecurityBlockScreenState extends State<SecurityBlockScreen>
                                     width: 36,
                                     height: 36,
                                     decoration: BoxDecoration(
-                                      color: Colors.green.withValues(alpha: 0.2),
+                                      color: Colors.green.withValues(
+                                        alpha: 0.2,
+                                      ),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: const Icon(
@@ -585,7 +606,10 @@ class _SecurityBlockScreenState extends State<SecurityBlockScreen>
             'dispositivo fisico collegato via USB per il debug.',
       );
     }
-    if (lower.contains('firma') || lower.contains('manomess') || lower.contains('tamper') || lower.contains('integrit')) {
+    if (lower.contains('firma') ||
+        lower.contains('manomess') ||
+        lower.contains('tamper') ||
+        lower.contains('integrit')) {
       return _ThreatDetail(
         icon: Icons.broken_image_outlined,
         title: 'Integrità Applicazione Compromessa',
@@ -600,7 +624,9 @@ class _SecurityBlockScreenState extends State<SecurityBlockScreen>
             'Se il problema persiste, contatta il supporto per verificare la firma.',
       );
     }
-    if (lower.contains('hook') || lower.contains('frida') || lower.contains('xposed')) {
+    if (lower.contains('hook') ||
+        lower.contains('frida') ||
+        lower.contains('xposed')) {
       return _ThreatDetail(
         icon: Icons.bug_report_outlined,
         title: 'Framework Hooking Rilevato',
@@ -623,7 +649,8 @@ class _SecurityBlockScreenState extends State<SecurityBlockScreen>
             'Il binding crittografico del dispositivo è stato violato. '
             'Questo significa che i dati dell\'app sono stati copiati su un altro '
             'dispositivo o l\'identità hardware è stata falsificata (spoofing).',
-        impact: 'IMPATTO: Clonazione identità dispositivo, accesso non autorizzato',
+        impact:
+            'IMPATTO: Clonazione identità dispositivo, accesso non autorizzato',
         solution:
             'Contatta il supporto per ri-autenticare il dispositivo. '
             'Potrebbe essere necessario riaccedere all\'account e registrare '

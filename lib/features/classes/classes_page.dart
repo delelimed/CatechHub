@@ -12,10 +12,13 @@
 /// Integrazione CateREG: si aggancia a [classesStreamProvider] per ricevere
 /// in tempo reale l'elenco aggiornato delle classi e a [classesRepoProvider]
 /// per le operazioni di scrittura (add/delete/update).
+library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../../shared/utils/auth_utils.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/models/class_model.dart';
@@ -31,12 +34,7 @@ class ClassesPage extends ConsumerWidget {
 
     return classesAsync.when(
       data: (classes) {
-        final activeClassId = classes.isNotEmpty
-            ? classes.firstWhere(
-                (c) => c.catechistIds.contains(AuthService.localUserId),
-                orElse: () => classes.first,
-              ).id
-            : null;
+        final activeClassId = ref.watch(currentClassProvider) ?? '';
 
         return AppScaffold(
           title: 'Gruppi',
@@ -59,7 +57,7 @@ class ClassesPage extends ConsumerWidget {
               : ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: classes.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
                   itemBuilder: (_, index) {
                     final c = classes[index];
                     final isActive = c.id == activeClassId;
@@ -72,19 +70,22 @@ class ClassesPage extends ConsumerWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) =>
-                                ClassDetailPage(classId: c.id),
+                            builder: (_) => ClassDetailPage(classId: c.id),
                           ),
                         );
                       },
                       onDelete: () async {
                         try {
                           await ref.read(classesRepoProvider).deleteClass(c.id);
+                          // Se si eliminava la classe aperta, pulisce la selezione
+                          await clearCurrentClassIfDeleted(ref, c.id);
                         } catch (e) {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('Errore durante l\'eliminazione: $e'),
+                                content: Text(
+                                  'Errore durante l\'eliminazione: $e',
+                                ),
                                 backgroundColor: Colors.red.shade700,
                               ),
                             );
@@ -95,17 +96,30 @@ class ClassesPage extends ConsumerWidget {
                       className: c.name,
                       nameLocked: c.nameLocked,
                       isActive: isActive,
-                      canEdit: c.isCreator(AuthService.localUserId, getCurrentCatechistName(),
-                              catechistId: AuthService.getCatechistId()) &&
-                          (c.creatorCatechistId.isEmpty && c.creatorId.isEmpty && c.creatorName.isEmpty || !c.nameLocked),
-                      onEditName: c.isCreator(AuthService.localUserId, getCurrentCatechistName(),
-                              catechistId: AuthService.getCatechistId()) &&
-                              (c.creatorCatechistId.isEmpty && c.creatorId.isEmpty && c.creatorName.isEmpty || !c.nameLocked)
+                      canEdit:
+                          c.isCreator(
+                            AuthService.localUserId,
+                            getCurrentCatechistName(),
+                            catechistId: AuthService.getCatechistId(),
+                          ) &&
+                          (c.creatorCatechistId.isEmpty &&
+                                  c.creatorId.isEmpty &&
+                                  c.creatorName.isEmpty ||
+                              !c.nameLocked),
+                      onEditName:
+                          c.isCreator(
+                                AuthService.localUserId,
+                                getCurrentCatechistName(),
+                                catechistId: AuthService.getCatechistId(),
+                              ) &&
+                              (c.creatorCatechistId.isEmpty &&
+                                      c.creatorId.isEmpty &&
+                                      c.creatorName.isEmpty ||
+                                  !c.nameLocked)
                           ? (newName) {
-                              ref.read(classesRepoProvider).updateClass(
-                                    c.id,
-                                    c.copyWith(name: newName),
-                                  );
+                              ref
+                                  .read(classesRepoProvider)
+                                  .updateClass(c.id, c.copyWith(name: newName));
                             }
                           : null,
                     );
@@ -130,15 +144,11 @@ class ClassesPage extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Nuova classe'),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'Nome classe',
-          ),
+          decoration: const InputDecoration(labelText: 'Nome classe'),
         ),
         actions: [
           TextButton(
@@ -151,7 +161,9 @@ class ClassesPage extends ConsumerWidget {
               foregroundColor: Colors.white,
             ),
             onPressed: () async {
-              await ref.read(classesRepoProvider).addClass(
+              await ref
+                  .read(classesRepoProvider)
+                  .addClass(
                     SchoolClass(
                       id: '',
                       name: controller.text,
@@ -160,6 +172,7 @@ class ClassesPage extends ConsumerWidget {
                     ),
                   );
 
+              if (!context.mounted) return;
               Navigator.pop(context);
             },
             child: const Text('Crea'),
@@ -206,15 +219,11 @@ class _ClassCard extends StatelessWidget {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Modifica nome gruppo'),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'Nome gruppo',
-          ),
+          decoration: const InputDecoration(labelText: 'Nome gruppo'),
         ),
         actions: [
           TextButton(
@@ -242,10 +251,8 @@ class _ClassCard extends StatelessWidget {
   void _showDeleteConfirmation(BuildContext context) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Elimina gruppo'),
         content: Text(
           'Sei sicuro di voler eliminare "$name"?\n\n'
@@ -253,7 +260,7 @@ class _ClassCard extends StatelessWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Annulla'),
           ),
           ElevatedButton(
@@ -262,7 +269,7 @@ class _ClassCard extends StatelessWidget {
               foregroundColor: Colors.white,
             ),
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.of(dialogContext).pop();
               onDelete?.call();
             },
             child: const Text('Elimina'),
@@ -286,10 +293,7 @@ class _ClassCard extends StatelessWidget {
                     Colors.blue.shade50,
                     Colors.blue.shade100.withValues(alpha: 0.4),
                   ]
-                : [
-                    Colors.white,
-                    Colors.blue.shade50.withValues(alpha: 0.35),
-                  ],
+                : [Colors.white, Colors.blue.shade50.withValues(alpha: 0.35)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -303,7 +307,7 @@ class _ClassCard extends StatelessWidget {
               color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 16,
               offset: const Offset(0, 10),
-            )
+            ),
           ],
         ),
         child: Row(
@@ -370,15 +374,9 @@ class _ClassCard extends StatelessWidget {
 
                   Row(
                     children: [
-                      _Pill(
-                        icon: Icons.person,
-                        text: '$students ragazzi',
-                      ),
+                      _Pill(icon: Icons.person, text: '$students ragazzi'),
                       const SizedBox(width: 8),
-                      _Pill(
-                        icon: Icons.school,
-                        text: '$catechists catechisti',
-                      ),
+                      _Pill(icon: Icons.school, text: '$catechists catechisti'),
                     ],
                   ),
                 ],
@@ -427,18 +425,12 @@ class _Pill extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  const _Pill({
-    required this.icon,
-    required this.text,
-  });
+  const _Pill({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 6,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -451,10 +443,7 @@ class _Pill extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             text,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade700,
-            ),
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
           ),
         ],
       ),
@@ -491,27 +480,18 @@ class _EmptyState extends StatelessWidget {
                 color: Colors.blue.shade50,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                icon,
-                size: 44,
-                color: const Color(0xFF174A7E),
-              ),
+              child: Icon(icon, size: 44, color: const Color(0xFF174A7E)),
             ),
             const SizedBox(height: 20),
             Text(
               title,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.grey.shade700,
-              ),
+              style: TextStyle(color: Colors.grey.shade700),
             ),
           ],
         ),

@@ -21,23 +21,23 @@
 //
 // PLUGIN UTILIZZATI (SOLO UFFICIALI, ZERO CODICE NATIVO CUSTOM):
 // ──────────────────────────────────────────────────────────────────────────────
-// • flutter_secure_storage ^10.3.1 — Storage cifrato con Android Keystore
+// • flutter_secure_storage ^11.0.0 — Storage cifrato con Android Keystore
 // • local_auth ^3.0.2 — Verifica hardware biometrico (TEE proxy)
 // • hive_flutter ^1.1.0 — Database locale con cifratura AES-256
 //
 // CONFIGURAZIONE ANDROID (flutter_secure_storage):
 // ──────────────────────────────────────────────────────────────────────────────
-// • encryptedSharedPreferences: true — Forza uso Android Keystore
-// • Il plugin usa internamente KeyGenParameterSpec con setIsStrongBoxBacked(true)
-//   quando disponibile su API 28+ (Android 9+)
-// • Su dispositivi senza StrongBox, usa TEE standard (Keymaster in TEE)
+// • Backend "custom ciphers" (AES-GCM) con chiave protetta dall'Android
+//   Keystore hardware-backed (TEE / StrongBox quando disponibile su API 28+).
+// • resetOnError: false → la master key NON viene cancellata su errori
+//   temporanei del Keystore (evita la perdita silenziosa di tutti i box Hive).
 // • NESSUN FALLBACK SOFTWARE: se Keystore non disponibile, l'operazione fallisce
 //
 // NOTE IMPORTANTI:
 // ──────────────────────────────────────────────────────────────────────────────
-// • minSdk 30 (Android 10+) garantisce supporto Keystore base
+// • minSdk 30 (Android 11+) garantisce supporto Keystore base
 // • StrongBox richiede hardware dedicato (disponibile su Pixel 3+, Samsung S20+, ecc.)
-// • TEE è presente su quasi tutti i dispositivi Android 10+ certificati
+// • TEE è presente su quasi tutti i dispositivi Android 11+ certificati
 // • local_auth verifica BiometricManager.canCheckBiometrics come proxy TEE
 // • Se il dispositivo non ha NEANCHE TEE base, non è idoneo per dati sensibili minori
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -58,21 +58,30 @@ class _StorageKeys {
 }
 
 /// Versione corrente del formato chiave master.
-const int _CURRENT_KEY_VERSION = 1;
+const int _currentKeyVersion = 1;
 
 /// Configurazione FlutterSecureStorage per Android HARDWARE-ONLY.
 ///
 /// Impostazioni critiche:
-/// - encryptedSharedPreferences: true → Forza uso Android Keystore
-///   Il plugin userà KeyGenParameterSpec con:
-///   - setIsStrongBoxBacked(true) su API 28+ se StrongBox disponibile
-///   - Altrimenti TEE standard (Keymaster in Trusted Execution Environment)
+/// - resetOnError: false → NON cancella i dati crittografati in caso di
+///   errore temporaneo del Keystore (es. KeyStoreException durante la rotazione
+///   dell'hardware key). Con il default true, un errore transitorio distruggerebbe
+///   silenziosamente la master key e con essa tutti i box Hive cifrati.
+///   IMPORTANTE: con resetOnError=false, in caso di KeyStoreException la chiave
+///   NON viene mai cancellata automaticamente; l'utente può eventualmente
+///   procedere a un reset manuale del dispositivo (che cancella comunque i dati
+///   dell'app). Il rischio di una master key permanente e non estraibile è quindi
+///   circoscritto ai soli casi di reset manuale da parte dell'utente.
 /// - NESSUNA opzione di fallback software: se Keystore non disponibile,
-///   read/write sollevano PlatformException
-/// - NOTA: encryptedSharedPreferences è deprecato ma ancora necessario per
-///   forzare l'uso del Keystore hardware-backed. Il plugin migra automaticamente
-///   a custom ciphers su primo accesso.
-const AndroidOptions _androidOptions = AndroidOptions();
+///   read/write sollevano PlatformException.
+/// - NOTA: `encryptedSharedPreferences` è deprecato nel plugin e NON viene
+///   impostato: flutter_secure_storage 10.x usa di default il backend
+///   "custom ciphers" (AES-GCM) con chiave generata e protetta dall'Android
+///   Keystore hardware-backed, migrando automaticamente le chiavi esistenti.
+///   Non è quindi necessario (né possibile in modo affidabile) forzare
+///   StrongBox via opzioni del plugin: il Keystore usa TEE/StrongBox in base
+///   all'hardware disponibile.
+const AndroidOptions _androidOptions = AndroidOptions(resetOnError: false);
 
 /// Opzioni complete per FlutterSecureStorage.
 const FlutterSecureStorage _secureStorage = FlutterSecureStorage(
@@ -96,6 +105,11 @@ class SecurityManager {
   bool _isHardwareInitialized = false;
 
   /// Chiave master AES-256 per Hive (32 bytes = 256 bit).
+  ///
+  /// Viene mantenuta SOLO durante la fase di inizializzazione e poi
+  /// sovrascritta da [_wipeMasterKeyFromMemory]: dopo l'avvio il processo
+  /// non conserva una copia materiale aggiuntiva oltre a quella interna al
+  /// cipher Hive (che la richiede per la decifratura on-demand).
   Uint8List? _masterKey;
 
   /// Cipher Hive configurato con la master key.
@@ -107,17 +121,23 @@ class SecurityManager {
   /// Restituisce il cipher Hive per l'apertura dei Box cifrati.
   HiveAesCipher get hiveCipher {
     if (_hiveCipher == null) {
-      throw StateError('SecurityManager non inizializzato. Chiamare initialize() prima.');
+      throw StateError(
+        'SecurityManager non inizializzato. Chiamare initialize() prima.',
+      );
     }
     return _hiveCipher!;
   }
 
-  /// Restituisce la master key raw (solo per operazioni critiche interne).
-  Uint8List get masterKey {
-    if (_masterKey == null) {
-      throw StateError('Master key non disponibile. Chiamare initialize() prima.');
+  /// Sovrascrive e rilascia la copia della master key materiale in memoria.
+  ///
+  /// Scrivere zeri prima di azzerare il riferimento evita che i byte della
+  /// chiave restino recuperabili nell'heap riallocato dal GC.
+  void _wipeMasterKeyFromMemory() {
+    final key = _masterKey;
+    if (key != null) {
+      key.fillRange(0, key.length, 0);
     }
-    return _masterKey!;
+    _masterKey = null;
   }
 
   // ══════════════════════════════════════════════════════════════════════════════
@@ -178,7 +198,13 @@ class SecurityManager {
     // ─────────────────────────────────────────────────────────────────────────
     // PASSO 4: CREAZIONE HIVE AES CIPHER
     // ─────────────────────────────────────────────────────────────────────────
+    // Il cipher conserva al suo interno la chiave (necessaria per la
+    // decifratura on-demand dei box Hive). Subito dopo la creazione, la
+    // copia della master key detenuta da questo manager viene sovrascritta
+    // e rilasciata per minimizzare la finestra di permanenza in RAM di una
+    // chiave materiale extra (oltre a quella già interna al cipher).
     _hiveCipher = HiveAesCipher(_masterKey!);
+    _wipeMasterKeyFromMemory();
 
     // ─────────────────────────────────────────────────────────────────────────
     // PASSO 5: MARCATURA HARDWARE VERIFICATO
@@ -190,7 +216,7 @@ class SecurityManager {
     );
     await _secureStorage.write(
       key: _StorageKeys.keyVersion,
-      value: _CURRENT_KEY_VERSION.toString(),
+      value: _currentKeyVersion.toString(),
       aOptions: _androidOptions,
     );
 
@@ -226,8 +252,7 @@ class SecurityManager {
     final LocalAuthentication auth = LocalAuthentication();
 
     final bool canCheck = await auth.canCheckBiometrics;
-    final List<BiometricType> available =
-        await auth.getAvailableBiometrics();
+    final List<BiometricType> available = await auth.getAvailableBiometrics();
 
     // Nessun metodo di autenticazione configurato
     if (!canCheck && available.isEmpty) {
@@ -245,14 +270,17 @@ class SecurityManager {
     // canCheck = true, available vuoto → solo PIN/Pattern/Password
     // Su Android 10+, la verifica PIN/Pattern/Password è TEE-backed
     if (available.isEmpty) {
-      debugPrint('[SECURITY] Autenticazione: solo credenziali dispositivo (PIN/pattern)');
+      if (kDebugMode) {
+        debugPrint(
+          '[SECURITY] Autenticazione: solo credenziali dispositivo (PIN/pattern)',
+        );
+      }
       return;
     }
 
     // Biometrie disponibili: verifica siano forti
-    final bool hasStrongBiometric = available.contains(
-      BiometricType.strong,
-    ) ||
+    final bool hasStrongBiometric =
+        available.contains(BiometricType.strong) ||
         available.contains(BiometricType.fingerprint) ||
         available.contains(BiometricType.face) ||
         available.contains(BiometricType.iris);
@@ -264,7 +292,11 @@ class SecurityManager {
       );
     }
 
-    debugPrint('[SECURITY] Autenticazione: biometria forte disponibile (TEE garantito)');
+    if (kDebugMode) {
+      debugPrint(
+        '[SECURITY] Autenticazione: biometria forte disponibile (TEE garantito)',
+      );
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════════
@@ -283,7 +315,8 @@ class SecurityManager {
   ///
   /// THROWS: HardwareSecurityException se Keystore non disponibile
   Future<void> _verifyKeystoreAvailability() async {
-    final String testKey = '_hw_keystore_test_${DateTime.now().millisecondsSinceEpoch}';
+    final String testKey =
+        '_hw_keystore_test_${DateTime.now().millisecondsSinceEpoch}';
     const String testValue = 'hardware_keystore_verification_test';
 
     try {
@@ -344,12 +377,17 @@ class SecurityManager {
       try {
         _masterKey = base64Decode(existingKeyB64);
         if (_masterKey!.length != 32) {
-          throw FormatException('Lunghezza chiave non valida: ${_masterKey!.length}');
+          throw FormatException(
+            'Lunghezza chiave non valida: ${_masterKey!.length}',
+          );
         }
         return;
       } on FormatException catch (_) {
         // Chiave corrotta: rigenera
-        await _secureStorage.delete(key: _StorageKeys.masterKey, aOptions: _androidOptions);
+        await _secureStorage.delete(
+          key: _StorageKeys.masterKey,
+          aOptions: _androidOptions,
+        );
       }
     }
 
@@ -382,6 +420,7 @@ class SecurityManager {
     final Uint8List newKey = Uint8List.fromList(Hive.generateSecureKey());
     _masterKey = newKey;
     _hiveCipher = HiveAesCipher(newKey);
+    _wipeMasterKeyFromMemory();
 
     // Memorizza nuova chiave
     final String keyB64 = base64Encode(newKey);
@@ -394,7 +433,7 @@ class SecurityManager {
     // Incrementa versione
     await _secureStorage.write(
       key: _StorageKeys.keyVersion,
-      value: (_CURRENT_KEY_VERSION + 1).toString(),
+      value: (_currentKeyVersion + 1).toString(),
       aOptions: _androidOptions,
     );
   }
@@ -407,7 +446,7 @@ class SecurityManager {
   /// USARE SOLO IN DEBUG/TESTING.
   Future<void> resetForTesting() async {
     await _secureStorage.deleteAll(aOptions: _androidOptions);
-    _masterKey = null;
+    _wipeMasterKeyFromMemory();
     _hiveCipher = null;
     _isHardwareInitialized = false;
   }

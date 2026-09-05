@@ -7,15 +7,14 @@
 /// - pulsanti "Presente" (verde) e "Assente" (rosso) per ogni studente
 /// - supporto a futuri swipe gesture per cambiare stato rapidamente
 /// Le presenze vengono salvate su Hive tramite [AttendanceRepository].
+library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/auth/auth_service.dart';
-import '../../shared/models/class_model.dart';
 import '../../shared/models/planning_meeting.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/widgets/last_modified_info.dart';
-import '../classes/classes_provider.dart';
 import '../students/students_provider.dart';
 import 'attendance_repository.dart';
 
@@ -34,11 +33,14 @@ class _Student {
 }
 
 final _studentsWithHistoryProvider = StreamProvider.autoDispose
-    .family<List<_Student>, String>((ref, currentMeetingId) {
+    .family<List<_Student>, ({String currentMeetingId, String classId})>((
+      ref,
+      args,
+    ) {
       final studentsRepo = ref.watch(studentsRepoProvider);
       final attendanceRepo = AttendanceRepository();
 
-      return studentsRepo.getAllStudents().map((students) {
+      return studentsRepo.getStudentsByClass(args.classId).map((students) {
         final attendance = attendanceRepo.getAttendanceSync()
           ..sort((a, b) {
             final aDate =
@@ -52,7 +54,9 @@ final _studentsWithHistoryProvider = StreamProvider.autoDispose
 
         final studentHistory = <String, List<String>>{};
         for (final record in attendance.where(
-          (a) => a['id'] != currentMeetingId,
+          (a) =>
+              a['id'] != args.currentMeetingId &&
+              a['classId']?.toString() == args.classId,
         )) {
           final presenceMap = Map<String, dynamic>.from(
             record['presence'] as Map? ?? {},
@@ -115,8 +119,9 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
     );
     if (existing != null) {
       presence = Map<String, String>.from(existing['presence'] as Map? ?? {});
-      _attendanceUpdatedAt =
-          DateTime.tryParse(existing['updatedAt']?.toString() ?? '');
+      _attendanceUpdatedAt = DateTime.tryParse(
+        existing['updatedAt']?.toString() ?? '',
+      );
       _attendanceLastModifiedBy = existing['lastModifiedBy']?.toString() ?? '';
     }
   }
@@ -166,11 +171,13 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
       );
     }
 
-    final classesAsync = ref.watch(classesStreamProvider);
+    final meetingClassId = meeting is PlanningMeeting ? meeting.classId : '';
     final studentsWithHistoryAsync = ref.watch(
-      _studentsWithHistoryProvider(widget.meeting?.id ?? ''),
+      _studentsWithHistoryProvider((
+        currentMeetingId: widget.meeting?.id ?? '',
+        classId: meetingClassId,
+      )),
     );
-    const uid = AuthService.localUserId;
 
     return AppScaffold(
       title: 'Appello presenze',
@@ -194,180 +201,136 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
               ),
             ),
           Expanded(
-            child: classesAsync.when(
+            child: studentsWithHistoryAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) =>
-                  Center(child: Text('Errore nel caricamento classi: $e')),
-              data: (classes) {
-                final myClass = classes.firstWhere(
-                  (c) => c.catechistIds.contains(uid),
-                  orElse: () => SchoolClass(
-                    id: '',
-                    name: '',
-                    studentIds: [],
-                    catechistIds: [],
-                  ),
-                );
-
-                if (myClass.id.isEmpty) {
+                  Center(child: Text('Errore nel caricamento studenti: $e')),
+              data: (students) {
+                if (students.isEmpty) {
                   return const Center(
-                    child: Text('Nessun gruppo assegnato per questo profilo'),
+                    child: Text('Nessun ragazzo presente nel tuo gruppo'),
                   );
                 }
 
-                return studentsWithHistoryAsync.when(
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(
-                    child: Text('Errore nel caricamento studenti: $e'),
-                  ),
-                  data: (allStudents) {
-                    final students =
-                        allStudents
-                            .where((s) => myClass.studentIds.contains(s.id))
-                            .toList()
-                          ..sort((a, b) {
-                            final bySurname = a.surname.toLowerCase().compareTo(
-                              b.surname.toLowerCase(),
-                            );
-                            if (bySurname != 0) return bySurname;
-                            return a.name.toLowerCase().compareTo(
-                              b.name.toLowerCase(),
-                            );
-                          });
+                return ListView.separated(
+                  padding: const EdgeInsets.only(bottom: 100),
+                  itemCount: students.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final s = students[index];
+                    final value = presence[s.id];
 
-                    if (students.isEmpty) {
-                      return const Center(
-                        child: Text('Nessun ragazzo presente nel tuo gruppo'),
-                      );
-                    }
-
-                    return ListView.separated(
-                      padding: const EdgeInsets.only(bottom: 100),
-                      itemCount: students.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final s = students[index];
-                        final value = presence[s.id];
-
-                        return Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: s.consecutiveAbsences >= 2
-                                ? (isDark
-                                      ? Colors.red.shade900.withValues(
-                                          alpha: 0.2,
-                                        )
-                                      : Colors.red.shade50)
-                                : (isDark
-                                      ? colorScheme.surfaceContainer
-                                      : Colors.white),
-                            borderRadius: BorderRadius.circular(20),
-                            border: s.consecutiveAbsences >= 2
-                                ? Border.all(
-                                    color: isDark
-                                        ? Colors.red.shade700.withValues(
-                                            alpha: 0.4,
-                                          )
-                                        : Colors.red.shade200,
-                                    width: 1,
-                                  )
-                                : null,
-                            boxShadow: [
-                              BoxShadow(
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: s.consecutiveAbsences >= 2
+                            ? (isDark
+                                  ? Colors.red.shade900.withValues(alpha: 0.2)
+                                  : Colors.red.shade50)
+                            : (isDark
+                                  ? colorScheme.surfaceContainer
+                                  : Colors.white),
+                        borderRadius: BorderRadius.circular(20),
+                        border: s.consecutiveAbsences >= 2
+                            ? Border.all(
                                 color: isDark
-                                    ? Colors.black.withValues(alpha: 0.3)
-                                    : Colors.black.withValues(alpha: 0.04),
-                                blurRadius: 12,
-                                offset: const Offset(0, 6),
-                              ),
-                            ],
+                                    ? Colors.red.shade700.withValues(alpha: 0.4)
+                                    : Colors.red.shade200,
+                                width: 1,
+                              )
+                            : null,
+                        boxShadow: [
+                          BoxShadow(
+                            color: isDark
+                                ? Colors.black.withValues(alpha: 0.3)
+                                : Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 12,
+                            offset: const Offset(0, 6),
                           ),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                backgroundColor: s.consecutiveAbsences >= 2
-                                    ? (isDark
-                                          ? Colors.red.shade800.withValues(
-                                              alpha: 0.3,
-                                            )
-                                          : Colors.red.shade100)
-                                    : (isDark
-                                          ? colorScheme.primaryContainer
-                                                .withValues(alpha: 0.3)
-                                          : Colors.blue.shade50),
-                                child: Icon(
-                                  Icons.person,
-                                  color: s.consecutiveAbsences >= 2
-                                      ? (isDark
-                                            ? Colors.red.shade300
-                                            : Colors.red.shade900)
-                                      : (isDark
-                                            ? colorScheme.primary
-                                            : const Color(0xFF174A7E)),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: s.consecutiveAbsences >= 2
+                                ? (isDark
+                                      ? Colors.red.shade800.withValues(
+                                          alpha: 0.3,
+                                        )
+                                      : Colors.red.shade100)
+                                : (isDark
+                                      ? colorScheme.primaryContainer.withValues(
+                                          alpha: 0.3,
+                                        )
+                                      : Colors.blue.shade50),
+                            child: Icon(
+                              Icons.person,
+                              color: s.consecutiveAbsences >= 2
+                                  ? (isDark
+                                        ? Colors.red.shade300
+                                        : Colors.red.shade900)
+                                  : (isDark
+                                        ? colorScheme.primary
+                                        : const Color(0xFF174A7E)),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${s.name} ${s.surname}',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: s.consecutiveAbsences >= 2
+                                        ? (isDark
+                                              ? Colors.red.shade300
+                                              : Colors.red.shade900)
+                                        : (isDark
+                                              ? colorScheme.onSurface
+                                              : Colors.black87),
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '${s.name} ${s.surname}',
+                                if (s.consecutiveAbsences >= 2)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Text(
+                                      '${s.consecutiveAbsences} assenze consecutive!',
                                       style: TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
-                                        color: s.consecutiveAbsences >= 2
-                                            ? (isDark
-                                                  ? Colors.red.shade300
-                                                  : Colors.red.shade900)
-                                            : (isDark
-                                                  ? colorScheme.onSurface
-                                                  : Colors.black87),
+                                        fontSize: 11,
+                                        color: isDark
+                                            ? Colors.red.shade400
+                                            : Colors.red.shade700,
+                                        fontWeight: FontWeight.w500,
                                       ),
                                     ),
-                                    if (s.consecutiveAbsences >= 2)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 2),
-                                        child: Text(
-                                          '${s.consecutiveAbsences} assenze consecutive!',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: isDark
-                                                ? Colors.red.shade400
-                                                : Colors.red.shade700,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              _PresenceButton(
+                                label: 'Presente',
+                                selected: value == 'Presente',
+                                color: Colors.green,
+                                onTap: () =>
+                                    setState(() => presence[s.id] = 'Presente'),
                               ),
-                              Row(
-                                children: [
-                                  _PresenceButton(
-                                    label: 'Presente',
-                                    selected: value == 'Presente',
-                                    color: Colors.green,
-                                    onTap: () => setState(
-                                      () => presence[s.id] = 'Presente',
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  _PresenceButton(
-                                    label: 'Assente',
-                                    selected: value == 'Assente',
-                                    color: Colors.red,
-                                    onTap: () => setState(
-                                      () => presence[s.id] = 'Assente',
-                                    ),
-                                  ),
-                                ],
+                              const SizedBox(width: 8),
+                              _PresenceButton(
+                                label: 'Assente',
+                                selected: value == 'Assente',
+                                color: Colors.red,
+                                onTap: () =>
+                                    setState(() => presence[s.id] = 'Assente'),
                               ),
                             ],
                           ),
-                        );
-                      },
+                        ],
+                      ),
                     );
                   },
                 );

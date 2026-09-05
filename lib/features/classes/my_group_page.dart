@@ -14,19 +14,21 @@
 /// Navigazione CateREG: toccando uno studente si apre [StudentQuickViewPage];
 /// i pulsanti azione portano a gestione appelli (/attendance-meetings) e
 /// alla pagina di stampa [AttendancePrintPage].
+library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/auth/auth_service.dart';
+import '../../core/providers/current_class_provider.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/models/class_model.dart';
 import '../../shared/models/student_model.dart';
 
-import '../classes/classes_provider.dart';
 import '../meetings/attendance_repository.dart';
 import '../students/students_provider.dart';
 import 'attendance_print_page.dart';
+import 'quick_count_page.dart';
 import '../students/student_quick_view_page.dart' hide studentsRepoProvider;
 
 /// Modello di supporto locale che unisce lo studente alle sue statistiche e assenze consecutive
@@ -45,7 +47,10 @@ class _StudentWithStats {
 }
 
 final _groupStudentsStatsProvider = StreamProvider.autoDispose
-    .family<List<_StudentWithStats>, List<String>>((ref, studentIds) {
+    .family<
+      List<_StudentWithStats>,
+      ({List<String> studentIds, String classId})
+    >((ref, args) {
       final studentsRepo = ref.read(studentsRepoProvider);
       final attendanceRepo = AttendanceRepository();
 
@@ -53,6 +58,7 @@ final _groupStudentsStatsProvider = StreamProvider.autoDispose
 
       return studentsStream.asyncMap((allStudents) async {
         final attendance = attendanceRepo.getAttendanceSync()
+          ..removeWhere((r) => r['classId']?.toString() != args.classId)
           ..sort((a, b) {
             final aDate =
                 DateTime.tryParse(a['date']?.toString() ?? '') ??
@@ -63,7 +69,7 @@ final _groupStudentsStatsProvider = StreamProvider.autoDispose
             return bDate.compareTo(aDate);
           });
 
-        final studentIdsSet = studentIds.toSet();
+        final studentIdsSet = args.studentIds.toSet();
         final classStudents = allStudents
             .where((s) => studentIdsSet.contains(s.id))
             .toList();
@@ -121,8 +127,7 @@ class MyGroupPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final classesAsync = ref.watch(classesStreamProvider);
-    const uid = AuthService.localUserId;
+    final currentClass = ref.watch(currentClassDetailsProvider);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -131,88 +136,95 @@ class MyGroupPage extends ConsumerWidget {
 
     return AppScaffold(
       title: 'Il mio gruppo',
-      child: classesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Errore: $e')),
-        data: (classes) {
-          final myClass = classes.firstWhere(
-            (c) => c.catechistIds.contains(uid),
-            orElse: () =>
-                SchoolClass(id: '', name: '', studentIds: [], catechistIds: []),
-          );
+      child: currentClass == null
+          ? const Center(child: Text('Nessun gruppo assegnato'))
+          : Builder(
+              builder: (context) {
+                final myClass = currentClass;
 
-          if (myClass.id.isEmpty) {
-            return const Center(child: Text('Nessun gruppo assegnato'));
-          }
+                if (myClass.id.isEmpty) {
+                  return const Center(child: Text('Nessun gruppo assegnato'));
+                }
 
-          final studentsStatsAsync = ref.watch(
-            _groupStudentsStatsProvider(myClass.studentIds),
-          );
+                final studentsStatsAsync = ref.watch(
+                  _groupStudentsStatsProvider((
+                    studentIds: myClass.studentIds,
+                    classId: myClass.id,
+                  )),
+                );
 
-          return studentsStatsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) =>
-                Center(child: Text('Errore nel caricamento dati: $e')),
-            data: (studentsWithStats) {
-              return Column(
-                children: [
-                  const SizedBox(height: 12),
+                return studentsStatsAsync.when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) =>
+                      Center(child: Text('Errore nel caricamento dati: $e')),
+                  data: (studentsWithStats) {
+                    return Column(
+                      children: [
+                        const SizedBox(height: 12),
 
-Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: isDesktop
-                          ? _DesktopActions(
-                              schoolClass: myClass,
-                              students: studentsWithStats,
-                              isDark: isDark,
-                              colorScheme: colorScheme,
-                            )
-                          : _MobileActions(
-                              schoolClass: myClass,
-                              students: studentsWithStats,
-                              isDark: isDark,
-                              colorScheme: colorScheme,
-                            ),
-                    ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: isDesktop
+                              ? _DesktopActions(
+                                  schoolClass: myClass,
+                                  students: studentsWithStats,
+                                  isDark: isDark,
+                                  colorScheme: colorScheme,
+                                )
+                              : _MobileActions(
+                                  schoolClass: myClass,
+                                  students: studentsWithStats,
+                                  isDark: isDark,
+                                  colorScheme: colorScheme,
+                                ),
+                        ),
 
-                  const SizedBox(height: 14),
+                        const SizedBox(height: 14),
 
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: _ClassHeader(name: myClass.name, isDark: isDark, colorScheme: colorScheme),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  Expanded(
-                    child: studentsWithStats.isEmpty
-                        ? const Center(child: Text('Nessun ragazzo presente'))
-                        : ListView.separated(
-                            padding: const EdgeInsets.all(12),
-                            itemCount: studentsWithStats.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 8),
-                            itemBuilder: (_, i) {
-                              final item = studentsWithStats[i];
-
-                              return _StudentCard(
-                                student: item.student,
-                                compact: !isDesktop,
-                                present: item.totalPresence,
-                                absent: item.totalAbsence,
-                                consecutiveAbsences: item.consecutiveAbsences,
-                                isDark: isDark,
-                                colorScheme: colorScheme,
-                              );
-                            },
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: _ClassHeader(
+                            name: myClass.name,
+                            isDark: isDark,
+                            colorScheme: colorScheme,
                           ),
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      ),
+                        ),
+
+                        const SizedBox(height: 10),
+
+                        Expanded(
+                          child: studentsWithStats.isEmpty
+                              ? const Center(
+                                  child: Text('Nessun ragazzo presente'),
+                                )
+                              : ListView.separated(
+                                  padding: const EdgeInsets.all(12),
+                                  itemCount: studentsWithStats.length,
+                                  separatorBuilder: (_, _) =>
+                                      const SizedBox(height: 8),
+                                  itemBuilder: (_, i) {
+                                    final item = studentsWithStats[i];
+
+                                    return _StudentCard(
+                                      student: item.student,
+                                      compact: !isDesktop,
+                                      present: item.totalPresence,
+                                      absent: item.totalAbsence,
+                                      consecutiveAbsences:
+                                          item.consecutiveAbsences,
+                                      isDark: isDark,
+                                      colorScheme: colorScheme,
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
     );
   }
 }
@@ -264,8 +276,29 @@ class _MobileActions extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => AttendancePrintPage(schoolClass: schoolClass),
+                      builder: (_) =>
+                          AttendancePrintPage(schoolClass: schoolClass),
                     ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _ActionButton(
+                icon: Icons.fact_check_rounded,
+                label: 'Conteggio rapido',
+                compact: true,
+                isDark: isDark,
+                colorScheme: colorScheme,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const QuickCountPage()),
                   );
                 },
               ),
@@ -326,6 +359,21 @@ class _DesktopActions extends StatelessWidget {
             },
           ),
         ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _ActionButton(
+            icon: Icons.fact_check_rounded,
+            label: 'Conteggio rapido',
+            isDark: isDark,
+            colorScheme: colorScheme,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const QuickCountPage()),
+              );
+            },
+          ),
+        ),
       ],
     );
   }
@@ -368,7 +416,9 @@ class _ActionButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: isPrimary
               ? (isDark ? colorScheme.primary : color)
-              : (isDark ? colorScheme.primaryContainer.withValues(alpha: 0.3) : color.withValues(alpha: 0.10)),
+              : (isDark
+                    ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+                    : color.withValues(alpha: 0.10)),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
@@ -377,7 +427,9 @@ class _ActionButton extends StatelessWidget {
             Icon(
               icon,
               size: compact ? 18 : 22,
-              color: isPrimary ? (isDark ? colorScheme.onPrimary : Colors.white) : (isDark ? colorScheme.primary : color),
+              color: isPrimary
+                  ? (isDark ? colorScheme.onPrimary : Colors.white)
+                  : (isDark ? colorScheme.primary : color),
             ),
             const SizedBox(width: 8),
             Flexible(
@@ -387,7 +439,9 @@ class _ActionButton extends StatelessWidget {
                 style: TextStyle(
                   fontSize: compact ? 12 : 14,
                   fontWeight: FontWeight.w600,
-                  color: isPrimary ? (isDark ? colorScheme.onPrimary : Colors.white) : (isDark ? colorScheme.primary : color),
+                  color: isPrimary
+                      ? (isDark ? colorScheme.onPrimary : Colors.white)
+                      : (isDark ? colorScheme.primary : color),
                 ),
               ),
             ),
@@ -502,14 +556,17 @@ class _StudentCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: isDark
               ? (hasWarning
-                  ? colorScheme.errorContainer.withValues(alpha: 0.3)
-                  : colorScheme.surfaceContainer)
+                    ? colorScheme.errorContainer.withValues(alpha: 0.3)
+                    : colorScheme.surfaceContainer)
               : (hasWarning ? Colors.red.shade50 : Colors.white),
           borderRadius: BorderRadius.circular(14),
           border: hasWarning
               ? Border.all(
-                  color: isDark ? colorScheme.error.withValues(alpha: 0.3) : Colors.red.shade200,
-                  width: 1)
+                  color: isDark
+                      ? colorScheme.error.withValues(alpha: 0.3)
+                      : Colors.red.shade200,
+                  width: 1,
+                )
               : null,
           boxShadow: [
             BoxShadow(
@@ -527,7 +584,9 @@ class _StudentCard extends StatelessWidget {
               radius: compact ? 16 : 20,
               backgroundColor: hasWarning
                   ? (isDark ? colorScheme.errorContainer : Colors.red.shade100)
-                  : (isDark ? colorScheme.primaryContainer : Colors.blue.shade50),
+                  : (isDark
+                        ? colorScheme.primaryContainer
+                        : Colors.blue.shade50),
               child: Icon(
                 Icons.person,
                 color: hasWarning
@@ -560,7 +619,9 @@ class _StudentCard extends StatelessWidget {
                         '$consecutiveAbsences assenze di fila!',
                         style: TextStyle(
                           fontSize: 11,
-                          color: isDark ? colorScheme.error : Colors.red.shade700,
+                          color: isDark
+                              ? colorScheme.error
+                              : Colors.red.shade700,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -593,6 +654,7 @@ class _StudentCard extends StatelessWidget {
             ),
           ],
         ),
-      ));
+      ),
+    );
   }
 }

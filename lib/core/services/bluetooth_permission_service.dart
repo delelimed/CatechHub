@@ -61,24 +61,23 @@ class PermissionCheckResult {
   });
 
   factory PermissionCheckResult.success() => const PermissionCheckResult(
-        allGranted: true,
-        hasPermanentlyDenied: false,
-        deniedPermissions: [],
-        permanentlyDeniedPermissions: [],
-      );
+    allGranted: true,
+    hasPermanentlyDenied: false,
+    deniedPermissions: [],
+    permanentlyDeniedPermissions: [],
+  );
 
   factory PermissionCheckResult.failure({
     required String message,
     List<Permission> denied = const [],
     List<Permission> permanent = const [],
-  }) =>
-      PermissionCheckResult(
-        allGranted: false,
-        hasPermanentlyDenied: permanent.isNotEmpty,
-        deniedPermissions: denied,
-        permanentlyDeniedPermissions: permanent,
-        errorMessage: message,
-      );
+  }) => PermissionCheckResult(
+    allGranted: false,
+    hasPermanentlyDenied: permanent.isNotEmpty,
+    deniedPermissions: denied,
+    permanentlyDeniedPermissions: permanent,
+    errorMessage: message,
+  );
 }
 
 /// Servizio centralizzato per la gestione dei permessi Bluetooth su Android.
@@ -130,11 +129,16 @@ class BluetoothPermissionService {
     if (notGranted.isNotEmpty) {
       if (context != null) {
         final shouldShowRationale = await _shouldShowRationale(notGranted);
-        if (shouldShowRationale) {
-          final userAgreed = await _showRationaleDialog(context, notGranted, sdkInt);
+        if (shouldShowRationale && context.mounted) {
+          final userAgreed = await _showRationaleDialog(
+            context,
+            notGranted,
+            sdkInt,
+          );
           if (!userAgreed) {
             return PermissionCheckResult.failure(
-              message: 'I permessi Bluetooth sono necessari per la sincronizzazione.',
+              message:
+                  'I permessi Bluetooth sono necessari per la sincronizzazione.',
               denied: notGranted,
             );
           }
@@ -157,7 +161,8 @@ class BluetoothPermissionService {
       if (nowPermanentlyDenied.isNotEmpty) {
         final names = nowPermanentlyDenied.map(_permissionName).join(', ');
         return PermissionCheckResult.failure(
-          message: 'I seguenti permessi sono stati bloccati: $names. Abilitali nelle Impostazioni.',
+          message:
+              'I seguenti permessi sono stati bloccati: $names. Abilitali nelle Impostazioni.',
           permanent: nowPermanentlyDenied,
         );
       }
@@ -165,7 +170,8 @@ class BluetoothPermissionService {
       if (stillDenied.isNotEmpty) {
         final names = stillDenied.map(_permissionName).join(', ');
         return PermissionCheckResult.failure(
-          message: 'Permessi negati: $names. Servono per la sincronizzazione Bluetooth.',
+          message:
+              'Permessi negati: $names. Servono per la sincronizzazione Bluetooth.',
           denied: stillDenied,
         );
       }
@@ -210,7 +216,11 @@ class BluetoothPermissionService {
     return false;
   }
 
-  static Future<bool> _showRationaleDialog(BuildContext context, List<Permission> permissions, int sdkInt) async {
+  static Future<bool> _showRationaleDialog(
+    BuildContext context,
+    List<Permission> permissions,
+    int sdkInt,
+  ) async {
     final message = StringBuffer(
       'Per sincronizzare il registro con l\'altro catechista accanto a te, CatechHub ha bisogno dell\'accesso al Bluetooth.',
     );
@@ -219,7 +229,8 @@ class BluetoothPermissionService {
         '\n\nSu questa versione di Android, la localizzazione è necessaria per rilevare i dispositivi Bluetooth. La tua posizione NON viene salvata o condivisa.',
       );
     }
-    if (permissions.contains(Permission.bluetoothScan) || permissions.contains(Permission.bluetoothConnect)) {
+    if (permissions.contains(Permission.bluetoothScan) ||
+        permissions.contains(Permission.bluetoothConnect)) {
       message.write('\n\nConsenti l\'accesso al Bluetooth per procedere.');
     }
 
@@ -227,32 +238,57 @@ class BluetoothPermissionService {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        icon: Icon(Icons.bluetooth, color: Theme.of(ctx).colorScheme.primary, size: 48),
+        icon: Icon(
+          Icons.bluetooth,
+          color: Theme.of(ctx).colorScheme.primary,
+          size: 48,
+        ),
         title: const Text('Permesso Bluetooth'),
         content: Text(message.toString()),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Annulla')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Consenti')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Annulla'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Consenti'),
+          ),
         ],
       ),
     );
     return result ?? false;
   }
 
-  static Future<void> showPermanentlyDeniedDialog(BuildContext context, {required String message}) async {
+  static Future<void> showPermanentlyDeniedDialog(
+    BuildContext context, {
+    required String message,
+  }) async {
     await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        icon: Icon(Icons.bluetooth_disabled, color: Theme.of(ctx).colorScheme.error, size: 48),
+        icon: Icon(
+          Icons.bluetooth_disabled,
+          color: Theme.of(ctx).colorScheme.error,
+          size: 48,
+        ),
         title: const Text('Bluetooth disattivato'),
-        content: Text(message.isEmpty
-            ? 'L\'accesso al Bluetooth è disattivato. Per sincronizzare, abilita i permessi nelle impostazioni.'
-            : message),
+        content: Text(
+          message.isEmpty
+              ? 'L\'accesso al Bluetooth è disattivato. Per sincronizzare, abilita i permessi nelle impostazioni.'
+              : message,
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Annulla')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Annulla'),
+          ),
           FilledButton(
-            onPressed: () async { Navigator.of(ctx).pop(); await openAppSettings(); },
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await openAppSettings();
+            },
             child: const Text('Apri Impostazioni'),
           ),
         ],
@@ -295,12 +331,18 @@ class BluetoothPermissionService {
 
   static String _permissionName(Permission permission) {
     switch (permission) {
-      case Permission.bluetoothScan: return 'Scansione Bluetooth';
-      case Permission.bluetoothConnect: return 'Connessione Bluetooth';
-      case Permission.bluetoothAdvertise: return 'Pubblicità Bluetooth';
-      case Permission.locationWhenInUse: return 'Localizzazione';
-      case Permission.nearbyWifiDevices: return 'Wi-Fi nelle vicinanze';
-      default: return permission.toString();
+      case Permission.bluetoothScan:
+        return 'Scansione Bluetooth';
+      case Permission.bluetoothConnect:
+        return 'Connessione Bluetooth';
+      case Permission.bluetoothAdvertise:
+        return 'Pubblicità Bluetooth';
+      case Permission.locationWhenInUse:
+        return 'Localizzazione';
+      case Permission.nearbyWifiDevices:
+        return 'Wi-Fi nelle vicinanze';
+      default:
+        return permission.toString();
     }
   }
 }

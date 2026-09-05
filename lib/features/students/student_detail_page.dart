@@ -24,7 +24,6 @@ class StudentDetailPage extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-
           /// =========================
           /// HEADER PROFILO
           /// =========================
@@ -37,12 +36,22 @@ class StudentDetailPage extends StatelessWidget {
           /// =========================
           _Section(
             title: 'Dati ragazzo',
-            children: [
-              _InfoRow(label: 'Telefono', value: '3331234567', isDark: isDark, colorScheme: colorScheme),
-              _InfoRow(label: 'Classe', value: '3ª Elementare', isDark: isDark, colorScheme: colorScheme),
-            ],
             isDark: isDark,
             colorScheme: colorScheme,
+            children: [
+              _InfoRow(
+                label: 'Telefono',
+                value: '3331234567',
+                isDark: isDark,
+                colorScheme: colorScheme,
+              ),
+              _InfoRow(
+                label: 'Classe',
+                value: '3ª Elementare',
+                isDark: isDark,
+                colorScheme: colorScheme,
+              ),
+            ],
           ),
 
           const SizedBox(height: 16),
@@ -52,17 +61,37 @@ class StudentDetailPage extends StatelessWidget {
           /// =========================
           _Section(
             title: 'Genitori',
+            isDark: isDark,
+            colorScheme: colorScheme,
             children: [
-              _InfoRow(label: 'Madre', value: 'Maria Rossi', isDark: isDark, colorScheme: colorScheme),
-              _InfoRow(label: 'Cellulare madre', value: '333222111', isDark: isDark, colorScheme: colorScheme),
+              _InfoRow(
+                label: 'Madre',
+                value: 'Maria Rossi',
+                isDark: isDark,
+                colorScheme: colorScheme,
+              ),
+              _InfoRow(
+                label: 'Cellulare madre',
+                value: '333222111',
+                isDark: isDark,
+                colorScheme: colorScheme,
+              ),
 
               SizedBox(height: 8),
 
-              _InfoRow(label: 'Padre', value: 'Luca Rossi', isDark: isDark, colorScheme: colorScheme),
-              _InfoRow(label: 'Cellulare padre', value: '333444555', isDark: isDark, colorScheme: colorScheme),
+              _InfoRow(
+                label: 'Padre',
+                value: 'Luca Rossi',
+                isDark: isDark,
+                colorScheme: colorScheme,
+              ),
+              _InfoRow(
+                label: 'Cellulare padre',
+                value: '333444555',
+                isDark: isDark,
+                colorScheme: colorScheme,
+              ),
             ],
-            isDark: isDark,
-            colorScheme: colorScheme,
           ),
 
           const SizedBox(height: 16),
@@ -82,7 +111,7 @@ class StudentDetailPage extends StatelessWidget {
                       : Colors.black.withValues(alpha: 0.04),
                   blurRadius: 12,
                   offset: const Offset(0, 6),
-                )
+                ),
               ],
             ),
             child: Column(
@@ -92,7 +121,9 @@ class StudentDetailPage extends StatelessWidget {
                   'Attività',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                    color: isDark
+                        ? colorScheme.primary
+                        : const Color(0xFF174A7E),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -154,10 +185,7 @@ class _ProfileHeader extends StatelessWidget {
                   colorScheme.surfaceContainer,
                   colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                 ]
-              : [
-                  Colors.white,
-                  Colors.blue.shade50.withValues(alpha: 0.5),
-                ],
+              : [Colors.white, Colors.blue.shade50.withValues(alpha: 0.5)],
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
@@ -167,14 +195,16 @@ class _ProfileHeader extends StatelessWidget {
                 : Colors.black.withValues(alpha: 0.05),
             blurRadius: 16,
             offset: const Offset(0, 10),
-          )
+          ),
         ],
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 28,
-            backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+            backgroundColor: isDark
+                ? colorScheme.primary
+                : const Color(0xFF174A7E),
             child: Text(
               name.isNotEmpty ? name[0] : '?',
               style: const TextStyle(
@@ -194,7 +224,9 @@ class _ProfileHeader extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
+                    color: isDark
+                        ? colorScheme.onSurface
+                        : const Color(0xFF174A7E),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -243,7 +275,7 @@ class _Section extends StatelessWidget {
                 : Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 6),
-          )
+          ),
         ],
       ),
       child: Column(
@@ -333,7 +365,10 @@ class _ActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+      leading: Icon(
+        icon,
+        color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+      ),
       title: Text(
         label,
         style: TextStyle(

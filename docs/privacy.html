@@ -41,12 +41,17 @@
 
     <div class="alert alert-info" style="display:block;">
       <p style="margin-bottom:0.25rem;"><strong>In sintesi:</strong></p>
-      <p style="margin-bottom:0;">CatechHub &egrave; un'app che tiene i tuoi dati solo sul tuo telefono. Non li invia a nessun server. Tu decidi chi pu&ograve; vederli. I dati sono protetti con crittografia e impronta digitale. Fine.</p>
+      <ul style="padding-left:1.25rem;margin-bottom:0;">
+        <li><strong>L'app non condivide dati.</strong> Nessun server, nessun cloud, nessuna telemetria: i tuoi dati non vengono mai inviati a terzi.</li>
+        <li><strong>Sei tu a gestire i dati.</strong> CatechHub &egrave; solo lo strumento; l'utente &egrave; il titolare del trattamento.</li>
+        <li><strong>Tu decidi chi pu&ograve; vederli</strong>, tramite condivisioni volontarie e crittografate.</li>
+        <li><strong>Tutto &egrave; protetto</strong> con crittografia e impronta digitale, e puoi esportare o eliminare i dati quando vuoi.</li>
+      </ul>
     </div>
 
     <h2>1. Titolare del trattamento</h2>
     <p>CatechHub è un'app creata da un catechista per altri catechisti. Non c'è un'azienda dietro. Non ci sono server. I dati che inserisci (nomi, presenze, numeri di telefono) rimangono <strong>solo sul tuo telefono</strong>, cifrati e protetti.</p>
-    <p>Il "titolare del trattamento" — cioè chi decide come e perché usare i dati — sei tu, il catechista o la parrocchia. CatechHub è solo lo strumento che usi per gestire il tuo lavoro.</p>
+    <p>Il "titolare del trattamento" — cioè chi decide come e perché usare i dati — sei tu, il catechista o la parrocchia. <strong>CatechHub non condivide dati e non accede ai tuoi dati</strong>: è solo lo strumento che usi per gestire il tuo lavoro, e solo tu ne determini l'uso.</p>
 
     <h2>2. Dati trattati</h2>
     <p>CatechHub tratta esclusivamente i dati inseriti volontariamente dall'utente:</p>
@@ -58,6 +63,8 @@
       <li><strong>Documenti</strong>: stato di consegna e riconsegna di moduli</li>
       <li><strong>Note di contatto</strong>: registro delle comunicazioni con le famiglie</li>
       <li><strong>Contenuti catechetici</strong>: materiale didattico, riferimenti biblici</li>
+      <li><strong>Archivio storico</strong>: snapshot del percorso annuale dei ragazzi (classe, presenze, valutazioni)</li>
+      <li><strong>Logistica parrocchiale</strong> (solo modalità Responsabile): aule, stanze, slot settimanali</li>
     </ul>
 
     <h2>3. Base giuridica del trattamento (GDPR)</h2>
@@ -80,16 +87,20 @@
     </ul>
 
     <h2>5. Conservazione dei dati</h2>
-    <p>I dati sono conservati <strong>esclusivamente sul dispositivo dell'utente</strong>, all'interno del database Hive cifrato con AES-256-GCM. Non esiste alcun server esterno, cloud o backup remoto automatico.</p>
-    <p>L'utente può eliminare i dati in qualsiasi momento tramite l'apposita funzione "Elimina dati" nelle impostazioni dell'app.</p>
+    <p>I dati sono conservati <strong>esclusivamente sul dispositivo dell'utente</strong>, all'interno del database Hive cifrato con AES-256-GCM (chiave master in AndroidKeyStore, hardware-backed). Non esiste alcun server esterno, cloud o backup remoto automatico.</p>
+    <p>In modalità Responsabile, i <strong>consensi privacy hanno una durata di validità</strong> configurabile: alla scadenza l'app applica automaticamente la retention (marcatura RITIRATO, periodo di grazia di 30 giorni, quindi cancellazione a cascata dei dati). L'archivio storico conserva snapshot immutabili dei percorsi degli anni precedenti.</p>
+    <p>L'utente può eliminare i dati in qualsiasi momento tramite l'apposita funzione "Elimina dati" nelle impostazioni dell'app (cancellazione completa o selettiva). La cancellazione genera un tombstone che impedisce ai dati di riapparire tramite sincronizzazione.</p>
     <p>Non essendoci server remoti, la conservazione dei dati coincide con la permanenza dell'app sul dispositivo. Disinstallando l'app, tutti i dati vengono eliminati definitivamente (salvo backup espliciti creati dall'utente).</p>
 
     <h2>6. Condivisione dei dati</h2>
-    <p><strong>CatechHub non condivide automaticamente alcun dato con terze parti.</strong> Le uniche modalità di trasferimento dei dati sono:</p>
+    <p><strong>CatechHub non condivide dati con terze parti: non esiste alcuna comunicazione automatica, cessione o trasferimento a soggetti esterni.</strong> L'app non utilizza server, cloud o servizi di analisi; nessuna informazione lascia il tuo dispositivo se non tramite le seguenti azioni volontarie dell'utente:</p>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
-      <li><strong>Sincronizzazione P2P Bluetooth/WiFi Direct</strong>: avviata volontariamente dall'utente, solo con dispositivi di altri catechisti di fiducia. I dati sono cifrati end-to-end con X25519 ECDH + HKDF + AES-256-GCM, con verifica pairing code a 6 cifre e key pinning.</li>
-      <li><strong>Condivisione QR</strong>: esportazione volontaria di moduli selezionati, protetta da PIN.</li>
+      <li><strong>Sincronizzazione P2P Bluetooth/WiFi Direct</strong>: avviata volontariamente dall'utente, solo con dispositivi di altri catechisti di fiducia. I dati sono cifrati end-to-end con TripleDH X25519 + HKDF-SHA256 + AES-256-GCM, con verifica pairing code a 6 cifre, key pinning e rotazione chiavi di sessione ogni 30 minuti. In modalità Responsabile solo i dispositivi approvati (certificati Ed25519) possono sincronizzare le classi. I dati personali passano sempre dal canale classe cifrato per-classe.</li>
+      <li><strong>Canale parrocchiale</strong>: riunioni e avvisi parrocchiali vengono scambiati tra i dispositivi associati in un canale separato che <strong>non contiene dati personali</strong> (solo testi di comunicazione).</li>
+      <li><strong>Condivisione QR</strong>: esportazione volontaria di moduli selezionati, PIN 12 cifre (3 min, meta <code>createdAt/expiresAt</code> verificata), PBKDF2 350k nuovi / 60k legacy read, AAD <code>Context_QRShare_v1</code>, chunk 1200B + checksum, indice cifrato con PIN di sessione, sync differenziale per modulo (<code>QRDataService</code>), rate-limit 5→1 min.</li>
       <li><strong>Backup manuale</strong>: l'utente può creare un file .catechhub e trasferirlo come preferisce.</li>
+      <li><strong>Controllo aggiornamenti (opzionale)</strong>: l'app può verificare la disponibilità di nuove versioni su GitHub (certificato verificato tramite pinning); disattivabile dalle Impostazioni. Non trasmette alcun dato personale.</li>
+      <li><strong>Feedback all'autore (opt-in)</strong>: il modulo di feedback (Wiredash) è disattivato per impostazione predefinita e si attiva solo su scelta esplicita dell'utente.</li>
     </ul>
 
     <h2>7. Sicurezza</h2>
@@ -97,12 +108,14 @@
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
       <li>Crittografia AES-256-GCM di tutti i dati a riposo</li>
       <li>Chiave master custodita in AndroidKeyStore con protezione hardware (TEE/StrongBox) — verifica obbligatoria all'avvio, nessun fallback software</li>
+      <li>Cifratura di campo aggiuntiva (AES-256-GCM, chiave per-dispositivo) per i dati più sensibili (allergie, note sanitarie, uscite autonome)</li>
       <li>Autenticazione biometrica per l'accesso all'app</li>
       <li>Blocco screenshot e screen recording</li>
       <li>freeRASP per rilevamento root, emulatori e tampering</li>
-      <li>Blocco automatico sessione dopo 120 secondi in background</li>
-      <li>Backup protetti da password con derivazione PBKDF2 (210.000 iterazioni)</li>
-      <li>Sincronizzazione P2P con crittografia end-to-end X25519 ECDH + HKDF + AES-256-GCM, pairing code a 6 cifre anti-MitM, key pinning per dispositivo</li>
+      <li>Blocco automatico sessione dopo 120 secondi in background e dopo 5 minuti di inattività in foreground</li>
+      <li>Backup <code>.catechhub</code> e export GDPR protetti da PIN 12 alfanumerici (≥1 lettera+≥1 cifra) con PBKDF2-HMAC-SHA256 <strong>350.000</strong> iterazioni per tutti i nuovi file (210k/60k legacy solo in lettura), AAD <code>Context_Backup_v1</code>, anti-brute-force per-file (5 tentativi → 30 min, <code>BackupEncryptionService:57</code>)</li>
+      <li>Sincronizzazione P2P con crittografia end-to-end TripleDH X25519 + HKDF-SHA256 + AES-256-GCM, rotazione chiavi di sessione ogni 30 minuti, pairing code a 6 cifre anti-MitM, key pinning per dispositivo</li>
+      <li>Registro Trattamenti GDPR firmato HMAC-SHA256, tombstone firmati (HMAC + firma Ed25519 per-dispositivo) per la cancellazione, retention automatica dei consensi scaduti</li>
     </ul>
 
     <h2>8. Diritti dell'interessato (GDPR)</h2>
@@ -119,15 +132,16 @@
     <p>Poiché l'app è destinata alla gestione di dati di minori (partecipanti al catechismo), lo sviluppatore ha adottato misure specifiche:</p>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
       <li>Nessun dato di minore lascia mai il dispositivo senza azione esplicita dell'utente</li>
-      <li>I dati sensibili (allergie, uscite autonome) sono protetti con crittografia aggiuntiva</li>
+      <li>I dati sensibili (allergie, uscite autonome, note sanitarie) sono protetti con cifratura di campo aggiuntiva (AES-256-GCM, chiave per-dispositivo)</li>
       <li>L'app non raccoglie analytics, telemetria o dati di utilizzo</li>
       <li>Non sono presenti pubblicità o servizi di terze parti che profilano gli utenti</li>
+      <li>I consensi privacy (in modalità Responsabile) hanno durata di validità e scadenza gestite automaticamente</li>
     </ul>
 
     <h2>10. Aggiornamenti</h2>
     <p>La presente informativa può essere aggiornata. La versione corrente è consultabile su <a href="https://catechhub-dev.github.io/CatechHub/privacy.html">https://catechhub-dev.github.io/CatechHub/privacy.html</a>.</p>
 
-    <p><small>Ultimo aggiornamento: Giugno 2026</small></p>
+    <p><small>Ultimo aggiornamento: Agosto 2026</small></p>
 
   </div>
 </section>

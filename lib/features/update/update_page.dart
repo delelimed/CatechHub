@@ -55,12 +55,12 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version;
 
-      // Client con certificate pinning per i domini GitHub: il controllo
+      // Client con bundle CA embeddato per i domini GitHub: il controllo
       // aggiornamenti è sensibile (mitm = APK malevolo), quindi NON usare
       // un client generico con trust store di sistema.
-      final pinned = UpdateService.createPinnedClient();
+      final pinned = await createPinnedClient();
       if (pinned == null) {
-        throw Exception('Pinning TLS non configurato: controllo bloccato');
+        throw Exception('Bundle CA non disponibile: controllo bloccato');
       }
       final response = await pinned
           .get(
@@ -167,9 +167,9 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
       return;
     }
     try {
-      final pinned = UpdateService.createPinnedClient();
+      final pinned = await createPinnedClient();
       if (pinned == null) {
-        throw Exception('Pinning TLS non configurato: verifica bloccata');
+        throw Exception('Bundle CA non disponibile: verifica bloccata');
       }
       final digestResponse = await pinned
           .get(Uri.parse(apkDigestUrl))
@@ -237,13 +237,13 @@ class _UpdatePageState extends ConsumerState<UpdatePage>
         await file.delete();
       }
 
-      // Client con certificate pinning: il download dell'APK è il passo più
+      // Client con bundle CA embeddato: il download dell'APK è il passo più
       // sensibile del flusso. La verifica del digest protegge dall'alterazione,
-      // ma il pinning protegge dal MitM sull'intero trasferimento.
-      final pinnedClient = UpdateService.createPinnedClient();
+      // ma il bundle CA protegge dal MitM sull'intero trasferimento.
+      final pinnedClient = await createPinnedClient();
       if (pinnedClient == null) {
         await file.delete();
-        throw Exception('Pinning TLS non configurato: download bloccato');
+        throw Exception('Bundle CA non disponibile: download bloccato');
       }
       final client = pinnedClient;
       try {

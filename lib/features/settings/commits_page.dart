@@ -60,12 +60,12 @@ class _CommitsPageState extends State<CommitsPage> {
       final url =
           _nextPageUrl ??
           'https://api.github.com/repos/delelimed/CatechHub/commits?per_page=30';
-      // A8: certificate pinning per api.github.com. Fail-closed: senza
-      // pinning configurato non ci colleghiamo affatto.
-      final httpClient = UpdateService.createPinnedClient();
+      // A8: bundle CA embeddato per api.github.com. Fail-closed: senza
+      // bundle CA non ci colleghiamo affatto.
+      final httpClient = await createPinnedClient();
       if (httpClient == null) {
         setState(() {
-          _error = 'Connessione non disponibile: pinning non configurato';
+          _error = 'Connessione non disponibile: bundle CA non caricato';
           _isLoading = false;
         });
         return;

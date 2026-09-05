@@ -9,6 +9,7 @@ import '../../shared/models/planning_meeting.dart';
 import '../../shared/models/student_daily_note_model.dart';
 import '../../shared/models/student_model.dart';
 import '../../shared/widgets/last_modified_info.dart';
+import '../../core/providers/class_scoped_providers.dart';
 import '../attachments/widgets/attachments_section.dart';
 import '../archive/widgets/student_history_card.dart';
 import '../contact_notes/contact_notes_repository.dart';
@@ -566,7 +567,7 @@ class _DocumentsCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final docsAsync = ref.watch(documentsStreamProvider);
+    final docsAsync = ref.watch(currentClassDocumentsProvider);
 
     return _InfoCard(
       title: 'Documenti da consegnare',

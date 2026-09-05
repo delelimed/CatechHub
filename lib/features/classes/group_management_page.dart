@@ -479,7 +479,7 @@ class _StudentsList extends StatelessWidget {
 
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: isDark ? colorScheme.surface : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
@@ -493,7 +493,7 @@ class _StudentsList extends StatelessWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Annulla'),
           ),
           ElevatedButton(
@@ -503,7 +503,7 @@ class _StudentsList extends StatelessWidget {
             ),
             onPressed: () {
               studentsRepo.deleteStudent(student.id);
-              Navigator.pop(context);
+              Navigator.of(dialogContext).pop();
             },
             child: const Text('Elimina'),
           ),

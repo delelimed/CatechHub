@@ -4,11 +4,12 @@
 ///   programmazione, catechesi, documenti e allegati), li cifra con il PIN
 ///   dell'utente tramite [DataExportService.exportEncryptedData] e salva il
 ///   file `.catechhub` nella posizione scelta dall'utente (tramite
-///   [FilePicker]).
+///   [FilePicker]). Il file viene verificato con checksum SHA-256 per
+///   garantire integrità e completezza (sicurezza grado militare).
 /// - **Importa backup**: seleziona un file `.catechhub`, richiede il PIN
 ///   di decifratura, verifica la password tramite
-///   [DataExportService.verifyEncryptedPassword], chiede conferma della
-///   sovrascrittura e ripristina tutti i dati tramite
+///   [DataExportService.verifyEncryptedPassword], verifica il checksum,
+///   chiede conferma della sovrascrittura e ripristina tutti i dati tramite
 ///   [DataExportService.importEncryptedData].
 ///
 /// Entrambe le operazioni verificano il PIN dell'utente prima di procedere.
@@ -19,6 +20,7 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:cryptography/cryptography.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -135,6 +137,9 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       );
       final bytes = Uint8List.fromList(utf8.encode(encrypted));
 
+      // Verifica integrità: calcola checksum SHA-256 dei dati cifrati (cryptography)
+      final checksum = await _sha256(bytes);
+
       // Permetti all'utente di scegliere dove salvare
       final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
       final className = exportClass != null
@@ -151,19 +156,48 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       String? savedPath;
       bool saved = false;
       try {
-        // file_picker 12: saveFile restituisce Uri?.
-        final uri = await FilePicker.saveFile(
+        // file_picker: saveFile restituisce String? (path) su Android/iOS,
+        // Uri? su desktop/web. Gestiamo entrambi i casi.
+        final result = await FilePicker.saveFile(
           dialogTitle: 'Salva backup',
           fileName: fileName,
           bytes: bytes,
         );
-        savedPath = uri;
-        if (savedPath != null) saved = true;
+        if (result != null) {
+          savedPath = result.toString();
+          // Verifica militare: il file deve esistere, avere size > 0 e checksum corretto
+          final file = File(savedPath);
+          if (await file.exists()) {
+            final writtenBytes = await file.readAsBytes();
+            if (writtenBytes.isNotEmpty) {
+              final writtenChecksum = await _sha256(writtenBytes);
+              if (writtenChecksum == checksum) {
+                saved = true;
+              } else {
+                if (mounted) {
+                  setState(() {
+                    _statusMessage = 'Errore: checksum non corrispondente (dati corrotti)';
+                    _isError = true;
+                  });
+                }
+                return;
+              }
+            } else {
+              if (mounted) {
+                setState(() {
+                  _statusMessage = 'Errore: file scritto ma vuoto (0 byte)';
+                  _isError = true;
+                });
+              }
+              return;
+            }
+          }
+        }
       } catch (e) {
         savedPath = null;
       }
 
-      // Se saveFile fallisce, usa getDirectoryPath + scrittura manuale
+      // Se saveFile fallisce, usa getDirectoryPath + scrittura manuale con verifica
       if (!saved) {
         try {
           final directory = await FilePicker.getDirectoryPath(
@@ -173,8 +207,33 @@ class _BackupPageState extends ConsumerState<BackupPage> {
             final filePath = '$directory/$fileName';
             final file = File(filePath);
             await file.writeAsBytes(bytes, flush: true);
-            savedPath = filePath;
-            saved = true;
+            // Verifica post-scrittura
+            if (await file.exists()) {
+              final writtenBytes = await file.readAsBytes();
+              if (writtenBytes.isNotEmpty) {
+                final writtenChecksum = await _sha256(writtenBytes);
+                if (writtenChecksum == checksum) {
+                  savedPath = filePath;
+                  saved = true;
+                } else {
+                  if (mounted) {
+                    setState(() {
+                      _statusMessage = 'Errore: checksum non corrispondente (fallback)';
+                      _isError = true;
+                    });
+                  }
+                  return;
+                }
+              } else {
+                if (mounted) {
+                  setState(() {
+                    _statusMessage = 'Errore: file scritto ma vuoto (0 byte) - fallback';
+                    _isError = true;
+                  });
+                }
+                return;
+              }
+            }
           }
         } catch (e) {
           savedPath = null;
@@ -184,14 +243,14 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       if (saved) {
         if (mounted) {
           setState(() {
-            _statusMessage = 'Backup esportato con successo';
+            _statusMessage = 'Backup esportato e verificato con successo (SHA-256)';
             _isError = false;
           });
         }
       } else {
         if (mounted) {
           setState(() {
-            _statusMessage = 'Esportazione annullata';
+            _statusMessage = 'Esportazione annullata o fallita';
             _isError = false;
           });
         }
@@ -208,6 +267,12 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         setState(() => _isExporting = false);
       }
     }
+  }
+
+  /// Calcola hash SHA-256 usando il package cryptography (compatibile con backup_encryption_service).
+  static Future<String> _sha256(Uint8List data) async {
+    final hash = await Sha256().hash(data);
+    return base64Encode(hash.bytes);
   }
 
   // ────────────────────────────────────────────

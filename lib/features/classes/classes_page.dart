@@ -251,7 +251,7 @@ class _ClassCard extends StatelessWidget {
   void _showDeleteConfirmation(BuildContext context) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Elimina gruppo'),
         content: Text(
@@ -260,7 +260,7 @@ class _ClassCard extends StatelessWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Annulla'),
           ),
           ElevatedButton(
@@ -269,7 +269,7 @@ class _ClassCard extends StatelessWidget {
               foregroundColor: Colors.white,
             ),
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.of(dialogContext).pop();
               onDelete?.call();
             },
             child: const Text('Elimina'),

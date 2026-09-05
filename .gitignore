@@ -14,6 +14,7 @@ android/local.properties
 *.keystore
 *.p12
 *.pem
+!assets/certs/*.pem
 .buildlog/
 .history
 .svn/

@@ -14,7 +14,8 @@ class AttendanceGridPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     try {
-      final allStudents = ref.read(currentClassStudentsSyncProvider);
+      final allStudents =
+          ref.read(currentClassStudentsSyncProvider).value ?? const <Student>[];
       if (allStudents.isEmpty) {
         return AppScaffold(
           title: 'Registro presenze',
@@ -22,10 +23,12 @@ class AttendanceGridPage extends ConsumerWidget {
         );
       }
 
-      final meetings = ref.read(currentClassPlanningSyncProvider)
-          .where((m) => !m.isReunion)
-          .toList()
-        ..sort((a, b) => a.date.compareTo(b.date));
+      final meetings =
+          ref
+              .read(currentClassPlanningSyncProvider)
+              .where((m) => !m.isReunion)
+              .toList()
+            ..sort((a, b) => a.date.compareTo(b.date));
 
       if (meetings.isEmpty) {
         return AppScaffold(
@@ -40,12 +43,17 @@ class AttendanceGridPage extends ConsumerWidget {
       String latestModifiedBy = '';
       for (final record in allAttendance) {
         final mid = record['id'].toString();
-        final presence = (record['presence'] as Map?)?.map(
-          (k, v) => MapEntry(k.toString(), v.toString()),
-        ) ?? {};
+        final presence =
+            (record['presence'] as Map?)?.map(
+              (k, v) => MapEntry(k.toString(), v.toString()),
+            ) ??
+            {};
         attendanceByMeeting[mid] = presence;
-        final updatedAt = DateTime.tryParse(record['updatedAt']?.toString() ?? '');
-        if (updatedAt != null && (latestUpdatedAt == null || updatedAt.isAfter(latestUpdatedAt))) {
+        final updatedAt = DateTime.tryParse(
+          record['updatedAt']?.toString() ?? '',
+        );
+        if (updatedAt != null &&
+            (latestUpdatedAt == null || updatedAt.isAfter(latestUpdatedAt))) {
           latestUpdatedAt = updatedAt;
           latestModifiedBy = record['lastModifiedBy']?.toString() ?? '';
         }
@@ -139,7 +147,10 @@ class _GridBody extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         decoration: BoxDecoration(
                           border: Border(
-                            bottom: BorderSide(color: Colors.grey.shade200, width: 0.5),
+                            bottom: BorderSide(
+                              color: Colors.grey.shade200,
+                              width: 0.5,
+                            ),
                           ),
                         ),
                         child: Text(
@@ -180,7 +191,10 @@ class _GridBody extends StatelessWidget {
                                     ),
                                   ),
                                   Text(
-                                    DateFormat('MMM', 'it_IT').format(m.date).toUpperCase(),
+                                    DateFormat(
+                                      'MMM',
+                                      'it_IT',
+                                    ).format(m.date).toUpperCase(),
                                     style: TextStyle(
                                       fontSize: 9,
                                       color: Colors.grey.shade600,
@@ -214,8 +228,8 @@ class _GridBody extends StatelessWidget {
                                       color: isPresent
                                           ? Colors.green
                                           : isAbsent
-                                              ? Colors.red
-                                              : Colors.transparent,
+                                          ? Colors.red
+                                          : Colors.transparent,
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Center(
@@ -223,16 +237,16 @@ class _GridBody extends StatelessWidget {
                                         isPresent
                                             ? 'P'
                                             : isAbsent
-                                                ? 'A'
-                                                : '',
+                                            ? 'A'
+                                            : '',
                                         style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
                                           color: isPresent
                                               ? Colors.black
                                               : isAbsent
-                                                  ? Colors.white
-                                                  : Colors.grey.shade300,
+                                              ? Colors.white
+                                              : Colors.grey.shade300,
                                         ),
                                       ),
                                     ),

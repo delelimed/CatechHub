@@ -37,15 +37,17 @@ class ClassSelectionPage extends ConsumerWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
-              ...myClasses.map((c) => _ClassCard(
-                schoolClass: c,
-                isDark: isDark,
-                colorScheme: colorScheme,
-                onTap: () async {
-                  await currentClassNotifier.setClass(c.id);
-                  if (context.mounted) context.go('/');
-                },
-              )),
+              ...myClasses.map(
+                (c) => _ClassCard(
+                  schoolClass: c,
+                  isDark: isDark,
+                  colorScheme: colorScheme,
+                  onTap: () async {
+                    await currentClassNotifier.setClass(c.id);
+                    if (context.mounted) context.go('/');
+                  },
+                ),
+              ),
               const SizedBox(height: 16),
               Text(
                 'Per creare un nuovo gruppo vai su "I miei gruppi" dalle impostazioni.',
@@ -89,7 +91,9 @@ class _ClassCard extends StatelessWidget {
           color: isDark ? colorScheme.surfaceContainer : Colors.white,
           borderRadius: BorderRadius.circular(22),
           border: Border.all(
-            color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.blue.shade100,
+            color: isDark
+                ? colorScheme.outline.withValues(alpha: 0.2)
+                : Colors.blue.shade100,
           ),
           boxShadow: [
             BoxShadow(
@@ -125,7 +129,9 @@ class _ClassCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
+                      color: isDark
+                          ? colorScheme.onSurface
+                          : const Color(0xFF174A7E),
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -182,10 +188,7 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               'Non fai parte di nessun gruppo',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
             ),
             const SizedBox(height: 8),
             Text(

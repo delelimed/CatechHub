@@ -48,7 +48,10 @@ class CatechesiRepository {
     return LocalDatabase.watchList(
       _box,
       (id, data) => Catechesi.fromMap(id, data),
-    ).map((list) => list.where((c) => c.classUniqueCode == classUniqueCode).toList());
+    ).map(
+      (list) =>
+          list.where((c) => c.classUniqueCode == classUniqueCode).toList(),
+    );
   }
 
   /// Lettura sincrona delle catechesi di una classe.
@@ -110,8 +113,12 @@ class CatechesiRepository {
     return getCatechesiSync().where((c) {
       final matchesTitle = c.title.toLowerCase().contains(q);
       final matchesTag = c.tags.any((t) => t.toLowerCase().contains(q));
-      final matchesBiblical = c.biblicalReferences.any((b) => b.toLowerCase().contains(q));
-      final matchesWebsite = c.websiteReferences.any((w) => w.toLowerCase().contains(q));
+      final matchesBiblical = c.biblicalReferences.any(
+        (b) => b.toLowerCase().contains(q),
+      );
+      final matchesWebsite = c.websiteReferences.any(
+        (w) => w.toLowerCase().contains(q),
+      );
       return matchesTitle || matchesTag || matchesBiblical || matchesWebsite;
     }).toList();
   }

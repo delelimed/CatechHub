@@ -40,30 +40,56 @@ SOFTWARE.
 
   static const List<Map<String, String>> dependencies = [
     {'name': 'flutter', 'version': 'SDK', 'license': 'BSD-3-Clause'},
-    {'name': 'flutter_localizations', 'version': 'SDK', 'license': 'BSD-3-Clause'},
+    {
+      'name': 'flutter_localizations',
+      'version': 'SDK',
+      'license': 'BSD-3-Clause',
+    },
     {'name': 'flutter_riverpod', 'version': '^3.3.2', 'license': 'MIT'},
     {'name': 'go_router', 'version': '^17.3.0', 'license': 'BSD-3-Clause'},
     {'name': 'local_auth', 'version': '^3.0.2', 'license': 'BSD-3-Clause'},
     {'name': 'hive_flutter', 'version': '^1.1.0', 'license': 'Apache-2.0'},
-    {'name': 'flutter_secure_storage', 'version': '^10.3.1', 'license': 'BSD-3-Clause'},
-    {'name': 'shared_preferences', 'version': '^2.3.0', 'license': 'BSD-3-Clause'},
-    {'name': 'pointycastle', 'version': '^4.0.0', 'license': 'MIT'},
-    {'name': 'crypto', 'version': '^3.0.3', 'license': 'BSD-3-Clause'},
+    {
+      'name': 'flutter_secure_storage',
+      'version': '^10.3.1',
+      'license': 'BSD-3-Clause',
+    },
+    {
+      'name': 'shared_preferences',
+      'version': '^2.3.0',
+      'license': 'BSD-3-Clause',
+    },
     {'name': 'cryptography', 'version': '^2.7.0', 'license': 'Apache-2.0'},
     {'name': 'freerasp', 'version': '^8.0.0', 'license': 'MIT'},
     {'name': 'file_picker', 'version': '^12.0.0-beta.7', 'license': 'MIT'},
     {'name': 'archive', 'version': '^4.0.9', 'license': 'MIT'},
     {'name': 'qr_flutter', 'version': '^4.1.0', 'license': 'BSD-3-Clause'},
     {'name': 'mobile_scanner', 'version': '^7.0.0', 'license': 'BSD-3-Clause'},
-    {'name': 'nearby_connections', 'version': '^4.3.0', 'license': 'BSD-2-Clause'},
+    {
+      'name': 'nearby_connections',
+      'version': '^4.3.0',
+      'license': 'BSD-2-Clause',
+    },
     {'name': 'intl', 'version': '^0.20.2', 'license': 'BSD-3-Clause'},
     {'name': 'url_launcher', 'version': '^6.3.0', 'license': 'BSD-3-Clause'},
     {'name': 'http', 'version': '^1.2.0', 'license': 'BSD-3-Clause'},
     {'name': 'timezone', 'version': '^0.11.0', 'license': 'BSD-2-Clause'},
-    {'name': 'package_info_plus', 'version': '^10.0.0', 'license': 'BSD-3-Clause'},
-    {'name': 'device_info_plus', 'version': '^13.0.0', 'license': 'BSD-3-Clause'},
+    {
+      'name': 'package_info_plus',
+      'version': '^10.0.0',
+      'license': 'BSD-3-Clause',
+    },
+    {
+      'name': 'device_info_plus',
+      'version': '^13.0.0',
+      'license': 'BSD-3-Clause',
+    },
     {'name': 'permission_handler', 'version': '^12.0.0', 'license': 'MIT'},
-    {'name': 'flutter_local_notifications', 'version': '^22.0.0', 'license': 'BSD-3-Clause'},
+    {
+      'name': 'flutter_local_notifications',
+      'version': '^22.0.0',
+      'license': 'BSD-3-Clause',
+    },
     {'name': 'pdf', 'version': '^3.10.8', 'license': 'Apache-2.0'},
     {'name': 'printing', 'version': '^5.15.0', 'license': 'Apache-2.0'},
     {'name': 'cupertino_icons', 'version': '^1.0.8', 'license': 'MIT'},
@@ -72,7 +98,6 @@ SOFTWARE.
     {'name': 'image_picker', 'version': '^1.2.2', 'license': 'Apache-2.0'},
     {'name': 'path_provider', 'version': '^2.1.0', 'license': 'BSD-3-Clause'},
     {'name': 'image', 'version': '^4.9.0', 'license': 'MIT'},
-    {'name': 'open_filex', 'version': '^4.5.0', 'license': 'BSD-3-Clause'},
     {'name': 'share_plus', 'version': '^13.2.0', 'license': 'BSD-3-Clause'},
     {'name': 'license_checker', 'version': '1.6.2', 'license': 'BSD-3-Clause'},
     {'name': 'state_notifier', 'version': '^1.0.0', 'license': 'MIT'},
@@ -179,7 +204,11 @@ SOFTWARE.
                       'registri di catechismo, pensata da un catechista per '
                       'semplificare la gestione di presenze, documenti e '
                       'comunicazioni con le famiglie.',
-                      style: TextStyle(fontSize: 14, height: 1.5, color: theme.textTheme.bodyMedium?.color),
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.5,
+                        color: theme.textTheme.bodyMedium?.color,
+                      ),
                     ),
                   ],
                 ),
@@ -191,7 +220,9 @@ SOFTWARE.
           const SizedBox(height: 24),
           Text(
             'Licenza dell\'app',
-            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 12),
           Container(
@@ -213,7 +244,11 @@ SOFTWARE.
               children: [
                 Text(
                   licenseText,
-                  style: TextStyle(fontSize: 14, height: 1.5, color: theme.textTheme.bodyMedium?.color),
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                    color: theme.textTheme.bodyMedium?.color,
+                  ),
                 ),
               ],
             ),
@@ -221,7 +256,9 @@ SOFTWARE.
           const SizedBox(height: 24),
           Text(
             'Dipendenze runtime',
-            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 14),
           Container(
@@ -238,7 +275,9 @@ SOFTWARE.
                   contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                   title: Text(
                     dependency['name']!,
-                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   subtitle: Text(
                     'Versione: ${dependency['version']}',
@@ -259,7 +298,9 @@ SOFTWARE.
                       dependency['license']!,
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                        color: isDark
+                            ? colorScheme.primary
+                            : const Color(0xFF174A7E),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -271,14 +312,20 @@ SOFTWARE.
           const SizedBox(height: 24),
           Text(
             'Nota di conformità',
-            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 12),
           Text(
             'Questo elenco riporta le licenze principali delle dipendenze usate. '
             'Verifica sempre la licenza specifica dei pacchetti su pub.dev o sul repository ufficiale prima di riutilizzare o distribuire il codice. '
             'Nel contesto non commerciale e open source, rispetta i termini di ciascuna licenza e conserva gli avvisi di copyright.',
-            style: TextStyle(fontSize: 14, height: 1.5, color: theme.textTheme.bodyMedium?.color),
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.5,
+              color: theme.textTheme.bodyMedium?.color,
+            ),
           ),
         ],
       ),
@@ -320,7 +367,10 @@ Widget _buildActionButtons(BuildContext context, ThemeData theme) {
         onTap: () async {
           const url = 'https://delelimed.github.io/CatechHub';
           if (await canLaunchUrl(Uri.parse(url))) {
-            await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+            await launchUrl(
+              Uri.parse(url),
+              mode: LaunchMode.externalApplication,
+            );
           }
         },
         theme: theme,
@@ -358,7 +408,9 @@ class _ActionButton extends StatelessWidget {
           color: isDark ? colorScheme.surfaceContainer : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade200,
+            color: isDark
+                ? colorScheme.outline.withValues(alpha: 0.2)
+                : Colors.grey.shade200,
           ),
           boxShadow: [
             BoxShadow(
@@ -381,7 +433,11 @@ class _ActionButton extends StatelessWidget {
                     : const Color(0xFF174A7E).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: isDark ? colorScheme.primary : const Color(0xFF174A7E), size: 22),
+              child: Icon(
+                icon,
+                color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                size: 22,
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -393,18 +449,28 @@ class _ActionButton extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: isDark ? colorScheme.onSurface : const Color(0xFF174A7E),
+                      color: isDark
+                          ? colorScheme.onSurface
+                          : const Color(0xFF174A7E),
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: TextStyle(fontSize: 12, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
+                    ),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: isDark ? Colors.grey.shade500 : Colors.grey.shade400),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+            ),
           ],
         ),
       ),

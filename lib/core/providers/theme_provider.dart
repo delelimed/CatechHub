@@ -230,7 +230,10 @@ final lightThemeProvider = Provider<ThemeData>((ref) {
       indicatorColor: primaryColor,
       indicatorSize: TabBarIndicatorSize.label,
       labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-      unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+      unselectedLabelStyle: const TextStyle(
+        fontWeight: FontWeight.w500,
+        fontSize: 14,
+      ),
     ),
     listTileTheme: ListTileThemeData(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -466,7 +469,10 @@ final darkThemeProvider = Provider<ThemeData>((ref) {
       indicatorColor: primaryColor,
       indicatorSize: TabBarIndicatorSize.label,
       labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-      unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+      unselectedLabelStyle: const TextStyle(
+        fontWeight: FontWeight.w500,
+        fontSize: 14,
+      ),
     ),
     listTileTheme: ListTileThemeData(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -534,9 +540,10 @@ class ThemeNotifier extends StateNotifier<AppThemeMode> {
   }
 }
 
-final themeNotifierProvider = StateNotifierProvider<ThemeNotifier, AppThemeMode>(
-  (ref) => ThemeNotifier(),
-);
+final themeNotifierProvider =
+    StateNotifierProvider<ThemeNotifier, AppThemeMode>(
+      (ref) => ThemeNotifier(),
+    );
 
 final themeModeProvider = Provider<ThemeMode>((ref) {
   return ref.watch(themeNotifierProvider).toThemeMode;

@@ -68,14 +68,14 @@
     <h2>Viste dedicate</h2>
     <p>Oltre ai badge nelle schermate principali, ci sono pagine apposite che mostrano l'elenco completo e filtrato dei ragazzi con allergie o con autorizzazioni alle uscite. Utili per una verifica rapida prima di un evento o di una gita.</p>
 
-    <h2>Sicurezza e GDPR</h2>
-    <p>Le allergie sono dati relativi alla salute e richiedono protezioni speciali. CatechHub adotta le seguenti misure:</p>
+    <h2>Sicurezza e GDPR — dati particolari art.9</h2>
+    <p>Allergie, note sanitarie, uscite autonome e recapiti sono dati particolari. CatechHub applica:</p>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
-      <li>I dati sulle allergie sono crittografati individualmente con AES-256-GCM</li>
-      <li>L'accesso all'app richiede autenticazione biometrica</li>
-      <li>Il consenso esplicito è richiesto al momento dell'inserimento</li>
-      <li>I dati non vengono sincronizzati via Bluetooth senza autorizzazione esplicita</li>
-      <li>Puoi cancellare selettivamente le informazioni mediche senza perdere gli altri dati del ragazzo</li>
+      <li>Cifratura di campo per 9 campi sensibili (<code>field_encryption_service.dart:140</code>: <code>noteAllergieSalute, allergies, autonomousExits, notes, birthDate, studentPhone, motherPhone, fatherPhone, parentEmail</code>) — formato <code>cieI1:</code> + AES-256-GCM con chiave 32B per-dispositivo in box cifrato; egresso P2P decifrato solo nel canale già E2EE</li>
+      <li>Accesso all'app con biometria / PIN dispositivo, sessione solo RAM (blocco 120s background + 5 min foreground), FLAG_SECURE</li>
+      <li>Consenso esplicito richiesto; consensi con durata+scadenza in modalità Responsabile (RITIRATO → 30 gg grazia → cancellazione a cascata + tombstone HMAC+Ed25519)</li>
+      <li>Sync P2P solo con autorizzazione esplicita (doppio consenso per Altro Catechista) e solo classi condivise; canale classe cifrato per-classe</li>
+      <li>Cancellazione selettiva senza perdita di altri dati; tombstone anti-resurrezione propagato ad ogni sync</li>
     </ul>
 
   </div>

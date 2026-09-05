@@ -127,11 +127,11 @@ void main() {
       expect(student.motherPhone, '');
       expect(student.fatherPhone, '');
       expect(student.studentPhone, '');
-      // La data di nascita deve defaultare a DateTime.now() se mancante
-      expect(student.birthDate, isNotNull);
+      // La data di nascita è facoltativa: se mancante resta null
+      expect(student.birthDate, isNull);
     });
 
-    test('fromMap gestisce data di nascita non valida con DateTime.now()', () {
+    test('fromMap gestisce data di nascita non valida come null', () {
       // Arrange: mappa con data non parsabile
       final map = {
         'name': 'Test',
@@ -140,13 +140,44 @@ void main() {
       };
       // Act: deserializza con data corrotta
       final student = Student.fromMap('s5', map);
-      // Assert: la data deve essere quella corrente (fallback)
-      expect(student.birthDate, isNotNull);
-      // La differenza con now deve essere minima (meno di 1 secondo)
-      expect(
-        DateTime.now().difference(student.birthDate).inSeconds,
-        lessThan(2),
+      // Assert: la data deve essere null (facoltativa)
+      expect(student.birthDate, isNull);
+    });
+
+    test('toMap/fromMap roundtrip conserva i campi GDPR di iscrizione', () {
+      // Arrange: studente con scheda firmata e contributo volontario
+      final student = Student(
+        id: 's6',
+        name: 'Giorgia',
+        surname: 'Blu',
+        birthDate: DateTime(2014, 3, 15),
+        motherName: 'Elena',
+        motherSurname: 'Viola',
+        fatherName: 'Luca',
+        fatherSurname: 'Blu',
+        motherPhone: '3400000001',
+        fatherPhone: '3400000002',
+        studentPhone: '',
+        consensoPrivacyFirmato: true,
+        dataFirmaConsenso: DateTime(2026, 9, 1),
+        dataScadenzaTrattamento: DateTime(2027, 9, 1, 23, 59, 59),
+        consensoUsciteAutonome: true,
+        contributoVersato: true,
+        contributoEuros: 20,
+        annoContributo: '2026-2027',
+        noteAllergieSalute: 'cilieI1:abc',
       );
+      // Act: round-trip toMap -> fromMap
+      final map = student.toMap();
+      final back = Student.fromMap('s6', map);
+      // Assert: i campi GDPR sopravvivono alla serializzazione
+      expect(back.consensoPrivacyFirmato, isTrue);
+      expect(back.dataFirmaConsenso, DateTime(2026, 9, 1));
+      expect(back.dataScadenzaTrattamento, DateTime(2027, 9, 1, 23, 59, 59));
+      expect(back.consensoUsciteAutonome, isTrue);
+      expect(back.contributoVersato, isTrue);
+      expect(back.contributoEuros, 20);
+      expect(back.annoContributo, '2026-2027');
     });
   });
 
@@ -155,22 +186,43 @@ void main() {
     test('compareBySurname ordina prima per cognome, poi per nome', () {
       // Arrange: prepara tre studenti con cognomi e nomi diversi
       final a = Student(
-        id: '1', name: 'Marco', surname: 'Rossi',
+        id: '1',
+        name: 'Marco',
+        surname: 'Rossi',
         birthDate: DateTime(2010, 1, 1),
-        motherName: '', motherSurname: '', fatherName: '', fatherSurname: '',
-        motherPhone: '', fatherPhone: '', studentPhone: '',
+        motherName: '',
+        motherSurname: '',
+        fatherName: '',
+        fatherSurname: '',
+        motherPhone: '',
+        fatherPhone: '',
+        studentPhone: '',
       );
       final b = Student(
-        id: '2', name: 'Anna', surname: 'Bianchi',
+        id: '2',
+        name: 'Anna',
+        surname: 'Bianchi',
         birthDate: DateTime(2010, 1, 1),
-        motherName: '', motherSurname: '', fatherName: '', fatherSurname: '',
-        motherPhone: '', fatherPhone: '', studentPhone: '',
+        motherName: '',
+        motherSurname: '',
+        fatherName: '',
+        fatherSurname: '',
+        motherPhone: '',
+        fatherPhone: '',
+        studentPhone: '',
       );
       final c = Student(
-        id: '3', name: 'Luca', surname: 'Bianchi',
+        id: '3',
+        name: 'Luca',
+        surname: 'Bianchi',
         birthDate: DateTime(2010, 1, 1),
-        motherName: '', motherSurname: '', fatherName: '', fatherSurname: '',
-        motherPhone: '', fatherPhone: '', studentPhone: '',
+        motherName: '',
+        motherSurname: '',
+        fatherName: '',
+        fatherSurname: '',
+        motherPhone: '',
+        fatherPhone: '',
+        studentPhone: '',
       );
       // Act: applica il confronto
       final confrontoBA = Student.compareBySurname(b, a);

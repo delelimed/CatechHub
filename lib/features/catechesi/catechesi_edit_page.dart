@@ -96,7 +96,9 @@ class _CatechesiEditPageState extends ConsumerState<CatechesiEditPage> {
       backgroundColor: isDark ? colorScheme.surface : Colors.grey.shade50,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: isDark ? colorScheme.primaryContainer : const Color(0xFF174A7E),
+        backgroundColor: isDark
+            ? colorScheme.primaryContainer
+            : const Color(0xFF174A7E),
         foregroundColor: isDark ? colorScheme.onPrimaryContainer : Colors.white,
         title: Text(
           widget.existing == null ? 'Nuova catechesi' : 'Modifica catechesi',
@@ -189,8 +191,12 @@ class _CatechesiEditPageState extends ConsumerState<CatechesiEditPage> {
               width: double.infinity,
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-                  foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
+                  backgroundColor: isDark
+                      ? colorScheme.primary
+                      : const Color(0xFF174A7E),
+                  foregroundColor: isDark
+                      ? colorScheme.onPrimary
+                      : Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(18),
@@ -232,9 +238,9 @@ class _CatechesiEditPageState extends ConsumerState<CatechesiEditPage> {
                     if (context.mounted) Navigator.pop(context);
                   } catch (e) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Errore: $e')),
-                      );
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text('Errore: $e')));
                     }
                   }
                 },
@@ -286,7 +292,7 @@ class _ModernInputCard extends StatelessWidget {
                 : Colors.black.withValues(alpha: 0.04),
             blurRadius: 16,
             offset: const Offset(0, 8),
-          )
+          ),
         ],
       ),
       child: Column(

@@ -82,7 +82,9 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
           ? null
           : FloatingActionButton.extended(
               elevation: 4,
-              backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+              backgroundColor: isDark
+                  ? colorScheme.primary
+                  : const Color(0xFF174A7E),
               foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
               icon: const Icon(Icons.add_rounded),
               label: const Text(
@@ -96,7 +98,8 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
           ? _EmptyState(
               icon: Icons.groups_rounded,
               title: 'Nessuna classe selezionata',
-              subtitle: 'Seleziona una classe per visualizzare la programmazione.',
+              subtitle:
+                  'Seleziona una classe per visualizzare la programmazione.',
             )
           : planningAsync.when(
               data: (meetings) {
@@ -107,24 +110,24 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
 
                 // Normalizza le date a mezzanotte locale per evitare problemi di fuso orario/DST
                 // (es. incontri creati in ora legale vs ora solare)
-                DateTime _normalizeDate(DateTime dt) =>
+                DateTime normalizeDate(DateTime dt) =>
                     DateTime(dt.year, dt.month, dt.day);
 
                 if (_showPast) {
                   filteredMeetings = filteredMeetings
-                      .where((m) => _normalizeDate(m.date).isBefore(today))
+                      .where((m) => normalizeDate(m.date).isBefore(today))
                       .toList();
                   filteredMeetings.sort(
                     (a, b) =>
-                        _normalizeDate(b.date).compareTo(_normalizeDate(a.date)),
+                        normalizeDate(b.date).compareTo(normalizeDate(a.date)),
                   );
                 } else {
                   filteredMeetings = filteredMeetings
-                      .where((m) => !_normalizeDate(m.date).isBefore(today))
+                      .where((m) => !normalizeDate(m.date).isBefore(today))
                       .toList();
                   filteredMeetings.sort(
                     (a, b) =>
-                        _normalizeDate(a.date).compareTo(_normalizeDate(b.date)),
+                        normalizeDate(a.date).compareTo(normalizeDate(b.date)),
                   );
                 }
 
@@ -134,7 +137,7 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                   final key = DateFormat(
                     'MMMM yyyy',
                     'it_IT',
-                  ).format(_normalizeDate(m.date));
+                  ).format(normalizeDate(m.date));
                   if (!groupedMeetings.containsKey(key)) {
                     groupedMeetings[key] = [];
                     monthKeys.add(key);
@@ -178,8 +181,11 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                           ...monthKeys.map(
                             (mk) => _MonthChip(
                               label: mk[0].toUpperCase() + mk.substring(1),
-                              onTap: () =>
-                                  _scrollToMonth(mk, monthKeys, groupedMeetings),
+                              onTap: () => _scrollToMonth(
+                                mk,
+                                monthKeys,
+                                groupedMeetings,
+                              ),
                             ),
                           ),
                         ],
@@ -207,260 +213,272 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                       ),
                     ...monthKeys.map((monthKey) {
                       final monthMeetings = groupedMeetings[monthKey]!;
-                    return Column(
-                      key: _getMonthKey(monthKey),
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isDark
-                                      ? colorScheme.primaryContainer.withValues(
-                                          alpha: 0.3,
-                                        )
-                                      : const Color(
-                                          0xFF174A7E,
-                                        ).withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.calendar_month_rounded,
-                                      size: 16,
-                                      color: isDark
-                                          ? colorScheme.primary
-                                          : const Color(0xFF174A7E),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      monthKey[0].toUpperCase() +
-                                          monthKey.substring(1),
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
+                      return Column(
+                        key: _getMonthKey(monthKey),
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isDark
+                                        ? colorScheme.primaryContainer
+                                              .withValues(alpha: 0.3)
+                                        : const Color(
+                                            0xFF174A7E,
+                                          ).withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.calendar_month_rounded,
+                                        size: 16,
                                         color: isDark
-                                            ? colorScheme.onSurface
+                                            ? colorScheme.primary
                                             : const Color(0xFF174A7E),
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        monthKey[0].toUpperCase() +
+                                            monthKey.substring(1),
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: isDark
+                                              ? colorScheme.onSurface
+                                              : const Color(0xFF174A7E),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        ...monthMeetings.map((m) {
-                          final isReunion = m.isReunion;
-                          final accentColor = isReunion
-                              ? Colors.deepPurple
-                              : const Color(0xFF174A7E);
-
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 6,
+                              ],
                             ),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(24),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        PlanningEditPage(existing: m),
-                                  ),
-                                );
-                              },
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 180),
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: isDark
-                                        ? [
-                                            colorScheme.surfaceContainer,
-                                            colorScheme.surfaceContainerHighest
-                                                .withValues(alpha: 0.5),
-                                          ]
-                                        : [
-                                            Colors.white,
-                                            Colors.blue.shade50.withValues(
-                                              alpha: 0.35,
-                                            ),
-                                          ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(24),
-                                  border: Border.all(
-                                    color: isDark
-                                        ? colorScheme.outline.withValues(
-                                            alpha: 0.2,
-                                          )
-                                        : Colors.blue.shade100,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: isDark
-                                          ? Colors.black.withValues(alpha: 0.3)
-                                          : Colors.black.withValues(
-                                              alpha: 0.04,
-                                            ),
-                                      blurRadius: 16,
-                                      offset: const Offset(0, 8),
+                          ),
+                          ...monthMeetings.map((m) {
+                            final isReunion = m.isReunion;
+                            final accentColor = isReunion
+                                ? Colors.deepPurple
+                                : const Color(0xFF174A7E);
+
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 6,
+                              ),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(24),
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          PlanningEditPage(existing: m),
                                     ),
-                                  ],
-                                ),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Container(
-                                      width: 56,
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 8,
+                                  );
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: isDark
+                                          ? [
+                                              colorScheme.surfaceContainer,
+                                              colorScheme
+                                                  .surfaceContainerHighest
+                                                  .withValues(alpha: 0.5),
+                                            ]
+                                          : [
+                                              Colors.white,
+                                              Colors.blue.shade50.withValues(
+                                                alpha: 0.35,
+                                              ),
+                                            ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(
+                                      color: isDark
+                                          ? colorScheme.outline.withValues(
+                                              alpha: 0.2,
+                                            )
+                                          : Colors.blue.shade100,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: isDark
+                                            ? Colors.black.withValues(
+                                                alpha: 0.3,
+                                              )
+                                            : Colors.black.withValues(
+                                                alpha: 0.04,
+                                              ),
+                                        blurRadius: 16,
+                                        offset: const Offset(0, 8),
                                       ),
-                                      decoration: BoxDecoration(
-                                        color: accentColor,
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                      child: Column(
-                                        children: [
-                                          Text(
-                                            DateFormat(
-                                              'dd',
-                                            ).format(_normalizeDate(m.date)),
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 17,
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        width: 56,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 8,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: accentColor,
+                                          borderRadius: BorderRadius.circular(
+                                            14,
                                           ),
-                                          Text(
-                                            DateFormat('MMM', 'it_IT')
-                                                .format(_normalizeDate(m.date))
-                                                .toUpperCase(),
-                                            style: const TextStyle(
-                                              color: Colors.white70,
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 10,
-                                            ),
-                                          ),
-                                          if (isReunion &&
-                                              m.time != null &&
-                                              m.time!.isNotEmpty) ...[
-                                            const SizedBox(height: 2),
+                                        ),
+                                        child: Column(
+                                          children: [
                                             Text(
-                                              m.time!,
+                                              DateFormat(
+                                                'dd',
+                                              ).format(normalizeDate(m.date)),
                                               style: const TextStyle(
-                                                color: Colors.white70,
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.w500,
+                                                color: Colors.white,
+                                                fontSize: 17,
+                                                fontWeight: FontWeight.bold,
                                               ),
                                             ),
-                                          ],
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            m.title,
-                                            style: theme.textTheme.titleMedium
-                                                ?.copyWith(
-                                                  fontWeight: FontWeight.bold,
-                                                  color: accentColor,
-                                                ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    PopupMenuButton<String>(
-                                      icon: const Icon(Icons.more_vert_rounded),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(18),
-                                      ),
-                                      onSelected: (v) async {
-                                        if (v == 'delete') {
-                                          await repo.deleteMeeting(m.id);
-                                        }
-                                        if (v == 'edit') {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) =>
-                                                  PlanningEditPage(existing: m),
+                                            Text(
+                                              DateFormat('MMM', 'it_IT')
+                                                  .format(normalizeDate(m.date))
+                                                  .toUpperCase(),
+                                              style: const TextStyle(
+                                                color: Colors.white70,
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 10,
+                                              ),
                                             ),
-                                          );
-                                        }
-                                      },
-                                      itemBuilder: (_) => const [
-                                        PopupMenuItem(
-                                          value: 'edit',
-                                          child: Row(
-                                            children: [
-                                              Icon(Icons.edit_rounded),
-                                              SizedBox(width: 10),
-                                              Text('Modifica'),
+                                            if (isReunion &&
+                                                m.time != null &&
+                                                m.time!.isNotEmpty) ...[
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                m.time!,
+                                                style: const TextStyle(
+                                                  color: Colors.white70,
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
                                             ],
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              m.title,
+                                              style: theme.textTheme.titleMedium
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: accentColor,
+                                                  ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      PopupMenuButton<String>(
+                                        icon: const Icon(
+                                          Icons.more_vert_rounded,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            18,
                                           ),
                                         ),
-                                        PopupMenuItem(
-                                          value: 'delete',
-                                          child: Row(
-                                            children: [
-                                              Icon(Icons.delete_rounded),
-                                              SizedBox(width: 10),
-                                              Text('Elimina'),
-                                            ],
+                                        onSelected: (v) async {
+                                          if (v == 'delete') {
+                                            await repo.deleteMeeting(m.id);
+                                          }
+                                          if (!context.mounted) return;
+                                          if (v == 'edit') {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) =>
+                                                    PlanningEditPage(
+                                                      existing: m,
+                                                    ),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                        itemBuilder: (_) => const [
+                                          PopupMenuItem(
+                                            value: 'edit',
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.edit_rounded),
+                                                SizedBox(width: 10),
+                                                Text('Modifica'),
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
+                                          PopupMenuItem(
+                                            value: 'delete',
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.delete_rounded),
+                                                SizedBox(width: 10),
+                                                Text('Elimina'),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ),
-                          );
-                        }).toList(),
-                      ],
-                    );
-                  }),
-                ],
-              );
-          },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? colorScheme.errorContainer.withValues(alpha: 0.3)
-                    : Colors.red.shade50,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                'Errore: $e',
-                style: TextStyle(
-                  color: isDark ? colorScheme.error : Colors.red.shade700,
-                  fontWeight: FontWeight.w600,
+                            );
+                          }),
+                        ],
+                      );
+                    }),
+                  ],
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? colorScheme.errorContainer.withValues(alpha: 0.3)
+                        : Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Errore: $e',
+                    style: TextStyle(
+                      color: isDark ? colorScheme.error : Colors.red.shade700,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
     );
   }
 

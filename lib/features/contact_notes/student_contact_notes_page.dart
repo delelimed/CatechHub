@@ -12,13 +12,11 @@ import 'contact_notes_repository.dart';
 /// Provider che espone in tempo reale le [ContactNote] di uno specifico
 /// studente, identificate dal suo [studentId]. Viene usato da
 /// [StudentContactNotesPage] per aggiornare la UI a ogni modifica.
-final _studentNotesProvider =
-    StreamProvider.autoDispose.family<List<ContactNote>, String>(
-  (ref, studentId) {
-    final repo = ref.watch(contactNotesRepoProvider);
-    return repo.getNotesForStudent(studentId);
-  },
-);
+final _studentNotesProvider = StreamProvider.autoDispose
+    .family<List<ContactNote>, String>((ref, studentId) {
+      final repo = ref.watch(contactNotesRepoProvider);
+      return repo.getNotesForStudent(studentId);
+    });
 
 /// Pagina dettaglio contatti per un singolo studente di CateREG.
 ///
@@ -42,7 +40,9 @@ class StudentContactNotesPage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: isDark ? colorScheme.surface : Colors.grey.shade50,
       appBar: AppBar(
-        backgroundColor: isDark ? colorScheme.primaryContainer : const Color(0xFF174A7E),
+        backgroundColor: isDark
+            ? colorScheme.primaryContainer
+            : const Color(0xFF174A7E),
         foregroundColor: isDark ? colorScheme.onPrimaryContainer : Colors.white,
         title: Text('${student.surname} ${student.name}'),
       ),
@@ -62,14 +62,21 @@ class StudentContactNotesPage extends ConsumerWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.contact_phone_outlined,
-                        size: 64, color: isDark ? Colors.grey.shade600 : Colors.grey.shade400),
+                    Icon(
+                      Icons.contact_phone_outlined,
+                      size: 64,
+                      color: isDark
+                          ? Colors.grey.shade600
+                          : Colors.grey.shade400,
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       'Nessuna nota di contatto',
                       style: TextStyle(
                         fontSize: 16,
-                        color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                        color: isDark
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade600,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -77,7 +84,9 @@ class StudentContactNotesPage extends ConsumerWidget {
                       'Premi + per aggiungere una nota',
                       style: TextStyle(
                         fontSize: 14,
-                        color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+                        color: isDark
+                            ? Colors.grey.shade500
+                            : Colors.grey.shade400,
                       ),
                     ),
                   ],
@@ -99,11 +108,21 @@ class StudentContactNotesPage extends ConsumerWidget {
                   final confirm = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
-                      backgroundColor: isDark ? colorScheme.surfaceContainer : null,
-                      title: Text('Elimina nota', style: TextStyle(color: isDark ? colorScheme.onSurface : null)),
+                      backgroundColor: isDark
+                          ? colorScheme.surfaceContainer
+                          : null,
+                      title: Text(
+                        'Elimina nota',
+                        style: TextStyle(
+                          color: isDark ? colorScheme.onSurface : null,
+                        ),
+                      ),
                       content: Text(
-                          'Vuoi eliminare questa nota di contatto?',
-                          style: TextStyle(color: isDark ? colorScheme.onSurface : null)),
+                        'Vuoi eliminare questa nota di contatto?',
+                        style: TextStyle(
+                          color: isDark ? colorScheme.onSurface : null,
+                        ),
+                      ),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(ctx, false),
@@ -111,8 +130,9 @@ class StudentContactNotesPage extends ConsumerWidget {
                         ),
                         TextButton(
                           onPressed: () => Navigator.pop(ctx, true),
-                          style:
-                              TextButton.styleFrom(foregroundColor: Colors.red),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.red,
+                          ),
                           child: const Text('Elimina'),
                         ),
                       ],
@@ -157,7 +177,10 @@ class StudentContactNotesPage extends ConsumerWidget {
   }
 
   void _showEditNoteDialog(
-      BuildContext context, WidgetRef ref, ContactNote note) {
+    BuildContext context,
+    WidgetRef ref,
+    ContactNote note,
+  ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -252,8 +275,9 @@ class _ContactNoteCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: mediumColor.withValues(alpha: 0.06),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
             ),
             child: Row(
               children: [
@@ -268,7 +292,11 @@ class _ContactNoteCard extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                Icon(Icons.calendar_today, size: 14, color: isDark ? Colors.grey.shade500 : Colors.grey.shade600),
+                Icon(
+                  Icons.calendar_today,
+                  size: 14,
+                  color: isDark ? Colors.grey.shade500 : Colors.grey.shade600,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   DateFormat('dd/MM/yyyy  HH:mm').format(note.dateTime),
@@ -281,15 +309,21 @@ class _ContactNoteCard extends StatelessWidget {
                 InkWell(
                   onTap: onEdit,
                   borderRadius: BorderRadius.circular(8),
-                  child: Icon(Icons.edit,
-                      size: 18, color: isDark ? Colors.blue.shade300 : Colors.blue.shade300),
+                  child: Icon(
+                    Icons.edit,
+                    size: 18,
+                    color: isDark ? Colors.blue.shade300 : Colors.blue.shade300,
+                  ),
                 ),
                 const SizedBox(width: 4),
                 InkWell(
                   onTap: onDelete,
                   borderRadius: BorderRadius.circular(8),
-                  child: Icon(Icons.delete_outline,
-                      size: 18, color: Colors.red.shade300),
+                  child: Icon(
+                    Icons.delete_outline,
+                    size: 18,
+                    color: Colors.red.shade300,
+                  ),
                 ),
               ],
             ),
@@ -298,7 +332,11 @@ class _ContactNoteCard extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Text(
               note.notes,
-              style: TextStyle(fontSize: 14, height: 1.4, color: isDark ? colorScheme.onSurface : null),
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.4,
+                color: isDark ? colorScheme.onSurface : null,
+              ),
             ),
           ),
           Padding(
@@ -449,19 +487,33 @@ class _AddContactNoteSheetState extends State<_AddContactNoteSheet> {
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 14),
+                        horizontal: 12,
+                        vertical: 14,
+                      ),
                       decoration: BoxDecoration(
-                        border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade300),
+                        border: Border.all(
+                          color: isDark
+                              ? colorScheme.outline.withValues(alpha: 0.2)
+                              : Colors.grey.shade300,
+                        ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.calendar_today,
-                              size: 18, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+                          Icon(
+                            Icons.calendar_today,
+                            size: 18,
+                            color: isDark
+                                ? colorScheme.primary
+                                : const Color(0xFF174A7E),
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             DateFormat('dd/MM/yyyy').format(_selectedDate),
-                            style: TextStyle(fontSize: 14, color: isDark ? colorScheme.onSurface : null),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: isDark ? colorScheme.onSurface : null,
+                            ),
                           ),
                         ],
                       ),
@@ -475,19 +527,33 @@ class _AddContactNoteSheetState extends State<_AddContactNoteSheet> {
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 14),
+                        horizontal: 12,
+                        vertical: 14,
+                      ),
                       decoration: BoxDecoration(
-                        border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade300),
+                        border: Border.all(
+                          color: isDark
+                              ? colorScheme.outline.withValues(alpha: 0.2)
+                              : Colors.grey.shade300,
+                        ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.access_time,
-                              size: 18, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+                          Icon(
+                            Icons.access_time,
+                            size: 18,
+                            color: isDark
+                                ? colorScheme.primary
+                                : const Color(0xFF174A7E),
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             _selectedTime.format(context),
-                            style: TextStyle(fontSize: 14, color: isDark ? colorScheme.onSurface : null),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: isDark ? colorScheme.onSurface : null,
+                            ),
                           ),
                         ],
                       ),
@@ -559,7 +625,9 @@ class _AddContactNoteSheetState extends State<_AddContactNoteSheet> {
             ElevatedButton(
               onPressed: _isSaving ? null : _save,
               style: ElevatedButton.styleFrom(
-                backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                backgroundColor: isDark
+                    ? colorScheme.primary
+                    : const Color(0xFF174A7E),
                 foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
@@ -577,8 +645,10 @@ class _AddContactNoteSheetState extends State<_AddContactNoteSheet> {
                     )
                   : const Text(
                       'Salva',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
             ),
           ],
@@ -725,19 +795,33 @@ class _EditContactNoteSheetState extends State<_EditContactNoteSheet> {
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 14),
+                        horizontal: 12,
+                        vertical: 14,
+                      ),
                       decoration: BoxDecoration(
-                        border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade300),
+                        border: Border.all(
+                          color: isDark
+                              ? colorScheme.outline.withValues(alpha: 0.2)
+                              : Colors.grey.shade300,
+                        ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.calendar_today,
-                              size: 18, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+                          Icon(
+                            Icons.calendar_today,
+                            size: 18,
+                            color: isDark
+                                ? colorScheme.primary
+                                : const Color(0xFF174A7E),
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             DateFormat('dd/MM/yyyy').format(_selectedDate),
-                            style: TextStyle(fontSize: 14, color: isDark ? colorScheme.onSurface : null),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: isDark ? colorScheme.onSurface : null,
+                            ),
                           ),
                         ],
                       ),
@@ -751,19 +835,33 @@ class _EditContactNoteSheetState extends State<_EditContactNoteSheet> {
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 14),
+                        horizontal: 12,
+                        vertical: 14,
+                      ),
                       decoration: BoxDecoration(
-                        border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade300),
+                        border: Border.all(
+                          color: isDark
+                              ? colorScheme.outline.withValues(alpha: 0.2)
+                              : Colors.grey.shade300,
+                        ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.access_time,
-                              size: 18, color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+                          Icon(
+                            Icons.access_time,
+                            size: 18,
+                            color: isDark
+                                ? colorScheme.primary
+                                : const Color(0xFF174A7E),
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             _selectedTime.format(context),
-                            style: TextStyle(fontSize: 14, color: isDark ? colorScheme.onSurface : null),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: isDark ? colorScheme.onSurface : null,
+                            ),
                           ),
                         ],
                       ),
@@ -835,7 +933,9 @@ class _EditContactNoteSheetState extends State<_EditContactNoteSheet> {
             ElevatedButton(
               onPressed: _isSaving ? null : _save,
               style: ElevatedButton.styleFrom(
-                backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                backgroundColor: isDark
+                    ? colorScheme.primary
+                    : const Color(0xFF174A7E),
                 foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
@@ -853,8 +953,10 @@ class _EditContactNoteSheetState extends State<_EditContactNoteSheet> {
                     )
                   : const Text(
                       'Salva Modifiche',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
             ),
           ],
@@ -898,11 +1000,21 @@ class _MediumChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
             color: selected
-                ? (isDark ? colorScheme.primary.withValues(alpha: 0.2) : const Color(0xFF174A7E).withValues(alpha: 0.1))
-                : (isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.grey.shade100),
+                ? (isDark
+                      ? colorScheme.primary.withValues(alpha: 0.2)
+                      : const Color(0xFF174A7E).withValues(alpha: 0.1))
+                : (isDark
+                      ? colorScheme.surfaceContainerHighest.withValues(
+                          alpha: 0.3,
+                        )
+                      : Colors.grey.shade100),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: selected ? (isDark ? colorScheme.primary : const Color(0xFF174A7E)) : (isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade300),
+              color: selected
+                  ? (isDark ? colorScheme.primary : const Color(0xFF174A7E))
+                  : (isDark
+                        ? colorScheme.outline.withValues(alpha: 0.2)
+                        : Colors.grey.shade300),
               width: selected ? 2 : 1,
             ),
           ),

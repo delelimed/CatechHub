@@ -29,6 +29,7 @@ class HardwareSecurityException implements Exception {
   const HardwareSecurityException(this.userMessage, {this.technicalDetail});
 
   @override
-  String toString() => 'HardwareSecurityException: $userMessage'
+  String toString() =>
+      'HardwareSecurityException: $userMessage'
       '${technicalDetail != null ? ' (Dettaglio: $technicalDetail)' : ''}';
 }

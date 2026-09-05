@@ -61,10 +61,7 @@ class DashboardCard extends StatelessWidget {
           children: [
             Icon(icon, size: 40),
             const Spacer(),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            Text(title, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             Text(subtitle),
           ],

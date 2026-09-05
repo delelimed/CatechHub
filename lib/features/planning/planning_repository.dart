@@ -12,8 +12,7 @@ import '../attachments/attachments_repository.dart';
 /// Definito a livello di file (non più in planning_provider.dart) per
 /// coerenza modulare. Fornisce l'istanza condivisa del repository
 /// dei meeting a tutti i widget della sezione Programmazione.
-final planningRepositoryProvider =
-    Provider<PlanningRepository>((ref) {
+final planningRepositoryProvider = Provider<PlanningRepository>((ref) {
   return PlanningRepository();
 });
 
@@ -77,7 +76,9 @@ class PlanningRepository {
     final id = m.id.isEmpty ? LocalDatabase.newId('meeting') : m.id;
     final catechistName = getCurrentCatechistName();
     final now = DateTime.now();
-    final code = m.classUniqueCode.isNotEmpty ? m.classUniqueCode : _lookupClassUniqueCode(m.classId);
+    final code = m.classUniqueCode.isNotEmpty
+        ? m.classUniqueCode
+        : _lookupClassUniqueCode(m.classId);
     final data = m.copyWith(classUniqueCode: code).toMap();
     data['lastModifiedBy'] = catechistName;
     data['createdAt'] = now.toIso8601String();
@@ -109,7 +110,9 @@ class PlanningRepository {
     }
     final code = m.classUniqueCode.isNotEmpty
         ? m.classUniqueCode
-        : (existingUniqueCode?.isNotEmpty == true ? existingUniqueCode! : _lookupClassUniqueCode(m.classId));
+        : (existingUniqueCode?.isNotEmpty == true
+              ? existingUniqueCode!
+              : _lookupClassUniqueCode(m.classId));
     final data = m.copyWith(classUniqueCode: code).toMap();
     data['lastModifiedBy'] = getCurrentCatechistName();
     data['createdAt'] = existingCreatedAt ?? data['createdAt'];

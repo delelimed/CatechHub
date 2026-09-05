@@ -60,7 +60,7 @@ class SyncStatusDot extends ConsumerWidget {
         return _Dot(color: _toMaterialColor(_resolveColor(state)));
       },
       loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
     );
   }
 }

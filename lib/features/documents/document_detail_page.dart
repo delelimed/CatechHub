@@ -23,8 +23,18 @@ class DocumentDetailPage extends ConsumerWidget {
     if (date == null) return '';
 
     final List<String> mesi = [
-      'Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu',
-      'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'
+      'Gen',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mag',
+      'Giu',
+      'Lug',
+      'Ago',
+      'Set',
+      'Ott',
+      'Nov',
+      'Dic',
     ];
 
     return '${date.day} ${mesi[date.month - 1]} ${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
@@ -53,8 +63,9 @@ class DocumentDetailPage extends ConsumerWidget {
 
     final presenceMap = Map<String, String>.from(
       (todayAttendance['presence'] as Map?)?.map(
-        (k, v) => MapEntry(k.toString(), v.toString()),
-      ) ?? {},
+            (k, v) => MapEntry(k.toString(), v.toString()),
+          ) ??
+          {},
     );
 
     final presentIds = presenceMap.entries
@@ -147,11 +158,11 @@ class DocumentDetailPage extends ConsumerWidget {
             );
           }
 
-          final exoneratedCount = students.where(
-            (s) => deliveries[s.id]?['exoneratedAt'] != null,
-          ).length;
+          final exoneratedCount = students
+              .where((s) => deliveries[s.id]?['exoneratedAt'] != null)
+              .length;
 
-              return ListView.builder(
+          return ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: students.length + 1,
             itemBuilder: (context, index) {
@@ -176,70 +187,96 @@ class DocumentDetailPage extends ConsumerWidget {
                         }
                       },
                     ),
-                      if (exoneratedCount > 0) ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Icon(Icons.info_outline_rounded, size: 14, color: isDark ? Colors.grey.shade500 : Colors.grey.shade600),
-                            const SizedBox(width: 6),
-                            Text(
-                              '$exoneratedCount ${exoneratedCount == 1 ? 'ragazzo esonerato' : 'ragazzi esonerati'}',
-                              style: TextStyle(fontSize: 13, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                    if (exoneratedCount > 0) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline_rounded,
+                            size: 14,
+                            color: isDark
+                                ? Colors.grey.shade500
+                                : Colors.grey.shade600,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '$exoneratedCount ${exoneratedCount == 1 ? 'ragazzo esonerato' : 'ragazzi esonerati'}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDark
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
                             ),
-                          ],
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
                     ],
-                  );
-                }
-                final student = students[index - 1];
-                final studentId = student.id;
+                  ],
+                );
+              }
+              final student = students[index - 1];
+              final studentId = student.id;
 
-                final deliveryData = deliveries[studentId];
-                final bool isExonerated = deliveryData?['exoneratedAt'] != null;
+              final deliveryData = deliveries[studentId];
+              final bool isExonerated = deliveryData?['exoneratedAt'] != null;
 
-                final dynamic givenOutTimestamp = deliveryData?['givenOutAt'];
-                final dynamic receivedTimestamp = deliveryData?['receivedAt'];
+              final dynamic givenOutTimestamp = deliveryData?['givenOutAt'];
+              final dynamic receivedTimestamp = deliveryData?['receivedAt'];
 
-                final bool isGivenOut = givenOutTimestamp != null;
-                final bool isReceived = receivedTimestamp != null;
+              final bool isGivenOut = givenOutTimestamp != null;
+              final bool isReceived = receivedTimestamp != null;
 
-                final String dateGivenStr = _formatTimestamp(givenOutTimestamp);
-                final String dateReceivedStr = _formatTimestamp(receivedTimestamp);
+              final String dateGivenStr = _formatTimestamp(givenOutTimestamp);
+              final String dateReceivedStr = _formatTimestamp(
+                receivedTimestamp,
+              );
 
-                String statusText = 'Da consegnare';
-                Color statusColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
-                if (isExonerated) {
-                  statusText = 'Esonerato';
-                  statusColor = isDark ? Colors.grey.shade500 : Colors.grey;
-                } else if (isGivenOut && !isReceived) {
-                  statusText = 'Consegnato (In attesa di riconsegna)';
-                  statusColor = isDark ? Colors.orange.shade300 : Colors.orange.shade800;
-                } else if (isReceived) {
-                  statusText = 'Ritirato e Completato';
-                  statusColor = Colors.green;
-                }
+              String statusText = 'Da consegnare';
+              Color statusColor = isDark
+                  ? Colors.grey.shade400
+                  : Colors.grey.shade600;
+              if (isExonerated) {
+                statusText = 'Esonerato';
+                statusColor = isDark ? Colors.grey.shade500 : Colors.grey;
+              } else if (isGivenOut && !isReceived) {
+                statusText = 'Consegnato (In attesa di riconsegna)';
+                statusColor = isDark
+                    ? Colors.orange.shade300
+                    : Colors.orange.shade800;
+              } else if (isReceived) {
+                statusText = 'Ritirato e Completato';
+                statusColor = Colors.green;
+              }
 
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isExonerated
-                          ? (isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.grey.shade100)
-                          : (isDark ? colorScheme.surfaceContainer : Colors.white),
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: isDark
-                              ? Colors.black.withValues(alpha: 0.3)
-                              : Colors.black.withValues(alpha: 0.04),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        )
-                      ],
-                    ),
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isExonerated
+                        ? (isDark
+                              ? colorScheme.surfaceContainerHighest.withValues(
+                                  alpha: 0.3,
+                                )
+                              : Colors.grey.shade100)
+                        : (isDark
+                              ? colorScheme.surfaceContainer
+                              : Colors.white),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: isDark
+                            ? Colors.black.withValues(alpha: 0.3)
+                            : Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -247,12 +284,27 @@ class DocumentDetailPage extends ConsumerWidget {
                           children: [
                             CircleAvatar(
                               backgroundColor: isExonerated
-                                  ? (isDark ? Colors.grey.shade700 : Colors.grey.shade300)
-                                  : (isDark ? colorScheme.primaryContainer.withValues(alpha: 0.3) : const Color(0xFF174A7E).withValues(alpha: 0.1)),
+                                  ? (isDark
+                                        ? Colors.grey.shade700
+                                        : Colors.grey.shade300)
+                                  : (isDark
+                                        ? colorScheme.primaryContainer
+                                              .withValues(alpha: 0.3)
+                                        : const Color(
+                                            0xFF174A7E,
+                                          ).withValues(alpha: 0.1)),
                               child: Text(
-                                student.name.isNotEmpty ? student.name[0].toUpperCase() : 'R',
+                                student.name.isNotEmpty
+                                    ? student.name[0].toUpperCase()
+                                    : 'R',
                                 style: TextStyle(
-                                  color: isExonerated ? (isDark ? Colors.grey.shade500 : Colors.grey.shade500) : (isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+                                  color: isExonerated
+                                      ? (isDark
+                                            ? Colors.grey.shade500
+                                            : Colors.grey.shade500)
+                                      : (isDark
+                                            ? colorScheme.primary
+                                            : const Color(0xFF174A7E)),
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -267,7 +319,13 @@ class DocumentDetailPage extends ConsumerWidget {
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
-                                      color: isExonerated ? (isDark ? Colors.grey.shade500 : Colors.grey.shade500) : (isDark ? colorScheme.primary : const Color(0xFF174A7E)),
+                                      color: isExonerated
+                                          ? (isDark
+                                                ? Colors.grey.shade500
+                                                : Colors.grey.shade500)
+                                          : (isDark
+                                                ? colorScheme.primary
+                                                : const Color(0xFF174A7E)),
                                     ),
                                   ),
                                   Text(
@@ -284,7 +342,13 @@ class DocumentDetailPage extends ConsumerWidget {
                             PopupMenuButton<String>(
                               icon: Icon(
                                 Icons.more_vert_rounded,
-                                color: isExonerated ? (isDark ? Colors.grey.shade600 : Colors.grey.shade400) : (isDark ? Colors.grey.shade500 : Colors.grey.shade600),
+                                color: isExonerated
+                                    ? (isDark
+                                          ? Colors.grey.shade600
+                                          : Colors.grey.shade400)
+                                    : (isDark
+                                          ? Colors.grey.shade500
+                                          : Colors.grey.shade600),
                               ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(18),
@@ -304,11 +368,17 @@ class DocumentDetailPage extends ConsumerWidget {
                                   child: Row(
                                     children: [
                                       Icon(
-                                        isExonerated ? Icons.replay_rounded : Icons.block_rounded,
+                                        isExonerated
+                                            ? Icons.replay_rounded
+                                            : Icons.block_rounded,
                                         size: 20,
                                       ),
                                       const SizedBox(width: 10),
-                                      Text(isExonerated ? 'Revoca esonero' : 'Esonera'),
+                                      Text(
+                                        isExonerated
+                                            ? 'Revoca esonero'
+                                            : 'Esonera',
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -320,22 +390,36 @@ class DocumentDetailPage extends ConsumerWidget {
                           Container(
                             width: double.infinity,
                             margin: const EdgeInsets.only(top: 12),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
                             decoration: BoxDecoration(
-                              color: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.grey.shade200,
+                              color: isDark
+                                  ? colorScheme.surfaceContainerHighest
+                                        .withValues(alpha: 0.3)
+                                  : Colors.grey.shade200,
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.block_rounded, size: 16, color: isDark ? Colors.grey.shade500 : Colors.grey.shade600),
+                                Icon(
+                                  Icons.block_rounded,
+                                  size: 16,
+                                  color: isDark
+                                      ? Colors.grey.shade500
+                                      : Colors.grey.shade600,
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
                                   'Esonerato',
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
-                                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                    color: isDark
+                                        ? Colors.grey.shade400
+                                        : Colors.grey.shade600,
                                   ),
                                 ),
                               ],
@@ -347,20 +431,34 @@ class DocumentDetailPage extends ConsumerWidget {
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.person_rounded, size: 12, color: isDark ? Colors.grey.shade500 : Colors.grey.shade400),
+                                  Icon(
+                                    Icons.person_rounded,
+                                    size: 12,
+                                    color: isDark
+                                        ? Colors.grey.shade500
+                                        : Colors.grey.shade400,
+                                  ),
                                   const SizedBox(width: 4),
                                   Text(
                                     'da ${deliveryData!['lastModifiedBy']}',
                                     style: TextStyle(
                                       fontSize: 11,
-                                      color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+                                      color: isDark
+                                          ? Colors.grey.shade500
+                                          : Colors.grey.shade400,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
                         ] else ...[
-                          Divider(height: 20, thickness: 0.5, color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : null),
+                          Divider(
+                            height: 20,
+                            thickness: 0.5,
+                            color: isDark
+                                ? colorScheme.outline.withValues(alpha: 0.2)
+                                : null,
+                          ),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             crossAxisAlignment: CrossAxisAlignment.center,
@@ -381,17 +479,20 @@ class DocumentDetailPage extends ConsumerWidget {
                                       isCurrentlyGiven: isGivenOut,
                                     ),
                                   ),
-                                  if (isGivenOut && dateGivenStr.isNotEmpty) ...[
+                                  if (isGivenOut &&
+                                      dateGivenStr.isNotEmpty) ...[
                                     const SizedBox(height: 4),
                                     Text(
                                       dateGivenStr,
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w500,
-                                        color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                        color: isDark
+                                            ? Colors.grey.shade400
+                                            : Colors.grey.shade600,
                                       ),
                                     ),
-                                  ]
+                                  ],
                                 ],
                               ),
                               const SizedBox(width: 12),
@@ -413,17 +514,20 @@ class DocumentDetailPage extends ConsumerWidget {
                                             isCurrentlyReceived: isReceived,
                                           ),
                                   ),
-                                  if (isReceived && dateReceivedStr.isNotEmpty) ...[
+                                  if (isReceived &&
+                                      dateReceivedStr.isNotEmpty) ...[
                                     const SizedBox(height: 4),
                                     Text(
                                       dateReceivedStr,
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w500,
-                                        color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                        color: isDark
+                                            ? Colors.grey.shade400
+                                            : Colors.grey.shade600,
                                       ),
                                     ),
-                                  ]
+                                  ],
                                 ],
                               ),
                             ],
@@ -434,13 +538,21 @@ class DocumentDetailPage extends ConsumerWidget {
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
-                                  Icon(Icons.person_rounded, size: 12, color: isDark ? Colors.grey.shade500 : Colors.grey.shade400),
+                                  Icon(
+                                    Icons.person_rounded,
+                                    size: 12,
+                                    color: isDark
+                                        ? Colors.grey.shade500
+                                        : Colors.grey.shade400,
+                                  ),
                                   const SizedBox(width: 4),
                                   Text(
                                     'da ${deliveryData!['lastModifiedBy']}',
                                     style: TextStyle(
                                       fontSize: 11,
-                                      color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+                                      color: isDark
+                                          ? Colors.grey.shade500
+                                          : Colors.grey.shade400,
                                     ),
                                   ),
                                 ],
@@ -491,17 +603,23 @@ class _ActionButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isButtonDisabled
-              ? (isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.grey.shade100)
+              ? (isDark
+                    ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
+                    : Colors.grey.shade100)
               : isActive
-                  ? activeColor.withValues(alpha: 0.12)
-                  : Colors.transparent,
+              ? activeColor.withValues(alpha: 0.12)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isButtonDisabled
-                ? (isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade300)
+                ? (isDark
+                      ? colorScheme.outline.withValues(alpha: 0.2)
+                      : Colors.grey.shade300)
                 : isActive
-                    ? activeColor
-                    : (isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade300),
+                ? activeColor
+                : (isDark
+                      ? colorScheme.outline.withValues(alpha: 0.2)
+                      : Colors.grey.shade300),
             width: 1,
           ),
         ),
@@ -514,8 +632,8 @@ class _ActionButton extends StatelessWidget {
               color: isButtonDisabled
                   ? (isDark ? Colors.grey.shade500 : Colors.grey.shade400)
                   : isActive
-                      ? activeColor
-                      : (isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                  ? activeColor
+                  : (isDark ? Colors.grey.shade400 : Colors.grey.shade600),
             ),
             const SizedBox(width: 6),
             Text(
@@ -526,8 +644,8 @@ class _ActionButton extends StatelessWidget {
                 color: isButtonDisabled
                     ? (isDark ? Colors.grey.shade500 : Colors.grey.shade400)
                     : isActive
-                        ? activeColor
-                        : (isDark ? Colors.grey.shade400 : Colors.grey.shade700),
+                    ? activeColor
+                    : (isDark ? Colors.grey.shade400 : Colors.grey.shade700),
               ),
             ),
           ],
@@ -559,10 +677,7 @@ class _TodayDeliverButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                Colors.green.shade700,
-                Colors.green.shade500,
-              ],
+              colors: [Colors.green.shade700, Colors.green.shade500],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -615,7 +730,10 @@ class _TodayDeliverButton extends StatelessWidget {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 7,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(10),

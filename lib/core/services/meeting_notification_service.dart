@@ -18,7 +18,7 @@
 //   - hive_flutter: per lettura box meeting_notifications_box
 // ══════════════════════════════════════════════════════════════════════════════
 
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -65,7 +65,9 @@ class MeetingNotificationService {
     if (_initialized) return;
 
     // 1. Configura canale notifiche Android
-    const androidSettings = AndroidInitializationSettings('@mipmap/launcher_icon');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/launcher_icon',
+    );
     const settings = InitializationSettings(android: androidSettings);
 
     await _notificationsPlugin.initialize(
@@ -95,7 +97,8 @@ class MeetingNotificationService {
 
     await _notificationsPlugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(androidChannel);
   }
 
@@ -111,7 +114,9 @@ class MeetingNotificationService {
   static void _onNotificationTapped(NotificationResponse response) {
     // Navigazione opzionale alla pagina planning
     // Per ora apriamo l'app alla home
-    print('Notifica incontro toccata: ${response.payload}');
+    if (kDebugMode) {
+      debugPrint('Notifica incontro toccata: ${response.payload}');
+    }
   }
 
   /// Verifica se le notifiche incontri sono abilitate.
@@ -214,7 +219,9 @@ class MeetingNotificationService {
 
     final hasPermission = await isPermissionGranted;
     if (!hasPermission) {
-      print('Permesso notifiche non concesso, impossibile programmare');
+      if (kDebugMode) {
+        debugPrint('Permesso notifiche non concesso, impossibile programmare');
+      }
       return;
     }
 
@@ -298,6 +305,18 @@ class MeetingNotificationService {
 
     const details = NotificationDetails(android: androidDetails);
 
+    // L2 / Fase 4-11: SCHEDULE_EXACT_ALARM viene RICHIESTO a runtime al momento
+    // della programmazione del promemoria (best-effort). Prima il permesso era
+    // solo dichiarato nel manifest senza richiesta: su Android 12+ la
+    // pianificazione esatta falliva o era impossibile da concedere. Se la
+    // richiesta non è disponibile/concessa, si continua con la modalità
+    // inesatta (fallback già previsto sotto).
+    try {
+      await Permission.scheduleExactAlarm.request();
+    } catch (_) {
+      // Best-effort: su API < 31 il permesso non esiste ed è già "granted".
+    }
+
     try {
       await _notificationsPlugin.zonedSchedule(
         id: id,
@@ -311,22 +330,23 @@ class MeetingNotificationService {
       );
     } on PlatformException catch (e) {
       if (e.code == 'exact_alarms_not_permitted') {
-        print(
-          'Permesso SCHEDULE_EXACT_ALARM non concesso, uso modalità inesatta',
-        );
-        await _notificationsPlugin.zonedSchedule(
-          id: id,
-          title: title,
-          body: body,
-          scheduledDate: _toTZDateTime(scheduledDate),
-          notificationDetails: details,
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-          matchDateTimeComponents: null,
-          payload: payload,
-        );
-      } else {
+        if (kDebugMode) {
+          debugPrint(
+            'Permesso SCHEDULE_EXACT_ALARM non concesso, uso modalità inesatta',
+          );
+          await _notificationsPlugin.zonedSchedule(
+            id: id,
+            title: title,
+            body: body,
+            scheduledDate: _toTZDateTime(scheduledDate),
+            notificationDetails: details,
+            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+            matchDateTimeComponents: null,
+            payload: payload,
+          );
+        } // close kDebugMode if
         rethrow;
-      }
+      } // close e.code if
     }
   }
 
@@ -370,7 +390,9 @@ class MeetingNotificationService {
   }
 
   /// Programma la notifica per un singolo meeting.
-  static Future<void> _scheduleNotificationForMeeting(PlanningMeeting meeting) async {
+  static Future<void> _scheduleNotificationForMeeting(
+    PlanningMeeting meeting,
+  ) async {
     final timeParts = notificationTime.split(':');
     if (timeParts.length != 2) return;
 

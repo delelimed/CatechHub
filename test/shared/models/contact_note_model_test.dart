@@ -23,7 +23,10 @@ void main() {
       // Assert: i campi corrispondono
       expect(restored.studentId, 's1');
       expect(restored.medium, 'whatsapp');
-      expect(restored.notes, 'Chiamata con la madre per discutere del comportamento');
+      expect(
+        restored.notes,
+        'Chiamata con la madre per discutere del comportamento',
+      );
     });
 
     test('fromMap gestisce campi mancanti con default', () {

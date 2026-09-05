@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════════════════════
 // auth_provider.dart — CatechHub (Riverpod auth state machine - POST MIGRAZIONE)
-// 
+//
 // NUOVO FLUSSO (solo biometria/PIN telefono):
 //   - NESSUN PIN app proprio
 //   - isPinConfigured → SEMPRE false (rimosso per compatibilità, deprecato)
@@ -14,12 +14,14 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_service.dart';
 import '../../features/classes/classes_repository.dart';
+import '../../shared/models/user_role.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
-final authStateProvider = AsyncNotifierProvider<LocalAuthNotifier, Map<String, dynamic>?>(
-  () => LocalAuthNotifier(),
-);
+final authStateProvider =
+    AsyncNotifierProvider<LocalAuthNotifier, Map<String, dynamic>?>(
+      () => LocalAuthNotifier(),
+    );
 
 class LocalAuthNotifier extends AsyncNotifier<Map<String, dynamic>?> {
   AuthService get _authService => ref.read(authServiceProvider);
@@ -69,6 +71,7 @@ class LocalAuthNotifier extends AsyncNotifier<Map<String, dynamic>?> {
   /// Configurazione profilo INIZIALE (prima volta).
   /// Salva: nome, cognome e opzionalmente crea la classe.
   /// Se [createClass] è false, l'utente si unirà a una classe via P2P.
+  /// [role] determina il ruolo locale (Catechista / Responsabile).
   /// NON chiede PIN (usa biometria telefono).
   Future<bool> setupInitialProfile({
     required String firstName,
@@ -76,6 +79,7 @@ class LocalAuthNotifier extends AsyncNotifier<Map<String, dynamic>?> {
     String? groupName,
     String? phoneNumber,
     bool createClass = true,
+    UserRole role = UserRole.catechista,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -86,6 +90,7 @@ class LocalAuthNotifier extends AsyncNotifier<Map<String, dynamic>?> {
           groupName: groupName,
           phoneNumber: phoneNumber,
           createClass: createClass,
+          role: role,
         ),
         const Duration(seconds: 30),
         'Timeout durante la configurazione',

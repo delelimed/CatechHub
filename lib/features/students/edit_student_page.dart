@@ -24,8 +24,7 @@ class EditStudentPage extends ConsumerStatefulWidget {
   const EditStudentPage({super.key, required this.student});
 
   @override
-  ConsumerState<EditStudentPage> createState() =>
-      _EditStudentPageState();
+  ConsumerState<EditStudentPage> createState() => _EditStudentPageState();
 }
 
 class _EditStudentPageState extends ConsumerState<EditStudentPage> {
@@ -138,7 +137,9 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
       backgroundColor: isDark ? colorScheme.surface : Colors.grey.shade50,
 
       appBar: AppBar(
-        backgroundColor: isDark ? colorScheme.primaryContainer : const Color(0xFF174A7E),
+        backgroundColor: isDark
+            ? colorScheme.primaryContainer
+            : const Color(0xFF174A7E),
         foregroundColor: isDark ? colorScheme.onPrimaryContainer : Colors.white,
         title: const Text('Modifica ragazzo'),
         actions: [
@@ -146,7 +147,7 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
             icon: Icon(editMode ? Icons.lock_open : Icons.lock),
             onPressed: () => setState(() => editMode = !editMode),
             tooltip: editMode ? 'Blocca modifiche' : 'Abilita modifiche',
-          )
+          ),
         ],
       ),
 
@@ -167,8 +168,22 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
               isDark: isDark,
               colorScheme: colorScheme,
               children: [
-                _Field(name, 'Nome', enabled: editMode, capitalizeWords: true, isDark: isDark, colorScheme: colorScheme),
-                _Field(surname, 'Cognome', enabled: editMode, capitalizeWords: true, isDark: isDark, colorScheme: colorScheme),
+                _Field(
+                  name,
+                  'Nome',
+                  enabled: editMode,
+                  capitalizeWords: true,
+                  isDark: isDark,
+                  colorScheme: colorScheme,
+                ),
+                _Field(
+                  surname,
+                  'Cognome',
+                  enabled: editMode,
+                  capitalizeWords: true,
+                  isDark: isDark,
+                  colorScheme: colorScheme,
+                ),
               ],
             ),
 
@@ -181,8 +196,7 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
               children: isDesktop
                   ? [
                       Row(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
                             child: _ParentCard(
@@ -212,7 +226,7 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
                             ),
                           ),
                         ],
-                      )
+                      ),
                     ]
                   : [
                       _ParentCard(
@@ -266,7 +280,14 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
               isDark: isDark,
               colorScheme: colorScheme,
               children: [
-                _Field(allergies, 'Allergie', maxLines: 2, enabled: editMode, isDark: isDark, colorScheme: colorScheme),
+                _Field(
+                  allergies,
+                  'Allergie',
+                  maxLines: 2,
+                  enabled: editMode,
+                  isDark: isDark,
+                  colorScheme: colorScheme,
+                ),
                 const SizedBox(height: 16),
                 _EditExitsSelector(
                   selectedExits: selectedExits,
@@ -291,7 +312,12 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
               isDark: isDark,
               colorScheme: colorScheme,
               children: [
-                _NotesField(notes, enabled: editMode, isDark: isDark, colorScheme: colorScheme),
+                _NotesField(
+                  notes,
+                  enabled: editMode,
+                  isDark: isDark,
+                  colorScheme: colorScheme,
+                ),
               ],
             ),
 
@@ -322,16 +348,21 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-                  foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 14),
+                  backgroundColor: isDark
+                      ? colorScheme.primary
+                      : const Color(0xFF174A7E),
+                  foregroundColor: isDark
+                      ? colorScheme.onPrimary
+                      : Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 onPressed: editMode
                     ? () async {
                         String? autonomousExits;
                         if (selectedExits.isNotEmpty) {
-                          if (selectedExits.contains('altro') && customExitName != null && customExitName!.isNotEmpty) {
+                          if (selectedExits.contains('altro') &&
+                              customExitName != null &&
+                              customExitName!.isNotEmpty) {
                             autonomousExits = 'altro:$customExitName';
                           } else if (selectedExits.length == 1) {
                             autonomousExits = selectedExits.first;
@@ -352,15 +383,14 @@ class _EditStudentPageState extends ConsumerState<EditStudentPage> {
                           fatherSurname: fatherSurname.text,
                           fatherPhone: fatherPhone.text,
                           studentPhone: studentPhone.text,
-                          allergies: allergies.text.isNotEmpty ? allergies.text : null,
+                          allergies: allergies.text.isNotEmpty
+                              ? allergies.text
+                              : null,
                           autonomousExits: autonomousExits,
                           notes: notes.text.isNotEmpty ? notes.text : null,
                         );
 
-                        await repo.updateStudent(
-                          widget.student.id,
-                          updated,
-                        );
+                        await repo.updateStudent(widget.student.id, updated);
 
                         setState(() => editMode = false);
                       }
@@ -400,10 +430,7 @@ class _HeaderCard extends StatelessWidget {
                   colorScheme.surfaceContainer,
                   colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                 ]
-              : [
-                  Colors.white,
-                  Colors.blue.shade50.withValues(alpha: 0.5),
-                ],
+              : [Colors.white, Colors.blue.shade50.withValues(alpha: 0.5)],
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
@@ -413,13 +440,16 @@ class _HeaderCard extends StatelessWidget {
                 : Colors.black.withValues(alpha: 0.05),
             blurRadius: 16,
             offset: const Offset(0, 10),
-          )
+          ),
         ],
       ),
       child: Row(
         children: [
-          Icon(Icons.edit,
-              color: isDark ? colorScheme.primary : const Color(0xFF174A7E), size: 30),
+          Icon(
+            Icons.edit,
+            color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+            size: 30,
+          ),
           const SizedBox(width: 12),
           Text(
             'Modifica profilo ragazzo',
@@ -465,7 +495,7 @@ class _Section extends StatelessWidget {
                 : Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 6),
-          )
+          ),
         ],
       ),
       child: Column(
@@ -517,9 +547,15 @@ class _ParentCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.grey.shade50,
+        color: isDark
+            ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
+            : Colors.grey.shade50,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade200),
+        border: Border.all(
+          color: isDark
+              ? colorScheme.outline.withValues(alpha: 0.2)
+              : Colors.grey.shade200,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -532,12 +568,33 @@ class _ParentCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          _Field(name, 'Nome', enabled: editMode, capitalizeWords: true, isDark: isDark, colorScheme: colorScheme),
-          _Field(surname, 'Cognome', enabled: editMode, capitalizeWords: true, isDark: isDark, colorScheme: colorScheme),
+          _Field(
+            name,
+            'Nome',
+            enabled: editMode,
+            capitalizeWords: true,
+            isDark: isDark,
+            colorScheme: colorScheme,
+          ),
+          _Field(
+            surname,
+            'Cognome',
+            enabled: editMode,
+            capitalizeWords: true,
+            isDark: isDark,
+            colorScheme: colorScheme,
+          ),
           Row(
             children: [
               Expanded(
-                child: _Field(phone, 'Telefono', enabled: editMode, keyboardType: TextInputType.phone, isDark: isDark, colorScheme: colorScheme),
+                child: _Field(
+                  phone,
+                  'Telefono',
+                  enabled: editMode,
+                  keyboardType: TextInputType.phone,
+                  isDark: isDark,
+                  colorScheme: colorScheme,
+                ),
               ),
               if (phone.text.isNotEmpty) ...[
                 const SizedBox(width: 8),
@@ -597,7 +654,9 @@ class _Field extends StatelessWidget {
         decoration: InputDecoration(
           labelText: label,
           filled: true,
-          fillColor: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.2) : Colors.grey.shade50,
+          fillColor: isDark
+              ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.2)
+              : Colors.grey.shade50,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
             borderSide: BorderSide.none,
@@ -617,7 +676,12 @@ class _NotesField extends StatelessWidget {
   final bool isDark;
   final ColorScheme colorScheme;
 
-  const _NotesField(this.controller, {this.enabled = true, required this.isDark, required this.colorScheme});
+  const _NotesField(
+    this.controller, {
+    this.enabled = true,
+    required this.isDark,
+    required this.colorScheme,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -629,7 +693,9 @@ class _NotesField extends StatelessWidget {
         labelText: 'Note',
         alignLabelWithHint: true,
         filled: true,
-        fillColor: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.2) : Colors.grey.shade50,
+        fillColor: isDark
+            ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.2)
+            : Colors.grey.shade50,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
@@ -710,8 +776,7 @@ class _EditExitsSelector extends StatefulWidget {
   });
 
   @override
-  State<_EditExitsSelector> createState() =>
-      _EditExitsSelectorState();
+  State<_EditExitsSelector> createState() => _EditExitsSelectorState();
 }
 
 class _EditExitsSelectorState extends State<_EditExitsSelector> {
@@ -743,14 +808,19 @@ class _EditExitsSelectorState extends State<_EditExitsSelector> {
         if (widget.editMode)
           Text(
             'Chi accompagna l\'uscita?',
-            style: TextStyle(fontWeight: FontWeight.w600, color: widget.isDark ? widget.colorScheme.onSurface : null),
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: widget.isDark ? widget.colorScheme.onSurface : null,
+            ),
           )
         else
           Text(
             'Chi accompagna l\'uscita: ${selected.isEmpty ? 'Non specificato' : selected.join(', ')}',
             style: TextStyle(
               fontWeight: FontWeight.w600,
-              color: widget.isDark ? widget.colorScheme.onSurface : Colors.grey.shade700,
+              color: widget.isDark
+                  ? widget.colorScheme.onSurface
+                  : Colors.grey.shade700,
             ),
           ),
         const SizedBox(height: 12),
@@ -817,7 +887,11 @@ class _EditExitsSelectorState extends State<_EditExitsSelector> {
             decoration: InputDecoration(
               labelText: 'Specifica chi accompagna',
               filled: true,
-              fillColor: widget.isDark ? widget.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2) : Colors.grey.shade50,
+              fillColor: widget.isDark
+                  ? widget.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.2,
+                    )
+                  : Colors.grey.shade50,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide.none,
@@ -831,7 +905,11 @@ class _EditExitsSelectorState extends State<_EditExitsSelector> {
             padding: const EdgeInsets.only(top: 8),
             child: Text(
               'Altro: ${customController.text}',
-              style: TextStyle(color: widget.isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+              style: TextStyle(
+                color: widget.isDark
+                    ? Colors.grey.shade400
+                    : Colors.grey.shade600,
+              ),
             ),
           ),
       ],
@@ -863,10 +941,14 @@ class _ExitChip extends StatelessWidget {
       label: Text(label),
       selected: selected,
       onSelected: onChanged,
-      backgroundColor: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.grey.shade100,
+      backgroundColor: isDark
+          ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
+          : Colors.grey.shade100,
       selectedColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
       labelStyle: TextStyle(
-        color: selected ? Colors.white : (isDark ? colorScheme.onSurface : Colors.black),
+        color: selected
+            ? Colors.white
+            : (isDark ? colorScheme.onSurface : Colors.black),
         fontWeight: FontWeight.w500,
       ),
     );

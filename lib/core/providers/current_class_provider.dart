@@ -57,7 +57,10 @@ final currentClassProvider = NotifierProvider<CurrentClassNotifier, String?>(
 ///
 /// Da chiamare DOPO aver eliminato la classe, così modifica/cancellazione
 /// restano sempre coerenti con la classe effettivamente aperta.
-Future<void> clearCurrentClassIfDeleted(WidgetRef ref, String deletedClassId) async {
+Future<void> clearCurrentClassIfDeleted(
+  WidgetRef ref,
+  String deletedClassId,
+) async {
   if (ref.read(currentClassProvider) == deletedClassId) {
     await ref.read(currentClassProvider.notifier).clear();
   }
@@ -71,10 +74,11 @@ final currentClassDetailsProvider = Provider<SchoolClass?>((ref) {
   return classesAsync.when(
     data: (classes) => classes.firstWhere(
       (c) => c.id == classId,
-      orElse: () => SchoolClass(id: '', name: '', studentIds: [], catechistIds: []),
+      orElse: () =>
+          SchoolClass(id: '', name: '', studentIds: [], catechistIds: []),
     ),
     loading: () => null,
-    error: (_, __) => null,
+    error: (_, _) => null,
   );
 });
 
@@ -83,8 +87,9 @@ final myClassesProvider = Provider<List<SchoolClass>>((ref) {
   const uid = AuthService.localUserId;
   final classesAsync = ref.watch(classesStreamProvider);
   return classesAsync.when(
-    data: (classes) => classes.where((c) => c.catechistIds.contains(uid)).toList(),
+    data: (classes) =>
+        classes.where((c) => c.catechistIds.contains(uid)).toList(),
     loading: () => [],
-    error: (_, __) => [],
+    error: (_, _) => [],
   );
 });

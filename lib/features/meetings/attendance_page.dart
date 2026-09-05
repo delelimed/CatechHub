@@ -7,6 +7,8 @@
 /// - pulsanti "Presente" (verde) e "Assente" (rosso) per ogni studente
 /// - supporto a futuri swipe gesture per cambiare stato rapidamente
 /// Le presenze vengono salvate su Hive tramite [AttendanceRepository].
+library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -31,7 +33,10 @@ class _Student {
 }
 
 final _studentsWithHistoryProvider = StreamProvider.autoDispose
-    .family<List<_Student>, ({String currentMeetingId, String classId})>((ref, args) {
+    .family<List<_Student>, ({String currentMeetingId, String classId})>((
+      ref,
+      args,
+    ) {
       final studentsRepo = ref.watch(studentsRepoProvider);
       final attendanceRepo = AttendanceRepository();
 
@@ -114,8 +119,9 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
     );
     if (existing != null) {
       presence = Map<String, String>.from(existing['presence'] as Map? ?? {});
-      _attendanceUpdatedAt =
-          DateTime.tryParse(existing['updatedAt']?.toString() ?? '');
+      _attendanceUpdatedAt = DateTime.tryParse(
+        existing['updatedAt']?.toString() ?? '',
+      );
       _attendanceLastModifiedBy = existing['lastModifiedBy']?.toString() ?? '';
     }
   }
@@ -165,8 +171,7 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
       );
     }
 
-    final meetingClassId =
-        meeting is PlanningMeeting ? meeting.classId : '';
+    final meetingClassId = meeting is PlanningMeeting ? meeting.classId : '';
     final studentsWithHistoryAsync = ref.watch(
       _studentsWithHistoryProvider((
         currentMeetingId: widget.meeting?.id ?? '',
@@ -198,9 +203,8 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
           Expanded(
             child: studentsWithHistoryAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(
-                child: Text('Errore nel caricamento studenti: $e'),
-              ),
+              error: (e, _) =>
+                  Center(child: Text('Errore nel caricamento studenti: $e')),
               data: (students) {
                 if (students.isEmpty) {
                   return const Center(
@@ -208,135 +212,130 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
                   );
                 }
 
-                    return ListView.separated(
-                      padding: const EdgeInsets.only(bottom: 100),
-                      itemCount: students.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final s = students[index];
-                        final value = presence[s.id];
+                return ListView.separated(
+                  padding: const EdgeInsets.only(bottom: 100),
+                  itemCount: students.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final s = students[index];
+                    final value = presence[s.id];
 
-                        return Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: s.consecutiveAbsences >= 2
-                                ? (isDark
-                                      ? Colors.red.shade900.withValues(
-                                          alpha: 0.2,
-                                        )
-                                      : Colors.red.shade50)
-                                : (isDark
-                                      ? colorScheme.surfaceContainer
-                                      : Colors.white),
-                            borderRadius: BorderRadius.circular(20),
-                            border: s.consecutiveAbsences >= 2
-                                ? Border.all(
-                                    color: isDark
-                                        ? Colors.red.shade700.withValues(
-                                            alpha: 0.4,
-                                          )
-                                        : Colors.red.shade200,
-                                    width: 1,
-                                  )
-                                : null,
-                            boxShadow: [
-                              BoxShadow(
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: s.consecutiveAbsences >= 2
+                            ? (isDark
+                                  ? Colors.red.shade900.withValues(alpha: 0.2)
+                                  : Colors.red.shade50)
+                            : (isDark
+                                  ? colorScheme.surfaceContainer
+                                  : Colors.white),
+                        borderRadius: BorderRadius.circular(20),
+                        border: s.consecutiveAbsences >= 2
+                            ? Border.all(
                                 color: isDark
-                                    ? Colors.black.withValues(alpha: 0.3)
-                                    : Colors.black.withValues(alpha: 0.04),
-                                blurRadius: 12,
-                                offset: const Offset(0, 6),
-                              ),
-                            ],
+                                    ? Colors.red.shade700.withValues(alpha: 0.4)
+                                    : Colors.red.shade200,
+                                width: 1,
+                              )
+                            : null,
+                        boxShadow: [
+                          BoxShadow(
+                            color: isDark
+                                ? Colors.black.withValues(alpha: 0.3)
+                                : Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 12,
+                            offset: const Offset(0, 6),
                           ),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                backgroundColor: s.consecutiveAbsences >= 2
-                                    ? (isDark
-                                          ? Colors.red.shade800.withValues(
-                                              alpha: 0.3,
-                                            )
-                                          : Colors.red.shade100)
-                                    : (isDark
-                                          ? colorScheme.primaryContainer
-                                                .withValues(alpha: 0.3)
-                                          : Colors.blue.shade50),
-                                child: Icon(
-                                  Icons.person,
-                                  color: s.consecutiveAbsences >= 2
-                                      ? (isDark
-                                            ? Colors.red.shade300
-                                            : Colors.red.shade900)
-                                      : (isDark
-                                            ? colorScheme.primary
-                                            : const Color(0xFF174A7E)),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: s.consecutiveAbsences >= 2
+                                ? (isDark
+                                      ? Colors.red.shade800.withValues(
+                                          alpha: 0.3,
+                                        )
+                                      : Colors.red.shade100)
+                                : (isDark
+                                      ? colorScheme.primaryContainer.withValues(
+                                          alpha: 0.3,
+                                        )
+                                      : Colors.blue.shade50),
+                            child: Icon(
+                              Icons.person,
+                              color: s.consecutiveAbsences >= 2
+                                  ? (isDark
+                                        ? Colors.red.shade300
+                                        : Colors.red.shade900)
+                                  : (isDark
+                                        ? colorScheme.primary
+                                        : const Color(0xFF174A7E)),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${s.name} ${s.surname}',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: s.consecutiveAbsences >= 2
+                                        ? (isDark
+                                              ? Colors.red.shade300
+                                              : Colors.red.shade900)
+                                        : (isDark
+                                              ? colorScheme.onSurface
+                                              : Colors.black87),
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '${s.name} ${s.surname}',
+                                if (s.consecutiveAbsences >= 2)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Text(
+                                      '${s.consecutiveAbsences} assenze consecutive!',
                                       style: TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
-                                        color: s.consecutiveAbsences >= 2
-                                            ? (isDark
-                                                  ? Colors.red.shade300
-                                                  : Colors.red.shade900)
-                                            : (isDark
-                                                  ? colorScheme.onSurface
-                                                  : Colors.black87),
+                                        fontSize: 11,
+                                        color: isDark
+                                            ? Colors.red.shade400
+                                            : Colors.red.shade700,
+                                        fontWeight: FontWeight.w500,
                                       ),
                                     ),
-                                    if (s.consecutiveAbsences >= 2)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 2),
-                                        child: Text(
-                                          '${s.consecutiveAbsences} assenze consecutive!',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: isDark
-                                                ? Colors.red.shade400
-                                                : Colors.red.shade700,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              _PresenceButton(
+                                label: 'Presente',
+                                selected: value == 'Presente',
+                                color: Colors.green,
+                                onTap: () =>
+                                    setState(() => presence[s.id] = 'Presente'),
                               ),
-                              Row(
-                                children: [
-                                  _PresenceButton(
-                                    label: 'Presente',
-                                    selected: value == 'Presente',
-                                    color: Colors.green,
-                                    onTap: () => setState(
-                                      () => presence[s.id] = 'Presente',
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  _PresenceButton(
-                                    label: 'Assente',
-                                    selected: value == 'Assente',
-                                    color: Colors.red,
-                                    onTap: () => setState(
-                                      () => presence[s.id] = 'Assente',
-                                    ),
-                                  ),
-                                ],
+                              const SizedBox(width: 8),
+                              _PresenceButton(
+                                label: 'Assente',
+                                selected: value == 'Assente',
+                                color: Colors.red,
+                                onTap: () =>
+                                    setState(() => presence[s.id] = 'Assente'),
                               ),
                             ],
                           ),
-                        );
-                      },
+                        ],
+                      ),
                     );
                   },
-                ),
+                );
+              },
+            ),
           ),
         ],
       ),

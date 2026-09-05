@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════════════════════
 // hard_lock_screen.dart — CatechHub (Schermata blocco obbligatoria: niente lockscreen telefono = niente app)
-// 
+//
 // Widget NON CHIUDIBILE (barrierDismissible: false) che blocca completamente l'app
 // se il dispositivo NON ha un blocco schermo attivo (PIN, pattern, password, biometria).
 //
@@ -33,7 +33,8 @@ class HardLockScreen extends StatefulWidget {
   State<HardLockScreen> createState() => _HardLockScreenState();
 }
 
-class _HardLockScreenState extends State<HardLockScreen> with TickerProviderStateMixin {
+class _HardLockScreenState extends State<HardLockScreen>
+    with TickerProviderStateMixin {
   late final AnimationController _pulseController;
   late final Animation<double> _pulseAnimation;
   bool _isChecking = false;
@@ -91,7 +92,9 @@ class _HardLockScreenState extends State<HardLockScreen> with TickerProviderStat
   Future<void> _openSecuritySettings() async {
     if (Platform.isAndroid) {
       try {
-        const MethodChannel channel = MethodChannel('catechhub/security_settings');
+        const MethodChannel channel = MethodChannel(
+          'catechhub/security_settings',
+        );
         await channel.invokeMethod('openSecuritySettings');
       } catch (e) {
         _showSettingsError(e);
@@ -149,7 +152,10 @@ class _HardLockScreenState extends State<HardLockScreen> with TickerProviderStat
                       decoration: BoxDecoration(
                         color: Colors.red.shade50,
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.red.shade200, width: 3),
+                        border: Border.all(
+                          color: Colors.red.shade200,
+                          width: 3,
+                        ),
                       ),
                       child: Icon(
                         Icons.security_rounded,
@@ -204,13 +210,20 @@ class _HardLockScreenState extends State<HardLockScreen> with TickerProviderStat
                   decoration: BoxDecoration(
                     color: Colors.amber.shade50,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.amber.shade200, width: 1.5),
+                    border: Border.all(
+                      color: Colors.amber.shade200,
+                      width: 1.5,
+                    ),
                   ),
                   child: Column(
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.info_outline_rounded, color: Colors.amber.shade800, size: 24),
+                          Icon(
+                            Icons.info_outline_rounded,
+                            color: Colors.amber.shade800,
+                            size: 24,
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
@@ -259,8 +272,13 @@ class _HardLockScreenState extends State<HardLockScreen> with TickerProviderStat
                           )
                         : const Icon(Icons.settings_rounded, size: 26),
                     label: Text(
-                      _isChecking ? 'Verifica in corso...' : 'Apri Impostazioni Sicurezza',
-                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                      _isChecking
+                          ? 'Verifica in corso...'
+                          : 'Apri Impostazioni Sicurezza',
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFF174A7E),
@@ -283,11 +301,17 @@ class _HardLockScreenState extends State<HardLockScreen> with TickerProviderStat
                     icon: const Icon(Icons.refresh_rounded, size: 22),
                     label: const Text(
                       'Ho impostato il blocco schermo → Verifica',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF174A7E),
-                      side: const BorderSide(color: Color(0xFF174A7E), width: 2),
+                      side: const BorderSide(
+                        color: Color(0xFF174A7E),
+                        width: 2,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),

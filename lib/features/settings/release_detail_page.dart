@@ -244,11 +244,7 @@ class ReleaseDetailPage extends StatelessWidget {
                 Expanded(
                   child: buildMarkdownText(
                     trimmed.substring(2),
-                    TextStyle(
-                      color: textColor,
-                      fontSize: 14,
-                      height: 1.5,
-                    ),
+                    TextStyle(color: textColor, fontSize: 14, height: 1.5),
                   ),
                 ),
               ],

@@ -1,8 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:intl/intl.dart';
+
+import '../../core/services/update_service.dart';
 
 class CommitsPage extends StatefulWidget {
   const CommitsPage({super.key});
@@ -58,42 +60,56 @@ class _CommitsPageState extends State<CommitsPage> {
       final url =
           _nextPageUrl ??
           'https://api.github.com/repos/delelimed/CatechHub/commits?per_page=30';
-      final response = await http
-          .get(
-            Uri.parse(url),
-            headers: {'Accept': 'application/vnd.github.v3+json'},
-          )
-          .timeout(const Duration(seconds: 15));
+      // A8: certificate pinning per api.github.com. Fail-closed: senza
+      // pinning configurato non ci colleghiamo affatto.
+      final httpClient = UpdateService.createPinnedClient();
+      if (httpClient == null) {
+        setState(() {
+          _error = 'Connessione non disponibile: pinning non configurato';
+          _isLoading = false;
+        });
+        return;
+      }
+      try {
+        final response = await httpClient
+            .get(
+              Uri.parse(url),
+              headers: {'Accept': 'application/vnd.github.v3+json'},
+            )
+            .timeout(const Duration(seconds: 15));
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body) as List<dynamic>;
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body) as List<dynamic>;
 
-        final linkHeader = response.headers['link'];
-        String? nextUrl;
-        if (linkHeader != null) {
-          final matches = RegExp(
-            r'<([^>]+)>;\s*rel="next"',
-          ).allMatches(linkHeader);
-          if (matches.isNotEmpty) {
-            nextUrl = matches.first.group(1);
+          final linkHeader = response.headers['link'];
+          String? nextUrl;
+          if (linkHeader != null) {
+            final matches = RegExp(
+              r'<([^>]+)>;\s*rel="next"',
+            ).allMatches(linkHeader);
+            if (matches.isNotEmpty) {
+              nextUrl = matches.first.group(1);
+            }
           }
+
+          setState(() {
+            if (loadMore) {
+              _commits.addAll(data);
+            } else {
+              _commits = data;
+            }
+            _nextPageUrl = nextUrl;
+            _hasMore = nextUrl != null;
+            _isLoading = false;
+          });
+        } else {
+          setState(() {
+            _error = 'Errore nel recupero commit (${response.statusCode})';
+            _isLoading = false;
+          });
         }
-
-        setState(() {
-          if (loadMore) {
-            _commits.addAll(data);
-          } else {
-            _commits = data;
-          }
-          _nextPageUrl = nextUrl;
-          _hasMore = nextUrl != null;
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _error = 'Errore nel recupero commit (${response.statusCode})';
-          _isLoading = false;
-        });
+      } finally {
+        httpClient.close();
       }
     } catch (e) {
       setState(() {

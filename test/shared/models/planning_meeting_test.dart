@@ -32,10 +32,7 @@ void main() {
 
     test('fromMap genera un titolo di default se mancante', () {
       // Arrange: mappa senza titolo (caso legacy)
-      final map = {
-        'classId': 'c1',
-        'date': '2024-06-15T00:00:00.000',
-      };
+      final map = {'classId': 'c1', 'date': '2024-06-15T00:00:00.000'};
       // Act: deserializza senza titolo
       final meeting = PlanningMeeting.fromMap('pm2', map);
       // Assert: il titolo deve essere generato dalla data

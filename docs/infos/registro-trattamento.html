@@ -42,8 +42,12 @@
       <strong>Art. 30 GDPR:</strong> Ogni titolare del trattamento e, ove applicabile, il suo rappresentante tengono un registro delle attività di trattamento svolte sotto la propria responsabilità. Il presente registro è redatto per assistere il catechista / parrocchia nell'adempimento di tale obbligo.
     </div>
 
+    <div class="alert alert-info">
+      <strong>Supporto in-app:</strong> la <strong>Modalità Responsabile Catechistico</strong> include un <strong>Registro Trattamenti</strong> digitale: ogni operazione rilevante (inserimento, modifica, eliminazione) viene registrata con data, ora e autore in un audit log firmato HMAC. Include inoltre la gestione dei <strong>consensi privacy</strong> con durata di validità e scadenza. Vedi <a href="../features/responsabile.html">Responsabile parrocchiale</a>.
+    </div>
+
     <p><strong>Titolare del trattamento:</strong> Il catechista o la parrocchia che utilizza CatechHub.<br>
-    <strong>Strumento utilizzato:</strong> CatechHub v1.0.3 (app mobile Android)<br>
+    <strong>Strumento utilizzato:</strong> CatechHub v1.0.5 (app mobile Android)<br>
     <strong>Responsabile del trattamento:</strong> Non designato (nessun trattamento per conto del titolare)<br>
     <strong>DPO:</strong> Da designare se obbligatorio secondo Art. 37 GDPR</p>
 
@@ -68,7 +72,7 @@
           <td>Nome, cognome, data di nascita, classe/gruppo, nome genitori, numeri di telefono, indirizzo (opzionale)</td>
           <td>Minori partecipanti al catechismo, genitori/tutori</td>
           <td>Durata anno catechistico + 1 anno fiscale, salvo richiesta cancellazione</td>
-          <td>Crittografia AES-256-GCM, auth biometrica, FLAG_SECURE, freeRASP</td>
+          <td>Crittografia AES-256-GCM, cifratura di campo per dati sensibili, auth biometrica, FLAG_SECURE, freeRASP</td>
           <td>Art. 6.1.a (consenso), Art. 6.1.e (compito interesse pubblico — educazione catechistica)</td>
         </tr>
         <tr>
@@ -122,7 +126,7 @@
           <td>Tutti i dati presenti nel database al momento del backup</td>
           <td>Tutti gli interessati (minori, genitori)</td>
           <td>Fino alla cancellazione del file da parte dell'utente</td>
-          <td>PBKDF2 210k iterazioni + AES-256-GCM, password scelta dall'utente</td>
+          <td>PBKDF2-HMAC-SHA256 + AES-256-GCM: <strong>350k</strong> per tutti i nuovi backup <code>.catechhub</code> e per l'export conformità GDPR (anti-brute-force per-file 5 tentativi → 30 min, <code>BackupEncryptionService:49</code>); 210k/60k legacy solo in lettura; PIN min 12 alfanumerici (≥1 lettera+≥1 cifra)</td>
           <td>Obbligo di sicurezza (Art. 32 GDPR) — adempimento</td>
         </tr>
         <tr>
@@ -140,8 +144,62 @@
           <td>Box sincronizzabili: classi, studenti, presenze, documenti, delivery, allegati, note contatto, pianificazione</td>
           <td>Minori, genitori (dati condivisi tra catechisti autorizzati)</td>
           <td>N/A (dati sincronizzati, non conservati centralmente)</td>
-          <td>X25519 ECDH + HKDF + AES-256-GCM per sessione, chiavi per dispositivo, pairing code SHA-256 a 6 cifre anti-MitM, key pinning sulle riconnessioni, forward secrecy (ECDHE), trusted devices list, timeout sessione 30min</td>
+          <td>X25519 TripleDH (4 DH ordinati + HKDF <code>ForwardSecret_v1</code>) + HKDF <code>P2P_Session_v3</code> + AES-256-GCM con AAD <code>Context_P2P_v1</code> e rotazione finestra 30 min (keep corrente+precedente), heartbeat 30s, periodic 60s, watch 500 ms → realtime quando vicini; chiavi effimere per-sessione MAI persistite (forward secrecy), chiavi per-associazione, canale classe AES per-classe con AAD <code>ClassChannel_v1</code>, canale parrocchiale in chiaro (nessun dato personale), SAS 6 cifre su sharedSecret+nonce+efimere ordinate, pinning, modalità normale via <code>NormalModeSyncHandler</code> (Mio Dispositivo = <code>catechistId</code> + tutte le classi; Altro = solo condivise), certificati Ed25519 30 gg in Responsabile, timeout sessione 30 min</td>
           <td>Consenso interessati + autorizzazione parrocchia (Art. 6.1.a + 6.1.e)</td>
+        </tr>
+        <tr>
+          <td>10</td>
+          <td><strong>Import ragazzi (CSV/XLSX)</strong><br>Importazione massiva dell'anagrafica da file CSV/XLSX generati da altri strumenti (es. fogli di calcolo parrocchiali).</td>
+          <td>Stessi dati del registro studenti (nome, cognome, data nascita, genitori, contatti)</td>
+          <td>Minori partecipanti, genitori/tutori</td>
+          <td>Durata anno catechistico + 1 anno fiscale</td>
+          <td>Elaborazione locale, anteprima prima dell'import, nessun trasferimento a server</td>
+          <td>Art. 6.1.a (consenso), Art. 6.1.e (compito interesse pubblico)</td>
+        </tr>
+        <tr>
+          <td>11</td>
+          <td><strong>Archivio storico</strong><br>"Concludi anno": gli incontri dell'anno concluso vengono congelati in snapshot immutabili, leggibili solo per consultazione (storico presenze).</td>
+          <td>Presenze, anagrafica dell'anno concluso</td>
+          <td>Minori partecipanti (storico)</td>
+          <td>Conservato come archivio; soggetto a cancellazione tramite retention/diritto all'oblio</td>
+          <td>Snapshot immutabili firmati (tombstone e integrità), consultazione read-only</td>
+          <td>Art. 6.1.e (compito interesse pubblico), conservazione documentale</td>
+        </tr>
+        <tr>
+          <td>12</td>
+          <td><strong>Supplenze</strong><br>Delega temporanea di una classe a un altro catechista tramite QR crittografico a scadenza.</td>
+          <td>Dati della classe delegata (lettura e presenze)</td>
+          <td>Minori partecipanti (via catechista delegato)</td>
+          <td>Solo per la durata della delega (validità configurabile, max 24 h)</td>
+          <td>QR cifrato con scadenza, registro delle deleghe firmato, revoca immediata</td>
+          <td>Consenso interessati + autorizzazione parrocchia (Art. 6.1.a + 6.1.e)</td>
+        </tr>
+        <tr>
+          <td>13</td>
+          <td><strong>Logistica aule</strong><br>Assegnazione delle classi alle aule per ciascuna data d'incontro.</td>
+          <td>Nome aula, data, classe associata</td>
+          <td>Minori partecipanti (indirettamente)</td>
+          <td>Durata anno catechistico + 2 anni</td>
+          <td>Dati non personali, memorizzati localmente</td>
+          <td>Legittimo interesse del titolare (Art. 6.1.f)</td>
+        </tr>
+        <tr>
+          <td>14</td>
+          <td><strong>Rete parrocchiale e notifiche incontri</strong><br>Condivisione di riunioni e avvisi tra catechisti associati (canale parrocchiale) e notifiche locali degli incontri.</td>
+          <td>Riunioni/avvisi (nessun dato personale), data e titolo degli incontri per le notifiche</td>
+          <td>Catechisti della rete, famiglie (notifiche)</td>
+          <td>Fino alla cancellazione manuale o alla rimozione dell'associazione</td>
+          <td>Canale parrocchiale in chiaro solo su rete associata e per comunicazioni non personali; notifiche con soli data/titolo, generazione locale</td>
+          <td>Legittimo interesse (Art. 6.1.f), consenso associati</td>
+        </tr>
+        <tr>
+          <td>15</td>
+          <td><strong>Consensi con scadenza e retention automatica</strong><br>Gestione dei consensi privacy con durata di validità. Alla scadenza: marcatura RITIRATO, periodo di grazia di 30 giorni, cancellazione a cascata automatica dei dati.</td>
+          <td>Stato consensi, date di scadenza</td>
+          <td>Minori, genitori/tutori</td>
+          <td>Periodo di grazia 30 giorni poi cancellazione definitiva (tombstone)</td>
+          <td>Automazione locale, cancellazione a cascata, tombstone firmato propagato in sync</td>
+          <td>Adempimento Art. 5.1.e (limitazione della conservazione)</td>
         </tr>
       </tbody>
     </table>
@@ -150,8 +208,8 @@
     <table class="sec-table">
       <thead><tr><th>Dato</th><th>Attività di trattamento</th><th>Consenso esplicito</th><th>Misure aggiuntive</th></tr></thead>
       <tbody>
-        <tr><td>Allergie</td><td>Registrazione studenti (campo opzionale)</td><td>Richiesto (Art. 9.2.a)</td><td>Campo marcato come sensibile, cifratura aggiuntiva</td></tr>
-        <tr><td>Autorizzazioni uscite autonome</td><td>Registrazione studenti (campo opzionale)</td><td>Richiesto (Art. 9.2.a)</td><td>Campo marcato come sensibile</td></tr>
+        <tr><td>Allergie</td><td>Registrazione studenti (campo opzionale)</td><td>Richiesto (Art. 9.2.a)</td><td>Campo marcato come sensibile, cifratura di campo (AES-256-GCM, chiave per-dispositivo)</td></tr>
+        <tr><td>Autorizzazioni uscite autonome</td><td>Registrazione studenti (campo opzionale)</td><td>Richiesto (Art. 9.2.a)</td><td>Campo marcato come sensibile, cifratura di campo, consenso con scadenza gestito in modalità Responsabile</td></tr>
         <tr><td>Note sanitarie generiche</td><td>Note di contatto / note studente</td><td>Richiesto (Art. 9.2.a)</td><td>Avviso all'inserimento: "Inserendo dati sanitari, confermi di avere il consenso esplicito"</td></tr>
       </tbody>
     </table>
@@ -164,13 +222,13 @@
       <thead><tr><th>Categoria</th><th>Misure implementate</th></tr></thead>
       <tbody>
         <tr><td>Controllo accessi</td><td>Biometria / PIN, sessione in RAM, timeout 120s background</td></tr>
-        <tr><td>Crittografia</td><td>AES-256-GCM, PBKDF2 (210k), X25519 ECDH, HKDF-SHA256, pairing code anti-MitM</td></tr>
-        <tr><td>Integrità</td><td>Tag GCM 128bit, checksum SHA-256 su backup, message ID SHA-256</td></tr>
-        <tr><td>Disponibilità</td><td>Auto-recovery corruzione Hive (2 livelli), retry apertura box</td></tr>
-        <tr><td>Riservatezza</td><td>FLAG_SECURE, AndroidKeyStore, freeRASP anti-tamper</td></tr>
-        <tr><td>Minimizzazione</td><td>Zero cloud, nessuna telemetria, nessun analytics, offline-first</td></tr>
-        <tr><td>Portabilità</td><td>Export .catechhub, export selettivo, merge import con LWW</td></tr>
-        <tr><td>Trasparenza</td><td>Codice open source (MIT), documentazione tecnica, informativa privacy integrata</td></tr>
+        <tr><td>Crittografia</td><td>AES-256-GCM su 27 box + field (<code>cieI1:</code>) + sync (AAD), PBKDF2 350k nuovi / 210k-60k legacy read, TripleDH X25519 + HKDF (forward secrecy, rotazione 30 min, heartbeat 30s, SAS 6 cifre, pinning), Ed25519 per approvazioni/tombstone (solo Responsabile), <code>NormalModeSyncHandler</code> per normale</td></tr>
+        <tr><td>Integrità</td><td>Tag GCM 128bit, checksum SHA-256 su backup e QR, message ID SHA-256, audit log HMAC-SHA256, tombstone firmati</td></tr>
+        <tr><td>Disponibilità</td><td>Auto-recovery corruzione Hive (2 livelli), retry apertura box, snapshot immutabili archivio</td></tr>
+        <tr><td>Riservatezza</td><td>FLAG_SECURE, AndroidKeyStore, freeRASP anti-tamper, canale classe cifrato per-classe</td></tr>
+        <tr><td>Minimizzazione</td><td>Zero cloud, nessuna telemetria, offline-first, retention automatica consensi (30 giorni + cancellazione a cascata)</td></tr>
+        <tr><td>Portabilità</td><td>Export .catechhub, export selettivo, export conformità GDPR, merge import con LWW</td></tr>
+        <tr><td>Trasparenza</td><td>Codice open source (MIT), documentazione tecnica, informativa privacy integrata, Registro Trattamenti in-app (Art. 30)</td></tr>
       </tbody>
     </table>
 

@@ -44,18 +44,21 @@ void main() {
       expect(AuthService.getCatechistId(), primary);
     });
 
-    test('adotta e sovrascrive l\'identità corrente (guardia a livello di servizio)', () {
-      // La protezione contro la sovrascrittura di un dispositivo con classi
-      // proprie è applicata in P2PSyncService._maybeAdoptRemoteCatechistId
-      // tramite _hasCatechistIdentity. Qui verifichiamo il contratto base:
-      // l'adozione persiste e l'identità successiva coincide con quella adottata.
-      final existing = AuthService.getCatechistId();
-      expect(existing, isNotEmpty);
+    test(
+      'adotta e sovrascrive l\'identità corrente (guardia a livello di servizio)',
+      () {
+        // La protezione contro la sovrascrittura di un dispositivo con classi
+        // proprie è applicata in P2PSyncService._maybeAdoptRemoteCatechistId
+        // tramite _hasCatechistIdentity. Qui verifichiamo il contratto base:
+        // l'adozione persiste e l'identità successiva coincide con quella adottata.
+        final existing = AuthService.getCatechistId();
+        expect(existing, isNotEmpty);
 
-      final adopted = AuthService.adoptCatechistId('cat_altro');
-      expect(adopted, 'cat_altro');
-      expect(AuthService.getCatechistId(), 'cat_altro');
-    });
+        final adopted = AuthService.adoptCatechistId('cat_altro');
+        expect(adopted, 'cat_altro');
+        expect(AuthService.getCatechistId(), 'cat_altro');
+      },
+    );
 
     test('non adotta id vuoti e mantiene l\'identità corrente', () {
       final existing = AuthService.getCatechistId();
@@ -85,11 +88,17 @@ void main() {
 
     test('rimuove gli accenti', () {
       expect(AuthService.normalizeCatechistName('Marìo Róssi'), 'mariorossi');
-      expect(AuthService.normalizeCatechistName('Giuseppè Fernández'), 'giuseppefernandez');
+      expect(
+        AuthService.normalizeCatechistName('Giuseppè Fernández'),
+        'giuseppefernandez',
+      );
     });
 
     test('rimuove caratteri non alfanumerici', () {
-      expect(AuthService.normalizeCatechistName('O\'Brien-Smith'), 'obriensmith');
+      expect(
+        AuthService.normalizeCatechistName('O\'Brien-Smith'),
+        'obriensmith',
+      );
     });
   });
 
@@ -149,10 +158,7 @@ void main() {
     test('preferisce il creatore locale se presente', () {
       const local = 'cat_locale';
       const remote = 'cat_remoto';
-      final creators = {
-        'c1': 'cat_locale',
-        'c2': 'cat_remoto',
-      };
+      final creators = {'c1': 'cat_locale', 'c2': 'cat_remoto'};
       expect(computeDefaultCatechistId(local, remote, creators), local);
     });
 

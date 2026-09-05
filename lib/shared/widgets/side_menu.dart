@@ -33,15 +33,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../models/user_role.dart';
+import '../utils/app_mode.dart';
+
 class SideMenu extends StatelessWidget {
   /// true = sidebar desktop (sfondo scuro, testo bianco, usato in
   /// AppScaffold). false = variante chiara per potenziale drawer.
   final bool isSidebar;
 
-  const SideMenu({
-    super.key,
-    this.isSidebar = false,
-  });
+  const SideMenu({super.key, this.isSidebar = false});
 
   @override
   Widget build(BuildContext context) {
@@ -63,27 +63,123 @@ class SideMenu extends StatelessWidget {
           Text(
             'CatechHub',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: isSidebar ? Colors.white : const Color(0xFF174A7E),
-                  fontWeight: FontWeight.bold,
-                ),
+              color: isSidebar ? Colors.white : const Color(0xFF174A7E),
+              fontWeight: FontWeight.bold,
+            ),
           ),
 
           const SizedBox(height: 25),
 
           // ─── VOCI DI MENU ──────────────────────────────────────────
-          // 6 voci corrispondenti alle sezioni principali dell'app.
-          // Ogni voce naviga alla route associata via context.go().
-          // L'ordine delle voci è: Home, Gruppo, Programmazione,
-          // Documenti, Catechesi, Impostazioni.
-          // NOTA: la bottom navigation in AppScaffold ha SOLO 5 voci
-          // (non include "Catechesi"), quindi la sidebar offre una
-          // navigazione più completa.
-          _item(context, location, '/', Icons.dashboard_rounded, 'Dashboard'),
-          _item(context, location, '/my-group', Icons.groups_rounded, 'Il mio gruppo'),
-          _item(context, location, '/planning', Icons.calendar_month_rounded, 'Programmazione'),
-          _item(context, location, '/documents', Icons.description_rounded, 'Documenti'),
-          _item(context, location, '/catechesi', Icons.menu_book_rounded, 'Catechesi'),
-          _item(context, location, '/settings', Icons.settings_rounded, 'Impostazioni'),
+          // La navigazione dipende dal ruolo:
+          //   - Catechista: Dashboard, Gruppo, Programmazione, Documenti,
+          //     Catechesi, Impostazioni.
+          //   - Responsabile: Dashboard parrocchiale e funzioni della
+          //     parrocchia (Classi, Iscrizioni, Catechisti, Logistica,
+          //     Consensi, Rete, Archivio) + Impostazioni.
+          if (UserRole.isResponsabile) ...[
+            _item(
+              context,
+              location,
+              '/parrocchia',
+              Icons.dashboard_rounded,
+              'Dashboard',
+            ),
+            _item(
+              context,
+              location,
+              '/parrocchia/classi',
+              Icons.class_rounded,
+              'Classi',
+            ),
+            _item(
+              context,
+              location,
+              '/parrocchia/iscrizioni',
+              Icons.how_to_reg_rounded,
+              'Iscrizioni',
+            ),
+            _item(
+              context,
+              location,
+              '/parrocchia/catechisti',
+              Icons.people_alt_rounded,
+              'Catechisti',
+            ),
+            _item(
+              context,
+              location,
+              '/parrocchia/logistica',
+              Icons.meeting_room_rounded,
+              'Logistica',
+            ),
+            _item(
+              context,
+              location,
+              '/parrocchia/consensi',
+              Icons.task_alt_rounded,
+              'Consensi',
+            ),
+            _item(
+              context,
+              location,
+              '/parrocchia/rete',
+              Icons.network_check_rounded,
+              'Rete parrocchiale',
+            ),
+            _item(
+              context,
+              location,
+              '/parrocchia/archivio',
+              Icons.history_rounded,
+              'Archivio storico',
+            ),
+          ] else ...[
+            _item(context, location, '/', Icons.dashboard_rounded, 'Dashboard'),
+            _item(
+              context,
+              location,
+              '/my-group',
+              Icons.groups_rounded,
+              'Il mio gruppo',
+            ),
+            _item(
+              context,
+              location,
+              '/planning',
+              Icons.calendar_month_rounded,
+              'Programmazione',
+            ),
+            _item(
+              context,
+              location,
+              '/documents',
+              Icons.description_rounded,
+              'Documenti',
+            ),
+            _item(
+              context,
+              location,
+              '/catechesi',
+              Icons.menu_book_rounded,
+              'Catechesi',
+            ),
+            if (AppModeUtils.canViewLogistica())
+              _item(
+                context,
+                location,
+                '/parrocchia/logistica',
+                Icons.meeting_room_rounded,
+                'Aule e orari',
+              ),
+          ],
+          _item(
+            context,
+            location,
+            '/settings',
+            Icons.settings_rounded,
+            'Impostazioni',
+          ),
         ],
       ),
     );
@@ -121,8 +217,8 @@ class SideMenu extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           color: selected
               ? (isSidebar
-                  ? Colors.white.withValues(alpha: 0.15)
-                  : const Color(0xFF174A7E).withValues(alpha: 0.1))
+                    ? Colors.white.withValues(alpha: 0.15)
+                    : const Color(0xFF174A7E).withValues(alpha: 0.1))
               : Colors.transparent,
         ),
         child: ListTile(

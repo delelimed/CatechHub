@@ -4,8 +4,9 @@ import '../../core/storage/local_database.dart';
 import '../../shared/models/student_daily_note_model.dart';
 import '../../shared/utils/auth_utils.dart';
 
-final studentDailyNotesRepoProvider =
-    Provider((ref) => StudentDailyNotesRepository());
+final studentDailyNotesRepoProvider = Provider(
+  (ref) => StudentDailyNotesRepository(),
+);
 
 /// Provider Riverpod singleton (alias) del repository delle note giornaliere.
 final studentDailyNotesRepositoryProvider = studentDailyNotesRepoProvider;
@@ -23,50 +24,51 @@ class StudentDailyNotesRepository {
     return LocalDatabase.watchList(
       _box,
       (id, data) => StudentDailyNote.fromMap(id, data),
-    ).map((notes) => notes
-        .where((n) => n.studentId == studentId)
-        .toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt)));
+    ).map(
+      (notes) =>
+          notes.where((n) => n.studentId == studentId).toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
+    );
   }
 
   List<StudentDailyNote> getNotesForStudentSync(String studentId) {
     return LocalDatabase.values(
-      _box,
-      (id, data) => StudentDailyNote.fromMap(id, data),
-    )
-        .where((n) => n.studentId == studentId)
-        .toList()
+        _box,
+        (id, data) => StudentDailyNote.fromMap(id, data),
+      ).where((n) => n.studentId == studentId).toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
   /// Stream in tempo reale delle note giornaliere della classe identificata
   /// dal [classUniqueCode], dalla più recente alla più vecchia.
   Stream<List<Map<String, dynamic>>> getNotesByClass(String classUniqueCode) {
-    return LocalDatabase.watchList(
-      _box,
-      (id, data) => {'id': id, ...data},
-    ).map((notes) => notes
-        .where((n) => n['classUniqueCode'] == classUniqueCode)
-        .toList()
-      ..sort((a, b) {
-        final aDate = DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
-            DateTime.fromMillisecondsSinceEpoch(0);
-        final bDate = DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
-            DateTime.fromMillisecondsSinceEpoch(0);
-        return bDate.compareTo(aDate);
-      }));
+    return LocalDatabase.watchList(_box, (id, data) => {'id': id, ...data}).map(
+      (notes) =>
+          notes.where((n) => n['classUniqueCode'] == classUniqueCode).toList()
+            ..sort((a, b) {
+              final aDate =
+                  DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+                  DateTime.fromMillisecondsSinceEpoch(0);
+              final bDate =
+                  DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+                  DateTime.fromMillisecondsSinceEpoch(0);
+              return bDate.compareTo(aDate);
+            }),
+    );
   }
 
   /// Lettura sincrona delle note giornaliere di una classe.
   List<Map<String, dynamic>> getNotesByClassSync(String classUniqueCode) {
     return LocalDatabase.values(
-      _box,
-      (id, data) => {'id': id, ...data},
-    ).where((n) => n['classUniqueCode'] == classUniqueCode).toList()
+        _box,
+        (id, data) => {'id': id, ...data},
+      ).where((n) => n['classUniqueCode'] == classUniqueCode).toList()
       ..sort((a, b) {
-        final aDate = DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+        final aDate =
+            DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
             DateTime.fromMillisecondsSinceEpoch(0);
-        final bDate = DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+        final bDate =
+            DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
             DateTime.fromMillisecondsSinceEpoch(0);
         return bDate.compareTo(aDate);
       });
@@ -89,7 +91,8 @@ class StudentDailyNotesRepository {
       final map = LocalDatabase.toStringDynamicMap(existing);
       existingCode = map['classUniqueCode'];
     }
-    final code = note.classUniqueCode ?? existingCode ?? _lookupClassUniqueCode(note);
+    final code =
+        note.classUniqueCode ?? existingCode ?? _lookupClassUniqueCode(note);
     final data = note.copyWith(classUniqueCode: code).toMap();
     data['lastModifiedBy'] = getCurrentCatechistName();
     await _box.put(id, data);

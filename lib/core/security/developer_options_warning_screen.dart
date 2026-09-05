@@ -71,10 +71,12 @@ class DeveloperOptionsWarningScreen extends StatefulWidget {
   });
 
   @override
-  State<DeveloperOptionsWarningScreen> createState() => _DeveloperOptionsWarningScreenState();
+  State<DeveloperOptionsWarningScreen> createState() =>
+      _DeveloperOptionsWarningScreenState();
 }
 
-class _DeveloperOptionsWarningScreenState extends State<DeveloperOptionsWarningScreen>
+class _DeveloperOptionsWarningScreenState
+    extends State<DeveloperOptionsWarningScreen>
     with TickerProviderStateMixin {
   late final AnimationController _fadeController;
   late final AnimationController _slideController;
@@ -107,11 +109,14 @@ class _DeveloperOptionsWarningScreenState extends State<DeveloperOptionsWarningS
       vsync: this,
     )..repeat(reverse: true);
 
-    _fadeAnimation = CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic));
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeOut,
+    );
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+          CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
+        );
     _scaleAnimation = Tween<double>(begin: 0.7, end: 1.0).animate(
       CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut),
     );
@@ -121,8 +126,14 @@ class _DeveloperOptionsWarningScreenState extends State<DeveloperOptionsWarningS
 
     // Sequenza animazioni
     _fadeController.forward();
-    Future.delayed(const Duration(milliseconds: 100), () => _slideController.forward());
-    Future.delayed(const Duration(milliseconds: 200), () => _scaleController.forward());
+    Future.delayed(
+      const Duration(milliseconds: 100),
+      () => _slideController.forward(),
+    );
+    Future.delayed(
+      const Duration(milliseconds: 200),
+      () => _scaleController.forward(),
+    );
 
     // Attiva immersive sticky mode per nascondere system UI
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -251,7 +262,10 @@ class _DeveloperOptionsWarningScreenState extends State<DeveloperOptionsWarningS
 
                           // ─── MESSAGGIO SPECIFICO FREE_RASP ───
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.black.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(12),
@@ -303,8 +317,10 @@ class _DeveloperOptionsWarningScreenState extends State<DeveloperOptionsWarningS
                                 _InfoRow(
                                   icon: Icons.shield_outlined,
                                   iconColor: Colors.red.shade600,
-                                  title: 'Possibile rischio per i dati sensibili',
-                                  description: 'Anagrafica minori, allergie, contatti genitori '
+                                  title:
+                                      'Possibile rischio per i dati sensibili',
+                                  description:
+                                      'Anagrafica minori, allergie, contatti genitori '
                                       'possono essere esposti a accesso non autorizzato.\n'
                                       'Questo per ora non è un limite e puoi procedere, ma è consigliato disattivare le Opzioni Sviluppatore.',
                                 ),
@@ -325,7 +341,8 @@ class _DeveloperOptionsWarningScreenState extends State<DeveloperOptionsWarningS
                                   icon: Icons.bug_report_outlined,
                                   iconColor: Colors.orange.shade700,
                                   title: 'Vettori di attacco abilitati',
-                                  description: 'Debug USB, debugger remoto (ADB), hooking (Frida/Xposed), '
+                                  description:
+                                      'Debug USB, debugger remoto (ADB), hooking (Frida/Xposed), '
                                       'installazione app non certificate, keylogging.\n'
                                       'Questi possono essere sfruttati da malware o attaccanti per compromettere la sicurezza dell\'app e dei dati.\n'
                                       'Una loro attivazione causerebbe il blocco immediato dell\' app.',
@@ -347,7 +364,8 @@ class _DeveloperOptionsWarningScreenState extends State<DeveloperOptionsWarningS
                                   icon: Icons.settings_outlined,
                                   iconColor: Colors.blue.shade600,
                                   title: 'Azione consigliata',
-                                  description: 'Disattiva le Opzioni Sviluppatore:\n'
+                                  description:
+                                      'Disattiva le Opzioni Sviluppatore:\n'
                                       'Impostazioni → Sistema → Opzioni Sviluppatore → Disattiva',
                                 ),
                               ],
@@ -364,7 +382,10 @@ class _DeveloperOptionsWarningScreenState extends State<DeveloperOptionsWarningS
                                 width: double.infinity,
                                 child: FilledButton.tonalIcon(
                                   onPressed: _onContinueAnyway,
-                                  icon: const Icon(Icons.arrow_forward_rounded, size: 20),
+                                  icon: const Icon(
+                                    Icons.arrow_forward_rounded,
+                                    size: 20,
+                                  ),
                                   label: const Text(
                                     'Continua comunque',
                                     style: TextStyle(
@@ -376,12 +397,16 @@ class _DeveloperOptionsWarningScreenState extends State<DeveloperOptionsWarningS
                                   style: FilledButton.styleFrom(
                                     backgroundColor: Colors.black87,
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 18),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 18,
+                                    ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(14),
                                     ),
                                     elevation: 2,
-                                    shadowColor: Colors.black.withValues(alpha: 0.3),
+                                    shadowColor: Colors.black.withValues(
+                                      alpha: 0.3,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -393,7 +418,10 @@ class _DeveloperOptionsWarningScreenState extends State<DeveloperOptionsWarningS
                                 width: double.infinity,
                                 child: OutlinedButton.icon(
                                   onPressed: _onOpenSettings,
-                                  icon: const Icon(Icons.settings_outlined, size: 20),
+                                  icon: const Icon(
+                                    Icons.settings_outlined,
+                                    size: 20,
+                                  ),
                                   label: const Text(
                                     'Apri Impostazioni Sistema',
                                     style: TextStyle(
@@ -405,10 +433,14 @@ class _DeveloperOptionsWarningScreenState extends State<DeveloperOptionsWarningS
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: Colors.white,
                                     side: BorderSide(
-                                      color: Colors.white.withValues(alpha: 0.6),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.6,
+                                      ),
                                       width: 1.5,
                                     ),
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(14),
                                     ),

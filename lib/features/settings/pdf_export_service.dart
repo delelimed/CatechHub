@@ -23,6 +23,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../../core/services/field_encryption_service.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/catechesi_model.dart';
 import '../../shared/models/class_model.dart';
@@ -89,7 +90,6 @@ class PdfExportService {
   static final PdfColor _orange = PdfColor.fromInt(0xFFE76F51);
   static final PdfColor _green = PdfColor.fromInt(0xFF27AE60);
   static final PdfColor _red = PdfColor.fromInt(0xFFE74C3C);
-  static final PdfColor _amber = PdfColor.fromInt(0xFFF4A62A);
   static final PdfColor _bgSoft = PdfColor.fromInt(0xFFF0F5FB);
   static final PdfColor _bgZebra = PdfColor.fromInt(0xFFF7FAFD);
   static final PdfColor _line = PdfColor.fromInt(0xFFDCE6F0);
@@ -108,11 +108,9 @@ class PdfExportService {
     final rawClass = LocalDatabase.classes().get(classId);
     final classData = LocalDatabase.toStringDynamicMap(rawClass);
     final schoolClass = SchoolClass.fromMap(classId, classData);
-    final className = schoolClass.name.isNotEmpty
-        ? schoolClass.name
-        : 'Gruppo';
+    final className = schoolClass.name.isNotEmpty ? schoolClass.name : 'Gruppo';
 
-    final students = _loadStudents(schoolClass);
+    final students = await _loadStudents(schoolClass);
     final attendance = _loadAttendance(schoolClass);
     final meetings = _loadMeetings(schoolClass);
     final documents = _loadDocuments(schoolClass);
@@ -185,50 +183,94 @@ class PdfExportService {
     final catechesiModule = <pw.Widget>[];
 
     if (options.includeAnagrafica) {
-      add(anagrafica, _sectionHeader(++index, 'Anagrafica',
-          'Dati anagrafici e contatti dei ragazzi del gruppo'));
+      add(
+        anagrafica,
+        _sectionHeader(
+          ++index,
+          'Anagrafica',
+          'Dati anagrafici e contatti dei ragazzi del gruppo',
+        ),
+      );
       add(anagrafica, _anagraficaSection(students));
     }
 
     if (options.includeNoteContatto) {
-      add(noteContatto, _sectionHeader(++index, 'Note di contatto',
-          'Registro delle comunicazioni con i genitori'));
+      add(
+        noteContatto,
+        _sectionHeader(
+          ++index,
+          'Note di contatto',
+          'Registro delle comunicazioni con i genitori',
+        ),
+      );
       add(noteContatto, _noteContattoSection(students, contactNotes));
     }
 
     if (options.includeComposizione) {
-      add(composizione, _sectionHeader(++index, 'Composizione del gruppo',
-          'Elenco dei ragazzi iscritti'));
+      add(
+        composizione,
+        _sectionHeader(
+          ++index,
+          'Composizione del gruppo',
+          'Elenco dei ragazzi iscritti',
+        ),
+      );
       add(composizione, _composizioneSection(schoolClass, students));
     }
 
     if (options.includePresenze) {
-      add(presenze, _sectionHeader(++index, 'Presenze',
-          'Registro delle presenze per ogni incontro'));
+      add(
+        presenze,
+        _sectionHeader(
+          ++index,
+          'Presenze',
+          'Registro delle presenze per ogni incontro',
+        ),
+      );
       add(presenze, _rotatedPresenze(_presenzeSection(students, attendance)));
     }
 
     if (options.includeStatistiche) {
-      add(statistiche, _sectionHeader(++index, 'Statistiche',
-          'Sintesi dei dati di frequenza del gruppo'));
+      add(
+        statistiche,
+        _sectionHeader(
+          ++index,
+          'Statistiche',
+          'Sintesi dei dati di frequenza del gruppo',
+        ),
+      );
       add(statistiche, _statisticheSection(students, attendance, className));
     }
 
     if (options.includeDocumenti) {
-      add(documenti, _sectionHeader(++index, 'Documenti',
-          'Certificati, autorizzazioni e consegne'));
+      add(
+        documenti,
+        _sectionHeader(
+          ++index,
+          'Documenti',
+          'Certificati, autorizzazioni e consegne',
+        ),
+      );
       add(documenti, _documentiSection(students, documents));
     }
 
     if (options.includeProgrammazione) {
-      add(programmazione, _sectionHeader(++index, 'Programmazione degli incontri',
-          'Incontri e riunioni programmate nel corso dell\'anno'));
+      add(
+        programmazione,
+        _sectionHeader(
+          ++index,
+          'Programmazione degli incontri',
+          'Incontri e riunioni programmate nel corso dell\'anno',
+        ),
+      );
       add(programmazione, _programmazioneSection(meetings));
     }
 
     if (options.includeCatechesi) {
-      add(catechesiModule, _sectionHeader(++index, 'Catechesi',
-          'Contenuti e schede catechetiche'));
+      add(
+        catechesiModule,
+        _sectionHeader(++index, 'Catechesi', 'Contenuti e schede catechetiche'),
+      );
       add(catechesiModule, _catechesiSection(catechesi));
     }
 
@@ -246,11 +288,19 @@ class PdfExportService {
 
   // ─── Caricamento dati ─────────────────────────────────────────────────────
 
-  static List<Student> _loadStudents(SchoolClass schoolClass) {
-    final students = LocalDatabase.values(
-      LocalDatabase.students(),
-      (id, data) => Student.fromMap(id, data),
-    );
+  static Future<List<Student>> _loadStudents(SchoolClass schoolClass) async {
+    // L6 / Fase 4-12: i campi sensibili (birthDate, telefoni, email, allergie,
+    // note) sono cifrati a livello di campo nel box. Devono essere decifrati
+    // PRIMA di costruire il modello: in passato il PDF poteva stampare
+    // ciphertext al posto di data di nascita/telefoni.
+    final students = <Student>[];
+    final box = LocalDatabase.students();
+    for (final key in box.keys) {
+      final data = LocalDatabase.toStringDynamicMap(box.get(key));
+      final decrypted =
+          await FieldEncryptionService.decryptStudentMapForTransport(data);
+      students.add(Student.fromMap(key.toString(), decrypted));
+    }
     final ids = schoolClass.studentIds.toSet();
     return Student.sortedBySurname(students.where((s) => ids.contains(s.id)));
   }
@@ -261,14 +311,18 @@ class PdfExportService {
       (id, data) => {'id': id, ...data},
     );
     return records
-        .where((r) =>
-            r['classId']?.toString() == schoolClass.id ||
-            r['classUniqueCode']?.toString() == schoolClass.uniqueCode)
+        .where(
+          (r) =>
+              r['classId']?.toString() == schoolClass.id ||
+              r['classUniqueCode']?.toString() == schoolClass.uniqueCode,
+        )
         .toList()
       ..sort((a, b) {
-        final ad = DateTime.tryParse(a['date']?.toString() ?? '') ??
+        final ad =
+            DateTime.tryParse(a['date']?.toString() ?? '') ??
             DateTime.fromMillisecondsSinceEpoch(0);
-        final bd = DateTime.tryParse(b['date']?.toString() ?? '') ??
+        final bd =
+            DateTime.tryParse(b['date']?.toString() ?? '') ??
             DateTime.fromMillisecondsSinceEpoch(0);
         return ad.compareTo(bd);
       });
@@ -280,9 +334,11 @@ class PdfExportService {
       (id, data) => PlanningMeeting.fromMap(id, data),
     );
     return meetings
-        .where((m) =>
-            m.classId == schoolClass.id ||
-            m.classUniqueCode == schoolClass.uniqueCode)
+        .where(
+          (m) =>
+              m.classId == schoolClass.id ||
+              m.classUniqueCode == schoolClass.uniqueCode,
+        )
         .toList()
       ..sort((a, b) => a.date.compareTo(b.date));
   }
@@ -294,7 +350,9 @@ class PdfExportService {
     );
     if (schoolClass.uniqueCode.isEmpty) return [];
     return docs
-        .where((d) => d['classUniqueCode']?.toString() == schoolClass.uniqueCode)
+        .where(
+          (d) => d['classUniqueCode']?.toString() == schoolClass.uniqueCode,
+        )
         .toList();
   }
 
@@ -307,8 +365,10 @@ class PdfExportService {
     return list;
   }
 
-  /// Nomi dei catechisti del gruppo: creatore, catechista corrente e ultimo
-  /// autore di una modifica, in ordine alfabetico e senza duplicati.
+  /// Nomi dei catechisti del gruppo: tutti quelli assegnati alla classe
+  /// (catechistIds) risolti via rubrica (CatechistProfile) per nome/cognome,
+  /// con fallback su creatore/ultimo autore se la rubrica non contiene il profilo.
+  /// Include anche i catechisti offline aggiunti manualmente.
   static List<String> _loadCatechists(SchoolClass schoolClass) {
     final names = <String>{};
     void add(String name) {
@@ -316,9 +376,57 @@ class PdfExportService {
       if (clean.isNotEmpty) names.add(clean);
     }
 
-    add(schoolClass.creatorName);
-    add(getCurrentCatechistName());
-    add(schoolClass.lastModifiedBy);
+    // Risolvi tutti i catechistIds del gruppo
+    for (final id in schoolClass.catechistIds) {
+      String? resolved;
+      if (id == 'local_catechist_id') {
+        resolved = getCurrentCatechistName();
+      } else {
+        try {
+          final raw = LocalDatabase.catechists().get(id);
+          if (raw != null) {
+            final p = LocalDatabase.toStringDynamicMap(raw);
+            final fn = (p['firstName'] ?? '').toString().trim();
+            final ln = (p['lastName'] ?? '').toString().trim();
+            final full = '$fn $ln'.trim();
+            if (full.isNotEmpty) resolved = full;
+          }
+        } catch (_) {}
+        // Se non trovato in rubrica, prova a vedere se id è cat_... con nome
+        // già presente in creatorName/lastModifiedBy come fallback
+      }
+      if (resolved != null && resolved.trim().isNotEmpty) {
+        add(resolved);
+      }
+    }
+
+    // Fallback: se nessun catechistId ha dato un nome (dati legacy),
+    // usa creatore / ultimo autore / corrente
+    if (names.isEmpty) {
+      add(schoolClass.creatorName);
+      add(getCurrentCatechistName());
+      add(schoolClass.lastModifiedBy);
+    } else {
+      // Aggiungi comunque questi per retrocompatibilità se non già presenti
+      // e se non sono duplicati di un profilo già risolto
+      // (non aggiunge ID grezzi)
+      if (schoolClass.creatorName.trim().isNotEmpty &&
+          !names.contains(schoolClass.creatorName.trim())) {
+        // solo se il creatorName non è già tra i nomi risolti
+        // e il creatorCatechistId non è già in lista
+        final creatorCat = schoolClass.creatorCatechistId;
+        if (creatorCat.isEmpty ||
+            !schoolClass.catechistIds.contains(creatorCat)) {
+          add(schoolClass.creatorName);
+        }
+      }
+    }
+
+    // Se dopo tutto è ancora vuoto (gruppo senza catechisti), mostra almeno il corrente
+    if (names.isEmpty) {
+      add(getCurrentCatechistName());
+    }
+
     final result = names.toList()
       ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
     return result;
@@ -327,7 +435,9 @@ class PdfExportService {
   /// Note di contatto relative alla classe: quelle che referenziano il
   /// codice univoco della classe o uno degli studenti del gruppo.
   static List<ContactNote> _loadContactNotes(
-      SchoolClass schoolClass, List<Student> students) {
+    SchoolClass schoolClass,
+    List<Student> students,
+  ) {
     final notes = LocalDatabase.values(
       LocalDatabase.contactNotes(),
       (id, data) => ContactNote.fromMap(id, data),
@@ -335,15 +445,19 @@ class PdfExportService {
     final studentIds = {for (final s in students) s.id};
     final classUniqueCode = schoolClass.uniqueCode;
     return notes
-        .where((n) =>
-            (classUniqueCode.isNotEmpty && n.classUniqueCode == classUniqueCode) ||
-            studentIds.contains(n.studentId))
+        .where(
+          (n) =>
+              (classUniqueCode.isNotEmpty &&
+                  n.classUniqueCode == classUniqueCode) ||
+              studentIds.contains(n.studentId),
+        )
         .toList()
       ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
   }
 
-  static Map<String, Student> _studentsById(List<Student> students) =>
-      {for (final s in students) s.id: s};
+  static Map<String, Student> _studentsById(List<Student> students) => {
+    for (final s in students) s.id: s,
+  };
 
   // ─── Copertina ────────────────────────────────────────────────────────────
 
@@ -475,9 +589,7 @@ class PdfExportService {
         pw.SizedBox(height: 2),
         pw.Center(
           child: pw.Text(
-            appVersion.isEmpty
-                ? 'CatechHub'
-                : 'Versione $appVersion',
+            appVersion.isEmpty ? 'CatechHub' : 'Versione $appVersion',
             style: pw.TextStyle(fontSize: 10, color: _textGrey),
           ),
         ),
@@ -570,7 +682,10 @@ class PdfExportService {
                   pw.SizedBox(height: 2),
                   pw.Text(
                     subtitle,
-                    style: pw.TextStyle(fontSize: 9.5, color: _white.withAlpha(0.82)),
+                    style: pw.TextStyle(
+                      fontSize: 9.5,
+                      color: _white.withAlpha(0.82),
+                    ),
                   ),
                 ],
               ],
@@ -599,7 +714,9 @@ class PdfExportService {
   // ─── Note di contatto ─────────────────────────────────────────────────────
 
   static pw.Widget _noteContattoSection(
-      List<Student> students, List<ContactNote> notes) {
+    List<Student> students,
+    List<ContactNote> notes,
+  ) {
     if (notes.isEmpty) {
       return _emptyState('Nessuna nota di contatto registrata');
     }
@@ -616,9 +733,9 @@ class PdfExportService {
       ..sort((a, b) {
         final sa = byId[a]!;
         final sb = byId[b]!;
-        return '${sa.surname} ${sa.name}'
-            .toLowerCase()
-            .compareTo('${sb.surname} ${sb.name}'.toLowerCase());
+        return '${sa.surname} ${sa.name}'.toLowerCase().compareTo(
+          '${sb.surname} ${sb.name}'.toLowerCase(),
+        );
       });
 
     if (studentKeys.isEmpty) {
@@ -727,41 +844,49 @@ class PdfExportService {
 
     void row(String label, String? value, {PdfColor? color}) {
       if (value == null || value.trim().isEmpty) return;
-      rows.add(pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.SizedBox(
-            width: 92,
-            child: pw.Text(
-              label,
-              style: pw.TextStyle(fontSize: 9.5, color: _textGrey),
+      rows.add(
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.SizedBox(
+              width: 92,
+              child: pw.Text(
+                label,
+                style: pw.TextStyle(fontSize: 9.5, color: _textGrey),
+              ),
             ),
-          ),
-          pw.Expanded(
-            child: pw.Text(
-              value,
-              style: pw.TextStyle(fontSize: 10, color: color ?? _textDark),
+            pw.Expanded(
+              child: pw.Text(
+                value,
+                style: pw.TextStyle(fontSize: 10, color: color ?? _textDark),
+              ),
             ),
-          ),
-        ],
-      ));
+          ],
+        ),
+      );
       rows.add(pw.SizedBox(height: 3));
     }
 
     final mother = _fullName(s.motherName, s.motherSurname);
     final father = _fullName(s.fatherName, s.fatherSurname);
 
-    row('Data di nascita', '${_formatDate(s.birthDate)}  (${_age(s.birthDate)} anni)');
+    if (s.birthDate != null) {
+      row(
+        'Data di nascita',
+        '${_formatDate(s.birthDate)}  (${_age(s.birthDate)} anni)',
+      );
+    }
     row('Madre', mother);
     row('Tel. madre', s.motherPhone);
     row('Padre', father);
     row('Tel. padre', s.fatherPhone);
-    if (s.studentPhone.trim().isNotEmpty) row('Telefono ragazzo', s.studentPhone);
+    if (s.studentPhone.trim().isNotEmpty) {
+      row('Telefono ragazzo', s.studentPhone);
+    }
     if (s.allergies != null && s.allergies!.trim().isNotEmpty) {
       row('Allergie', s.allergies!.trim(), color: _red);
     }
-    if (s.autonomousExits != null &&
-        s.autonomousExits!.trim().isNotEmpty) {
+    if (s.autonomousExits != null && s.autonomousExits!.trim().isNotEmpty) {
       row('Uscite autonome', s.autonomousExits!.trim());
     }
     if (s.notes != null && s.notes!.trim().isNotEmpty) {
@@ -811,11 +936,16 @@ class PdfExportService {
   // ─── Composizione del gruppo ──────────────────────────────────────────────
 
   static pw.Widget _composizioneSection(
-      SchoolClass schoolClass, List<Student> students) {
+    SchoolClass schoolClass,
+    List<Student> students,
+  ) {
     final summary = [
       _summaryTile('${students.length}', 'Ragazzi iscritti', _accent),
-      _summaryTile('${schoolClass.catechistIds.length}',
-          'Catechisti assegnati', _teal),
+      _summaryTile(
+        '${schoolClass.catechistIds.length}',
+        'Catechisti assegnati',
+        _teal,
+      ),
     ];
 
     return pw.Column(
@@ -846,7 +976,7 @@ class PdfExportService {
                 _tableDataRow([
                   '${s.surname} ${s.name}'.trim(),
                   _formatDate(s.birthDate),
-                  '${_age(s.birthDate)} anni',
+                  s.birthDate != null ? '${_age(s.birthDate)} anni' : '—',
                 ]),
             ],
           ),
@@ -874,10 +1004,7 @@ class PdfExportService {
             ),
           ),
           pw.SizedBox(height: 2),
-          pw.Text(
-            label,
-            style: pw.TextStyle(fontSize: 9.5, color: _textGrey),
-          ),
+          pw.Text(label, style: pw.TextStyle(fontSize: 9.5, color: _textGrey)),
         ],
       ),
     );
@@ -892,23 +1019,20 @@ class PdfExportService {
     return pw.Transform.rotateBox(
       angle: -math.pi / 2,
       unconstrained: true,
-      child: pw.SizedBox(
-        width: 670,
-        child: table,
-      ),
+      child: pw.SizedBox(width: 670, child: table),
     );
   }
 
   static pw.Widget _presenzeSection(
-      List<Student> students, List<Map<String, dynamic>> attendance) {
+    List<Student> students,
+    List<Map<String, dynamic>> attendance,
+  ) {
     if (attendance.isEmpty) {
       return _emptyState('Nessuna presenza registrata');
     }
 
     final byId = _studentsById(students);
-    final columns = <pw.TableColumnWidth>[
-      const pw.FlexColumnWidth(2.4),
-    ];
+    final columns = <pw.TableColumnWidth>[const pw.FlexColumnWidth(2.4)];
     for (var i = 0; i < attendance.length; i++) {
       columns.add(const pw.FlexColumnWidth(0.7));
     }
@@ -932,8 +1056,7 @@ class PdfExportService {
         decoration: pw.BoxDecoration(color: _primary),
         children: headerCells,
       ),
-      for (final s in students)
-        _presenceRow(s, byId, attendance),
+      for (final s in students) _presenceRow(s, byId, attendance),
     ];
 
     return pw.Table(
@@ -944,13 +1067,16 @@ class PdfExportService {
   }
 
   static pw.TableRow _presenceRow(
-      Student s, Map<String, Student> byId, List<Map<String, dynamic>> attendance) {
+    Student s,
+    Map<String, Student> byId,
+    List<Map<String, dynamic>> attendance,
+  ) {
     var present = 0, absent = 0;
-    final cells = <pw.Widget>[
-      _cell('${s.surname} ${s.name}'.trim()),
-    ];
+    final cells = <pw.Widget>[_cell('${s.surname} ${s.name}'.trim())];
     for (final record in attendance) {
-      final presence = Map<String, dynamic>.from(record['presence'] as Map? ?? {});
+      final presence = Map<String, dynamic>.from(
+        record['presence'] as Map? ?? {},
+      );
       final status = presence[s.id]?.toString() ?? '';
       if (status == 'Presente') present++;
       if (status == 'Assente') absent++;
@@ -965,24 +1091,27 @@ class PdfExportService {
           text = 'A';
           color = _red;
           break;
-        case 'Giustificato':
-          text = 'G';
-          color = _amber;
-          break;
         default:
           text = '';
       }
       cells.add(_cell(text, color: color, align: pw.TextAlign.center));
     }
-    cells.add(_cell('$present', color: _green, align: pw.TextAlign.center, bold: true));
-    cells.add(_cell('$absent', color: _red, align: pw.TextAlign.center, bold: true));
+    cells.add(
+      _cell('$present', color: _green, align: pw.TextAlign.center, bold: true),
+    );
+    cells.add(
+      _cell('$absent', color: _red, align: pw.TextAlign.center, bold: true),
+    );
     return pw.TableRow(children: cells);
   }
 
   // ─── Statistiche ──────────────────────────────────────────────────────────
 
   static pw.Widget _statisticheSection(
-      List<Student> students, List<Map<String, dynamic>> attendance, String className) {
+    List<Student> students,
+    List<Map<String, dynamic>> attendance,
+    String className,
+  ) {
     if (attendance.isEmpty) {
       return _emptyState('Nessuna presenza registrata');
     }
@@ -992,7 +1121,9 @@ class PdfExportService {
     final perMeeting = <Map<String, dynamic>>[];
 
     for (final record in attendance) {
-      final presence = Map<String, dynamic>.from(record['presence'] as Map? ?? {});
+      final presence = Map<String, dynamic>.from(
+        record['presence'] as Map? ?? {},
+      );
       var p = 0, a = 0;
       presence.forEach((id, status) {
         final st = status?.toString() ?? '';
@@ -1028,16 +1159,22 @@ class PdfExportService {
     final presentRate = overall > 0 ? totalPresent / overall * 100 : 0.0;
     final absentRate = overall > 0 ? totalAbsent / overall * 100 : 0.0;
     final avgPerMeeting = perMeeting.isNotEmpty
-        ? perMeeting.map((m) => (m['percent'] as double)).reduce((a, b) => a + b) /
-            perMeeting.length
+        ? perMeeting
+                  .map((m) => (m['percent'] as double))
+                  .reduce((a, b) => a + b) /
+              perMeeting.length
         : 0.0;
     final avgStudents = perMeeting.isNotEmpty
-        ? (perMeeting.map((m) => (m['present'] as int)).reduce((a, b) => a + b) /
-                perMeeting.length)
-            .round()
+        ? (perMeeting
+                      .map((m) => (m['present'] as int))
+                      .reduce((a, b) => a + b) /
+                  perMeeting.length)
+              .round()
         : 0;
     final totalStudents = perMeeting.isNotEmpty
-        ? perMeeting.map((m) => (m['total'] as int)).reduce((a, b) => a > b ? a : b)
+        ? perMeeting
+              .map((m) => (m['total'] as int))
+              .reduce((a, b) => a > b ? a : b)
         : 0;
 
     var best = perMeeting.isEmpty ? null : perMeeting.first;
@@ -1048,24 +1185,30 @@ class PdfExportService {
     }
 
     final cards = [
-      _metricCard('Presenze medie', '${presentRate.toStringAsFixed(1)}%', _green),
+      _metricCard(
+        'Presenze medie',
+        '${presentRate.toStringAsFixed(1)}%',
+        _green,
+      ),
       _metricCard('Assenze medie', '${absentRate.toStringAsFixed(1)}%', _red),
-      _metricCard('Media presenze per incontro',
-          '${avgPerMeeting.toStringAsFixed(1)}%', _accent),
+      _metricCard(
+        'Media presenze per incontro',
+        '${avgPerMeeting.toStringAsFixed(1)}%',
+        _accent,
+      ),
       _metricCard('Totale incontri', '${perMeeting.length}', _teal),
       _metricCard('Ragazzi nel gruppo', '$totalStudents', _orange),
-      _metricCard('Media ragazzi per incontro', '$avgStudents',
-          PdfColor.fromInt(0xFF8E44AD)),
+      _metricCard(
+        'Media ragazzi per incontro',
+        '$avgStudents',
+        PdfColor.fromInt(0xFF8E44AD),
+      ),
     ];
 
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
-        pw.Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: cards,
-        ),
+        pw.Wrap(spacing: 8, runSpacing: 8, children: cards),
         pw.SizedBox(height: 14),
         if (best != null)
           pw.Container(
@@ -1130,14 +1273,22 @@ class PdfExportService {
         pw.SizedBox(height: 14),
         pw.Text(
           'ANDAMENTO PRESENZE NEL TEMPO',
-          style: pw.TextStyle(fontSize: 9.5, letterSpacing: 1.1, color: _textGrey),
+          style: pw.TextStyle(
+            fontSize: 9.5,
+            letterSpacing: 1.1,
+            color: _textGrey,
+          ),
         ),
         pw.SizedBox(height: 8),
         _trendChart(perMeeting),
         pw.SizedBox(height: 18),
         pw.Text(
           'DETTAGLIO PER RAGAZZO',
-          style: pw.TextStyle(fontSize: 9.5, letterSpacing: 1.1, color: _textGrey),
+          style: pw.TextStyle(
+            fontSize: 9.5,
+            letterSpacing: 1.1,
+            color: _textGrey,
+          ),
         ),
         pw.SizedBox(height: 8),
         pw.Table(
@@ -1149,13 +1300,21 @@ class PdfExportService {
             3: const pw.FlexColumnWidth(1.4),
           },
           children: [
-            _tableHeaderRow(['Nome e cognome', 'Presenti', 'Assenti', 'Percentuale']),
+            _tableHeaderRow([
+              'Nome e cognome',
+              'Presenti',
+              'Assenti',
+              'Percentuale',
+            ]),
             for (final s in students)
               _tableDataRow([
                 '${s.surname} ${s.name}'.trim(),
                 '${perStudent[s.id]?['p'] ?? 0}',
                 '${perStudent[s.id]?['a'] ?? 0}',
-                _percentOf(perStudent[s.id]?['p'] ?? 0, perStudent[s.id]?['a'] ?? 0),
+                _percentOf(
+                  perStudent[s.id]?['p'] ?? 0,
+                  perStudent[s.id]?['a'] ?? 0,
+                ),
               ]),
           ],
         ),
@@ -1173,8 +1332,9 @@ class PdfExportService {
   /// altrimenti la data breve del record presenze.
   static String _meetingTitle(String meetingId, String dateStr) {
     if (meetingId.isEmpty) return _formatShortDate(dateStr);
-    final data =
-        LocalDatabase.toStringDynamicMap(LocalDatabase.planning().get(meetingId));
+    final data = LocalDatabase.toStringDynamicMap(
+      LocalDatabase.planning().get(meetingId),
+    );
     final title = data['title']?.toString().trim() ?? '';
     if (title.isNotEmpty) return title;
     return _formatShortDate(dateStr);
@@ -1185,15 +1345,16 @@ class PdfExportService {
     if (perMeeting.length < 2) {
       return _emptyState('Dati non sufficienti per il grafico');
     }
-    final maxPresent =
-        perMeeting.map((m) => (m['total'] as int)).reduce((a, b) => a > b ? a : b);
+    final maxPresent = perMeeting
+        .map((m) => (m['total'] as int))
+        .reduce((a, b) => a > b ? a : b);
     final maxTick = maxPresent <= 0 ? 1 : maxPresent;
     final dates = [
       for (final m in perMeeting) _formatShortDate(m['date'] as String),
     ];
-    final yTicks =
-        <int>{for (var i = 0; i <= 4; i++) (maxTick * i / 4).round()}.toList()
-          ..sort();
+    final yTicks = <int>{
+      for (var i = 0; i <= 4; i++) (maxTick * i / 4).round(),
+    }.toList()..sort();
 
     return pw.SizedBox(
       height: 190,
@@ -1254,10 +1415,7 @@ class PdfExportService {
             ),
           ),
           pw.SizedBox(height: 2),
-          pw.Text(
-            label,
-            style: pw.TextStyle(fontSize: 8.5, color: _textGrey),
-          ),
+          pw.Text(label, style: pw.TextStyle(fontSize: 8.5, color: _textGrey)),
         ],
       ),
     );
@@ -1266,7 +1424,9 @@ class PdfExportService {
   // ─── Documenti ────────────────────────────────────────────────────────────
 
   static pw.Widget _documentiSection(
-      List<Student> students, List<Map<String, dynamic>> documents) {
+    List<Student> students,
+    List<Map<String, dynamic>> documents,
+  ) {
     if (documents.isEmpty) {
       return _emptyState('Nessun documento registrato');
     }
@@ -1297,8 +1457,11 @@ class PdfExportService {
         ),
         _cell('$givenOut', align: pw.TextAlign.center),
         _cell('$received', align: pw.TextAlign.center),
-        _cell('${givenOut - received}', align: pw.TextAlign.center,
-            color: (givenOut - received) > 0 ? _orange : _textDark),
+        _cell(
+          '${givenOut - received}',
+          align: pw.TextAlign.center,
+          color: (givenOut - received) > 0 ? _orange : _textDark,
+        ),
         _cell('$exonerated', align: pw.TextAlign.center),
       ];
 
@@ -1310,19 +1473,26 @@ class PdfExportService {
       rows.add(pw.TableRow(children: rowCells));
 
       if (pending.isNotEmpty) {
-        rows.add(pw.TableRow(
-          decoration: pw.BoxDecoration(color: _bgZebra),
-          children: [
-            pw.Padding(
-              padding: const pw.EdgeInsets.fromLTRB(5, 2, 5, 6),
-              child: pw.Text(
-                'In attesa di riconsegna: ${pending.join(', ')}',
-                style: pw.TextStyle(fontSize: 8, color: _orange, font: pw.Font.helveticaOblique()),
+        rows.add(
+          pw.TableRow(
+            decoration: pw.BoxDecoration(color: _bgZebra),
+            children: [
+              pw.Padding(
+                padding: const pw.EdgeInsets.fromLTRB(5, 2, 5, 6),
+                child: pw.Text(
+                  'In attesa di riconsegna: ${pending.join(', ')}',
+                  style: pw.TextStyle(
+                    fontSize: 8,
+                    color: _orange,
+                    font: pw.Font.helveticaOblique(),
+                  ),
+                ),
               ),
-            ),
-            for (var i = 1; i < 5; i++) pw.Padding(padding: pw.EdgeInsets.all(2), child: pw.Text('')),
-          ],
-        ));
+              for (var i = 1; i < 5; i++)
+                pw.Padding(padding: pw.EdgeInsets.all(2), child: pw.Text('')),
+            ],
+          ),
+        );
       }
     }
 
@@ -1395,18 +1565,20 @@ class PdfExportService {
   static pw.Widget _catechesiCard(Catechesi c) {
     final chips = <pw.Widget>[];
     for (final tag in c.tags) {
-      chips.add(pw.Container(
-        padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: pw.BoxDecoration(
-          color: _bgSoft,
-          borderRadius: pw.BorderRadius.circular(20),
-          border: pw.Border.all(color: _accent.withAlpha(0.5), width: 0.8),
+      chips.add(
+        pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: pw.BoxDecoration(
+            color: _bgSoft,
+            borderRadius: pw.BorderRadius.circular(20),
+            border: pw.Border.all(color: _accent.withAlpha(0.5), width: 0.8),
+          ),
+          child: pw.Text(
+            tag,
+            style: pw.TextStyle(fontSize: 8, color: _primaryLight),
+          ),
         ),
-        child: pw.Text(
-          tag,
-          style: pw.TextStyle(fontSize: 8, color: _primaryLight),
-        ),
-      ));
+      );
     }
 
     final refs = c.biblicalReferences.isNotEmpty
@@ -1437,16 +1609,17 @@ class PdfExportService {
           ],
           if (refs.isNotEmpty) ...[
             pw.SizedBox(height: 6),
-            pw.Text(
-              refs,
-              style: pw.TextStyle(fontSize: 9, color: _teal),
-            ),
+            pw.Text(refs, style: pw.TextStyle(fontSize: 9, color: _teal)),
           ],
           if (c.description.trim().isNotEmpty) ...[
             pw.SizedBox(height: 6),
             pw.Text(
               c.description,
-              style: pw.TextStyle(fontSize: 9.5, color: _textDark, lineSpacing: 1.3),
+              style: pw.TextStyle(
+                fontSize: 9.5,
+                color: _textDark,
+                lineSpacing: 1.3,
+              ),
             ),
           ],
           if (c.websiteReferences.isNotEmpty) ...[
@@ -1474,7 +1647,11 @@ class PdfExportService {
       ),
       child: pw.Text(
         message,
-        style: pw.TextStyle(fontSize: 11, color: _textGrey, font: pw.Font.helveticaOblique()),
+        style: pw.TextStyle(
+          fontSize: 11,
+          color: _textGrey,
+          font: pw.Font.helveticaOblique(),
+        ),
       ),
     );
   }
@@ -1505,7 +1682,10 @@ class PdfExportService {
         for (final c in cells)
           pw.Padding(
             padding: const pw.EdgeInsets.all(6),
-            child: pw.Text(c, style: pw.TextStyle(fontSize: 9, color: _textDark)),
+            child: pw.Text(
+              c,
+              style: pw.TextStyle(fontSize: 9, color: _textDark),
+            ),
           ),
       ],
     );
@@ -1557,7 +1737,8 @@ class PdfExportService {
     return full.isNotEmpty ? full : '';
   }
 
-  static String _formatDate(DateTime date) {
+  static String _formatDate(DateTime? date) {
+    if (date == null) return '—';
     return '${_two(date.day)}/${_two(date.month)}/${date.year}';
   }
 
@@ -1573,7 +1754,8 @@ class PdfExportService {
 
   static String _two(int v) => v.toString().padLeft(2, '0');
 
-  static int _age(DateTime birthDate) {
+  static int _age(DateTime? birthDate) {
+    if (birthDate == null) return 0;
     final now = DateTime.now();
     var age = now.year - birthDate.year;
     if (now.month < birthDate.month ||
@@ -1584,7 +1766,9 @@ class PdfExportService {
   }
 
   static String _joinNonEmpty(List<String?> values) {
-    final clean = values.where((v) => v != null && v.trim().isNotEmpty).toList();
+    final clean = values
+        .where((v) => v != null && v.trim().isNotEmpty)
+        .toList();
     return clean.join(' · ');
   }
 }

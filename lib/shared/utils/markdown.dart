@@ -13,16 +13,18 @@ TextSpan _buildTextSpan(String text, TextStyle? baseStyle) {
     final italicMatch = italic.matchAsPrefix(text, i);
     final codeMatch = code.matchAsPrefix(text, i);
 
-    int? earliest = boldMatch != null ? boldMatch.start : null;
+    int? earliest = boldMatch?.start;
     String? type;
     Match? match;
 
-    if (boldMatch != null && (earliest == null || boldMatch.start <= earliest)) {
+    if (boldMatch != null &&
+        (earliest == null || boldMatch.start <= earliest)) {
       earliest = boldMatch.start;
       type = 'bold';
       match = boldMatch;
     }
-    if (italicMatch != null && (earliest == null || italicMatch.start < earliest)) {
+    if (italicMatch != null &&
+        (earliest == null || italicMatch.start < earliest)) {
       earliest = italicMatch.start;
       type = 'italic';
       match = italicMatch;
@@ -39,23 +41,29 @@ TextSpan _buildTextSpan(String text, TextStyle? baseStyle) {
       }
       switch (type) {
         case 'bold':
-          spans.add(TextSpan(
-            text: match.group(1),
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ));
-        case 'italic':
-          spans.add(TextSpan(
-            text: match.group(1),
-            style: TextStyle(fontStyle: FontStyle.italic),
-          ));
-        case 'code':
-          spans.add(TextSpan(
-            text: match.group(1),
-            style: TextStyle(
-              fontFamily: 'monospace',
-              backgroundColor: Colors.grey.withValues(alpha: 0.2),
+          spans.add(
+            TextSpan(
+              text: match.group(1),
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
-          ));
+          );
+        case 'italic':
+          spans.add(
+            TextSpan(
+              text: match.group(1),
+              style: TextStyle(fontStyle: FontStyle.italic),
+            ),
+          );
+        case 'code':
+          spans.add(
+            TextSpan(
+              text: match.group(1),
+              style: TextStyle(
+                fontFamily: 'monospace',
+                backgroundColor: Colors.grey.withValues(alpha: 0.2),
+              ),
+            ),
+          );
       }
       i = match.end;
     } else {

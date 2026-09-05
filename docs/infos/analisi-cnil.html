@@ -46,12 +46,13 @@
     <table class="sec-table">
       <thead><tr><th>Bene</th><th>Tipo</th><th>Classificazione</th><th>Supporto</th></tr></thead>
       <tbody>
-        <tr><td>Database Hive (13 box)</td><td>Dati strutturati</td><td>Critico / Riservato</td><td>Filesystem interno (cifrato AES-256-GCM)</td></tr>
+        <tr><td>Database Hive (27 box, <code>LocalDatabase:191</code>)</td><td>Dati strutturati</td><td>Critico / Riservato</td><td>Filesystem interno (cifrato AES-256-GCM con chiave master TEE/StrongBox, recovery atomica per-box via <code>deleteBoxFromDisk</code>)</td></tr>
         <tr><td>Allegati (PDF, immagini)</td><td>Dati binari</td><td>Riservato</td><td>Filesystem interno (cifrato AES-256-GCM)</td></tr>
         <tr><td>Chiavi crittografiche</td><td>Materiale crittografico</td><td>Critico</td><td>AndroidKeyStore (hardware-backed)</td></tr>
         <tr><td>Dispositivo Android</td><td>Hardware</td><td>Critico</td><td>Protezione fisica + FLAG_SECURE</td></tr>
         <tr><td>Backup .catechhub</td><td>Archivio cifrato</td><td>Riservato</td><td>Filesystem esterno / cloud (a scelta utente)</td></tr>
-        <tr><td>Trusted Devices</td><td>Chiavi pubbliche X25519 + chiavi per dispositivo</td><td>Sensibile</td><td>Box Hive cifrato + FlutterSecureStorage</td></tr>
+        <tr><td>Chiavi di sessione P2P</td><td>Materiale crittografico effimero</td><td>Critico</td><td>In RAM, mai persistite, rotazione ogni 30 min (forward secrecy)</td></tr>
+        <tr><td>Certificati di fiducia</td><td>Chiavi pubbliche Ed25519 + chiavi X25519 per dispositivo</td><td>Sensibile</td><td>Box Hive cifrato + FlutterSecureStorage</td></tr>
       </tbody>
     </table>
 
@@ -77,13 +78,13 @@
       <tbody>
         <tr><td>RGS A1 — Authentification</td><td>BiometricPrompt con fallback PIN/Pattern. Sessione in RAM.</td><td>&#9989; Conforme</td></tr>
         <tr><td>RGS A2 — Intégrité</td><td>Tag GCM 128bit su tutti i dati. Checksum SHA-256 su backup.</td><td>&#9989; Conforme</td></tr>
-        <tr><td>RGS A3 — Confidentialité</td><td>AES-256-GCM a riposo e in transito. X25519 ECDH + HKDF + AES-256-GCM per sync P2P.</td><td>&#9989; Conforme</td></tr>
-        <tr><td>RGS A4 — Traçabilité</td><td>Non implementata (scelta di design per minimizzazione).</td><td>&#10060; Non conforme (consapevole)</td></tr>
-        <tr><td>ANSSI — Chiffrement fort</td><td>AES-256-GCM, PBKDF2 210k iterazioni, X25519 ECDH, HKDF-SHA256, pairing code anti-MitM.</td><td>&#9989; Conforme</td></tr>
-        <tr><td>ANSSI — Gestion des clés</td><td>AndroidKeyStore (isolamento hardware). Chiavi mai esposte al livello Dart.</td><td>&#9989; Conforme</td></tr>
-        <tr><td>ANSSI — Sécurité runtime</td><td>freeRASP: anti-root, anti-hooking, anti-emulator, app integrity.</td><td>&#9989; Conforme</td></tr>
-        <tr><td>ANSSI — Chiffrement de sessions</td><td>Session key derivata con HKDF per ogni coppia di dispositivi.</td><td>&#9989; Conforme</td></tr>
-        <tr><td>ANSSI — Effacement sécurisé</td><td>Eliminazione box Hive con deleteBoxFromDisk. Disinstallazione rimuove tutti i dati.</td><td>&#9989; Conforme</td></tr>
+        <tr><td>RGS A3 — Confidentialité</td><td>AES-256-GCM a riposo e in transito. X25519 TripleDH + HKDF + AES-256-GCM per sync P2P, rotazione chiavi ogni 30 min. Cifratura di campo per i dati sensibili.</td><td>&#9989; Conforme</td></tr>
+        <tr><td>RGS A4 — Traçabilité</td><td>Registro Trattamenti in modalità Responsabile: audit log append-only firmato HMAC-SHA256 di ogni operazione rilevante, con verifica d'integrità in tempo reale. Campi createdAt/updatedAt/lastModifiedBy su tutti i record.</td><td>&#9989; Conforme</td></tr>
+        <tr><td>ANSSI — Chiffrement fort</td><td>AES-256-GCM su 27 box + field (<code>cieI1:</code>), PBKDF2 350k nuovi / 210k-60k legacy read, X25519 TripleDH (4 DH ordinati + HKDF, forward secrecy, rotazione 30 min, heartbeat 30s, SAS 6 cifre, pinning, AAD), Ed25519 (solo Responsabile), <code>NormalModeSyncHandler</code> per normale.</td><td>&#9989; Conforme</td></tr>
+        <tr><td>ANSSI — Gestion des clés</td><td>AndroidKeyStore (isolamento hardware). Chiavi mai esposte al livello Dart. Chiavi di sessione effimere mai persistite.</td><td>&#9989; Conforme</td></tr>
+        <tr><td>ANSSI — Sécurité runtime</td><td>freeRASP: anti-root, anti-hooking, anti-emulator, app integrity. SecurityBlockScreen non bypassabile.</td><td>&#9989; Conforme</td></tr>
+        <tr><td>ANSSI — Chiffrement de sessions</td><td>Session key derivata con HKDF per ogni coppia di dispositivi, rotazione ogni 30 minuti (forward secrecy).</td><td>&#9989; Conforme</td></tr>
+        <tr><td>ANSSI — Effacement sécurisé</td><td>Eliminazione box Hive con deleteBoxFromDisk. Tombstone firmati propagati in sync (anti-resurrezione). Disinstallazione rimuove tutti i dati.</td><td>&#9989; Conforme</td></tr>
       </tbody>
     </table>
 
@@ -110,7 +111,7 @@
         <tr><td>Art. 4</td><td>Consenso per dati sensibili</td><td>? Supportato (consenso esplicito richiesto)</td></tr>
         <tr><td>Art. 22</td><td>Diritto di opposizione</td><td>? L'utente può cessare il trattamento disinstallando l'app</td></tr>
         <tr><td>Art. 32</td><td>Obbligo di sicurezza</td><td>&#9989; Crittografia, auth, anti-tamper</td></tr>
-        <tr><td>Art. 48</td><td>Registro delle attività</td><td>&#9989; Documentato (vedi <a href="registro-trattamento.html">Registro Trattamento</a>)</td></tr>
+        <tr><td>Art. 48</td><td>Registro delle attività</td><td>&#9989; Documentato (vedi <a href="registro-trattamento.html">Registro Trattamento</a>) + supporto in-app (audit log HMAC) in modalità Responsabile</td></tr>
         <tr><td>Art. 69</td><td>Designazione DPO</td><td>&#10060; Non applicabile (nessuna struttura organizzativa)</td></tr>
         <tr><td>Art. 82</td><td>Sanzioni</td><td>&#10060; L'utente è responsabile della conformità</td></tr>
       </tbody>
@@ -121,7 +122,7 @@
       <p>CatechHub implementa misure di sicurezza allineate alle raccomandazioni ANSSI e ai principi PIA della CNIL. L'assenza di server centrali, la crittografia end-to-end e il controllo degli accessi biometrico costituiscono i punti di forza principali.</p>
     </div>
     <div class="alert alert-warning">
-      <p>Punti di attenzione: (1) assenza di logging di audit (traçabilité), scelta consapevole per minimizzare la superficie dati; (2) l'utente finale (catechista/parrocchia) rimane il responsabile della conformità; (3) si raccomanda una DPIA formale per parrocchie con trattamento su larga scala.</p>
+      <p>Punti di attenzione: (1) la tracciabilità (Registro Trattamenti HMAC) è disponibile in modalità Responsabile — fuori da essa l'app non tiene log per minimizzare la superficie dati; (2) l'utente finale (catechista/parrocchia) rimane il responsabile della conformità; (3) si raccomanda una DPIA formale per parrocchie con trattamento su larga scala.</p>
     </div>
 
     <div style="text-align:center;margin-top:2rem;">

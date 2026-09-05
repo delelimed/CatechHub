@@ -12,85 +12,99 @@ void main() {
   //  Cifratura e Decifratura Dati
   // ══════════════════════════════════════════════════
   group('EncryptionService - Cifratura/Decifratura', () {
-    test('encryptData e decryptData sono reversibili', () {
+    test('encryptData e decryptData sono reversibili', () async {
       // Arrange: prepara dati da cifrare
-      final dati = {
-        'nome': 'Mario Rossi',
-        'eta': 10,
-        'classe': 'Prima A',
-      };
+      final dati = {'nome': 'Mario Rossi', 'eta': 10, 'classe': 'Prima A'};
       final password = 'chiaveSegreta123';
       // Act: cifra e poi decifra
-      final encrypted = EncryptionService.encryptData(dati, password);
-      final decrypted = EncryptionService.decryptData(encrypted, password);
+      final encrypted = await EncryptionService.encryptData(dati, password);
+      final decrypted = await EncryptionService.decryptData(
+        encrypted,
+        password,
+      );
       // Assert: i dati decifrati devono corrispondere a quelli originali
       expect(decrypted['nome'], 'Mario Rossi');
       expect(decrypted['eta'], 10);
       expect(decrypted['classe'], 'Prima A');
     });
 
-    test('decryptData con password sbagliata solleva un\'eccezione', () {
+    test('decryptData con password sbagliata solleva un\'eccezione', () async {
       // Arrange: cifra con una password
       final dati = {'chiave': 'valore'};
-      final encrypted = EncryptionService.encryptData(dati, 'passwordCorretta');
+      final encrypted = await EncryptionService.encryptData(
+        dati,
+        'passwordCorretta',
+      );
       // Act/Assert: decifrare con password errata deve lanciare eccezione
-      expect(
-        () => EncryptionService.decryptData(encrypted, 'passwordSbagliata'),
+      await expectLater(
+        EncryptionService.decryptData(encrypted, 'passwordSbagliata'),
         throwsA(isA<Exception>()),
       );
     });
 
-    test('encryptData genera output Base64 valido', () {
+    test('encryptData genera output Base64 valido', () async {
       // Arrange: dati semplici
       final dati = {'test': 'dati'};
       // Act: cifra
-      final encrypted = EncryptionService.encryptData(dati, 'pwd');
+      final encrypted = await EncryptionService.encryptData(dati, 'pwd');
       // Assert: l'output deve essere decodificabile da Base64
       expect(() => base64Decode(encrypted), returnsNormally);
     });
 
-    test('encryptData genera output diverso ogni volta (salt/nonce casuali)', () {
-      // Arrange: stessi dati e stessa password
-      final dati = {'info': 'sensibili'};
-      // Act: cifra due volte
-      final enc1 = EncryptionService.encryptData(dati, 'pwd');
-      final enc2 = EncryptionService.encryptData(dati, 'pwd');
-      // Assert: i risultati devono essere diversi (salt e nonce casuali)
-      expect(enc1, isNot(equals(enc2)));
-    });
+    test(
+      'encryptData genera output diverso ogni volta (salt/nonce casuali)',
+      () async {
+        // Arrange: stessi dati e stessa password
+        final dati = {'info': 'sensibili'};
+        // Act: cifra due volte
+        final enc1 = await EncryptionService.encryptData(dati, 'pwd');
+        final enc2 = await EncryptionService.encryptData(dati, 'pwd');
+        // Assert: i risultati devono essere diversi (salt e nonce casuali)
+        expect(enc1, isNot(equals(enc2)));
+      },
+    );
   });
 
   // ══════════════════════════════════════════════════
   //  Derivazione Chiave PBKDF2
   // ══════════════════════════════════════════════════
   group('EncryptionService - Derivazione Chiave', () {
-    test('derivePasswordKeyBytes restituisce 32 byte', () {
+    test('derivePasswordKeyBytes restituisce 32 byte', () async {
       // Arrange: password e salt validi
       final password = 'miaPassword';
       final salt = EncryptionService.secureRandomBytes(16);
       // Act: deriva la chiave
-      final key = EncryptionService.derivePasswordKeyBytes(password, salt);
+      final key = await EncryptionService.derivePasswordKeyBytes(
+        password,
+        salt,
+      );
       // Assert: la chiave deve essere di 32 byte
       expect(key.length, 32);
     });
 
-    test('la stessa password e salt producono la stessa chiave', () {
+    test('la stessa password e salt producono la stessa chiave', () async {
       // Arrange: password e salt fissi
       final password = 'testPassword';
       final salt = EncryptionService.secureRandomBytes(16);
       // Act: deriva la chiave due volte
-      final key1 = EncryptionService.derivePasswordKeyBytes(password, salt);
-      final key2 = EncryptionService.derivePasswordKeyBytes(password, salt);
+      final key1 = await EncryptionService.derivePasswordKeyBytes(
+        password,
+        salt,
+      );
+      final key2 = await EncryptionService.derivePasswordKeyBytes(
+        password,
+        salt,
+      );
       // Assert: le chiavi devono essere identiche
       expect(key1, equals(key2));
     });
 
-    test('password diverse producono chiavi diverse', () {
+    test('password diverse producono chiavi diverse', () async {
       // Arrange: salt uguale, password diverse
       final salt = EncryptionService.secureRandomBytes(16);
       // Act: deriva chiavi con password diverse
-      final key1 = EncryptionService.derivePasswordKeyBytes('pwd1', salt);
-      final key2 = EncryptionService.derivePasswordKeyBytes('pwd2', salt);
+      final key1 = await EncryptionService.derivePasswordKeyBytes('pwd1', salt);
+      final key2 = await EncryptionService.derivePasswordKeyBytes('pwd2', salt);
       // Assert: le chiavi devono essere diverse
       expect(key1, isNot(equals(key2)));
     });
@@ -127,22 +141,34 @@ void main() {
   //  Verifica Password
   // ══════════════════════════════════════════════════
   group('EncryptionService - verifyPassword', () {
-    test('restuisce true con password corretta', () {
+    test('restuisce true con password corretta', () async {
       // Arrange: cifra dei dati
       final dati = {'secret': 'data'};
-      final encrypted = EncryptionService.encryptData(dati, 'correctPassword');
+      final encrypted = await EncryptionService.encryptData(
+        dati,
+        'correctPassword',
+      );
       // Act: verifica con password corretta
-      final result = EncryptionService.verifyPassword(encrypted, 'correctPassword');
+      final result = await EncryptionService.verifyPassword(
+        encrypted,
+        'correctPassword',
+      );
       // Assert: deve restituire true
       expect(result, isTrue);
     });
 
-    test('restuisce false con password sbagliata', () {
+    test('restuisce false con password sbagliata', () async {
       // Arrange: cifra dei dati
       final dati = {'secret': 'data'};
-      final encrypted = EncryptionService.encryptData(dati, 'correctPassword');
+      final encrypted = await EncryptionService.encryptData(
+        dati,
+        'correctPassword',
+      );
       // Act: verifica con password errata
-      final result = EncryptionService.verifyPassword(encrypted, 'wrongPassword');
+      final result = await EncryptionService.verifyPassword(
+        encrypted,
+        'wrongPassword',
+      );
       // Assert: deve restituire false
       expect(result, isFalse);
     });

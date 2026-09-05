@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/current_class_provider.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/attachment_parent_type.dart';
+import '../../shared/models/class_model.dart';
 import '../../shared/models/student_model.dart';
 import '../attachments/widgets/attachments_section.dart';
 import 'students_repository.dart';
@@ -18,13 +19,28 @@ final classesRepoProvider = Provider((ref) => ClassesRepository());
 /// genitori, altro) e sezione allegati.
 /// Usa il modello [Student] e salva tramite [StudentsRepository] (Box `students`).
 /// Alla creazione assegna automaticamente lo studente alla classe del
-/// catechista corrente. Flusso: accessibile dal FAB di [StudentsPage].
+/// catechista corrente. Se [classId] è fornito (es. censimento iscrizioni del
+/// Responsabile), lo studente viene iscritto a quella specifica classe invece
+/// che alla classe corrente. Flusso: accessibile dal FAB di [StudentsPage].
 class AddStudentPage extends ConsumerStatefulWidget {
-  const AddStudentPage({super.key});
+  /// Classe di destinazione (id). Se null si usa la classe corrente.
+  final String? classId;
+
+  /// Codice univoco della classe di destinazione (con [classId]).
+  final String? classUniqueCode;
+
+  /// Etichetta mostrata nell'header quando si iscrive a una classe specifica.
+  final String? classLabel;
+
+  const AddStudentPage({
+    super.key,
+    this.classId,
+    this.classUniqueCode,
+    this.classLabel,
+  });
 
   @override
-  ConsumerState<AddStudentPage> createState() =>
-      _AddStudentPageState();
+  ConsumerState<AddStudentPage> createState() => _AddStudentPageState();
 }
 
 class _AddStudentPageState extends ConsumerState<AddStudentPage> {
@@ -48,8 +64,7 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
   String? customExitName;
   String? tempStudentId = LocalDatabase.newId('student');
 
-  bool get isDesktop =>
-      MediaQuery.of(context).size.width > 900;
+  bool get isDesktop => MediaQuery.of(context).size.width > 900;
 
   @override
   void dispose() {
@@ -77,7 +92,9 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
       backgroundColor: isDark ? colorScheme.surface : Colors.grey.shade50,
 
       appBar: AppBar(
-        backgroundColor: isDark ? colorScheme.primaryContainer : const Color(0xFF174A7E),
+        backgroundColor: isDark
+            ? colorScheme.primaryContainer
+            : const Color(0xFF174A7E),
         foregroundColor: isDark ? colorScheme.onPrimaryContainer : Colors.white,
         title: const Text('Nuovo ragazzo'),
       ),
@@ -86,7 +103,11 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _HeaderCard(isDark: isDark, colorScheme: colorScheme),
+            _HeaderCard(
+              isDark: isDark,
+              colorScheme: colorScheme,
+              classLabel: widget.classLabel,
+            ),
 
             const SizedBox(height: 16),
 
@@ -95,9 +116,33 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
               isDark: isDark,
               colorScheme: colorScheme,
               children: [
-                _Field(name, 'Nome', capitalizeWords: true, isDark: isDark, colorScheme: colorScheme),
-                _Field(surname, 'Cognome', capitalizeWords: true, isDark: isDark, colorScheme: colorScheme),
-
+                _Field(
+                  name,
+                  'Nome *',
+                  capitalizeWords: true,
+                  isDark: isDark,
+                  colorScheme: colorScheme,
+                ),
+                _Field(
+                  surname,
+                  'Cognome *',
+                  capitalizeWords: true,
+                  isDark: isDark,
+                  colorScheme: colorScheme,
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 4, top: 4, bottom: 2),
+                  child: Text(
+                    'Solo nome e cognome obbligatori — tutto il resto è facoltativo e modificabile dopo.',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: isDark
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 10),
 
                 _DatePicker(
@@ -107,6 +152,7 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
                   },
                   isDark: isDark,
                   colorScheme: colorScheme,
+                  optional: true,
                 ),
               ],
             ),
@@ -120,8 +166,7 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
               children: isDesktop
                   ? [
                       Row(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
                             child: _ParentCard(
@@ -145,7 +190,7 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
                             ),
                           ),
                         ],
-                      )
+                      ),
                     ]
                   : [
                       _ParentCard(
@@ -175,7 +220,13 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
               isDark: isDark,
               colorScheme: colorScheme,
               children: [
-                _Field(studentPhone, 'Cellulare ragazzo', keyboardType: TextInputType.phone, isDark: isDark, colorScheme: colorScheme),
+                _Field(
+                  studentPhone,
+                  'Cellulare ragazzo',
+                  keyboardType: TextInputType.phone,
+                  isDark: isDark,
+                  colorScheme: colorScheme,
+                ),
               ],
             ),
 
@@ -186,7 +237,13 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
               isDark: isDark,
               colorScheme: colorScheme,
               children: [
-                _Field(allergies, 'Allergie', maxLines: 2, isDark: isDark, colorScheme: colorScheme),
+                _Field(
+                  allergies,
+                  'Allergie',
+                  maxLines: 2,
+                  isDark: isDark,
+                  colorScheme: colorScheme,
+                ),
                 const SizedBox(height: 16),
                 _ExitsSelector(
                   selectedExits: selectedExits,
@@ -227,17 +284,20 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
-                  foregroundColor: isDark ? colorScheme.onPrimary : Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 14),
+                  backgroundColor: isDark
+                      ? colorScheme.primary
+                      : const Color(0xFF174A7E),
+                  foregroundColor: isDark
+                      ? colorScheme.onPrimary
+                      : Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 onPressed: () async {
-                  if (birthDate == null) {
+                  if (name.text.trim().isEmpty ||
+                      surname.text.trim().isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content:
-                            Text('Seleziona la data di nascita'),
+                        content: Text('Nome e cognome sono obbligatori'),
                       ),
                     );
                     return;
@@ -249,7 +309,9 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
 
                   String? autonomousExits;
                   if (selectedExits.isNotEmpty) {
-                    if (selectedExits.contains('altro') && customExitName != null && customExitName!.isNotEmpty) {
+                    if (selectedExits.contains('altro') &&
+                        customExitName != null &&
+                        customExitName!.isNotEmpty) {
                       autonomousExits = 'altro:$customExitName';
                     } else if (selectedExits.length == 1) {
                       autonomousExits = selectedExits.first;
@@ -259,25 +321,37 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
                   }
 
                   final currentClass =
-                      ref.read(currentClassDetailsProvider);
+                      widget.classId != null && widget.classId!.isNotEmpty
+                      ? SchoolClass(
+                          id: widget.classId!,
+                          name: widget.classLabel ?? '',
+                          studentIds: const [],
+                          catechistIds: const [],
+                          uniqueCode: widget.classUniqueCode ?? '',
+                        )
+                      : ref.read(currentClassDetailsProvider);
 
                   final student = Student(
                     id: studentId,
-                    name: name.text,
-                    surname: surname.text,
-                    birthDate: birthDate!,
+                    name: name.text.trim(),
+                    surname: surname.text.trim(),
+                    birthDate: birthDate,
                     classId: currentClass?.id,
                     classUniqueCode: currentClass?.uniqueCode,
-                    motherName: motherName.text,
-                    motherSurname: motherSurname.text,
-                    motherPhone: motherPhone.text,
-                    fatherName: fatherName.text,
-                    fatherSurname: fatherSurname.text,
-                    fatherPhone: fatherPhone.text,
-                    studentPhone: studentPhone.text,
-                    allergies: allergies.text.isNotEmpty ? allergies.text : null,
+                    motherName: motherName.text.trim(),
+                    motherSurname: motherSurname.text.trim(),
+                    motherPhone: motherPhone.text.trim(),
+                    fatherName: fatherName.text.trim(),
+                    fatherSurname: fatherSurname.text.trim(),
+                    fatherPhone: fatherPhone.text.trim(),
+                    studentPhone: studentPhone.text.trim(),
+                    allergies: allergies.text.trim().isNotEmpty
+                        ? allergies.text.trim()
+                        : null,
                     autonomousExits: autonomousExits,
-                    notes: notes.text,
+                    notes: notes.text.trim().isNotEmpty
+                        ? notes.text.trim()
+                        : null,
                   );
 
                   try {
@@ -297,9 +371,10 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
                       Navigator.pop(context);
                     }
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Errore: $e')),
-                    );
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text('Errore: $e')));
                   }
                 },
                 child: const Text('Salva ragazzo'),
@@ -318,8 +393,13 @@ class _AddStudentPageState extends ConsumerState<AddStudentPage> {
 class _HeaderCard extends StatelessWidget {
   final bool isDark;
   final ColorScheme colorScheme;
+  final String? classLabel;
 
-  const _HeaderCard({required this.isDark, required this.colorScheme});
+  const _HeaderCard({
+    required this.isDark,
+    required this.colorScheme,
+    this.classLabel,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -332,10 +412,7 @@ class _HeaderCard extends StatelessWidget {
                   colorScheme.surfaceContainer,
                   colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                 ]
-              : [
-                  Colors.white,
-                  Colors.blue.shade50.withValues(alpha: 0.5),
-                ],
+              : [Colors.white, Colors.blue.shade50.withValues(alpha: 0.5)],
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
@@ -345,20 +422,46 @@ class _HeaderCard extends StatelessWidget {
                 : Colors.black.withValues(alpha: 0.05),
             blurRadius: 16,
             offset: const Offset(0, 10),
-          )
+          ),
         ],
       ),
       child: Row(
         children: [
-          Icon(Icons.person_add_alt_1,
-              color: isDark ? colorScheme.primary : const Color(0xFF174A7E), size: 30),
+          Icon(
+            Icons.person_add_alt_1,
+            color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+            size: 30,
+          ),
           const SizedBox(width: 12),
-          Text(
-            'Nuovo profilo ragazzo',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Nuovo profilo ragazzo',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: isDark
+                        ? colorScheme.primary
+                        : const Color(0xFF174A7E),
+                  ),
+                ),
+                if (classLabel != null && classLabel!.trim().isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'Iscrizione in: $classLabel',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontStyle: FontStyle.italic,
+                        color: isDark
+                            ? colorScheme.onSurfaceVariant
+                            : Colors.black54,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
@@ -397,7 +500,7 @@ class _Section extends StatelessWidget {
                 : Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 6),
-          )
+          ),
         ],
       ),
       child: Column(
@@ -443,9 +546,15 @@ class _ParentCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.grey.shade50,
+        color: isDark
+            ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
+            : Colors.grey.shade50,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade200),
+        border: Border.all(
+          color: isDark
+              ? colorScheme.outline.withValues(alpha: 0.2)
+              : Colors.grey.shade200,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -458,9 +567,27 @@ class _ParentCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          _Field(name, 'Nome', capitalizeWords: true, isDark: isDark, colorScheme: colorScheme),
-          _Field(surname, 'Cognome', capitalizeWords: true, isDark: isDark, colorScheme: colorScheme),
-          _Field(phone, 'Telefono', keyboardType: TextInputType.phone, isDark: isDark, colorScheme: colorScheme),
+          _Field(
+            name,
+            'Nome',
+            capitalizeWords: true,
+            isDark: isDark,
+            colorScheme: colorScheme,
+          ),
+          _Field(
+            surname,
+            'Cognome',
+            capitalizeWords: true,
+            isDark: isDark,
+            colorScheme: colorScheme,
+          ),
+          _Field(
+            phone,
+            'Telefono',
+            keyboardType: TextInputType.phone,
+            isDark: isDark,
+            colorScheme: colorScheme,
+          ),
         ],
       ),
     );
@@ -503,7 +630,9 @@ class _Field extends StatelessWidget {
         decoration: InputDecoration(
           labelText: label,
           filled: true,
-          fillColor: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.2) : Colors.grey.shade50,
+          fillColor: isDark
+              ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.2)
+              : Colors.grey.shade50,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
             borderSide: BorderSide.none,
@@ -522,7 +651,11 @@ class _NotesField extends StatelessWidget {
   final bool isDark;
   final ColorScheme colorScheme;
 
-  const _NotesField(this.controller, {required this.isDark, required this.colorScheme});
+  const _NotesField(
+    this.controller, {
+    required this.isDark,
+    required this.colorScheme,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -533,7 +666,9 @@ class _NotesField extends StatelessWidget {
         labelText: 'Note',
         alignLabelWithHint: true,
         filled: true,
-        fillColor: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.2) : Colors.grey.shade50,
+        fillColor: isDark
+            ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.2)
+            : Colors.grey.shade50,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
@@ -560,8 +695,7 @@ class _ExitsSelector extends StatefulWidget {
   });
 
   @override
-  State<_ExitsSelector> createState() =>
-      _ExitsSelectorState();
+  State<_ExitsSelector> createState() => _ExitsSelectorState();
 }
 
 class _ExitsSelectorState extends State<_ExitsSelector> {
@@ -592,7 +726,10 @@ class _ExitsSelectorState extends State<_ExitsSelector> {
       children: [
         Text(
           'Chi accompagna l\'uscita?',
-          style: TextStyle(fontWeight: FontWeight.w600, color: widget.isDark ? widget.colorScheme.onSurface : null),
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: widget.isDark ? widget.colorScheme.onSurface : null,
+          ),
         ),
         const SizedBox(height: 12),
         Wrap(
@@ -657,7 +794,11 @@ class _ExitsSelectorState extends State<_ExitsSelector> {
             decoration: InputDecoration(
               labelText: 'Specifica chi accompagna',
               filled: true,
-              fillColor: widget.isDark ? widget.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2) : Colors.grey.shade50,
+              fillColor: widget.isDark
+                  ? widget.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.2,
+                    )
+                  : Colors.grey.shade50,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide.none,
@@ -695,10 +836,14 @@ class _ExitChip extends StatelessWidget {
       label: Text(label),
       selected: selected,
       onSelected: onChanged,
-      backgroundColor: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : Colors.grey.shade100,
+      backgroundColor: isDark
+          ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
+          : Colors.grey.shade100,
       selectedColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
       labelStyle: TextStyle(
-        color: selected ? Colors.white : (isDark ? colorScheme.onSurface : Colors.black),
+        color: selected
+            ? Colors.white
+            : (isDark ? colorScheme.onSurface : Colors.black),
         fontWeight: FontWeight.w500,
       ),
     );
@@ -712,13 +857,15 @@ class _DatePicker extends StatelessWidget {
   final DateTime? date;
   final bool isDark;
   final ColorScheme colorScheme;
-  final Function(DateTime) onPick;
+  final Function(DateTime?) onPick;
+  final bool optional;
 
   const _DatePicker({
     required this.date,
     required this.isDark,
     required this.colorScheme,
     required this.onPick,
+    this.optional = false,
   });
 
   @override
@@ -738,21 +885,46 @@ class _DatePicker extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isDark ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.2) : Colors.grey.shade50,
+          color: isDark
+              ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.2)
+              : Colors.grey.shade50,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade300),
+          border: Border.all(
+            color: isDark
+                ? colorScheme.outline.withValues(alpha: 0.2)
+                : Colors.grey.shade300,
+          ),
         ),
         child: Row(
           children: [
-            Icon(Icons.calendar_month,
-                color: isDark ? colorScheme.primary : const Color(0xFF174A7E)),
-            const SizedBox(width: 10),
-            Text(
-              date == null
-                  ? 'Seleziona data nascita'
-                  : '${date!.day}/${date!.month}/${date!.year}',
-              style: TextStyle(fontWeight: FontWeight.w500, color: isDark ? colorScheme.onSurface : null),
+            Icon(
+              Icons.calendar_month,
+              color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
             ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                date == null
+                    ? (optional
+                        ? 'Data nascita (facoltativo)'
+                        : 'Seleziona data nascita')
+                    : '${date!.day}/${date!.month}/${date!.year}',
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: isDark ? colorScheme.onSurface : null,
+                ),
+              ),
+            ),
+            if (optional && date != null)
+              InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => onPick(null),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(Icons.clear_rounded,
+                      size: 18, color: Colors.grey.shade500),
+                ),
+              ),
           ],
         ),
       ),

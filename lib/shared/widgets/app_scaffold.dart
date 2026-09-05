@@ -35,6 +35,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/sync/widgets/sync_status_dot.dart';
+import '../models/user_role.dart';
 import 'side_menu.dart';
 
 class AppScaffold extends StatelessWidget {
@@ -58,13 +59,20 @@ class AppScaffold extends StatelessWidget {
   /// Converte la path della route corrente nell'indice della
   /// bottom navigation bar (mobile) o della sidebar evidenziazione.
   ///
-  /// MANTENERE SINCRONIZZATO CON router.dart:
-  ///   index 0 → '/' (Dashboard)
-  ///   index 1 → '/my-group'
-  ///   index 2 → '/planning'
-  ///   index 3 → '/documents'
-  ///   index 4 → '/settings'
+  /// La mappa route↔indice cambia in base al ruolo:
+  ///   - Catechista: 0 → '/', 1 → '/my-group', 2 → '/planning',
+  ///     3 → '/documents', 4 → '/settings'
+  ///   - Responsabile: 0 → '/parrocchia', 1 → '/parrocchia/classi',
+  ///     2 → '/parrocchia/logistica', 3 → '/parrocchia/rete',
+  ///     4 → '/settings'
   int _indexFromLocation(String location) {
+    if (UserRole.isResponsabile) {
+      if (location.startsWith('/parrocchia/classi')) return 1;
+      if (location.startsWith('/parrocchia/logistica')) return 2;
+      if (location.startsWith('/parrocchia/rete')) return 3;
+      if (location.startsWith('/settings')) return 4;
+      return 0;
+    }
     if (location.startsWith('/my-group')) return 1;
     if (location.startsWith('/planning')) return 2;
     if (location.startsWith('/documents')) return 3;
@@ -76,6 +84,27 @@ class AppScaffold extends StatelessWidget {
   /// Converte l'indice della navigation bar nella path della route.
   /// È l'inversa di _indexFromLocation.
   String _routeFromIndex(int index) {
+    if (UserRole.isResponsabile) {
+      switch (index) {
+        case 0:
+          return '/parrocchia';
+
+        case 1:
+          return '/parrocchia/classi';
+
+        case 2:
+          return '/parrocchia/logistica';
+
+        case 3:
+          return '/parrocchia/rete';
+
+        case 4:
+          return '/settings';
+
+        default:
+          return '/parrocchia';
+      }
+    }
     switch (index) {
       case 0:
         return '/';
@@ -97,6 +126,74 @@ class AppScaffold extends StatelessWidget {
     }
   }
 
+  /// Route principali (senza back button) per il ruolo corrente.
+  List<String> get _mainRoutes => UserRole.isResponsabile
+      ? const [
+          '/parrocchia',
+          '/parrocchia/classi',
+          '/parrocchia/logistica',
+          '/parrocchia/rete',
+          '/settings',
+        ]
+      : const ['/', '/my-group', '/planning', '/documents', '/settings'];
+
+  /// Destinazioni della bottom navigation per il ruolo corrente.
+  List<NavigationDestination> get _destinations => UserRole.isResponsabile
+      ? const [
+          NavigationDestination(
+            icon: Icon(Icons.dashboard_rounded),
+            selectedIcon: Icon(Icons.dashboard),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.class_rounded),
+            selectedIcon: Icon(Icons.class_rounded),
+            label: 'Classi',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.meeting_room_rounded),
+            selectedIcon: Icon(Icons.meeting_room_rounded),
+            label: 'Logistica',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.network_check_rounded),
+            selectedIcon: Icon(Icons.network_check_rounded),
+            label: 'Rete',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Impostazioni',
+          ),
+        ]
+      : const [
+          NavigationDestination(
+            icon: Icon(Icons.dashboard_rounded),
+            selectedIcon: Icon(Icons.dashboard),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.groups_rounded),
+            selectedIcon: Icon(Icons.groups),
+            label: 'Gruppo',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.calendar_month_outlined),
+            selectedIcon: Icon(Icons.calendar_month),
+            label: 'Programma',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.description_outlined),
+            selectedIcon: Icon(Icons.description),
+            label: 'Documenti',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Impostazioni',
+          ),
+        ];
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -113,32 +210,23 @@ class AppScaffold extends StatelessWidget {
     // 2. Se mostrare il pulsante back (solo sottopagine, non sezioni principali)
     final location = GoRouterState.of(context).uri.toString();
     final currentIndex = _indexFromLocation(location);
-    final showBackToHome =
-        !['/', '/my-group', '/planning', '/documents', '/settings']
-            .contains(location);
+    final showBackToHome = !_mainRoutes.contains(location);
 
     // Colori adattivi per il tema
     final scaffoldBg = isDark
-        ? colorScheme.surfaceContainerLowest // #121A24 per AMOLED
+        ? colorScheme
+              .surfaceContainerLowest // #121A24 per AMOLED
         : const Color(0xFFF5F8FC);
-    final topBarBg = isDark
-        ? colorScheme.surfaceContainer
-        : Colors.white;
-    final pageBodyBg = isDark
-        ? colorScheme.surfaceContainer
-        : Colors.white;
-    final navBarBg = isDark
-        ? colorScheme.surfaceContainer
-        : Colors.white;
+    final topBarBg = isDark ? colorScheme.surfaceContainer : Colors.white;
+    final pageBodyBg = isDark ? colorScheme.surfaceContainer : Colors.white;
+    final navBarBg = isDark ? colorScheme.surfaceContainer : Colors.white;
     final churchIconBg = isDark
         ? colorScheme.primaryContainer.withValues(alpha: 0.3)
         : const Color(0xFFEAF2FF);
     final churchIconColor = isDark
         ? colorScheme.primary
         : const Color(0xFF174A7E);
-    final titleColor = isDark
-        ? colorScheme.onSurface
-        : const Color(0xFF174A7E);
+    final titleColor = isDark ? colorScheme.onSurface : const Color(0xFF174A7E);
     final backIconColor = isDark
         ? colorScheme.onSurface
         : const Color(0xFF174A7E);
@@ -170,10 +258,7 @@ class AppScaffold extends StatelessWidget {
                 margin: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF174A7E),
-                      Color(0xFF2368B1),
-                    ],
+                    colors: [Color(0xFF174A7E), Color(0xFF2368B1)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -328,7 +413,9 @@ class AppScaffold extends StatelessWidget {
                   data: NavigationBarThemeData(
                     labelTextStyle: WidgetStatePropertyAll(
                       TextStyle(
-                        fontSize: MediaQuery.of(context).size.width < 360 ? 10 : 11,
+                        fontSize: MediaQuery.of(context).size.width < 360
+                            ? 10
+                            : 11,
                         fontWeight: FontWeight.w600,
                         overflow: TextOverflow.clip,
                       ),
@@ -338,38 +425,13 @@ class AppScaffold extends StatelessWidget {
                     height: 72,
                     backgroundColor: navBarBg,
                     selectedIndex: currentIndex,
-                    indicatorColor:
-                        theme.colorScheme.primary.withValues(alpha: 0.15),
+                    indicatorColor: theme.colorScheme.primary.withValues(
+                      alpha: 0.15,
+                    ),
                     onDestinationSelected: (index) {
                       context.go(_routeFromIndex(index));
                     },
-                    destinations: const [
-                      NavigationDestination(
-                        icon: Icon(Icons.dashboard_rounded),
-                        selectedIcon: Icon(Icons.dashboard),
-                        label: 'Home',
-                      ),
-                      NavigationDestination(
-                        icon: Icon(Icons.groups_rounded),
-                        selectedIcon: Icon(Icons.groups),
-                        label: 'Gruppo',
-                      ),
-                      NavigationDestination(
-                        icon: Icon(Icons.calendar_month_outlined),
-                        selectedIcon: Icon(Icons.calendar_month),
-                        label: 'Programma',
-                      ),
-                      NavigationDestination(
-                        icon: Icon(Icons.description_outlined),
-                        selectedIcon: Icon(Icons.description),
-                        label: 'Documenti',
-                      ),
-                      NavigationDestination(
-                        icon: Icon(Icons.settings_outlined),
-                        selectedIcon: Icon(Icons.settings),
-                        label: 'Impostazioni',
-                      ),
-                    ],
+                    destinations: _destinations,
                   ),
                 ),
               ),

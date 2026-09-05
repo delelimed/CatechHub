@@ -9,11 +9,14 @@
 /// - L'utente ha il pieno controllo dei propri dati
 /// - **PROTEZIONE RUNTIME freeRASP: anti-root, anti-emulatore, anti-tamper, anti-hooking**
 ///
+library;
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/security/privacy_settings.dart';
 import '../../core/security/security_service.dart';
 import '../../shared/widgets/app_scaffold.dart';
 
@@ -23,6 +26,7 @@ class PrivacySecurityPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final securityService = ref.watch(securityStatusProvider);
+    final privacy = ref.watch(privacySettingsProvider);
 
     return AppScaffold(
       title: 'Privacy e Sicurezza',
@@ -30,6 +34,22 @@ class PrivacySecurityPage extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           const _HeaderCard(),
+          const SizedBox(height: 16),
+          const _SectionLabel('Consensi e feedback'),
+          const SizedBox(height: 8),
+          SwitchListTile(
+            title: const Text('Feedback remoto'),
+            subtitle: const Text(
+              'Consenti l\'invio di feedback e segnalazioni bug tramite Wiredash',
+            ),
+            value: privacy.allowRemoteFeedback,
+            activeThumbColor: const Color(0xFF174A7E),
+            onChanged: (value) {
+              ref
+                  .read(privacySettingsProvider.notifier)
+                  .setAllowRemoteFeedback(value);
+            },
+          ),
           const SizedBox(height: 16),
           const _SectionLabel('I tuoi dati sono al sicuro'),
           const SizedBox(height: 8),
@@ -78,7 +98,6 @@ class PrivacySecurityPage extends ConsumerWidget {
           const SizedBox(height: 8),
           _FreeRASPStatusCard(securityStatus: securityService),
 
-
           const SizedBox(height: 24),
         ],
       ),
@@ -87,7 +106,10 @@ class PrivacySecurityPage extends ConsumerWidget {
 }
 
 /// Provider per lo stato di sicurezza freeRASP (reactive)
-final securityStatusProvider = NotifierProvider<_SecurityStatusNotifier, SecurityStatus>(_SecurityStatusNotifier.new);
+final securityStatusProvider =
+    NotifierProvider<_SecurityStatusNotifier, SecurityStatus>(
+      _SecurityStatusNotifier.new,
+    );
 
 /// Notifier che espone reattivamente i ValueNotifier di SecurityService
 class _SecurityStatusNotifier extends Notifier<SecurityStatus> {
@@ -96,10 +118,12 @@ class _SecurityStatusNotifier extends Notifier<SecurityStatus> {
 
   @override
   SecurityStatus build() {
-    _blockSub = _valueNotifierToStream(SecurityService.blockMessage)
-        .listen((value) => state = state.copyWith(blockMessage: value));
-    _warningSub = _valueNotifierToStream(SecurityService.developerOptionsWarningMessage)
-        .listen((value) => state = state.copyWith(warningMessage: value));
+    _blockSub = _valueNotifierToStream(
+      SecurityService.blockMessage,
+    ).listen((value) => state = state.copyWith(blockMessage: value));
+    _warningSub = _valueNotifierToStream(
+      SecurityService.developerOptionsWarningMessage,
+    ).listen((value) => state = state.copyWith(warningMessage: value));
     ref.onDispose(() {
       _blockSub?.cancel();
       _warningSub?.cancel();
@@ -157,7 +181,11 @@ class _SectionLabel extends StatelessWidget {
     return Row(
       children: [
         if (icon != null) ...[
-          Icon(icon, size: 16, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+          Icon(
+            icon,
+            size: 16,
+            color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+          ),
           const SizedBox(width: 6),
         ],
         Text(
@@ -209,7 +237,11 @@ class _HeaderCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.shield_rounded, color: isDark ? colorScheme.primary : const Color(0xFF174A7E), size: 34),
+          Icon(
+            Icons.shield_rounded,
+            color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+            size: 34,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -273,7 +305,11 @@ class _InfoCard extends StatelessWidget {
                   : const Color(0xFF174A7E).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: isDark ? colorScheme.primary : const Color(0xFF174A7E), size: 22),
+            child: Icon(
+              icon,
+              color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+              size: 22,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -314,7 +350,8 @@ class _FreeRASPStatusCard extends ConsumerStatefulWidget {
   const _FreeRASPStatusCard({required this.securityStatus});
 
   @override
-  ConsumerState<_FreeRASPStatusCard> createState() => _FreeRASPStatusCardState();
+  ConsumerState<_FreeRASPStatusCard> createState() =>
+      _FreeRASPStatusCardState();
 }
 
 class _FreeRASPStatusCardState extends ConsumerState<_FreeRASPStatusCard>
@@ -367,7 +404,8 @@ class _FreeRASPStatusCardState extends ConsumerState<_FreeRASPStatusCard>
       statusColor = Colors.green.shade700;
       statusIcon = Icons.verified_rounded;
       statusTitle = 'AMBIENTE SICURO';
-      statusSubtitle = 'Tutti i controlli freeRASP superati. Protezione attiva.';
+      statusSubtitle =
+          'Tutti i controlli freeRASP superati. Protezione attiva.';
     }
 
     return Container(
@@ -458,7 +496,10 @@ class _FreeRASPStatusCardState extends ConsumerState<_FreeRASPStatusCard>
               ),
               // Badge versione
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
@@ -483,11 +524,11 @@ class _FreeRASPStatusCardState extends ConsumerState<_FreeRASPStatusCard>
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: isDark ? colorScheme.surfaceContainer.withValues(alpha: 0.7) : Colors.white.withValues(alpha: 0.7),
+              color: isDark
+                  ? colorScheme.surfaceContainer.withValues(alpha: 0.7)
+                  : Colors.white.withValues(alpha: 0.7),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: statusColor.withValues(alpha: 0.2),
-              ),
+              border: Border.all(color: statusColor.withValues(alpha: 0.2)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -496,8 +537,8 @@ class _FreeRASPStatusCardState extends ConsumerState<_FreeRASPStatusCard>
                   status.hasActiveBlock
                       ? Icons.error_outline_rounded
                       : status.hasActiveWarning
-                          ? Icons.info_outline_rounded
-                          : Icons.check_circle_outline_rounded,
+                      ? Icons.info_outline_rounded
+                      : Icons.check_circle_outline_rounded,
                   color: statusColor,
                   size: 20,
                 ),
@@ -527,31 +568,41 @@ class _FreeRASPStatusCardState extends ConsumerState<_FreeRASPStatusCard>
               _MiniIndicator(
                 label: 'Root',
                 icon: Icons.admin_panel_settings_rounded,
-                passed: !status.hasActiveBlock || !status.blockMessage!.contains('Root'),
+                passed:
+                    !status.hasActiveBlock ||
+                    !status.blockMessage!.contains('Root'),
                 color: Colors.green,
               ),
               _MiniIndicator(
                 label: 'Emulatore',
                 icon: Icons.computer_rounded,
-                passed: !status.hasActiveBlock || !status.blockMessage!.contains('Emulatore'),
+                passed:
+                    !status.hasActiveBlock ||
+                    !status.blockMessage!.contains('Emulatore'),
                 color: Colors.green,
               ),
               _MiniIndicator(
                 label: 'Integrità',
                 icon: Icons.verified_rounded,
-                passed: !status.hasActiveBlock || !status.blockMessage!.contains('Firma'),
+                passed:
+                    !status.hasActiveBlock ||
+                    !status.blockMessage!.contains('Firma'),
                 color: Colors.green,
               ),
               _MiniIndicator(
                 label: 'Hooking',
                 icon: Icons.bug_report_rounded,
-                passed: !status.hasActiveBlock || !status.blockMessage!.contains('Hooking'),
+                passed:
+                    !status.hasActiveBlock ||
+                    !status.blockMessage!.contains('Hooking'),
                 color: Colors.green,
               ),
               _MiniIndicator(
                 label: 'Device Bind',
                 icon: Icons.devices_rounded,
-                passed: !status.hasActiveBlock || !status.blockMessage!.contains('Binding'),
+                passed:
+                    !status.hasActiveBlock ||
+                    !status.blockMessage!.contains('Binding'),
                 color: Colors.green,
               ),
               _MiniIndicator(
@@ -587,7 +638,9 @@ class _MiniIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayColor = passed ? color : (isWarning ? Colors.orange : Colors.red);
+    final displayColor = passed
+        ? color
+        : (isWarning ? Colors.orange : Colors.red);
     final bgColor = passed
         ? displayColor.withValues(alpha: 0.12)
         : displayColor.withValues(alpha: 0.12);

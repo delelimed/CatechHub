@@ -12,6 +12,8 @@
 /// Integrazione CateREG: utilizzato da [AttendancePrintPage] per esportare
 /// gli appelli; [PrintStudentData] è il DTO che veicola i dati di uno
 /// studente dal layer dati al layout PDF.
+library;
+
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -147,7 +149,7 @@ class PrintService {
                           ),
                         ],
                       );
-                    }).toList(),
+                    }),
                   ],
                 ),
               ),
@@ -157,9 +159,7 @@ class PrintService {
       ),
     );
 
-    await Printing.layoutPdf(
-      onLayout: (format) async => pdf.save(),
-    );
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
 
   static Future<void> printDetailedAttendanceReport({
@@ -173,7 +173,8 @@ class PrintService {
     final sortedStudents = [...students]
       ..sort((a, b) => a.fullName.compareTo(b.fullName));
 
-    final sortedMeetings = [...meetings]..sort((a, b) => a.date.compareTo(b.date));
+    final sortedMeetings = [...meetings]
+      ..sort((a, b) => a.date.compareTo(b.date));
 
     pdf.addPage(
       pw.Page(
@@ -202,7 +203,7 @@ class PrintService {
                     ...{
                       for (int i = 0; i < sortedMeetings.length; i++)
                         3 + i: const pw.FlexColumnWidth(0.6),
-                    }
+                    },
                   },
                   children: [
                     pw.TableRow(
@@ -214,7 +215,10 @@ class PrintService {
                           padding: const pw.EdgeInsets.all(4),
                           child: pw.Text(
                             'Nome e Cognome',
-                            style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+                            style: pw.TextStyle(
+                              fontSize: 10,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
                           ),
                         ),
                         pw.Padding(
@@ -222,7 +226,10 @@ class PrintService {
                           child: pw.Text(
                             'P',
                             textAlign: pw.TextAlign.center,
-                            style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+                            style: pw.TextStyle(
+                              fontSize: 9,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
                           ),
                         ),
                         pw.Padding(
@@ -230,7 +237,10 @@ class PrintService {
                           child: pw.Text(
                             'A',
                             textAlign: pw.TextAlign.center,
-                            style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+                            style: pw.TextStyle(
+                              fontSize: 9,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
                           ),
                         ),
                         ...sortedMeetings.map((meeting) {
@@ -239,10 +249,13 @@ class PrintService {
                             child: pw.Text(
                               '${meeting.date.day}/${meeting.date.month}',
                               textAlign: pw.TextAlign.center,
-                              style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold),
+                              style: pw.TextStyle(
+                                fontSize: 7,
+                                fontWeight: pw.FontWeight.bold,
+                              ),
                             ),
                           );
-                        }).toList(),
+                        }),
                       ],
                     ),
 
@@ -265,7 +278,10 @@ class PrintService {
                             child: pw.Text(
                               '$totalPresent',
                               textAlign: pw.TextAlign.center,
-                              style: pw.TextStyle(fontSize: 9, color: PdfColors.green),
+                              style: pw.TextStyle(
+                                fontSize: 9,
+                                color: PdfColors.green,
+                              ),
                             ),
                           ),
 
@@ -274,7 +290,10 @@ class PrintService {
                             child: pw.Text(
                               '$totalAbsent',
                               textAlign: pw.TextAlign.center,
-                              style: pw.TextStyle(fontSize: 9, color: PdfColors.red),
+                              style: pw.TextStyle(
+                                fontSize: 9,
+                                color: PdfColors.red,
+                              ),
                             ),
                           ),
 
@@ -298,14 +317,16 @@ class PrintService {
                                 textAlign: pw.TextAlign.center,
                                 style: pw.TextStyle(
                                   fontSize: 9,
-                                  color: isAbsent ? PdfColors.red : PdfColors.green,
+                                  color: isAbsent
+                                      ? PdfColors.red
+                                      : PdfColors.green,
                                 ),
                               ),
                             );
-                          }).toList(),
+                          }),
                         ],
                       );
-                    }).toList(),
+                    }),
                   ],
                 ),
               ),
@@ -315,8 +336,6 @@ class PrintService {
       ),
     );
 
-    await Printing.layoutPdf(
-      onLayout: (format) async => pdf.save(),
-    );
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
 }

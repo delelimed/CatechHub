@@ -64,71 +64,71 @@ class _PdfReportPageState extends ConsumerState<PdfReportPage> {
   bool _generating = false;
 
   List<_ModuleOption> get _options => [
-        _ModuleOption(
-          label: 'Anagrafica',
-          subtitle: 'Dati anagrafici, contatti e note dei ragazzi',
-          icon: Icons.people_rounded,
-          color: const Color(0xFF3E92CC),
-          selected: () => _includeAnagrafica,
-          onChanged: (v) => setState(() => _includeAnagrafica = v),
-        ),
-        _ModuleOption(
-          label: 'Note di contatto',
-          subtitle: 'Registro delle comunicazioni con i genitori',
-          icon: Icons.contact_phone_rounded,
-          color: const Color(0xFF6A4FA3),
-          selected: () => _includeNoteContatto,
-          onChanged: (v) => setState(() => _includeNoteContatto = v),
-        ),
-        _ModuleOption(
-          label: 'Composizione del gruppo',
-          subtitle: 'Elenco dei ragazzi iscritti al gruppo',
-          icon: Icons.groups_rounded,
-          color: const Color(0xFF2A9D8F),
-          selected: () => _includeComposizione,
-          onChanged: (v) => setState(() => _includeComposizione = v),
-        ),
-        _ModuleOption(
-          label: 'Presenze',
-          subtitle: 'Registro completo delle presenze per incontro',
-          icon: Icons.fact_check_rounded,
-          color: const Color(0xFF27AE60),
-          selected: () => _includePresenze,
-          onChanged: (v) => setState(() => _includePresenze = v),
-        ),
-        _ModuleOption(
-          label: 'Statistiche',
-          subtitle: 'Percentuali di frequenza e dati di sintesi',
-          icon: Icons.bar_chart_rounded,
-          color: const Color(0xFFE76F51),
-          selected: () => _includeStatistiche,
-          onChanged: (v) => setState(() => _includeStatistiche = v),
-        ),
-        _ModuleOption(
-          label: 'Documenti',
-          subtitle: 'Certificati, autorizzazioni e stato consegne',
-          icon: Icons.description_rounded,
-          color: const Color(0xFFF4A62A),
-          selected: () => _includeDocumenti,
-          onChanged: (v) => setState(() => _includeDocumenti = v),
-        ),
-        _ModuleOption(
-          label: 'Programmazione degli incontri',
-          subtitle: 'Incontri e riunioni programmate nel corso dell\'anno',
-          icon: Icons.calendar_month_rounded,
-          color: const Color(0xFF9B59B6),
-          selected: () => _includeProgrammazione,
-          onChanged: (v) => setState(() => _includeProgrammazione = v),
-        ),
-        _ModuleOption(
-          label: 'Catechesi',
-          subtitle: 'Schede e contenuti catechetici',
-          icon: Icons.menu_book_rounded,
-          color: const Color(0xFF174A7E),
-          selected: () => _includeCatechesi,
-          onChanged: (v) => setState(() => _includeCatechesi = v),
-        ),
-      ];
+    _ModuleOption(
+      label: 'Anagrafica',
+      subtitle: 'Dati anagrafici, contatti e note dei ragazzi',
+      icon: Icons.people_rounded,
+      color: const Color(0xFF3E92CC),
+      selected: () => _includeAnagrafica,
+      onChanged: (v) => setState(() => _includeAnagrafica = v),
+    ),
+    _ModuleOption(
+      label: 'Note di contatto',
+      subtitle: 'Registro delle comunicazioni con i genitori',
+      icon: Icons.contact_phone_rounded,
+      color: const Color(0xFF6A4FA3),
+      selected: () => _includeNoteContatto,
+      onChanged: (v) => setState(() => _includeNoteContatto = v),
+    ),
+    _ModuleOption(
+      label: 'Composizione del gruppo',
+      subtitle: 'Elenco dei ragazzi iscritti al gruppo',
+      icon: Icons.groups_rounded,
+      color: const Color(0xFF2A9D8F),
+      selected: () => _includeComposizione,
+      onChanged: (v) => setState(() => _includeComposizione = v),
+    ),
+    _ModuleOption(
+      label: 'Presenze',
+      subtitle: 'Registro completo delle presenze per incontro',
+      icon: Icons.fact_check_rounded,
+      color: const Color(0xFF27AE60),
+      selected: () => _includePresenze,
+      onChanged: (v) => setState(() => _includePresenze = v),
+    ),
+    _ModuleOption(
+      label: 'Statistiche',
+      subtitle: 'Percentuali di frequenza e dati di sintesi',
+      icon: Icons.bar_chart_rounded,
+      color: const Color(0xFFE76F51),
+      selected: () => _includeStatistiche,
+      onChanged: (v) => setState(() => _includeStatistiche = v),
+    ),
+    _ModuleOption(
+      label: 'Documenti',
+      subtitle: 'Certificati, autorizzazioni e stato consegne',
+      icon: Icons.description_rounded,
+      color: const Color(0xFFF4A62A),
+      selected: () => _includeDocumenti,
+      onChanged: (v) => setState(() => _includeDocumenti = v),
+    ),
+    _ModuleOption(
+      label: 'Programmazione degli incontri',
+      subtitle: 'Incontri e riunioni programmate nel corso dell\'anno',
+      icon: Icons.calendar_month_rounded,
+      color: const Color(0xFF9B59B6),
+      selected: () => _includeProgrammazione,
+      onChanged: (v) => setState(() => _includeProgrammazione = v),
+    ),
+    _ModuleOption(
+      label: 'Catechesi',
+      subtitle: 'Schede e contenuti catechetici',
+      icon: Icons.menu_book_rounded,
+      color: const Color(0xFF174A7E),
+      selected: () => _includeCatechesi,
+      onChanged: (v) => setState(() => _includeCatechesi = v),
+    ),
+  ];
 
   bool get _anySelected =>
       _includeAnagrafica ||
@@ -188,9 +188,7 @@ class _PdfReportPageState extends ConsumerState<PdfReportPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Errore durante la generazione del PDF: $e'),
-          ),
+          SnackBar(content: Text('Errore durante la generazione del PDF: $e')),
         );
       }
     } finally {
@@ -298,7 +296,11 @@ class _PdfReportPageState extends ConsumerState<PdfReportPage> {
         const SizedBox(height: 12),
 
         ..._options.map(
-          (option) => _ModuleTile(option: option, isDark: isDark, colorScheme: colorScheme),
+          (option) => _ModuleTile(
+            option: option,
+            isDark: isDark,
+            colorScheme: colorScheme,
+          ),
         ),
 
         const SizedBox(height: 12),
@@ -342,13 +344,8 @@ class _PdfReportPageState extends ConsumerState<PdfReportPage> {
                   )
                 : const Icon(Icons.share_rounded),
             label: Text(
-              _generating
-                  ? 'Generazione in corso…'
-                  : 'Genera e condividi PDF',
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
+              _generating ? 'Generazione in corso…' : 'Genera e condividi PDF',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
             ),
           ),
         ),
@@ -397,8 +394,8 @@ class _ModuleTile extends StatelessWidget {
             color: option.selected()
                 ? option.color.withValues(alpha: 0.6)
                 : (isDark
-                    ? colorScheme.outline.withValues(alpha: 0.2)
-                    : Colors.grey.shade200),
+                      ? colorScheme.outline.withValues(alpha: 0.2)
+                      : Colors.grey.shade200),
             width: option.selected() ? 1.6 : 1,
           ),
         ),
@@ -437,7 +434,9 @@ class _ModuleTile extends StatelessWidget {
                     option.subtitle,
                     style: TextStyle(
                       fontSize: 11,
-                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                      color: isDark
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
                     ),
                   ),
                 ],

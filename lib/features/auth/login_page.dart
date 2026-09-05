@@ -3,7 +3,11 @@
 //
 // FLUSSO:
 // 1. App avviata → controlla isProfileConfigured
-// 2. Se NON configurato → Form profilo (nome, cognome, gruppo) → setupInitialProfile → sblocca
+// 2. Se NON configurato → Form profilo:
+//    - Modalità RESPONSABILE (ruolo scelto in onboarding) → solo Nome,
+//      Cognome, Telefono; nessuna classe iniziale.
+//    - Altrimenti → Nome, Cognome, Telefono + creazione classe o unione P2P.
+//    → setupInitialProfile → sblocca
 // 3. Se configurato → Verifica hasSecureLockScreen()
 //    - Se FALSE → HardLockScreen (bloccante, non chiudibile)
 //    - Se TRUE → Mostra pulsante "Accedi con Impronta/Faccia/PIN Telefono"
@@ -14,15 +18,22 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'bible_quote.dart';
 import '../../core/auth/auth_provider.dart';
+import '../../core/auth/auth_service.dart';
+import '../../core/storage/local_database.dart';
+import '../../features/guide/demo_guide_service.dart';
+import '../../shared/models/user_role.dart';
 
 /// Animated gradient background with flowing colors
 class _AnimatedGradientBackground extends StatefulWidget {
@@ -109,7 +120,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   bool _checkedLockScreen = false;
   String? _errorMessage;
 
-  int _setupStep = 0; // 0: nome/cognome, 1: crea/unisciti, 2: nome gruppo (solo se crea)
+  int _setupStep =
+      0; // 0: nome/cognome, 1: crea/unisciti, 2: nome gruppo (solo se crea)
 
   @override
   void initState() {
@@ -119,7 +131,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final authService = ref.read(authServiceProvider);
       final isConfigured = authService.isProfileConfigured;
-      debugPrint('Login initState - Profilo configurato: $isConfigured');
+      if (kDebugMode) {
+        debugPrint('Login initState - Profilo configurato: $isConfigured');
+      }
 
       if (!isConfigured) {
         if (mounted) setState(() => _isFirstSetup = true);
@@ -128,7 +142,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
       // Profilo esiste: verifica se il dispositivo ha lockscreen attivo
       final hasLock = await authService.hasSecureLockScreen();
-      debugPrint('Login initState - Lockscreen attivo: $hasLock');
+      if (kDebugMode) {
+        debugPrint('Login initState - Lockscreen attivo: $hasLock');
+      }
 
       if (mounted) {
         setState(() {
@@ -162,6 +178,18 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
   }
 
+  /// Modalità operativa scelta in onboarding: in "Modalità Normale"
+  /// (setup_mode = 'create') la creazione di una nuova classe è diretta e
+  /// obbligatoria, quindi la scelta "crea / unisciti" viene saltata.
+  bool get _skipsCreateJoinChoice {
+    try {
+      return LocalDatabase.auth().get('setup_mode', defaultValue: 'create') ==
+          'create';
+    } catch (_) {
+      return true;
+    }
+  }
+
   void _nextStep() {
     if (_setupStep == 0) {
       final firstName = _firstNameController.text.trim();
@@ -172,7 +200,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       }
       setState(() {
         _errorMessage = null;
-        _setupStep = 1;
+        // In Modalità Normale si passa direttamente alla creazione della classe.
+        _setupStep = _skipsCreateJoinChoice ? 2 : 1;
       });
     }
   }
@@ -180,8 +209,15 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   void _previousStep() {
     setState(() {
       _errorMessage = null;
-      _setupStep = _setupStep - 1;
-      if (_setupStep == 1) _groupController.clear();
+      // Se la scelta "crea / unisciti" è stata saltata, dal passo di
+      // creazione della classe si torna direttamente al profilo.
+      if (_skipsCreateJoinChoice && _setupStep == 2) {
+        _setupStep = 0;
+        _groupController.clear();
+      } else {
+        _setupStep = _setupStep - 1;
+        if (_setupStep == 1) _groupController.clear();
+      }
     });
   }
 
@@ -236,6 +272,38 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
   }
 
+  Future<void> _handleCreateResponsabileProfile() async {
+    HapticFeedback.mediumImpact();
+    setState(() => _errorMessage = null);
+
+    final firstName = _firstNameController.text.trim();
+    final lastName = _lastNameController.text.trim();
+
+    if (firstName.isEmpty || lastName.isEmpty) {
+      setState(() => _errorMessage = 'Nome e cognome sono obbligatori.');
+      return;
+    }
+
+    // La guida live viene pianificata PRIMA di completare il profilo: al
+    // termine della configurazione il router reindirizza alla guida.
+    await DemoGuideService.scheduleGuide();
+
+    final auth = ref.read(authStateProvider.notifier);
+    final ok = await auth.setupInitialProfile(
+      firstName: firstName,
+      lastName: lastName,
+      phoneNumber: _phoneController.text.trim(),
+      createClass: false,
+      role: UserRole.responsabile,
+    );
+
+    if (!ok && mounted) {
+      setState(
+        () => _errorMessage = 'Errore durante la configurazione. Riprova.',
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
@@ -277,7 +345,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                     Image.asset(
                                       'assets/images/logo.png',
                                       height: isLandscape ? 140 : 100,
-                                      errorBuilder: (_, __, ___) =>
+                                      errorBuilder: (_, _, _) =>
                                           const Icon(Icons.menu_book, size: 80),
                                     ),
                                     const SizedBox(height: 12),
@@ -310,11 +378,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     if (_isFirstSetup) ...[
-                                      _buildFirstSetupForm(isLoading, isLandscape),
+                                      _buildFirstSetupForm(
+                                        isLoading,
+                                        isLandscape,
+                                      ),
                                     ] else if (!_checkedLockScreen) ...[
                                       _buildCheckingLockScreen(),
                                     ] else if (!_hasSecureLockScreen) ...[
-                                      const HardLockScreen(),
+                                      HardLockScreen(
+                                        onRetry: _recheckLockScreen,
+                                      ),
                                     ] else ...[
                                       _buildUnlockForm(isLoading, isLandscape),
                                     ],
@@ -338,7 +411,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               Image.asset(
                                 'assets/images/logo.png',
                                 height: 120,
-                                errorBuilder: (_, __, ___) =>
+                                errorBuilder: (_, _, _) =>
                                     const Icon(Icons.menu_book, size: 80),
                               ),
                               const SizedBox(height: 16),
@@ -370,7 +443,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                 _buildCheckingLockScreen(),
                               ] else if (!_hasSecureLockScreen) ...[
                                 // HARD LOCK SCREEN - Non chiudibile, non bypassabile
-                                const HardLockScreen(),
+                                HardLockScreen(onRetry: _recheckLockScreen),
                               ] else ...[
                                 _buildUnlockForm(isLoading, isLandscape),
                               ],
@@ -442,7 +515,25 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     );
   }
 
+  /// Rilancia il controllo del lockscreen (usato dal pulsante "Riprova"
+  /// della HardLockScreen) e aggiorna lo stato della pagina.
+  Future<void> _recheckLockScreen() async {
+    final authService = ref.read(authServiceProvider);
+    final hasLock = await authService.hasSecureLockScreen();
+    if (!mounted) return;
+    setState(() {
+      _hasSecureLockScreen = hasLock;
+      _checkedLockScreen = true;
+    });
+  }
+
   Widget _buildFirstSetupForm(bool isLoading, bool isLandscape) {
+    // Modalità Responsabile scelta in onboarding: solo profilo (nome, cognome,
+    // telefono), nessuna classe iniziale. La dashboard Responsabile gestirà
+    // centralmente classi, catechisti e luoghi.
+    if (UserRole.isResponsabile) {
+      return _buildResponsabileSetupForm(isLoading, isLandscape);
+    }
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -483,9 +574,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             const SizedBox(height: 16),
           ],
           if (_setupStep == 0) ...[
-            _buildTextField(_firstNameController, 'Nome', Icons.person, isLandscape),
+            _buildTextField(
+              _firstNameController,
+              'Nome',
+              Icons.person,
+              isLandscape,
+            ),
             const SizedBox(height: 12),
-            _buildTextField(_lastNameController, 'Cognome', Icons.person_outline, isLandscape),
+            _buildTextField(
+              _lastNameController,
+              'Cognome',
+              Icons.person_outline,
+              isLandscape,
+            ),
             const SizedBox(height: 12),
             _buildTextField(
               _phoneController,
@@ -585,7 +686,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               'Inserisci il nome del tuo gruppo di catechismo '
               '(es. "Prima elementare", "Cresima 2026")',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: isLandscape ? 12 : 11, color: Colors.grey),
+              style: TextStyle(
+                fontSize: isLandscape ? 12 : 11,
+                color: Colors.grey,
+              ),
             ),
             const SizedBox(height: 20),
             ElevatedButton(
@@ -618,6 +722,92 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               ),
             ),
           ],
+        ],
+      ],
+    );
+  }
+
+  Widget _buildResponsabileSetupForm(bool isLoading, bool isLandscape) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Profilo Responsabile Catechistico',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF174A7E),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Gestirai la struttura della parrocchia: classi, catechisti, '
+          'luoghi e registro GDPR. L\'app usa il blocco schermo del telefono '
+          '(impronta, volto, PIN) per proteggere i dati.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: isLandscape ? 13 : 12, color: Colors.grey),
+        ),
+        const SizedBox(height: 24),
+        if (isLoading) ...[
+          const SizedBox(height: 8),
+          const CircularProgressIndicator(strokeWidth: 3),
+        ] else ...[
+          if (_errorMessage != null) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.red.shade700, fontSize: 14),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          _buildTextField(
+            _firstNameController,
+            'Nome',
+            Icons.person,
+            isLandscape,
+          ),
+          const SizedBox(height: 12),
+          _buildTextField(
+            _lastNameController,
+            'Cognome',
+            Icons.person_outline,
+            isLandscape,
+          ),
+          const SizedBox(height: 12),
+          _buildTextField(
+            _phoneController,
+            'Telefono (facoltativo)',
+            Icons.phone_outlined,
+            isLandscape,
+            TextInputType.phone,
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: _handleCreateResponsabileProfile,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF174A7E),
+              foregroundColor: Colors.white,
+              minimumSize: Size(double.infinity, isLandscape ? 56 : 50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: Text(
+              'Crea profilo e accedi',
+              style: TextStyle(
+                fontSize: isLandscape ? 17 : 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ],
       ],
     );
@@ -720,8 +910,83 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
 /// Schermata di blocco totale - NON chiudibile, NON bypassabile
 /// Appare se il dispositivo NON ha un lockscreen sicuro attivo.
-class HardLockScreen extends StatelessWidget {
-  const HardLockScreen({super.key});
+/// Pulsanti funzionanti: apre le impostazioni di sicurezza del dispositivo
+/// e riprova la verifica (il pulsante vuoto precedente rendeva il blocco
+/// inutile e frustrante).
+class HardLockScreen extends StatefulWidget {
+  final VoidCallback? onRetry;
+
+  const HardLockScreen({super.key, this.onRetry});
+
+  @override
+  State<HardLockScreen> createState() => _HardLockScreenState();
+}
+
+class _HardLockScreenState extends State<HardLockScreen> {
+  bool _isChecking = false;
+  bool _openingSettings = false;
+
+  /// Apre le impostazioni di sicurezza del dispositivo (stessa logica del
+  /// HardLockScreen core in lib/core/auth/hard_lock_screen.dart).
+  Future<void> _openSecuritySettings() async {
+    setState(() => _openingSettings = true);
+    try {
+      if (Platform.isAndroid) {
+        const MethodChannel channel = MethodChannel(
+          'catechhub/security_settings',
+        );
+        await channel.invokeMethod('openSecuritySettings');
+      } else if (Platform.isIOS) {
+        final uri = Uri.parse('app-settings:');
+        await launchUrl(uri);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Impossibile aprire le impostazioni: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _openingSettings = false);
+    }
+  }
+
+  Future<void> _retry() async {
+    if (_isChecking) return;
+    setState(() => _isChecking = true);
+    try {
+      final authService = AuthService();
+      final hasLock = await authService.hasSecureLockScreen();
+      if (hasLock && mounted) {
+        widget.onRetry?.call();
+        return;
+      }
+      if (mounted) {
+        setState(() => _isChecking = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Blocco schermo non ancora attivo. Riprova dopo averlo configurato.',
+            ),
+            backgroundColor: Color(0xFF174A7E),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isChecking = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Errore verifica sicurezza: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -757,8 +1022,17 @@ class HardLockScreen extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               ElevatedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.settings, color: Colors.white),
+                onPressed: _openingSettings ? null : _openSecuritySettings,
+                icon: _openingSettings
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.settings, color: Colors.white),
                 label: const Text(
                   'Apri Impostazioni Sicurezza',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -767,6 +1041,29 @@ class HardLockScreen extends StatelessWidget {
                   backgroundColor: Colors.red.shade700,
                   foregroundColor: Colors.white,
                   minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _isChecking ? null : _retry,
+                icon: _isChecking
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh_rounded, size: 20),
+                label: const Text(
+                  'Ho impostato il blocco schermo → Verifica',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red.shade700,
+                  side: BorderSide(color: Colors.red.shade700, width: 1.5),
+                  minimumSize: const Size(double.infinity, 48),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),

@@ -88,7 +88,9 @@ class SecurityService {
   ///
   /// - `null` = ambiente sicuro, mostra app normale
   /// - `String` = messaggio di blocco (es. "Root rilevato"), mostra SecurityBlockScreen
-  static final ValueNotifier<String?> blockMessage = ValueNotifier<String?>(null);
+  static final ValueNotifier<String?> blockMessage = ValueNotifier<String?>(
+    null,
+  );
 
   /// Flag per evitare doppia inizializzazione.
   static bool _initialized = false;
@@ -115,11 +117,15 @@ class SecurityService {
   /// a [SecurityBlockScreen] invece di far killare l'app da freeRASP.
   static Future<void> init() async {
     if (_initialized) {
-      debugPrint('[SecurityService] Già inizializzato, salto.');
+      if (kDebugMode) {
+        debugPrint('[SecurityService] Già inizializzato, salto.');
+      }
       return;
     }
 
-    debugPrint('[SecurityService] Inizializzazione freeRASP...');
+    if (kDebugMode) {
+      debugPrint('[SecurityService] Inizializzazione freeRASP...');
+    }
 
     // ─── Lettura configurazione da --dart-define tramite EnvConfig ───
     final String packageName = EnvConfig.freeraspPackageName;
@@ -142,9 +148,13 @@ class SecurityService {
       }
     }
 
-    debugPrint('[SecurityService] Package: $packageName');
-    debugPrint('[SecurityService] Release Hash: ${releaseHash.isNotEmpty ? "presente (${releaseHash.length} char)" : "vuoto (debug mode)"}');
-    debugPrint('[SecurityService] Debug Mode: $kDebugMode');
+    if (kDebugMode) {
+      debugPrint('[SecurityService] Package: $packageName');
+      debugPrint(
+        '[SecurityService] Release Hash: ${releaseHash.isNotEmpty ? "presente (${releaseHash.length} char)" : "vuoto (debug mode)"}',
+      );
+      debugPrint('[SecurityService] Debug Mode: $kDebugMode');
+    }
 
     // ─── Configurazione AndroidConfig (freeRASP v8+) ───
     final androidConfig = AndroidConfig(
@@ -171,10 +181,14 @@ class SecurityService {
 
       _initialized = true;
       _initCompleter.complete();
-      debugPrint('[SecurityService] freeRASP inizializzato con successo');
+      if (kDebugMode) {
+        debugPrint('[SecurityService] freeRASP inizializzato con successo');
+      }
     } catch (e, stack) {
-      debugPrint('[SecurityService] ERRORE inizializzazione freeRASP: $e');
-      debugPrint('$stack');
+      if (kDebugMode) {
+        debugPrint('[SecurityService] ERRORE inizializzazione freeRASP: $e');
+        debugPrint('$stack');
+      }
       _initCompleter.completeError(e, stack);
       rethrow;
     }
@@ -245,7 +259,9 @@ class SecurityService {
   /// NOTA: Per requisito, NON blocca l'app, fa solo logging di warning.
   static void _onUntrustedInstallationSourceDetected() {
     const msg = 'Installazione da fonte non attendibile (non Play Store)';
-    debugPrint('[SecurityService] WARNING: $msg');
+    if (kDebugMode) {
+      debugPrint('[SecurityService] WARNING: $msg');
+    }
     // NON chiamare _triggerBlock() → l'app continua a funzionare
   }
 
@@ -267,11 +283,13 @@ class SecurityService {
 
   /// Callback: Opzioni sviluppatore attive.
   ///
-  /// MOSTRA una schermata ARANCIONE di avviso (BYPASSABILE),
-  /// NON blocca l'avvio dell'applicazione.
+  /// BLOCCA l'avvio dell'applicazione con schermata rossa.
+  /// Le opzioni sviluppatore abilitano vettori di attacco (debug USB, hooking,
+  /// installazione app non certificate) che compromettono la sicurezza dei
+  /// dati sensibili, especially those of minors.
   static void _onDeveloperOptionsEnabledDetected() {
     const msg = 'Opzioni sviluppatore attive rilevate';
-    debugPrint('[SecurityService] AVVISO: $msg');
+    _triggerBlock(msg);
     // Usa un notifier separato per la schermata arancione bypassabile
     WidgetsBinding.instance.addPostFrameCallback((_) {
       developerOptionsWarningMessage.value = msg;
@@ -282,7 +300,8 @@ class SecurityService {
   ///
   /// - `null` = nessun avviso, app normale
   /// - `String` = messaggio di avviso, mostra DeveloperOptionsWarningScreen
-  static final ValueNotifier<String?> developerOptionsWarningMessage = ValueNotifier<String?>(null);
+  static final ValueNotifier<String?> developerOptionsWarningMessage =
+      ValueNotifier<String?>(null);
 
   /// Attiva lo stato di blocco e notifica l'UI (schermata rossa, NON bypassabile).
   static void _triggerBlock(String message) {

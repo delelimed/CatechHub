@@ -200,16 +200,22 @@ void main() {
       // Arrange: 3 assenze consecutive
       final records = [
         PresenceRecord(
-          studentId: 's1', meetingId: 'm3',
-          date: DateTime(2024, 6, 15), isPresent: false,
+          studentId: 's1',
+          meetingId: 'm3',
+          date: DateTime(2024, 6, 15),
+          isPresent: false,
         ),
         PresenceRecord(
-          studentId: 's1', meetingId: 'm2',
-          date: DateTime(2024, 6, 8), isPresent: false,
+          studentId: 's1',
+          meetingId: 'm2',
+          date: DateTime(2024, 6, 8),
+          isPresent: false,
         ),
         PresenceRecord(
-          studentId: 's1', meetingId: 'm1',
-          date: DateTime(2024, 6, 1), isPresent: false,
+          studentId: 's1',
+          meetingId: 'm1',
+          date: DateTime(2024, 6, 1),
+          isPresent: false,
         ),
       ];
       // Act: verifica se l'avviso deve attivarsi
@@ -222,16 +228,22 @@ void main() {
       // Arrange: 2 assenze consecutive seguite da una presenza
       final records = [
         PresenceRecord(
-          studentId: 's1', meetingId: 'm3',
-          date: DateTime(2024, 6, 15), isPresent: false,
+          studentId: 's1',
+          meetingId: 'm3',
+          date: DateTime(2024, 6, 15),
+          isPresent: false,
         ),
         PresenceRecord(
-          studentId: 's1', meetingId: 'm2',
-          date: DateTime(2024, 6, 8), isPresent: false,
+          studentId: 's1',
+          meetingId: 'm2',
+          date: DateTime(2024, 6, 8),
+          isPresent: false,
         ),
         PresenceRecord(
-          studentId: 's1', meetingId: 'm1',
-          date: DateTime(2024, 6, 1), isPresent: true,
+          studentId: 's1',
+          meetingId: 'm1',
+          date: DateTime(2024, 6, 1),
+          isPresent: true,
         ),
       ];
       // Act: verifica
@@ -261,16 +273,22 @@ void main() {
       // Arrange: 3 assenze con date in ordine sparso
       final records = [
         PresenceRecord(
-          studentId: 's1', meetingId: 'm3',
-          date: DateTime(2024, 6, 1), isPresent: false,
+          studentId: 's1',
+          meetingId: 'm3',
+          date: DateTime(2024, 6, 1),
+          isPresent: false,
         ),
         PresenceRecord(
-          studentId: 's1', meetingId: 'm1',
-          date: DateTime(2024, 6, 15), isPresent: false,
+          studentId: 's1',
+          meetingId: 'm1',
+          date: DateTime(2024, 6, 15),
+          isPresent: false,
         ),
         PresenceRecord(
-          studentId: 's1', meetingId: 'm2',
-          date: DateTime(2024, 6, 8), isPresent: false,
+          studentId: 's1',
+          meetingId: 'm2',
+          date: DateTime(2024, 6, 8),
+          isPresent: false,
         ),
       ];
       // Act: verifica (l'algoritmo ordina internamente)
@@ -321,10 +339,30 @@ void main() {
     test('calcola percentuale mista correttamente', () {
       // Arrange: 2 presenti su 4 totali
       final records = [
-        PresenceRecord(studentId: 's1', meetingId: 'm1', date: DateTime(2024, 6, 1), isPresent: true),
-        PresenceRecord(studentId: 's1', meetingId: 'm2', date: DateTime(2024, 6, 8), isPresent: false),
-        PresenceRecord(studentId: 's1', meetingId: 'm3', date: DateTime(2024, 6, 15), isPresent: true),
-        PresenceRecord(studentId: 's1', meetingId: 'm4', date: DateTime(2024, 6, 22), isPresent: false),
+        PresenceRecord(
+          studentId: 's1',
+          meetingId: 'm1',
+          date: DateTime(2024, 6, 1),
+          isPresent: true,
+        ),
+        PresenceRecord(
+          studentId: 's1',
+          meetingId: 'm2',
+          date: DateTime(2024, 6, 8),
+          isPresent: false,
+        ),
+        PresenceRecord(
+          studentId: 's1',
+          meetingId: 'm3',
+          date: DateTime(2024, 6, 15),
+          isPresent: true,
+        ),
+        PresenceRecord(
+          studentId: 's1',
+          meetingId: 'm4',
+          date: DateTime(2024, 6, 22),
+          isPresent: false,
+        ),
       ];
       // Act: calcola
       final percent = AttendanceLogic.calcolaPercentualePresenze(records);

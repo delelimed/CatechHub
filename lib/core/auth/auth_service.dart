@@ -5,20 +5,20 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:developer' as dev;
 import 'dart:math';
 
-import 'package:crypto/crypto.dart' show sha256;
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:local_auth_android/local_auth_android.dart';
 import 'package:local_auth_darwin/local_auth_darwin.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/crypto_utils.dart';
 import '../storage/local_database.dart';
 import '../../features/sync/p2p/p2p_security_service.dart';
 import '../../shared/models/class_model.dart';
+import '../../shared/models/user_role.dart';
 
 /// Servizio di autenticazione basato ESCLUSIVAMENTE su biometrica nativa Android
 /// (impronta, volto, iride) con fallback automatico a PIN/Pattern/Password del dispositivo.
@@ -83,7 +83,7 @@ class AuthService {
       salt = _generateUuidV4();
       box.put(_catechistSaltKey, salt);
     }
-    final hash = sha256.convert(utf8.encode('$normalized:$salt')).toString();
+    final hash = sha256HexSync('$normalized:$salt');
     final newId = 'cat_${hash.substring(0, 16)}';
     box.put(_catechistIdKey, newId);
     return newId;
@@ -91,6 +91,42 @@ class AuthService {
 
   /// Getter di istanza per il catechistId corrente.
   String get catechistId => getCatechistId();
+
+  /// Genera un identificativo catechista DETERMINISTICO a partire da nome e
+  /// cognome (e, se disponibile, dal numero di telefono).
+  ///
+  /// A differenza di [getCatechistId] (che usa un salt casuale per-device),
+  /// questo id dipende SOLO dall'anagrafica normalizzata, così la STESSA
+  /// persona ottiene lo stesso `catechistId` su tutti i suoi dispositivi
+  /// (utile durante l'associazione P2P: il Responsabile riconosce il catechista
+  /// e non crea duplicati). Due persone con dati diversi ottengono id diversi.
+  ///
+  /// Forma: `cat_<nomeNormalizzato>_<hash8>` dove `hash8` è un hash breve di
+  /// "nome|cognome|telefono" che garantisce unicità anche a fronte di omonimi.
+  static String generateCatechistId(
+    String firstName,
+    String lastName, [
+    String? phone,
+  ]) {
+    final norm = normalizeCatechistName('$firstName $lastName');
+    final phoneNorm =
+        (phone != null && phone.trim().isNotEmpty)
+        ? normalizeCatechistName(phone)
+        : '';
+    final material = phoneNorm.isNotEmpty ? '$norm|$phoneNorm' : norm;
+    final hash = sha256HexSync(material).substring(0, 8);
+    final prefix = norm.length > 24 ? norm.substring(0, 24) : norm;
+    return 'cat_${prefix}_$hash';
+  }
+
+  /// Persiste un `catechistId` esplicito (generato, ad esempio, durante
+  /// l'onboarding a partire da nome e cognome) così che [getCatechistId]
+  /// lo restituisca invece di rigenerarne uno con salt casuale.
+  static void storeCatechistId(String id) {
+    if (id.trim().isEmpty) return;
+    final box = LocalDatabase.auth();
+    box.put(_catechistIdKey, id.trim());
+  }
 
   /// Numero di telefono facoltativo del catechista (campo `phone_number`).
   static String getPhoneNumber() {
@@ -106,10 +142,8 @@ class AuthService {
   static String normalizeCatechistName(String value) {
     final lower = value.toLowerCase();
     // Rimuove gli accenti (à→a, è→e, ...) così "Marìo" == "Mario".
-    const withAccents =
-        'àáâãäåèéêëìíîïòóôõöùúûüñç';
-    const withoutAccents =
-        'aaaaaaeeeeiiiiooooouuuunc';
+    const withAccents = 'àáâãäåèéêëìíîïòóôõöùúûüñç';
+    const withoutAccents = 'aaaaaaeeeeiiiiooooouuuunc';
     final buffer = StringBuffer();
     for (final rune in lower.runes) {
       final ch = String.fromCharCode(rune);
@@ -212,7 +246,8 @@ class AuthService {
 
       // Se il device supporta biometria E (ha biometrie registrate O ha lockscreen)
       // canCheckBiometrics torna true anche se ci sono solo PIN/Pattern (Android 10+)
-      return isDeviceSupported && (canCheckBiometrics || availableBiometrics.isNotEmpty);
+      return isDeviceSupported &&
+          (canCheckBiometrics || availableBiometrics.isNotEmpty);
     } on PlatformException catch (e) {
       dev.log('Errore canAuthenticate: ${e.message}');
       return false;
@@ -265,7 +300,10 @@ class AuthService {
       final authenticated = await _localAuth.authenticate(
         localizedReason: localizedReason,
         biometricOnly: false,
-        persistAcrossBackgrounding: true,
+        // M3: il prompt biometrico NON deve sopravvivere a un passaggio in
+        // background a metà autenticazione: se l'app viene interrotta, la
+        // sessione resta bloccata e va rifatto l'accesso.
+        persistAcrossBackgrounding: false,
         sensitiveTransaction: false,
         authMessages: const <AuthMessages>[
           AndroidAuthMessages(
@@ -317,7 +355,9 @@ class AuthService {
 
             // 3. Marca come completato
             await prefs.setBool(legacyCleanedKey, true);
-            dev.log('Migrazione completata: legacy PIN rimosso da Hive auth box');
+            dev.log(
+              'Migrazione completata: legacy PIN rimosso da Hive auth box',
+            );
           } catch (e) {
             dev.log('Errore durante pulizia legacy PIN (non bloccante): $e');
             // Non bloccare il login se la pulizia fallisce
@@ -330,7 +370,9 @@ class AuthService {
       dev.log('Autenticazione fallita o annullata');
       return false;
     } on PlatformException catch (e) {
-      dev.log('Errore PlatformException authenticate: ${e.code} - ${e.message}');
+      dev.log(
+        'Errore PlatformException authenticate: ${e.code} - ${e.message}',
+      );
       // Codici comuni: NotEnrolled, NotAvailable, LockedOut, PermanentlyLockedOut
       return false;
     } on TimeoutException {
@@ -346,6 +388,9 @@ class AuthService {
   /// Salva nome, cognome. Se [createClass] è true, salva anche [groupName]
   /// e crea la classe iniziale. Se false, salva solo nome/cognome e l'utente
   /// si unirà a una classe esistente via P2P sync.
+  /// [role] determina il ruolo locale (Catechista / Responsabile): con ruolo
+  /// Responsabile non viene creata alcuna classe iniziale e la fase multiclasse
+  /// dell'onboarding viene considerata già completata.
   /// [phoneNumber] è facoltativo e viene salvato come `phone_number`.
   /// Sblocca automaticamente la sessione.
   Future<bool> setupInitialProfile({
@@ -354,6 +399,7 @@ class AuthService {
     String? groupName,
     String? phoneNumber,
     bool createClass = true,
+    UserRole role = UserRole.catechista,
   }) async {
     if (firstName.trim().isEmpty || lastName.trim().isEmpty) {
       dev.log('Campi profilo vuoti');
@@ -367,6 +413,8 @@ class AuthService {
     try {
       getCatechistId(); // Ensure catechistId exists before profile data
 
+      final isResponsabile = role == UserRole.responsabile;
+
       await _box.put('first_name', firstName.trim());
       await _box.put('last_name', lastName.trim());
       await _box.put(
@@ -376,14 +424,37 @@ class AuthService {
       // Il catechistId viene generato DOPO il salvataggio dell'anagrafica,
       // così la sua derivazione può basarsi su Nome e Cognome normalizzati.
       getCatechistId(); // Ensure catechistId exists before profile data
-      await _box.put('setup_mode', createClass ? 'create' : 'join');
+
+      // Modalità operativa (spec: app_mode = RESPONSABILE | NORMAL | REPLICATED_PEER)
+      // e setup_mode (create | join | responsabile) coerenti con la scelta
+      // effettuata durante l'onboarding.
+      await _box.put(
+        'app_mode',
+        isResponsabile
+            ? 'RESPONSABILE'
+            : createClass
+            ? 'NORMAL'
+            : 'REPLICATED_PEER',
+      );
+      await _box.put(
+        'setup_mode',
+        isResponsabile
+            ? 'responsabile'
+            : createClass
+            ? 'create'
+            : 'join',
+      );
+      await UserRole.setCurrent(role);
+
       final fullName = '${firstName.trim()} ${lastName.trim()}';
       await _box.put('local_user_name', fullName);
 
       // La fase di onboarding dedicata alla gestione multiclasse è pendente:
       // il router reindirizzerà il catechista alla schermata "/onboarding-classes"
       // finché non verrà completata (flag impostato a true dalla schermata).
-      await _box.put('onboarding_classes_completed', false);
+      // Per il Responsabile questa fase non si applica (gestione centralizzata
+      // in /parrocchia): viene marcata come completata.
+      await _box.put('onboarding_classes_completed', isResponsabile);
 
       if (createClass) {
         await _box.put('group_name', groupName!.trim());
@@ -484,8 +555,9 @@ class AuthService {
       'phoneNumber': _box.get('phone_number', defaultValue: ''),
       'groupName': _box.get('group_name', defaultValue: ''),
       'email': 'locale@dispositivo',
-      'role': 'catechist',
-      'canManageCatechists': true,
+      'role': UserRole.current().storageKey,
+      'canManageCatechists': UserRole.isResponsabile,
+      'canManageParish': UserRole.isResponsabile,
     };
 
     return _cachedUser;

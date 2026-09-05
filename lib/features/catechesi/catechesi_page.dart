@@ -82,12 +82,17 @@ class _CatechesiPageState extends ConsumerState<CatechesiPage> {
                       )
                     : null,
                 filled: true,
-                fillColor: isDark ? colorScheme.surfaceContainer : Colors.grey.shade50,
+                fillColor: isDark
+                    ? colorScheme.surfaceContainer
+                    : Colors.grey.shade50,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
                   borderSide: BorderSide.none,
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
               ),
             ),
           ),
@@ -101,9 +106,19 @@ class _CatechesiPageState extends ConsumerState<CatechesiPage> {
                     : all.where((c) {
                         final q = _query.toLowerCase();
                         if (c.title.toLowerCase().contains(q)) return true;
-                        if (c.tags.any((t) => t.toLowerCase().contains(q))) return true;
-                        if (c.biblicalReferences.any((b) => b.toLowerCase().contains(q))) return true;
-                        if (c.websiteReferences.any((w) => w.toLowerCase().contains(q))) return true;
+                        if (c.tags.any((t) => t.toLowerCase().contains(q))) {
+                          return true;
+                        }
+                        if (c.biblicalReferences.any(
+                          (b) => b.toLowerCase().contains(q),
+                        )) {
+                          return true;
+                        }
+                        if (c.websiteReferences.any(
+                          (w) => w.toLowerCase().contains(q),
+                        )) {
+                          return true;
+                        }
                         return false;
                       }).toList();
 
@@ -116,8 +131,13 @@ class _CatechesiPageState extends ConsumerState<CatechesiPage> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.menu_book_rounded,
-                              size: 56, color: isDark ? Colors.grey.shade600 : Colors.grey.shade300),
+                          Icon(
+                            Icons.menu_book_rounded,
+                            size: 56,
+                            color: isDark
+                                ? Colors.grey.shade600
+                                : Colors.grey.shade300,
+                          ),
                           const SizedBox(height: 16),
                           Text(
                             _query.isEmpty
@@ -126,7 +146,9 @@ class _CatechesiPageState extends ConsumerState<CatechesiPage> {
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: isDark ? colorScheme.onSurface : Colors.grey.shade700,
+                              color: isDark
+                                  ? colorScheme.onSurface
+                                  : Colors.grey.shade700,
                             ),
                           ),
                         ],
@@ -138,7 +160,7 @@ class _CatechesiPageState extends ConsumerState<CatechesiPage> {
                 return ListView.separated(
                   padding: const EdgeInsets.only(bottom: 100),
                   itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
                   itemBuilder: (context, i) {
                     final c = items[i];
                     return _CatechesiCard(
@@ -191,7 +213,11 @@ class _CatechesiCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: isDark ? colorScheme.surfaceContainer : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.grey.shade200),
+          border: Border.all(
+            color: isDark
+                ? colorScheme.outline.withValues(alpha: 0.2)
+                : Colors.grey.shade200,
+          ),
           boxShadow: [
             BoxShadow(
               color: isDark
@@ -212,25 +238,35 @@ class _CatechesiCard extends StatelessWidget {
                     catechesi.title,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                      color: isDark
+                          ? colorScheme.primary
+                          : const Color(0xFF174A7E),
                     ),
                   ),
                 ),
                 PopupMenuButton<String>(
-                  icon: Icon(Icons.more_vert_rounded, size: 20, color: isDark ? colorScheme.onSurface : null),
+                  icon: Icon(
+                    Icons.more_vert_rounded,
+                    size: 20,
+                    color: isDark ? colorScheme.onSurface : null,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
                   onSelected: (v) async {
                     if (v == 'edit') {
-                      context.push('/catechesi/edit', extra: {'catechesi': catechesi});
+                      context.push(
+                        '/catechesi/edit',
+                        extra: {'catechesi': catechesi},
+                      );
                     } else if (v == 'delete') {
                       final confirm = await showDialog<bool>(
                         context: context,
                         builder: (ctx) => AlertDialog(
                           title: const Text('Elimina catechesi'),
                           content: const Text(
-                              'Sei sicuro di voler eliminare questa catechesi?'),
+                            'Sei sicuro di voler eliminare questa catechesi?',
+                          ),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(ctx, false),
@@ -239,7 +275,8 @@ class _CatechesiCard extends StatelessWidget {
                             TextButton(
                               onPressed: () => Navigator.pop(ctx, true),
                               style: TextButton.styleFrom(
-                                  foregroundColor: Colors.red),
+                                foregroundColor: Colors.red,
+                              ),
                               child: const Text('Elimina'),
                             ),
                           ],
@@ -267,8 +304,11 @@ class _CatechesiCard extends StatelessWidget {
                       value: 'delete',
                       child: Row(
                         children: [
-                          Icon(Icons.delete_rounded,
-                              size: 18, color: Colors.red),
+                          Icon(
+                            Icons.delete_rounded,
+                            size: 18,
+                            color: Colors.red,
+                          ),
                           SizedBox(width: 8),
                           Text('Elimina', style: TextStyle(color: Colors.red)),
                         ],
@@ -284,7 +324,10 @@ class _CatechesiCard extends StatelessWidget {
                 catechesi.description,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: isDark ? Colors.grey.shade300 : Colors.grey.shade700, height: 1.35),
+                style: TextStyle(
+                  color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+                  height: 1.35,
+                ),
               ),
             ],
             if (catechesi.tags.isNotEmpty) ...[
@@ -297,8 +340,16 @@ class _CatechesiCard extends StatelessWidget {
                       (t) => Chip(
                         label: Text(t),
                         visualDensity: VisualDensity.compact,
-                        side: BorderSide(color: isDark ? colorScheme.primary.withValues(alpha: 0.3) : Colors.blue.shade100),
-                        backgroundColor: isDark ? colorScheme.primaryContainer.withValues(alpha: 0.2) : Colors.blue.shade50,
+                        side: BorderSide(
+                          color: isDark
+                              ? colorScheme.primary.withValues(alpha: 0.3)
+                              : Colors.blue.shade100,
+                        ),
+                        backgroundColor: isDark
+                            ? colorScheme.primaryContainer.withValues(
+                                alpha: 0.2,
+                              )
+                            : Colors.blue.shade50,
                       ),
                     )
                     .toList(),

@@ -100,7 +100,10 @@ class AttachmentOptimizer {
     );
   }
 
-  static OptimizedAttachment _optimizePdf(Uint8List bytes, String originalName) {
+  static OptimizedAttachment _optimizePdf(
+    Uint8List bytes,
+    String originalName,
+  ) {
     if (bytes.length > maxPdfBytes) {
       throw Exception(
         'PDF troppo grande (max ${maxPdfBytes ~/ (1024 * 1024)} MB). '

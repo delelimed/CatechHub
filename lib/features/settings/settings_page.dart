@@ -1,4 +1,4 @@
-﻿/// Pagina principale delle Impostazioni dell'app CateREG (CatechHub).
+/// Pagina principale delle Impostazioni dell'app CateREG (CatechHub).
 ///
 /// Funge da hub di navigazione per tutte le sezioni di configurazione:
 /// - **Profilo**: card con nome e ruolo del catechista autenticato
@@ -11,6 +11,8 @@
 ///
 /// Dipende da [authStateProvider] per i dati dell'account e da
 /// [privacySettingsProvider] per verificare se il feedback remoto è abilitato.
+library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -22,7 +24,11 @@ import '../../core/auth/auth_provider.dart';
 import '../../core/providers/theme_provider.dart';
 import '../../core/security/privacy_settings.dart';
 import '../../core/services/meeting_notification_service.dart';
+import '../../shared/models/user_role.dart';
+import '../../shared/utils/anno_catechistico.dart';
+import '../../shared/utils/app_mode.dart';
 import '../../shared/widgets/app_scaffold.dart';
+import '../responsabile/parish_config_repository.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -37,7 +43,10 @@ class SettingsPage extends ConsumerWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: const Text(
           'Soglia assenze',
-          style: TextStyle(color: Color(0xFF174A7E), fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Color(0xFF174A7E),
+            fontWeight: FontWeight.bold,
+          ),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -89,18 +98,152 @@ class SettingsPage extends ConsumerWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF174A7E),
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             onPressed: () async {
               final v = int.tryParse(controller.text);
               if (v != null && v >= 1) {
-                await ref.read(privacySettingsProvider.notifier).setAbsenceThreshold(v);
+                await ref
+                    .read(privacySettingsProvider.notifier)
+                    .setAbsenceThreshold(v);
                 if (ctx.mounted) Navigator.of(ctx).pop();
               }
             },
             child: const Text('Salva'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showParishConfigDialog(BuildContext context, WidgetRef ref) {
+    final repo = ref.read(parishConfigRepositoryProvider);
+    final config = repo.getConfig();
+
+    final nomeCtrl = TextEditingController(text: config.nomeParrocchia);
+    final diocesiCtrl = TextEditingController(text: config.diocesi);
+    final annoCtrl = TextEditingController(
+      text: config.annoCatechisticoCorrente.trim().isNotEmpty
+          ? config.annoCatechisticoCorrente
+          : currentCatechisticYear(),
+    );
+    final sogliaCtrl = TextEditingController(
+      text: config.sogliaAssenzeConsecutive.toString(),
+    );
+    final durataCtrl = TextEditingController(
+      text: config.durataValiditaConsensoMesi.toString(),
+    );
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: const Text(
+            'Configura parrocchia',
+            style: TextStyle(
+              color: Color(0xFF174A7E),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _ConfigSectionLabel('Parrocchia'),
+                TextField(
+                  controller: nomeCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Nome parrocchia',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: diocesiCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Diocesi',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+                const Divider(height: 24),
+                const _ConfigSectionLabel('Anno e presenze'),
+                TextField(
+                  controller: annoCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Anno catechistico corrente',
+                    hintText: 'Es. 2026-2027',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: sogliaCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Soglia assenze consecutive (allerta)',
+                    helperText: 'Almeno 2. Usata per le segnalazioni.',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+                const Divider(height: 24),
+                const _ConfigSectionLabel('Privacy'),
+                TextField(
+                  controller: durataCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Validità consenso GDPR (mesi)',
+                    helperText: 'Durata del consenso al trattamento dei dati.',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Annulla'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final soglia = int.tryParse(sogliaCtrl.text.trim());
+                final durata = int.tryParse(durataCtrl.text.trim());
+                await repo.save(
+                  config.copyWith(
+                    nomeParrocchia: nomeCtrl.text.trim(),
+                    diocesi: diocesiCtrl.text.trim(),
+                    annoCatechisticoCorrente: annoCtrl.text.trim(),
+                    durataValiditaConsensoMesi: (durata != null && durata > 0)
+                        ? durata
+                        : config.durataValiditaConsensoMesi,
+                    sogliaAssenzeConsecutive: (soglia != null && soglia >= 2)
+                        ? soglia
+                        : config.sogliaAssenzeConsecutive,
+                  ),
+                );
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Configurazione parrocchia salvata.'),
+                  ),
+                );
+              },
+              child: const Text('Salva'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -113,10 +256,15 @@ class SettingsPage extends ConsumerWidget {
           final isEnabled = MeetingNotificationService.areNotificationsEnabled;
           final currentTime = MeetingNotificationService.notificationTime;
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
             title: const Text(
               'Notifiche incontri',
-              style: TextStyle(color: Color(0xFF174A7E), fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Color(0xFF174A7E),
+                fontWeight: FontWeight.bold,
+              ),
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -128,7 +276,9 @@ class SettingsPage extends ConsumerWidget {
                 const SizedBox(height: 20),
                 SwitchListTile(
                   title: const Text('Attiva notifiche'),
-                  subtitle: const Text('Ricevi promemoria per incontri e riunioni'),
+                  subtitle: const Text(
+                    'Ricevi promemoria per incontri e riunioni',
+                  ),
                   value: isEnabled,
                   activeThumbColor: const Color(0xFF174A7E),
                   onChanged: (value) async {
@@ -148,7 +298,10 @@ class SettingsPage extends ConsumerWidget {
                         color: Color(0xFF174A7E),
                       ),
                     ),
-                    trailing: const Icon(Icons.access_time_rounded, color: Color(0xFF174A7E)),
+                    trailing: const Icon(
+                      Icons.access_time_rounded,
+                      color: Color(0xFF174A7E),
+                    ),
                     onTap: () async {
                       final TimeOfDay? picked = await showTimePicker(
                         context: context,
@@ -160,7 +313,9 @@ class SettingsPage extends ConsumerWidget {
                       if (picked != null && ctx.mounted) {
                         final formattedTime =
                             '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
-                        await MeetingNotificationService.setNotificationTime(formattedTime);
+                        await MeetingNotificationService.setNotificationTime(
+                          formattedTime,
+                        );
                         setState(() {});
                       }
                     },
@@ -189,6 +344,7 @@ class SettingsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final privacy = ref.watch(privacySettingsProvider);
     final authAsync = ref.watch(authStateProvider);
+    final isResponsabile = UserRole.isResponsabile;
 
     return authAsync.when(
       data: (map) {
@@ -202,7 +358,10 @@ class SettingsPage extends ConsumerWidget {
               /// =========================
               /// PROFILE
               /// =========================
-              _ProfileCard(name: data['name'] ?? '', role: 'Catechista'),
+              _ProfileCard(
+                name: data['name'] ?? '',
+                role: UserRole.current().label,
+              ),
 
               const SizedBox(height: 20),
 
@@ -213,61 +372,155 @@ class SettingsPage extends ConsumerWidget {
 
               const SizedBox(height: 12),
 
-              _SettingsItem(
-                icon: Icons.list_alt_rounded,
-                title: 'Visualizza Gruppi',
-                subtitle: 'Vedi tutti i gruppi di cui fai parte',
-                color: const Color(0xFF174A7E),
-                onTap: () => context.push('/view-groups'),
-              ),
+              if (!isResponsabile) ...[
+                _SettingsItem(
+                  icon: Icons.list_alt_rounded,
+                  title: 'Visualizza Gruppi',
+                  subtitle: 'Vedi tutti i gruppi di cui fai parte',
+                  color: const Color(0xFF174A7E),
+                  onTap: () => context.push('/view-groups'),
+                ),
 
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              _SettingsItem(
-                icon: Icons.groups_rounded,
-                title: 'Gestione Gruppo',
-                subtitle: 'Gestisci il gruppo e i ragazzi',
-                color: const Color(0xFF174A7E),
-                onTap: () => context.push('/group-management'),
-              ),
+                _SettingsItem(
+                  icon: Icons.groups_rounded,
+                  title: 'Gestione Gruppo',
+                  subtitle: 'Gestisci il gruppo e i ragazzi',
+                  color: const Color(0xFF174A7E),
+                  onTap: () => context.push('/group-management'),
+                ),
 
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              _SettingsItem(
-                icon: Icons.warning_amber_rounded,
-                title: 'Soglia assenze',
-                subtitle: 'Minimo assenze per la dashboard: ${privacy.absenceThreshold}',
-                color: Colors.red,
-                onTap: () => _showAbsenceThresholdDialog(context, ref),
-              ),
+                if (AppModeUtils.supplenzeEnabled()) ...[
+                  _SettingsItem(
+                    icon: Icons.swap_horiz_rounded,
+                    title: 'Supplenze',
+                    subtitle:
+                        'Delega temporanea del registro a un altro catechista',
+                    color: const Color(0xFF174A7E),
+                    onTap: () => context.push('/substitutes'),
+                  ),
 
-              const SizedBox(height: 12),
+                  const SizedBox(height: 12),
+                ],
 
-              _SettingsItem(
-                icon: Icons.delete_forever_rounded,
-                title: 'Cancella dati salvati',
-                subtitle: 'Elimina selettivamente anagrafiche, presenze, documenti, calendario, catechesi o allegati',
-                color: Colors.red,
-                isDestructive: true,
-                onTap: () => context.push('/delete-data'),
-              ),
+                _SettingsItem(
+                  icon: Icons.warning_amber_rounded,
+                  title: 'Soglia assenze',
+                  subtitle:
+                      'Minimo assenze per la dashboard: ${privacy.absenceThreshold}',
+                  color: Colors.red,
+                  onTap: () => _showAbsenceThresholdDialog(context, ref),
+                ),
 
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
+              ],
 
-              _SettingsItem(
-                icon: Icons.notifications_active_rounded,
-                title: 'Notifiche incontri',
-                subtitle: 'Ricevi un promemoria il giorno prima di incontri e riunioni',
-                color: Colors.blue,
-                onTap: () => _showNotificationSettingsDialog(context, ref),
-              ),
+              if (!isResponsabile) ...[
+                const SizedBox(height: 12),
+
+                _SettingsItem(
+                  icon: Icons.notifications_active_rounded,
+                  title: 'Notifiche incontri',
+                  subtitle:
+                      'Ricevi un promemoria il giorno prima di incontri e riunioni',
+                  color: Colors.blue,
+                  onTap: () => _showNotificationSettingsDialog(context, ref),
+                ),
+              ],
 
               const SizedBox(height: 24),
+
+              /// =========================
+              /// GESTIONE PARROCCHIA (Responsabile Catechistico)
+              /// =========================
+              if (isResponsabile) ...[
+                const _SectionTitle(title: 'Gestione parrocchia'),
+
+                const SizedBox(height: 12),
+
+                _SettingsItem(
+                  icon: Icons.church_rounded,
+                  title: 'Amministrazione parrocchia',
+                  subtitle: 'Classi, iscrizioni, logistica e allarmi assenze',
+                  color: const Color(0xFF174A7E),
+                  onTap: () => context.push('/parrocchia/admin'),
+                ),
+
+                const SizedBox(height: 12),
+
+                _SettingsItem(
+                  icon: Icons.verified_user_rounded,
+                  title: 'Catena di fiducia',
+                  subtitle:
+                      'Approva i dispositivi abilitati alla sync e gestisci il QR di fiducia',
+                  color: Colors.teal,
+                  onTap: () => context.push('/settings/approval-center'),
+                ),
+
+                const SizedBox(height: 12),
+
+                _SettingsItem(
+                  icon: Icons.gavel_rounded,
+                  title: 'Registro Trattamenti',
+                  subtitle:
+                      'Registro GDPR (Art. 30) con verifica integrità firme',
+                  color: Colors.teal,
+                  onTap: () => context.push('/parrocchia/audit'),
+                ),
+
+                const SizedBox(height: 12),
+
+                _SettingsItem(
+                  icon: Icons.history_rounded,
+                  title: 'Archivio storico',
+                  subtitle:
+                      'Progresso dei ragazzi negli anni e chiusura anno catechistico',
+                  color: const Color(0xFF174A7E),
+                  onTap: () => context.push('/parrocchia/archivio'),
+                ),
+
+                const SizedBox(height: 12),
+
+                _SettingsItem(
+                  icon: Icons.upload_file_rounded,
+                  title: 'Importa Dati Ragazzi',
+                  subtitle: 'Importazione massiva anagrafica da Excel o CSV',
+                  color: const Color(0xFF174A7E),
+                  onTap: () => context.push('/parrocchia/import-ragazzi'),
+                ),
+
+                const SizedBox(height: 12),
+
+                _SettingsItem(
+                  icon: Icons.tune_rounded,
+                  title: 'Configura parrocchia',
+                  subtitle:
+                      'Nome parrocchia, diocesi, anno catechistico, soglia assenze',
+                  color: const Color(0xFF174A7E),
+                  onTap: () => _showParishConfigDialog(context, ref),
+                ),
+
+                const SizedBox(height: 24),
+              ],
 
               /// =========================
               /// ASSISTENZA & FEEDBACK
               /// =========================
               const _SectionTitle(title: 'Supporto'),
+
+              const SizedBox(height: 12),
+
+              _SettingsItem(
+                icon: Icons.tour_rounded,
+                title: 'Guida alle funzioni',
+                subtitle:
+                    'Rivedi la guida all\'uso dell\'app in qualsiasi momento',
+                color: Colors.blue,
+                onTap: () => context.push('/guide?mode=review'),
+              ),
 
               const SizedBox(height: 12),
 
@@ -301,24 +554,58 @@ class SettingsPage extends ConsumerWidget {
                 },
               ),
 
+              const SizedBox(height: 12),
+
+              _SettingsItem(
+                icon: Icons.delete_forever_rounded,
+                title: 'Cancella dati salvati',
+                subtitle:
+                    'Elimina selettivamente anagrafiche, presenze, documenti, calendario, catechesi o allegati. La cancellazione totale avviene con conferma dopo 24 ore',
+                color: Colors.red,
+                isDestructive: true,
+                onTap: () => context.push('/delete-data'),
+              ),
+
               const SizedBox(height: 24),
+
+              /// =========================
+              /// PARROCCHIA (Associati)
+              /// =========================
+              if (!isResponsabile && AppModeUtils.canViewLogistica()) ...[
+                const _SectionTitle(title: 'Parrocchia'),
+
+                const SizedBox(height: 12),
+
+                _SettingsItem(
+                  icon: Icons.meeting_room_rounded,
+                  title: 'Aule e orari',
+                  subtitle:
+                      'Consultazione in sola lettura della logistica parrocchiale',
+                  color: const Color(0xFF00695C),
+                  onTap: () => context.push('/parrocchia/logistica'),
+                ),
+
+                const SizedBox(height: 24),
+              ],
 
               /// =========================
               /// CONDIVISIONE E BACKUP
               /// =========================
-              const _SectionTitle(title: 'Condivisione e backup'),
+              if (!isResponsabile) ...[
+                const _SectionTitle(title: 'Condivisione e backup'),
 
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              _SettingsItem(
-                icon: Icons.qr_code_rounded,
-                title: 'Condivisione e Backup',
-                subtitle: 'Condividi dati, sincronizza e gestisci backup',
-                color: Colors.orange,
-                onTap: () => context.push('/data-share'),
-              ),
+                _SettingsItem(
+                  icon: Icons.qr_code_rounded,
+                  title: 'Condivisione e Backup',
+                  subtitle: 'Condividi dati, sincronizza e gestisci backup',
+                  color: Colors.orange,
+                  onTap: () => context.push('/data-share'),
+                ),
 
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
+              ],
 
               /// =========================
               /// APP
@@ -361,11 +648,7 @@ class SettingsPage extends ConsumerWidget {
                   final shareText =
                       'Ehi! Prova CatechHub — il registro smart per i catechisti. Scopri di più su GitHub: https://github.com/delelimed/CatechHub';
 
-                  SharePlus.instance.share(
-                    ShareParams(
-                      text: shareText,
-                    ),
-                  );
+                  SharePlus.instance.share(ShareParams(text: shareText));
                 },
               ),
 
@@ -430,7 +713,9 @@ class _ThemeSelectorItem extends ConsumerWidget {
     final iconColor = isDark ? colorScheme.primary : const Color(0xFF174A7E);
     final titleColor = isDark ? colorScheme.onSurface : const Color(0xFF1A1A1A);
     final subtitleColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
-    final borderColor = isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.transparent;
+    final borderColor = isDark
+        ? colorScheme.outline.withValues(alpha: 0.2)
+        : Colors.transparent;
     final shadowColor = isDark
         ? Colors.black.withValues(alpha: 0.4)
         : Colors.black.withValues(alpha: 0.04);
@@ -534,11 +819,15 @@ class _ThemeSelectorItem extends ConsumerWidget {
                   style: TextStyle(
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                     color: isSelected
-                        ? (isDark ? colorScheme.primary : const Color(0xFF174A7E))
+                        ? (isDark
+                              ? colorScheme.primary
+                              : const Color(0xFF174A7E))
                         : colorScheme.onSurface,
                   ),
                 ),
-                activeColor: isDark ? colorScheme.primary : const Color(0xFF174A7E),
+                activeColor: isDark
+                    ? colorScheme.primary
+                    : const Color(0xFF174A7E),
               );
             }).toList(),
           ),
@@ -682,6 +971,29 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
+/// Etichetta di sezione usata dentro i dialog di configurazione.
+class _ConfigSectionLabel extends StatelessWidget {
+  final String text;
+
+  const _ConfigSectionLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        text.toUpperCase(),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+      ),
+    );
+  }
+}
+
 /// Singola riga selezionabile nelle impostazioni, composta da icona,
 /// titolo, sottotitolo e freccia di navigazione. Supporta la modalità
 /// `isDestructive` per voci pericolose (cancellazione, logout).
@@ -715,7 +1027,9 @@ class _SettingsItem extends StatelessWidget {
     final titleColor = isDark ? colorScheme.onSurface : const Color(0xFF1A1A1A);
     final subtitleColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
     final iconColor = isDestructive ? Colors.red : color;
-    final borderColor = isDark ? colorScheme.outline.withValues(alpha: 0.2) : Colors.transparent;
+    final borderColor = isDark
+        ? colorScheme.outline.withValues(alpha: 0.2)
+        : Colors.transparent;
     final shadowColor = isDark
         ? Colors.black.withValues(alpha: 0.4)
         : Colors.black.withValues(alpha: 0.04);
@@ -774,7 +1088,10 @@ class _SettingsItem extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Icon(Icons.chevron_right_rounded, color: isDark ? Colors.grey.shade500 : Colors.grey.shade400),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
+            ),
           ],
         ),
       ),

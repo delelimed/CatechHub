@@ -38,6 +38,10 @@
       <p style="margin-bottom:0;"><strong>Nota:</strong> Questa pagina &egrave; stata generata con l'ausilio di intelligenza artificiale e non &egrave; stata scritta da un legale. Le informazioni hanno scopo puramente informativo e non costituiscono consulenza legale.</p>
     </div>
 
+    <div class="alert alert-warning" style="display:block;border-left:4px solid #ff9800;background:#fff3e0;">
+      <strong>⚠ BETA NON FUNZIONANTE:</strong> I riferimenti alla <strong>Modalità Responsabile</strong> in questa pagina (Registro Trattamenti HMAC, catena di fiducia Ed25519, tombstone firmati Ed25519) descrivono funzionalità <strong>non ancora implementate</strong> nella versione corrente (1.1.x). La Modalità Responsabile è in sviluppo come <strong>beta non funzionante</strong> e sarà operativa nella <strong>versione 2.0 prevista per agosto 2027</strong>.
+    </div>
+
     <p>L'Art. 32 del GDPR richiede che il titolare del trattamento implementi misure tecniche e organizzative adeguate per garantire un livello di sicurezza proporzionato al rischio. CatechHub è stata progettata con un'architettura <strong>security-by-design</strong> che integra molteplici livelli di protezione.</p>
 
     <h2>1. Standard di crittografia</h2>
@@ -148,7 +152,7 @@
         <tr><td>Crittografia a riposo</td><td>Sì</td><td>AES-256-GCM su 27 box Hive (<code>HiveAesCipher</code>, chiave master 256-bit in AndroidKeyStore TEE/StrongBox, <code>SecurityManager</code> verifica obbligatoria all'avvio, <code>HardwareSecurityException</code> se assente). + cifratura di campo per PII (<code>cieI1:</code>).</td></tr>
         <tr><td>Crittografia in transito</td><td>Sì</td><td>Sync P2P: TripleDH X25519 + HKDF + AES-256-GCM (rotazione 30 min, heartbeat 30s, periodic 60s, watch 500 ms → realtime quando vicini, AAD, SAS 6 cifre, pinning, forward secrecy, canale classe per-classe). Modalità normale via <code>NormalModeSyncHandler</code>. Backup/QR: PBKDF2 350k + AES-256-GCM.</td></tr>
         <tr><td>Controllo accesso</td><td>Sì</td><td>Biometria + PIN/Pattern, sessione in RAM, timeout 120s</td></tr>
-        <tr><td>Registrazione accessi</td><td>No</td><td>L'app non tiene log degli accessi (coerente con minimizzazione). In modalità Responsabile esiste invece il <strong>Registro Trattamenti</strong>: audit log firmato HMAC-SHA256 delle operazioni rilevanti (Art. 30 GDPR), non degli accessi.</td></tr>
+        <tr><td>Registrazione accessi</td><td>No</td><td>L'app non tiene log degli accessi (coerente con minimizzazione). In modalità Responsabile (<span style="color:#ff9800;">v2.0 beta</span>) esisterà il <strong>Registro Trattamenti</strong>: audit log firmato HMAC-SHA256 delle operazioni rilevanti (Art. 30 GDPR), non degli accessi.</td></tr>
       </tbody>
     </table>
 

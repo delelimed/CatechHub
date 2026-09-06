@@ -38,6 +38,10 @@
       <p style="margin-bottom:0;"><strong>Nota:</strong> Questa pagina &egrave; stata generata con l'ausilio di intelligenza artificiale e non &egrave; stata scritta da un legale. Le informazioni hanno scopo puramente informativo e non costituiscono consulenza legale.</p>
     </div>
 
+    <div class="alert alert-warning" style="display:block;border-left:4px solid #ff9800;background:#fff3e0;">
+      <strong>⚠ BETA NON FUNZIONANTE:</strong> Le sezioni che fanno riferimento alla <strong>Modalità Responsabile</strong> (Registro Trattamenti HMAC, certificati Ed25519, catena di fiducia) descrivono funzionalità <strong>non ancora implementate</strong> nella versione corrente (1.1.x). La Modalità Responsabile è in sviluppo come <strong>beta non funzionante</strong> e sarà operativa nella <strong>versione 2.0 prevista per agosto 2027</strong>.
+    </div>
+
     <div class="alert alert-info">
       <strong>Metodologia:</strong> Questa analisi è ispirata alla metodologia PIA (Privacy Impact Assessment) della CNIL (Commission Nationale de l'Informatique et des Libertés) e alle raccomandazioni di sicurezza dell'ANSSI (Agence Nationale de la Sécurité des Systèmes d'Information), incluso il Référentiel Général de Sécurité (RGS).
     </div>
@@ -79,7 +83,7 @@
         <tr><td>RGS A1 — Authentification</td><td>BiometricPrompt con fallback PIN/Pattern. Sessione in RAM.</td><td>&#9989; Conforme</td></tr>
         <tr><td>RGS A2 — Intégrité</td><td>Tag GCM 128bit su tutti i dati. Checksum SHA-256 su backup.</td><td>&#9989; Conforme</td></tr>
         <tr><td>RGS A3 — Confidentialité</td><td>AES-256-GCM a riposo e in transito. X25519 TripleDH + HKDF + AES-256-GCM per sync P2P, rotazione chiavi ogni 30 min. Cifratura di campo per i dati sensibili.</td><td>&#9989; Conforme</td></tr>
-        <tr><td>RGS A4 — Traçabilité</td><td>Registro Trattamenti in modalità Responsabile: audit log append-only firmato HMAC-SHA256 di ogni operazione rilevante, con verifica d'integrità in tempo reale. Campi createdAt/updatedAt/lastModifiedBy su tutti i record.</td><td>&#9989; Conforme</td></tr>
+        <tr><td>RGS A4 — Traçabilité</td><td>Registro Trattamenti in modalità Responsabile (<span style="color:#ff9800;">v2.0 beta</span>): audit log append-only firmato HMAC-SHA256 di ogni operazione rilevante, con verifica d'integrità in tempo reale. Campi createdAt/updatedAt/lastModifiedBy su tutti i record.</td><td>&#9989; Conforme (v2.0)</td></tr>
         <tr><td>ANSSI — Chiffrement fort</td><td>AES-256-GCM su 27 box + field (<code>cieI1:</code>), PBKDF2 350k nuovi / 210k-60k legacy read, X25519 TripleDH (4 DH ordinati + HKDF, forward secrecy, rotazione 30 min, heartbeat 30s, SAS 6 cifre, pinning, AAD), Ed25519 (solo Responsabile), <code>NormalModeSyncHandler</code> per normale.</td><td>&#9989; Conforme</td></tr>
         <tr><td>ANSSI — Gestion des clés</td><td>AndroidKeyStore (isolamento hardware). Chiavi mai esposte al livello Dart. Chiavi di sessione effimere mai persistite.</td><td>&#9989; Conforme</td></tr>
         <tr><td>ANSSI — Sécurité runtime</td><td>freeRASP: anti-root, anti-hooking, anti-emulator, app integrity. SecurityBlockScreen non bypassabile.</td><td>&#9989; Conforme</td></tr>
@@ -111,7 +115,7 @@
         <tr><td>Art. 4</td><td>Consenso per dati sensibili</td><td>? Supportato (consenso esplicito richiesto)</td></tr>
         <tr><td>Art. 22</td><td>Diritto di opposizione</td><td>? L'utente può cessare il trattamento disinstallando l'app</td></tr>
         <tr><td>Art. 32</td><td>Obbligo di sicurezza</td><td>&#9989; Crittografia, auth, anti-tamper</td></tr>
-        <tr><td>Art. 48</td><td>Registro delle attività</td><td>&#9989; Documentato (vedi <a href="registro-trattamento.html">Registro Trattamento</a>) + supporto in-app (audit log HMAC) in modalità Responsabile</td></tr>
+        <tr><td>Art. 48</td><td>Registro delle attività</td><td>&#9989; Documentato (vedi <a href="registro-trattamento.html">Registro Trattamento</a>) + supporto in-app (audit log HMAC) in modalità Responsabile (<span style="color:#ff9800;">v2.0 beta</span>)</td></tr>
         <tr><td>Art. 69</td><td>Designazione DPO</td><td>&#10060; Non applicabile (nessuna struttura organizzativa)</td></tr>
         <tr><td>Art. 82</td><td>Sanzioni</td><td>&#10060; L'utente è responsabile della conformità</td></tr>
       </tbody>
@@ -122,7 +126,7 @@
       <p>CatechHub implementa misure di sicurezza allineate alle raccomandazioni ANSSI e ai principi PIA della CNIL. L'assenza di server centrali, la crittografia end-to-end e il controllo degli accessi biometrico costituiscono i punti di forza principali.</p>
     </div>
     <div class="alert alert-warning">
-      <p>Punti di attenzione: (1) la tracciabilità (Registro Trattamenti HMAC) è disponibile in modalità Responsabile — fuori da essa l'app non tiene log per minimizzare la superficie dati; (2) l'utente finale (catechista/parrocchia) rimane il responsabile della conformità; (3) si raccomanda una DPIA formale per parrocchie con trattamento su larga scala.</p>
+      <p>Punti di attenzione: (1) la tracciabilità (Registro Trattamenti HMAC) sarà disponibile in modalità Responsabile (<span style="color:#ff9800;">v2.0 beta</span>) — fuori da essa l'app non tiene log per minimizzare la superficie dati; (2) l'utente finale (catechista/parrocchia) rimane il responsabile della conformità; (3) si raccomanda una DPIA formale per parrocchie con trattamento su larga scala.</p>
     </div>
 
     <div style="text-align:center;margin-top:2rem;">

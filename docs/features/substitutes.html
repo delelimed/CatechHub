@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Supplenze — CatechHub</title>
+<meta name="description" content="Delega temporanea e sicura del registro a un collega catechista via QR code crittografico. Registro supplenze dedicato e revoca firmata.">
+<link rel="icon" href="../logo.png" type="image/png">
+<link rel="stylesheet" href="../style.css">
+<script src="../js/version.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="../logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
+
+<section class="page-header">
+  <div class="container">
+    <h1>Supplenze</h1>
+    <p>Delega la tua classe a un collega per un periodo limitato con una delega crittografica via QR code. Il supplente segna le presenze e scrive note di lezione, tu mantieni il controllo.</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+
+    <div class="breadcrumb"><a href="../index.html">Home</a> / <a href="substitutes.html">Supplenze</a> / Panoramica</div>
+
+    <div class="alert alert-warning" style="display:block;border-left:4px solid #ff9800;background:#fff3e0;">
+      <strong>⚠ BETA NON FUNZIONANTE:</strong> Le <strong>Supplenze</strong> fanno parte della <strong>Modalità Responsabile</strong> (richiedono anche la modalità Associato), attualmente in <strong>beta non funzionante</strong>. Saranno operative nella <strong>versione 2.0 (agosto 2027)</strong>. Nella versione corrente (1.1.x) non è possibile delegare classi a supplenti.
+    </div>
+
+    <h2>Che cos'è</h2>
+    <p>Il modulo <strong>Supplenze</strong> permette a un catechista (Titolare) di delegare temporaneamente la propria classe a un collega (Supplente) quando non può essere presente all'incontro. La delega è <strong>crittografica, a scadenza e revocabile</strong>: il supplente riceve solo i dati necessari per l'incontro (anagrafica base per l'appello, note di lezione) e le sue azioni vengono registrate in un <strong>registro supplenze dedicato</strong>.</p>
+
+    <div class="alert alert-info">
+      Disponibile in <strong>modalità Associato</strong> (catechista collegato a una parrocchia gestita in modalità Responsabile). Richiede che la parrocchia abbia la Modalità Responsabile attiva.
+    </div>
+
+    <h2>Come funziona</h2>
+
+    <h3>1. Crea la delega (Titolare)</h3>
+    <p>Dalla schermata <strong>Supplenze</strong>, il Titolare sceglie il Supplente (dai catechisti della parrocchia), la classe, la data/ora di inizio e fine (massimo 24 ore). L'app genera un <strong>QR code crittografico</strong> che contiene una chiave temporanea AES-256 derivata via ECDH, firmata con HMAC.</p>
+
+    <h3>2. Scansiona e accetta (Supplente)</h3>
+    <p>Il Supplente inquadra il QR con la fotocamera. L'app verifica la firma, la scadenza e l'integrità, poi apre il <strong>Registro supplenze</strong> con i dati della classe (sola lettura per anagrafica, scrittura per presenze e note).</p>
+
+    <h3>3. Lavora durante l'incontro</h3>
+    <p>Il Supplente segna le presenze (presente/assente) e può scrivere <strong>note di lezione</strong> (cosa è stato fatto, osservazioni). Tutto viene salvato localmente sul dispositivo del Supplente.</p>
+
+    <h3>4. Consegna e revoca</h3>
+    <p>Alla fine, il Supplente genera un <strong>QR di consegna</strong> con i dati raccolti (presenze + note). Il Titolare lo scansiona e i dati vengono importati nel registro ufficiale. La delega può essere <strong>revocata in qualsiasi momento</strong> dal Titolare (revoca firmata, propagata P2P).</p>
+
+    <h2>Sicurezza — standard militare</h2>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li><strong>Crittografia delega:</strong> AES-256-GCM con chiave derivata via <strong>ECDH X25519</strong> (ephemeral) + <strong>HMAC-SHA256</strong> per integrità e autenticità</li>
+      <li><strong>Scadenza massima:</strong> 24 ore (configurabile, min 30 min)</li>
+      <li><strong>Revoca immediata:</strong> il Titolare può revocare in qualsiasi momento; la revoca è firmata e propagata peer-to-peer</li>
+      <li><strong>Isolamento dati:</strong> il Supplente vede solo anagrafica base (nome, cognome) per fare l'appello — niente contatti genitori, allergie, note sensibili, storico</li>
+      <li><strong>Registro dedicato:</strong> presenze e note supplenza in box separati, non si mischiano col registro ufficiale</li>
+      <li><strong>Tracciabilità GDPR:</strong> ogni operazione (creazione, accettazione, consegna, revoca) registrata nel Registro Trattamenti</li>
+    </ul>
+
+    <h2>Cosa vede il Supplente</h2>
+    <table class="sec-table">
+      <thead><tr><th>Dato</th><th>Visibilità</th></tr></thead>
+      <tbody>
+        <tr><td>Nome e cognome ragazzi</td><td>Sì (per appello)</td></tr>
+        <tr><td>Contatti genitori</td><td>No</td></tr>
+        <tr><td>Allergie / uscite autonome</td><td>No</td></tr>
+        <tr><td>Note generali / storiche</td><td>No</td></tr>
+        <tr><td>Fare appello (P/A)</td><td>Sì</td></tr>
+        <tr><td>Scrivere note lezione</td><td>Sì</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Hub Supplenze</h2>
+    <p>La schermata principale <strong>Supplenze</strong> mostra due sezioni:</p>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li><strong>Deleghate da me:</strong> deleghe create come Titolare (stato: in attesa, attiva, scaduta, revocata, completata)</li>
+      <li><strong>Ricevute:</strong> deleghe accettate come Supplente</li>
+    </ul>
+    <p>Da qui puoi vedere lo stato, revocare, aprire il registro o generare/scansionare i QR.</p>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div>
+      <strong>CatechHub</strong> <span class="version-tag"></span> — Registro Elettronico di Catechismo<br>
+      <small>Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.</small>
+    </div>
+    <div>
+      <small>
+        &#128231; <a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a> &middot;
+        &#128247; Instagram (prossimamente) &middot;
+        &#9992; Telegram (prossimamente)
+      </small><br>
+      <a href="../privacy.html">Privacy</a> &middot;
+      <a href="../terms.html">Termini</a> &middot;
+      <a href="../infos/index.html">GDPR</a> &middot;
+      <a href="../developer.html">Sviluppatore</a> &middot;
+      <a href="https://github.com/delelimed/CatechHub" class="release-url">GitHub</a><br>
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/nav.js"></script></body>
+</html>

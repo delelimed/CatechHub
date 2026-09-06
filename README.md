@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/github/downloads/delelimed/CatechHub/total?style=flat-square&label=downloads&color=success" alt="Download"/>
   <img src="https://img.shields.io/badge/licenza-MIT-green?style=flat-square" alt="Licenza"/>
   <img src="https://img.shields.io/badge/Android-API%2030%2B-brightgreen?style=flat-square&logo=android" alt="Android"/>
-  <img src="https://img.shields.io/badge/flutter-3.12%2B-02569B?style=flat-square&logo=flutter" alt="Flutter"/>
+  <img src="https://img.shields.io/badge/Dart-3.12%2B-0175C2?style=flat-square&logo=dart" alt="Dart SDK"/>
   <img src="https://img.shields.io/badge/crittografia-AES--256--GCM-orange?style=flat-square" alt="Crittografia"/>
   <img src="https://img.shields.io/badge/sicurezza-hardware--backed-blue?style=flat-square" alt="HW Security"/>
   <img src="https://img.shields.io/badge/privacy-offline--first-purple?style=flat-square" alt="Privacy"/>
@@ -81,13 +81,14 @@ CatechHub è progettata per **lasciare al catechista il pieno controllo dei prop
 ## Cosa Puoi Fare
 
 - **Anagrafica ragazzi** — Aggiungi, modifica, cerca e organizza gli iscritti in gruppi
+- **Note giornaliere** — Annotazioni per ragazzo (comportamento, osservazioni, note catechetiche) con visibilità per data e sincronizzazione P2P
 - **Gestione multigruppo** — Crea, unisciti e gestisci più gruppi di catechismo; passa da un gruppo all'altro con un tap e copia i contenuti (anagrafica, presenze, programmazione) da un gruppo a un altro. Tutti i tuoi gruppi sono sempre accessibili da "I miei gruppi" nelle Impostazioni
 - **Presenze** — Crea giornate, fai l'appello (con **conteggio rapido**), visualizza statistiche e griglie riepilogative, avvisi per assenze ripetute
 - **Programmazione** — Pianifica incontri e associa materiale catechetico, con rilevamento dei conflitti e notifiche promemoria
 - **Documenti** — Gestisci il ciclo di vita: crea, consegna, attendi riconsegna, archivia
 - **Note contatti** — Tieni traccia delle comunicazioni con le famiglie
 - **Condivisione QR** — Esporta e importa moduli selezionati in modo sicuro con PIN a 12 cifre temporaneo (3 minuti) e cifratura AES-256-GCM
-- **Backup crittografato** — Salva e ripristina tutto il database con un file `.catechhub` protetto da password (AES-256-GCM + PBKDF2) e import con merge
+- **Backup crittografato** — Salva e ripristina tutto il database con un file `.catechhub` protetto da password (AES-256-GCM + PBKDF2 350k iterazioni) e import con merge
 - **Sync P2P Nearby** — Modalità normale reingegnerizzata (`NormalModeSyncHandler`): **Mio Dispositivo** condivide anche `catechistId` (stessa persona → sync di *tutte* le classi, convergenza identità), **Altro Catechista** viene associato atomicamente alla(e) classe(i) scelta(e) (`catechistIds/associatedCatechistIds/catechistRoles`) → entrambi lavorano offline sulla stessa copia locale e riconvergono **realtime quando vicini** (Nearby `P2P_CLUSTER`, heartbeat 30s + periodic 60s + watch 500ms → `p2p_sync_data` incrementale). Crittografia **militare**: TripleDH X25519 + HKDF-SHA256 + AES-256-GCM con forward secrecy, rotazione finestra 30 min, SAS 6 cifre, pinning, AAD. **Scope per classe** per minimizzazione GDPR; **doppio consenso** per `Altro Catechista`.
 - **Modalità Responsabile Catechistico** — Area dedicata al responsabile della parrocchia: dashboard parrocchiale con riepilogo (classi attive, ragazzi iscritti, catechisti), gestione delle classi raggruppate per **percorso** (attive/archiviate), iscrizioni con promozione e passaggio di anno automatico, **consensi privacy con durata di validità** e retention automatica, **Registro Trattamenti GDPR** (audit log firmato HMAC), gestione catechisti, **logistica delle aule** (slot settimanali, controllo conflitti, occupazione tabellare), **import ragazzi CSV/XLSX**, **allarme assenze** parrocchiale, rete parrocchiale e dispositivi fidati, **percorsi catechistici personalizzabili**, **Concludi anno catechistico**
 - **Archivio Storico** — Chiusura dell'anno con **snapshot immutabili** del percorso di ogni ragazzo (classe, catechista, sacramenti, % presenze, valutazioni); consultazione per anno con accesso limitato (il catechista vede solo i propri ragazzi, il Responsabile tutto)
@@ -125,6 +126,9 @@ CatechHub è progettata per **lasciare al catechista il pieno controllo dei prop
 | Aggiornamenti | GitHub API con certificate pinning SHA-256, notifiche locali |
 | Sync status | Indicatore a pallino (verde/rosso/ciano/giallo) in app bar |
 | Multigruppo | Cambio gruppo rapido (class switcher), "I miei gruppi", copia contenuti tra classi |
+| Import bulk | CSV/XLSX parser per anagrafica ragazzi (modalità Responsabile) |
+| Supplenze | Delega crittografica QR temporanea (AES-256 + ECDH + HMAC, max 24h) |
+| Note giornaliere | Annotazioni per ragazzo sincronizzabili P2P |
 
 ## Per Iniziare
 
@@ -137,8 +141,8 @@ Non serve registrazione, account, email o connessione internet. L'app richiede u
 
 ## Stato del Progetto
 
-- **Versione corrente:** [![GitHub Release](https://img.shields.io/github/v/release/delelimed/CatechHub?style=flat-square&label=v)](https://github.com/delelimed/CatechHub/releases/latest) [![GitHub Downloads](https://img.shields.io/github/downloads/delelimed/CatechHub/total?style=flat-square&label=downloads)](https://github.com/delelimed/CatechHub/releases/latest)
-- **Piattaforma:** Android (minSdk 30)
+- **Versione corrente:** 1.1.0+6
+- **Piattaforma:** Android (minSdk 30, Android 10+)
 - **Licenza:** MIT — libero da usare, modificare e distribuire
 
 ## Future Implementazioni

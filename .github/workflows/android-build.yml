@@ -77,12 +77,19 @@ jobs:
             --split-debug-info=./debug_info \
             $EXTRA_ARGS
 
-      # 9. Pulizia del Keystore temporaneo
+      # 9. Calcola SHA-256 dell'APK e crea file digest
+      - name: Create SHA-256 digest
+        run: |
+          cd build/app/outputs/flutter-apk
+          sha256sum app-release.apk > app-release.apk.sha256
+          cat app-release.apk.sha256
+
+      # 10. Pulizia del Keystore temporaneo
       - name: Clean up Keystore
         if: always()
         run: rm -f /tmp/keystore.jks
 
-      # 10. Salva l'APK negli Artifacts
+      # 11. Salva l'APK negli Artifacts
       - name: Upload Signed APK Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -90,7 +97,15 @@ jobs:
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
 
-      # 11. Salva anche i simboli di debug per eventuale de-obfuscation degli stack trace
+      # 12. Salva anche il digest SHA-256 negli Artifacts
+      - name: Upload SHA-256 Digest Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-sha256-digest
+          path: build/app/outputs/flutter-apk/app-release.apk.sha256
+          retention-days: 7
+
+      # 13. Salva anche i simboli di debug per eventuale de-obfuscation degli stack trace
       - name: Upload Debug Symbols
         uses: actions/upload-artifact@v4
         with:
@@ -98,7 +113,7 @@ jobs:
           path: debug_info/
           retention-days: 7
 
-      # 12. Crea la Draft Release SOLO se avviato manualmente E su ramo 'main' E con versione inserita
+      # 14. Crea la Draft Release SOLO se avviato manualmente E su ramo 'main' E con versione inserita
       - name: Create GitHub Draft Release
         id: create_release
         if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.version_name != ''
@@ -109,5 +124,6 @@ jobs:
           name: Release ${{ inputs.version_name }} (Draft)
           files: |
             build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/flutter-apk/app-release.apk.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -37,6 +37,10 @@
       <p style="margin-bottom:0;"><strong>Nota:</strong> Questa pagina &egrave; stata generata con l'ausilio di intelligenza artificiale e non &egrave; stata scritta da un legale. Le informazioni hanno scopo puramente informativo e non costituiscono consulenza legale.</p>
     </div>
 
+    <div class="alert alert-warning" style="display:block;border-left:4px solid #ff9800;background:#fff3e0;">
+      <strong>⚠ ATTENZIONE — FUNZIONALITÀ RESPONSABILE IN BETA:</strong> Le sezioni di questa pagina che fanno riferimento alla <strong>Modalità Responsabile</strong> (Registro Trattamenti digitale, consensi con scadenza e retention automatica, cancellazione a cascata, tombstone firmati Ed25519, catena di fiducia, hard delete, audit log firmato HMAC) descrivono funzionalità <strong>non ancora implementate</strong> nella versione corrente (1.1.x). La Modalità Responsabile è in sviluppo come <strong>beta non funzionante</strong> e sarà operativa nella <strong>versione 2.0 prevista per agosto 2027</strong>. Attualmente l'app funziona solo in <strong>Modalità Normale</strong> (catechista autonomo) con sincronizzazione P2P base.
+    </div>
+
     <p>CatechHub è un'applicazione progettata per gestire i dati di bambini e ragazzi che frequentano il catechismo parrocchiale. In quanto tale, tratta dati personali, incluse potenziali categorie particolari (Art. 9 GDPR) come allergie e informazioni sanitarie. Questa pagina analizza la conformità dell'applicazione al Regolamento Generale sulla Protezione dei Dati (Regolamento UE 2016/679).</p>
 
     <div class="alert alert-warning" style="display:block;">
@@ -72,7 +76,7 @@
         <tr>
           <td>Art. 9</td>
           <td>Special categories of data</td>
-          <td>Allergie, informazioni sanitarie e autorizzazioni uscite autonome sono trattati solo se esplicitamente inseriti dall'utente con consenso esplicito (Art. 9.2.a). Cifratura di campo aggiuntiva (AES-256-GCM, chiave per-dispositivo) sui dati sensibili; consensi con durata di validità gestita automaticamente in modalità Responsabile.</td>
+          <td>Allergie, informazioni sanitarie e autorizzazioni uscite autonome sono trattati solo se esplicitamente inseriti dall'utente con consenso esplicito (Art. 9.2.a). Cifratura di campo aggiuntiva (AES-256-GCM, chiave per-dispositivo) sui dati sensibili; <span style="color:#ff9800;">consensi con durata di validità gestita automaticamente in modalità Responsabile (v2.0, beta)</span>.</td>
         </tr>
         <tr>
           <td>Art. 12-14</td>
@@ -102,7 +106,7 @@
         <tr>
           <td>Art. 30</td>
           <td>Records of processing activities</td>
-          <td>In modalità Responsabile l'app integra un <strong>Registro Trattamenti digitale</strong>: audit log append-only firmato HMAC-SHA256 di ogni operazione rilevante (data, ora, autore), con verifica d'integrità in tempo reale. Vedere anche il <a href="registro-trattamento.html">Registro delle attività di trattamento</a>.</td>
+          <td><span style="color:#ff9800;">In modalità Responsabile (v2.0, beta)</span> l'app integrerà un <strong>Registro Trattamenti digitale</strong>: audit log append-only firmato HMAC-SHA256 di ogni operazione rilevante (data, ora, autore), con verifica d'integrità in tempo reale. Vedere anche il <a href="registro-trattamento.html">Registro delle attività di trattamento</a>.</td>
         </tr>
         <tr>
           <td>Art. 32</td>
@@ -141,8 +145,8 @@
       <li><strong>Campi di audit:</strong> Ogni record nell'app (studenti, programmazione, catechesi, note di contatto, ecc.) traccia automaticamente <code>createdAt</code>, <code>updatedAt</code> e <code>lastModifiedBy</code>.</li>
       <li><strong>Visualizzazione:</strong> Questi campi sono visualizzati in tutte le schermate di dettaglio, consentendo all'utente di conoscere sempre chi ha creato o modificato un dato e quando.</li>
       <li><strong>Presenze:</strong> Per le presenze, viene mostrata la data cumulativa dell'ultima modifica per giornata, non per singolo studente, bilanciando trasparenza e minimizzazione.</li>
-      <li><strong>Registro Trattamenti (modalità Responsabile):</strong> audit log append-only di ogni operazione rilevante (iscrizione, modifica, consenso, passaggio anno, retention, oblio) <strong>firmato HMAC-SHA256</strong> con chiave per dispositivo e verifica d'integrità in tempo reale. È il supporto digitale dell'obbligo dell'Art. 30 GDPR.</li>
-      <li><strong>Retention automatica:</strong> i consensi scaduti vengono marcati RITIRATO, seguiti da un periodo di grazia di 30 giorni e dalla cancellazione a cascata automatica dei dati (storage limitation, Art. 5.1.e).</li>
+      <li><strong>Registro Trattamenti (modalità Responsabile, v2.0 beta):</strong> audit log append-only di ogni operazione rilevante (iscrizione, modifica, consenso, passaggio anno, retention, oblio) <strong>firmato HMAC-SHA256</strong> con chiave per dispositivo e verifica d'integrità in tempo reale. È il supporto digitale dell'obbligo dell'Art. 30 GDPR.</li>
+      <li><strong>Retention automatica (modalità Responsabile, v2.0 beta):</strong> i consensi scaduti vengono marcati RITIRATO, seguiti da un periodo di grazia di 30 giorni e dalla cancellazione a cascata automatica dei dati (storage limitation, Art. 5.1.e).</li>
       <li><strong>Sync P2P &mdash; doppio consenso:</strong> Quando entrambi i dispositivi sono configurati come "Altro Catechista", entrambi gli utenti devono autorizzare esplicitamente la sincronizzazione, fornendo un consenso reciproco prima del trasferimento dei dati.</li>
     </ul>
 

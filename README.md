@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/github/downloads/delelimed/CatechHub/total?style=flat-square&label=downloads&color=success" alt="Download"/>
   <img src="https://img.shields.io/badge/licenza-MIT-green?style=flat-square" alt="Licenza"/>
   <img src="https://img.shields.io/badge/Android-API%2030%2B-brightgreen?style=flat-square&logo=android" alt="Android"/>
-  <img src="https://img.shields.io/badge/flutter-3.12%2B-02569B?style=flat-square&logo=flutter" alt="Flutter"/>
+  <img src="https://img.shields.io/badge/Dart-3.12%2B-0175C2?style=flat-square&logo=dart" alt="Dart SDK"/>
   <img src="https://img.shields.io/badge/crittografia-AES--256--GCM-orange?style=flat-square" alt="Crittografia"/>
   <img src="https://img.shields.io/badge/sicurezza-hardware--backed-blue?style=flat-square" alt="HW Security"/>
   <img src="https://img.shields.io/badge/privacy-offline--first-purple?style=flat-square" alt="Privacy"/>
@@ -137,8 +137,8 @@ Non serve registrazione, account, email o connessione internet. L'app richiede u
 
 ## Stato del Progetto
 
-- **Versione corrente:** [![GitHub Release](https://img.shields.io/github/v/release/delelimed/CatechHub?style=flat-square&label=v)](https://github.com/delelimed/CatechHub/releases/latest) [![GitHub Downloads](https://img.shields.io/github/downloads/delelimed/CatechHub/total?style=flat-square&label=downloads)](https://github.com/delelimed/CatechHub/releases/latest)
-- **Piattaforma:** Android (minSdk 30)
+- **Versione corrente:** 1.1.0+6
+- **Piattaforma:** Android (minSdk 30, Android 10+)
 - **Licenza:** MIT — libero da usare, modificare e distribuire
 
 ## Future Implementazioni

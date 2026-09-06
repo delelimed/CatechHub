@@ -4,7 +4,7 @@
   const CONFIG = {
     owner: 'delelimed',
     repo: 'CatechHub',
-    fallbackVersion: 'v1.0.5',
+    fallbackVersion: 'v1.1.0',
     fallbackDownloads: 1,
   };
 

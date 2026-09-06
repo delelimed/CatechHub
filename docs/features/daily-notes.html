@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Note Giornaliere — CatechHub</title>
+<meta name="description" content="Annotazioni quotidiane per ogni ragazzo: comportamento, osservazioni, note catechetiche. Sincronizzabili tra catechisti via P2P.">
+<link rel="icon" href="../logo.png" type="image/png">
+<link rel="stylesheet" href="../style.css">
+<script src="../js/version.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="../logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
+
+<section class="page-header">
+  <div class="container">
+    <h1>Note Giornaliere</h1>
+    <p>Annotazioni per ogni ragazzo per data: comportamento, osservazioni durante l'incontro, note catechetiche. Sincronizzabili tra catechisti.</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+
+    <div class="breadcrumb"><a href="../index.html">Home</a> / <a href="daily-notes.html">Note Giornaliere</a> / Panoramica</div>
+
+    <h2>Che cos'è</h2>
+    <p>Le <strong>Note Giornaliere</strong> permettono di registrare annotazioni per ogni ragazzo in date specifiche. A differenza delle note di contatto (comunicazioni con le famiglie) o delle note generali nell'anagrafica, queste note sono legate a una <strong>giornata precisa</strong> e servono a tenere traccia di ciò che accade durante gli incontri: comportamento, partecipazione, osservazioni catechetiche, episodi particolari.</p>
+
+    <div class="alert alert-info">
+      Le note giornaliere sono sincronizzate via P2P tra i catechisti dello stesso gruppo, così chi non era presente all'incontro può comunque leggere cosa è successo.
+    </div>
+
+    <h2>Cosa puoi fare</h2>
+
+    <h3>Scrivere note per data</h3>
+    <p>Selezioni una data (di default oggi) e vedi la lista dei ragazzi del gruppo corrente. Per ognuno puoi aggiungere una nota testuale. Le note sono organizzate cronologicamente e raggruppate per data.</p>
+
+    <h3>Filtrare e cercare</h3>
+    <p>Puoi filtrare le note per data, per ragazzo, o cercare nel testo. Utile per ritrovare un'osservazione specifica o preparare un colloquio con i genitori.</p>
+
+    <h3>Sincronizzazione P2P</h3>
+    <p>Quando fai sync con un altro catechista dello stesso gruppo, le note giornaliere vengono allineate automaticamente (scope per classe, crittografia end-to-end). Così tutti i catechisti del gruppo hanno lo stesso quadro completo.</p>
+
+    <h2>Dove si trovano</h2>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>Nel profilo di ogni ragazzo: scheda <strong>Note giornaliere</strong></li>
+      <li>Da <strong>Impostazioni ? Note giornaliere</strong> per vedere tutte le note del gruppo per data</li>
+      <li>Durante l'appello: accesso rapido per annotare al volo</li>
+    </ul>
+
+    <h2>Sicurezza e privacy</h2>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>Cifrate AES-256-GCM nel database locale (box Hive dedicato)</li>
+      <li>Cifratura di campo aggiuntiva per i contenuti sensibili</li>
+      <li>Sync P2P solo con catechisti dello stesso gruppo (scope per classe)</li>
+      <li>Tracciabilità: ogni nota mostra autore, data e ora dell'ultima modifica</li>
+      <li>Inclusi nel backup crittografato e nella condivisione QR</li>
+    </ul>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div>
+      <strong>CatechHub</strong> <span class="version-tag"></span> — Registro Elettronico di Catechismo<br>
+      <small>Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.</small>
+    </div>
+    <div>
+      <small>
+        &#128231; <a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a> &middot;
+        &#128247; Instagram (prossimamente) &middot;
+        &#9992; Telegram (prossimamente)
+      </small><br>
+      <a href="../privacy.html">Privacy</a> &middot;
+      <a href="../terms.html">Termini</a> &middot;
+      <a href="../infos/index.html">GDPR</a> &middot;
+      <a href="../developer.html">Sviluppatore</a> &middot;
+      <a href="https://github.com/delelimed/CatechHub" class="release-url">GitHub</a><br>
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/nav.js"></script></body>
+</html>

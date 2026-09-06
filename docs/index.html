@@ -26,7 +26,7 @@
 
 <section class="hero">
   <div class="badges">
-    <span class="badge version-tag">v1.0.5</span>
+    <span class="badge version-tag"></span>
     <span class="badge">100% offline</span>
     <span class="badge">Privacy by Design</span>
     <span class="badge">GDPR by design</span>
@@ -37,7 +37,7 @@
   <p>Niente più fogli volanti, elenchi persi o dati lasciati in giro. CatechHub è l'app creata da un catechista per altri catechisti: semplice, sicura, funziona sempre, anche senza internet.</p>
   <p style="font-size:0.85rem;opacity:0.7;margin-top:0.5rem;">Sviluppata interamente in <strong>vibe coding</strong> con intelligenza artificiale da un catechista — non da uno sviluppatore di professione. Il codice &egrave; aperto, verificabile e migliorabile da chiunque.</p>
   <div style="margin-top:1.5rem;">
-    <span class="badge" style="font-size:0.9rem;padding:0.4rem 1rem;">Ultima versione: <strong class="version-tag">v1.0.5</strong> &middot; <span class="download-count">0 download</span></span>
+    <span class="badge" style="font-size:0.9rem;padding:0.4rem 1rem;">Ultima versione: <strong class="version-tag"></strong> &middot; <span class="download-count">0 download</span></span>
   </div>
   <div style="margin-top:1rem;">
     <a href="https://github.com/delelimed/CatechHub/releases" class="btn btn-outline release-url download-btn" style="border-color:#fff;color:#fff;margin:0.25rem;">Scarica l'APK gratis</a>
@@ -160,10 +160,19 @@
 <section>
   <div class="container">
     <h2>Tutto quello che puoi fare</h2>
+
+    <div class="alert alert-warning" style="display:block;border-left:4px solid #ff9800;background:#fff3e0;margin-bottom:1rem;">
+      <strong>⚠ NOTE SULLA MODALITÀ RESPONSABILE (BETA):</strong> Le funzionalità <strong>Responsabile parrocchiale</strong>, <strong>Percorsi catechistici</strong>, <strong>Archivio storico</strong>, <strong>Supplenze</strong> e <strong>Import ragazzi</strong> fanno parte della <strong>Modalità Responsabile</strong>, attualmente in sviluppo come <strong>beta non funzionante</strong>. Saranno operative nella <strong>versione 2.0 prevista per agosto 2027</strong>. La versione corrente (1.1.x) supporta solo la <strong>Modalità Normale</strong> (catechista autonomo) con sincronizzazione P2P base.
+    </div>
+
     <div class="card-grid">
       <a href="features/students.html" class="card" style="text-decoration:none;color:inherit;">
         <h3>&#128100; Anagrafica ragazzi</h3>
         <p>Aggiungi, modifica, cerca e organizza gli iscritti in gruppi. Gestisci contatti genitori, allergie e uscite autonome.</p>
+      </a>
+      <a href="features/daily-notes.html" class="card" style="text-decoration:none;color:inherit;">
+        <h3>&#128221; Note giornaliere</h3>
+        <p>Annotazioni per ogni ragazzo (comportamento, osservazioni, note catechetiche) con visibilità per data e sync P2P.</p>
       </a>
       <a href="features/gruppi.html" class="card" style="text-decoration:none;color:inherit;">
         <h3>&#128101; Gestione multigruppo</h3>
@@ -205,6 +214,10 @@
         <h3>&#128737; Responsabile parrocchiale</h3>
         <p>Gestisci la parrocchia: classi, iscrizioni, consensi, aule, catechisti e Registro Trattamenti GDPR.</p>
       </a>
+      <a href="features/percorsi.html" class="card" style="text-decoration:none;color:inherit;">
+        <h3>&#128206; Percorsi catechistici</h3>
+        <p>Definisci percorsi personalizzati (Iniziazione, Cresima, Post-Cresima) per organizzare le classi per anno liturgico.</p>
+      </a>
       <a href="features/allergies-exits.html" class="card" style="text-decoration:none;color:inherit;">
         <h3>&#9888; Allergie e uscite</h3>
         <p>Registra allergie, intolleranze e autorizzazioni alle uscite autonome. Informazioni sempre disponibili.</p>
@@ -217,11 +230,11 @@
         <h3>&#128193; Archivio storico</h3>
         <p>Concludi l'anno catechistico conservando uno snapshot immutabile del percorso di ogni ragazzo, consultabile anno per anno.</p>
       </a>
-      <a href="features/responsabile.html" class="card" style="text-decoration:none;color:inherit;">
+      <a href="features/substitutes.html" class="card" style="text-decoration:none;color:inherit;">
         <h3>&#128268; Supplenze</h3>
         <p>Delega la tua classe a un collega con una delega crittografica via QR e registro supplenze dedicato.</p>
       </a>
-      <a href="features/responsabile.html" class="card" style="text-decoration:none;color:inherit;">
+      <a href="features/import-ragazzi.html" class="card" style="text-decoration:none;color:inherit;">
         <h3>&#128228; Import ragazzi</h3>
         <p>Importa l'anagrafica dei ragazzi in blocco da CSV/XLSX per accelerare l'inserimento a inizio anno.</p>
       </a>
@@ -235,7 +248,7 @@
     <p>L'app è gratuita, open source e non richiede registrazione. Scarica l'APK, installalo sul tuo Android 10+ e inizia subito.</p>
     <div style="margin:1.5rem 0;">
       <span class="badge" style="background:#174A7E;color:#fff;padding:0.5rem 1.5rem;font-size:1.1rem;">
-        Versione <strong class="version-tag">v1.0.5</strong>
+        Versione <strong class="version-tag"></strong>
       </span>
       <span class="badge" style="background:#2e7d32;color:#fff;padding:0.5rem 1.5rem;font-size:1.1rem;margin-left:0.5rem;">
         <span class="download-count">0 download</span>

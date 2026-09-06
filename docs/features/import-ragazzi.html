@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Import Ragazzi — CatechHub</title>
+<meta name="description" content="Importazione massiva anagrafica ragazzi da file CSV/XLSX. Riservata alla modalità Responsabile per accelerare l'inserimento a inizio anno.">
+<link rel="icon" href="../logo.png" type="image/png">
+<link rel="stylesheet" href="../style.css">
+<script src="../js/version.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <img src="../logo.png" alt="CatechHub">
+      <span>CatechHub</span>
+      <small class="app-version" style="font-size:0.7rem;opacity:0.7;margin-left:0.3rem;"></small>
+    </div>
+    <button class="menu-toggle" onclick="document.querySelector('#nav-container ul').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+    <nav id="nav-container"></nav>
+  </div>
+</header>
+
+<section class="page-header">
+  <div class="container">
+    <h1>Import Ragazzi (CSV/XLSX)</h1>
+    <p>Importa l'anagrafica dei ragazzi in blocco da file Excel o CSV. Riservato alla Modalità Responsabile per accelerare l'avvio dell'anno catechistico.</p>
+  </div>
+</section>
+
+<section>
+  <div class="container">
+
+    <div class="breadcrumb"><a href="../index.html">Home</a> / <a href="import-ragazzi.html">Import Ragazzi</a> / Panoramica</div>
+
+    <div class="alert alert-warning" style="display:block;border-left:4px solid #ff9800;background:#fff3e0;">
+      <strong>⚠ BETA NON FUNZIONANTE:</strong> L'<strong>Import Ragazzi (CSV/XLSX)</strong> fa parte della <strong>Modalità Responsabile</strong>, attualmente in <strong>beta non funzionante</strong>. Sarà operativo nella <strong>versione 2.0 (agosto 2027)</strong>. Nella versione corrente (1.1.x) non è possibile importare anagrafiche da file.
+    </div>
+
+    <h2>Che cos'è</h2>
+    <p>La funzione <strong>Import Ragazzi</strong> permette al Responsabile Catechistico di caricare l'anagrafica completa degli iscritti partendo da un file <strong>CSV</strong> o <strong>XLSX (Excel)</strong>. Evita l'inserimento manuale uno a uno all'inizio dell'anno: prepari il foglio con i dati (nome, cognome, data nascita, classe, contatti genitori, ecc.) e li importi in pochi secondi.</p>
+
+    <div class="alert alert-info">
+      <strong>Solo Modalità Responsabile.</strong> Questa funzione è accessibile solo dal Responsabile della parrocchia (dashboard parrocchiale ? Import ragazzi). I catechisti in modalità Normale o Associato non la vedono.
+    </div>
+
+    <h2>Formato file supportato</h2>
+    <p>Il file deve avere una riga di intestazione (header) seguita dai dati. Colonne riconosciute (l'ordine non importa, si usa il nome colonna):</p>
+
+    <table class="sec-table">
+      <thead><tr><th>Colonna</th><th>Obbligatoria</th><th>Descrizione</th></tr></thead>
+      <tbody>
+        <tr><td><code>nome</code></td><td>Sì</td><td>Nome del ragazzo</td></tr>
+        <tr><td><code>cognome</code></td><td>Sì</td><td>Cognome del ragazzo</td></tr>
+        <tr><td><code>data_nascita</code></td><td>No</td><td>Data nascita (YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY)</td></tr>
+        <tr><td><code>classe</code></td><td>No</td><td>Classe scolastica (es. 3ª elementare)</td></tr>
+        <tr><td><code>gruppo</code></td><td>No</td><td>Gruppo/percorso catechistico (es. Prima Comunione, Cresima)</td></tr>
+        <tr><td><code>telefono_madre</code></td><td>No</td><td>Telefono madre</td></tr>
+        <tr><td><code>telefono_padre</code></td><td>No</td><td>Telefono padre</td></tr>
+        <tr><td><code>email_genitori</code></td><td>No</td><td>Email di riferimento</td></tr>
+        <tr><td><code>allergie</code></td><td>No</td><td>Allergie/intolleranze (testo libero)</td></tr>
+        <tr><td><code>note_salute</code></td><td>No</td><td>Note sanitarie (cifrate con protezione campo)</td></tr>
+        <tr><td><code>uscita_autonoma</code></td><td>No</td><td>true/false o sì/no</td></tr>
+        <tr><td><code>note</code></td><td>No</td><td>Note generali del catechista</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Come fare l'import</h2>
+    <ol style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>Dal dashboard parrocchiale, tocca <strong>Import ragazzi</strong></li>
+      <li>Scarica il <strong>modello CSV/XLSX</strong> (tasto "Scarica modello") per avere le colonne giuste</li>
+      <li>Compila il file con i dati degli iscritti (puoi usare Excel, LibreOffice, Google Sheets)</li>
+      <li>Salva come <strong>.csv</strong> (UTF-8) o <strong>.xlsx</strong></li>
+      <li>In app, scegli <strong>Seleziona file</strong> e carica il tuo file</li>
+      <li>L'app mostra un'<strong>anteprima</strong> con le righe valide e eventuali errori</li>
+      <li>Conferma: i ragazzi vengono creati e assegnati alle classi/gruppi indicati</li>
+    </ol>
+
+    <h2>Gestione errori e anteprima</h2>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>Righe con nome/cognome mancanti: saltate con avviso</li>
+      <li>Date non valide: ignorate (campo lasciato vuoto)</li>
+      <td>Gruppi/classi non esistenti: creati automaticamente se nuovo, altrimenti associati</td>
+      <li>Duplicati (stesso nome+cognome+data nascita): segnalati, puoi scegliere se aggiornare o saltare</li>
+      <li>Report finale: quanti importati, quanti saltati, quali errori</li>
+    </ul>
+
+    <h2>Sicurezza e privacy</h2>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;">
+      <li>Importazione <strong>solo locale</strong>: il file non viene mai caricato su server</li>
+      <li>Dati sensibili (allergie, note salute, telefoni) salvati con <strong>cifratura di campo</strong> aggiuntiva</li>
+      <li>Operazione registrata nel <strong>Registro Trattamenti GDPR</strong> (chi ha importato, quando, quanti record)</li>
+      <li>Il file originale può essere eliminato dopo l'import; i dati restano solo nel database cifrato dell'app</li>
+    </ul>
+
+    <h2>Template scaricabile</h2>
+    <p>L'app include un modello precompilato con intestazioni corrette e qualche riga di esempio. Puoi scaricarlo in formato <strong>CSV</strong> o <strong>XLSX</strong> direttamente dalla schermata di import.</p>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div>
+      <strong>CatechHub</strong> <span class="version-tag"></span> — Registro Elettronico di Catechismo<br>
+      <small>Fatto con dedizione da un catechista, per chi vive ogni giorno la bellezza di accompagnare bambini e ragazzi nel cammino di fede.</small>
+    </div>
+    <div>
+      <small>
+        &#128231; <a href="mailto:CatechHub.app@proton.me">CatechHub.app@proton.me</a> &middot;
+        &#128247; Instagram (prossimamente) &middot;
+        &#9992; Telegram (prossimamente)
+      </small><br>
+      <a href="../privacy.html">Privacy</a> &middot;
+      <a href="../terms.html">Termini</a> &middot;
+      <a href="../infos/index.html">GDPR</a> &middot;
+      <a href="../developer.html">Sviluppatore</a> &middot;
+      <a href="https://github.com/delelimed/CatechHub" class="release-url">GitHub</a><br>
+      <small>MIT License &copy; 2026 CatechHub</small>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/nav.js"></script></body>
+</html>

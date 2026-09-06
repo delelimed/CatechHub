@@ -75,6 +75,11 @@
     <p>Scegli quali classi condividere con ciascun dispositivo. Vengono scambiati <em>solo</em> i dati delle classi selezionate (anagrafica, presenze, programmazione, documenti, note, catechesi, note giornaliere). In modalità normale lo scope è enforced da <code>HiveSyncEngine.buildLocalIndex(scopes)</code> + <code>applyRemoteRecords(scopes)</code> con filtro <code>SyncClassScope</code> per <code>classId/uniqueCode</code> (supporto anche box associativi via lookup padre). Per <strong>Mio Dispositivo</strong> con stesso <code>catechistId</code> → tutte le classi; per <strong>Altro Catechista</strong> → solo condivise (se nessuna selezione → classi comuni). I dati fuori scope non sono mai nell'indice né nel payload.</p>
 
     <h2>Catena di fiducia (modalità Responsabile)</h2>
+
+    <div class="alert alert-warning" style="display:block;border-left:4px solid #ff9800;background:#fff3e0;">
+      <strong>⚠ BETA NON FUNZIONANTE:</strong> La <strong>Catena di fiducia (Ed25519)</strong>, il <strong>Centro approvazioni</strong>, il <strong>QR di fiducia</strong> e la verifica certificati nell'handshake P2P fanno parte della <strong>Modalità Responsabile</strong>, attualmente in <strong>beta non funzionante</strong>. Saranno operativi nella <strong>versione 2.0 (agosto 2027)</strong>. Nella versione corrente (1.1.x) la sync P2P funziona solo in <strong>Modalità Normale</strong> (Mio Dispositivo / Altro Catechista) senza catena di fiducia.
+    </div>
+
     <p>Quando la parrocchia è gestita in <strong>Modalità Responsabile</strong>, nessun dispositivo può sincronizzare le classi senza essere stato preventivamente <strong>approvato dal Responsabile</strong>. L'approvazione è un certificato asimmetrico firmato <strong>Ed25519</strong> (validità 30 giorni) che viaggia nell'handshake P2P:</p>
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
       <li>Il Responsabile approva (o revoca) i dispositivi dal <strong>Centro approvazioni</strong>; le revoche sono firmate e propagate peer-to-peer.</li>
@@ -104,10 +109,14 @@
       <li>Documenti e consegne</li>
       <li>Note di contatto</li>
       <li>Catechesi e note giornaliere dei ragazzi</li>
-      <li>Logistica parrocchiale (aule, stanze e slot settimanali)</li>
-      <li>Certificati di approvazione della catena di fiducia</li>
-      <li>Tombstone di cancellazione (impediscono che i dati eliminati "risorgano" da backup o altri dispositivi)</li>
+      <li>Logistica parrocchiale (aule, stanze e slot settimanali) <span style="color:#ff9800;font-size:0.85em;">(v2.0, Responsabile)</span></li>
+      <li>Certificati di approvazione della catena di fiducia <span style="color:#ff9800;font-size:0.85em;">(v2.0, Responsabile)</span></li>
+      <li>Tombstone di cancellazione (impediscono che i dati eliminati "risorgano" da backup o altri dispositivi) <span style="color:#ff9800;font-size:0.85em;">(v2.0, Responsabile)</span></li>
     </ul>
+
+    <div class="alert alert-info" style="margin-top:0.5rem;">
+      <strong>Legenda:</strong> Le voci marcate <span style="color:#ff9800;">(v2.0, Responsabile)</span> richiedono la Modalità Responsabile (beta, non funzionante in v1.1.x, prevista per agosto 2027).
+    </div>
 
     <h2>Cosa NON si sincronizza</h2>
     <p>La <strong>Biblioteca Catechetica</strong> (testi, schede, materiale didattico) non viene sincronizzata per rispettare la privacy e il copyright. Ogni catechista ha la sua biblioteca personale. Se vuoi, puoi comunque condividere una risorsa specifica con la <a href="data-share.html">Condivisione QR</a>. Il <strong>Registro Trattamenti</strong> (audit log GDPR) resta locale al dispositivo su cui l'operazione è avvenuta: è firmato con una chiave per dispositivo e non può essere verificato da altri apparecchi.</p>

@@ -16,12 +16,13 @@
     return `<li${active ? ' class="active-link"' : ''}>${a(href, label)}</li>`;
   }
 
-  const nav = `<ul>
+const nav = `<ul>
     <li>${a('index.html', 'Home')}</li>
     <li class="dropdown">
       <a href="#">Funzionalit\u00e0 \u25be</a>
       <ul class="dropdown-menu">
         ${li('features/students.html', 'Anagrafica ragazzi')}
+        ${li('features/daily-notes.html', 'Note giornaliere')}
         ${li('features/gruppi.html', 'Gestione multigruppo')}
         ${li('features/attendance.html', 'Presenze e appello')}
         ${li('features/planning.html', 'Programmazione')}
@@ -31,9 +32,12 @@
         ${li('features/data-share.html', 'Condivisione QR')}
         ${li('features/backup.html', 'Backup')}
         ${li('features/responsabile.html', 'Responsabile parrocchiale')}
+        ${li('features/percorsi.html', 'Percorsi catechistici')}
         ${li('features/sync.html', 'Sync P2P')}
         ${li('features/allergies-exits.html', 'Allergie/Uscite')}
         ${li('features/pdf-printing.html', 'PDF/Stampa')}
+        ${li('features/substitutes.html', 'Supplenze')}
+        ${li('features/import-ragazzi.html', 'Import ragazzi')}
       </ul>
     </li>
     <li class="dropdown">
@@ -51,7 +55,7 @@
       </ul>
     </li>
     <li class="dropdown">
-      <a href="#">Privacy &amp; Legal \u25be</a>
+      <a href="#">Privacy & Legal \u25be</a>
       <ul class="dropdown-menu">
         ${li('privacy.html', 'Privacy Policy')}
         ${li('terms.html', 'Termini e condizioni')}

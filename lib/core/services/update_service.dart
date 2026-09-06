@@ -51,6 +51,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:http/io_client.dart';
 import 'package:go_router/go_router.dart';
 
+import 'crypto_utils.dart';
+
 /// GlobalKey per la navigazione dalle notifiche.
 /// Inizializzato in main.dart e usato per navigare a /updates
 /// quando l'utente tocca la notifica di aggiornamento disponibile.

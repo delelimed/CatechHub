@@ -77,7 +77,7 @@
     <ul style="padding-left:1.25rem;margin-bottom:1rem;">
       <li>Cifratura di campo per 9 campi sensibili (<code>field_encryption_service.dart:140</code>: <code>noteAllergieSalute, allergies, autonomousExits, notes, birthDate, studentPhone, motherPhone, fatherPhone, parentEmail</code>) — formato <code>cieI1:</code> + AES-256-GCM con chiave 32B per-dispositivo in box cifrato; egresso P2P decifrato solo nel canale già E2EE</li>
       <li>Accesso all'app con biometria / PIN dispositivo, sessione solo RAM (blocco 120s background + 5 min foreground), FLAG_SECURE</li>
-      <li>Consenso esplicito richiesto; <span style="color:#ff9800;">consensi con durata+scadenza in modalità Responsabile (v2.0 beta: RITIRATO → 30 gg grazia → cancellazione a cascata + tombstone HMAC+Ed25519)</span></li>
+      <li>Consenso esplicito richiesto; consensi con durata+scadenza in modalità Responsabile (RITIRATO → 30 gg grazia → cancellazione a cascata + tombstone HMAC+Ed25519)</li>
       <li>Sync P2P solo con autorizzazione esplicita (doppio consenso per Altro Catechista) e solo classi condivise; canale classe cifrato per-classe</li>
       <li>Cancellazione selettiva senza perdita di altri dati; tombstone anti-resurrezione propagato ad ogni sync</li>
     </ul>

@@ -184,19 +184,18 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
   }) async {
     final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
     final fullName = '${fileName}_$timestamp.$extension';
-    String? savedPath;
+    Uri? savedUri;
     var saved = false;
     try {
-      // file_picker 12: saveFile restituisce String?.
-      final uri = await FilePicker.saveFile(
+      // file_picker 13 restituisce un URI per il file salvato.
+      savedUri = await FilePicker.saveFile(
         dialogTitle: 'Salva esportazione',
         fileName: fullName,
         bytes: bytes,
       );
-      savedPath = uri;
-      if (savedPath != null) saved = true;
+      if (savedUri != null) saved = true;
     } catch (_) {
-      savedPath = null;
+      savedUri = null;
     }
     if (!saved) {
       final directory = await FilePicker.getDirectoryPath(

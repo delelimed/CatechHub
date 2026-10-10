@@ -172,13 +172,13 @@ class _ImportRagazziPageState extends ConsumerState<ImportRagazziPage> {
   }
 
   Future<void> _pickFile() async {
-    // file_picker 12: pickFiles restituisce FilePickerResult.
+    // file_picker 13: pickFiles restituisce direttamente la lista dei file.
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['csv', 'xls', 'xlsx'],
     );
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.single;
+    if (result.isEmpty) return;
+    final file = result.single;
     final bytes = await file.readAsBytes();
     if (bytes.isEmpty) {
       _setWarning('Impossibile leggere il file selezionato.');
@@ -862,6 +862,7 @@ class _ImportRagazziPageState extends ConsumerState<ImportRagazziPage> {
     );
   }
 
-  String _formatDate(DateTime? d) =>
-      d == null ? '—' : '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+  String _formatDate(DateTime? d) => d == null
+      ? '—'
+      : '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 }

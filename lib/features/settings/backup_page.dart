@@ -176,7 +176,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
               } else {
                 if (mounted) {
                   setState(() {
-                    _statusMessage = 'Errore: checksum non corrispondente (dati corrotti)';
+                    _statusMessage =
+                        'Errore: checksum non corrispondente (dati corrotti)';
                     _isError = true;
                   });
                 }
@@ -218,7 +219,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                 } else {
                   if (mounted) {
                     setState(() {
-                      _statusMessage = 'Errore: checksum non corrispondente (fallback)';
+                      _statusMessage =
+                          'Errore: checksum non corrispondente (fallback)';
                       _isError = true;
                     });
                   }
@@ -227,7 +229,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
               } else {
                 if (mounted) {
                   setState(() {
-                    _statusMessage = 'Errore: file scritto ma vuoto (0 byte) - fallback';
+                    _statusMessage =
+                        'Errore: file scritto ma vuoto (0 byte) - fallback';
                     _isError = true;
                   });
                 }
@@ -243,7 +246,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       if (saved) {
         if (mounted) {
           setState(() {
-            _statusMessage = 'Backup esportato e verificato con successo (SHA-256)';
+            _statusMessage =
+                'Backup esportato e verificato con successo (SHA-256)';
             _isError = false;
           });
         }
@@ -289,14 +293,14 @@ class _BackupPageState extends ConsumerState<BackupPage> {
 
     try {
       // Seleziona file
-      // file_picker 12: pickFiles restituisce FilePickerResult.
+      // file_picker 13: pickFiles restituisce direttamente la lista dei file.
       final result = await FilePicker.pickFiles(type: FileType.any);
-      if (result == null || result.files.isEmpty) {
+      if (result.isEmpty) {
         if (mounted) setState(() => _isImporting = false);
         return;
       }
 
-      final filePath = result.files.single.path;
+      final filePath = result.single.path;
       if (filePath == null) {
         throw Exception(
           'Impossibile leggere il file selezionato: percorso non disponibile',
@@ -400,7 +404,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
     }
   }
 
-// ────────────────────────────────────────────
+  // ────────────────────────────────────────────
   //  DIALOGS
   // ────────────────────────────────────────────
 

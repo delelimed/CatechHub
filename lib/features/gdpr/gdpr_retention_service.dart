@@ -247,8 +247,8 @@ class GdprRetentionService {
   /// Esegue la pulizia automatica per tutti gli studenti i cui grace period
   //  è scaduto nell'arco dell'esecuzione corrente.
   static Future<void> _performRetentionCleanup(
-    final Map<String, Map<String, dynamic>> processed,
-    final DateTime now,
+    Map<String, Map<String, dynamic>> processed,
+    DateTime now,
   ) async {
     // C1: rivalida lo stato ATTUALE di ogni studente prima del cleanup.
     // La mappa `processed` è caricata a inizio esecuzione e può contenere

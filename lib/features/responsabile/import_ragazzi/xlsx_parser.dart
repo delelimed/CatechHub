@@ -13,7 +13,7 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import 'package:archive/archive.dart';
-import 'package:xml/xml.dart';
+import 'package:xml/xml.dart' as xml;
 
 /// Risultato del parsing XLSX: tabella grezza + intestazioni rilevate.
 class XlsxParseResult {
@@ -61,7 +61,7 @@ class XlsxParser {
     if (file == null) return const [];
     final bytes = file.readBytes();
     if (bytes == null || bytes.isEmpty) return const [];
-    final doc = XmlDocument.parse(String.fromCharCodes(bytes));
+    final doc = xml.XmlDocument.parse(String.fromCharCodes(bytes));
     return doc.findAllElements('t').map((node) => node.innerText).toList();
   }
 
@@ -72,7 +72,7 @@ class XlsxParser {
     if (workbook != null) {
       final bytes = workbook.readBytes();
       if (bytes != null && bytes.isNotEmpty) {
-        final doc = XmlDocument.parse(String.fromCharCodes(bytes));
+        final doc = xml.XmlDocument.parse(String.fromCharCodes(bytes));
         final firstSheet = doc.findAllElements('sheet').firstOrNull;
         rId = firstSheet?.getAttribute('r:id');
       }
@@ -84,10 +84,14 @@ class XlsxParser {
       if (rels != null) {
         final bytes = rels.readBytes();
         if (bytes != null && bytes.isNotEmpty) {
-          final doc = XmlDocument.parse(String.fromCharCodes(bytes));
-          final rel = doc
-              .findAllElements('Relationship')
-              .firstWhereOrNull((node) => node.getAttribute('Id') == rId);
+          final doc = xml.XmlDocument.parse(String.fromCharCodes(bytes));
+          xml.XmlElement? rel;
+          for (final relationship in doc.findAllElements('Relationship')) {
+            if (relationship.getAttribute('Id') == rId) {
+              rel = relationship;
+              break;
+            }
+          }
           final target = rel?.getAttribute('Target');
           if (target != null && target.isNotEmpty) {
             return target.startsWith('/') ? target.substring(1) : 'xl/$target';
@@ -107,7 +111,7 @@ class XlsxParser {
     if (bytes == null || bytes.isEmpty) {
       return const XlsxParseResult(headers: null, rows: []);
     }
-    final doc = XmlDocument.parse(String.fromCharCodes(bytes));
+    final doc = xml.XmlDocument.parse(String.fromCharCodes(bytes));
 
     // Mappa riga → mappa colonna (1-based) → valore stringa.
     final table = <int, Map<int, String>>{};
@@ -155,7 +159,7 @@ class XlsxParser {
   }
 
   /// Estrae il valore testuale di una cella gestendo i tipi XLSX.
-  String _cellValue(XmlElement cell, List<String> sharedStrings) {
+  String _cellValue(xml.XmlElement cell, List<String> sharedStrings) {
     final type = cell.getAttribute('t') ?? '';
 
     switch (type) {
@@ -195,21 +199,5 @@ class XlsxParser {
       }
     }
     return col;
-  }
-}
-
-/// Estensioni helper locali (evitano dipendenza da collection nel parser).
-extension _FirstWhereOrNull<T> on Iterable<T> {
-  T? get firstOrNull {
-    final it = iterator;
-    if (it.moveNext()) return it.current;
-    return null;
-  }
-
-  T? firstWhereOrNull(bool Function(T element) test) {
-    for (final e in this) {
-      if (test(e)) return e;
-    }
-    return null;
   }
 }

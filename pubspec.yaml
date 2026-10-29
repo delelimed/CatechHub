@@ -101,3 +101,9 @@ flutter:
     - assets/images/logo_BG.png
     - assets/NOTICE.txt
     - assets/certs/cacert.pem
+
+dependency_overrides:
+  android_file_picker:
+    git:
+      url: https://github.com/miguelpruivo/flutter_file_picker.git
+      path: android_file_picker

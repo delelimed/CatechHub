@@ -11,6 +11,7 @@ import '../../shared/models/planning_meeting.dart';
 import '../attachments/widgets/attachments_section.dart';
 import '../catechesi/catechesi_repository.dart';
 import '../../shared/models/catechesi_model.dart';
+import 'meeting_pdf_service.dart';
 import 'planning_provider.dart';
 import '../../shared/widgets/last_modified_info.dart';
 
@@ -216,6 +217,32 @@ class _PlanningEditPageState extends ConsumerState<PlanningEditPage> {
                           });
                         },
                       ),
+                      if (widget.existing != null) ...[
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _exportMeetingPdf,
+                            icon: const Icon(Icons.picture_as_pdf_rounded),
+                            label: const Text(
+                              'Esporta incontro in PDF',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isDark
+                                  ? colorScheme.primary
+                                  : const Color(0xFF174A7E),
+                              foregroundColor: isDark
+                                  ? colorScheme.onPrimary
+                                  : Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 15),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                       if (isReunion) ...[
                         const SizedBox(height: 14),
                         _TimePickerCard(
@@ -413,6 +440,97 @@ class _PlanningEditPageState extends ConsumerState<PlanningEditPage> {
       return isReunion ? 'Modifica riunione' : 'Modifica giornata';
     }
     return isReunion ? 'Nuova riunione' : 'Nuova giornata';
+  }
+
+  Future<void> _exportMeetingPdf() async {
+    final meeting = widget.existing;
+    if (meeting == null) return;
+
+    final available =
+        CatechesiRepository()
+            .getCatechesiSync()
+            .where((item) => associatedCatechesiIds.contains(item.id))
+            .toList()
+          ..sort(
+            (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+          );
+    final initiallySelected = available.map((item) => item.id).toSet();
+
+    final selected = await showDialog<List<String>>(
+      context: context,
+      builder: (dialogContext) {
+        final selectedIds = {...initiallySelected};
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Esporta incontro in PDF'),
+            content: available.isEmpty
+                ? const Text('Non ci sono catechesi associate da includere.')
+                : SizedBox(
+                    width: 420,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Seleziona le catechesi da aggiungere al PDF:',
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          ...available.map(
+                            (item) => CheckboxListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              value: selectedIds.contains(item.id),
+                              title: Text(item.title),
+                              onChanged: (value) {
+                                setDialogState(() {
+                                  if (value == true) {
+                                    selectedIds.add(item.id);
+                                  } else {
+                                    selectedIds.remove(item.id);
+                                  }
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Annulla'),
+              ),
+              FilledButton.icon(
+                onPressed: () =>
+                    Navigator.pop(dialogContext, selectedIds.toList()),
+                icon: const Icon(Icons.picture_as_pdf_rounded),
+                label: const Text('Genera PDF'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (selected == null || !mounted) return;
+    try {
+      await MeetingPdfService.printOrShare(
+        meeting: meeting,
+        catechesiIds: selected,
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Errore durante la generazione del PDF: $error'),
+          ),
+        );
+      }
+    }
   }
 }
 

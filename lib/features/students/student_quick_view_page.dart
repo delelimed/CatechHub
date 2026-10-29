@@ -202,6 +202,8 @@ class _StudentQuickViewPageState extends ConsumerState<StudentQuickViewPage> {
             const SizedBox(height: 16),
             _DailyAnnotationsCard(
               studentId: _student.id,
+              studentClassId: _student.classId,
+              studentClassUniqueCode: _student.classUniqueCode,
               isDark: isDark,
               colorScheme: colorScheme,
             ),
@@ -731,11 +733,15 @@ class _NotesCard extends StatelessWidget {
 
 class _DailyAnnotationsCard extends ConsumerWidget {
   final String studentId;
+  final String? studentClassId;
+  final String? studentClassUniqueCode;
   final bool isDark;
   final ColorScheme colorScheme;
 
   const _DailyAnnotationsCard({
     required this.studentId,
+    required this.studentClassId,
+    required this.studentClassUniqueCode,
     required this.isDark,
     required this.colorScheme,
   });
@@ -906,9 +912,19 @@ class _DailyAnnotationsCard extends ConsumerWidget {
     String? existingMeetingLabel,
   ) async {
     final textController = TextEditingController(text: existing?.text ?? '');
-    final meetings = PlanningRepository().getMeetingsSync()
-      ..sort((a, b) => b.date.compareTo(a.date));
-    String? selectedMeetingId = existing?.meetingId;
+    final meetings = PlanningRepository().getMeetingsSync().where((meeting) {
+      final sameClass = studentClassId != null && studentClassId!.isNotEmpty
+          ? meeting.classId == studentClassId
+          : studentClassUniqueCode != null &&
+                studentClassUniqueCode!.isNotEmpty &&
+                meeting.classUniqueCode == studentClassUniqueCode;
+      return sameClass && !meeting.isReunion;
+    }).toList()..sort((a, b) => b.date.compareTo(a.date));
+    final availableMeetingIds = meetings.map((meeting) => meeting.id).toSet();
+    String? selectedMeetingId =
+        availableMeetingIds.contains(existing?.meetingId)
+        ? existing?.meetingId
+        : null;
     final themeColor = Colors.indigo;
 
     final result = await showDialog<Map<String, String>?>(

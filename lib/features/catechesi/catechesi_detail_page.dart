@@ -96,6 +96,7 @@ class _CatechesiDetailPageState extends ConsumerState<CatechesiDetailPage> {
     final now = DateTime.now();
     final updated = Catechesi(
       id: _catechesi.id,
+      classUniqueCode: _catechesi.classUniqueCode,
       title: _titleController.text.trim(),
       tags: _splitTags(_tagsController.text),
       biblicalReferences: _splitLines(_biblicalController.text),

@@ -42,24 +42,38 @@ class CatechesiRepository {
     );
   }
 
-  /// Stream reattivo delle catechesi appartenenti alla classe identificata
-  /// dal [classUniqueCode].
+  /// Stream reattivo delle catechesi disponibili per la classe identificata
+  /// dal [classUniqueCode]. Le schede senza codice di classe sono contenuti
+  /// comuni e restano disponibili per tutti i gruppi.
   Stream<List<Catechesi>> getCatechesiByClass(String classUniqueCode) {
     return LocalDatabase.watchList(
       _box,
       (id, data) => Catechesi.fromMap(id, data),
     ).map(
       (list) =>
-          list.where((c) => c.classUniqueCode == classUniqueCode).toList(),
+          list
+              .where(
+                (c) =>
+                    c.classUniqueCode == null ||
+                    c.classUniqueCode!.isEmpty ||
+                    c.classUniqueCode == classUniqueCode,
+              )
+              .toList(),
     );
   }
 
-  /// Lettura sincrona delle catechesi di una classe.
+  /// Lettura sincrona delle catechesi disponibili per una classe, inclusi
+  /// i contenuti comuni senza codice di classe.
   List<Catechesi> getCatechesiByClassSync(String classUniqueCode) {
     return LocalDatabase.values(
       _box,
       (id, data) => Catechesi.fromMap(id, data),
-    ).where((c) => c.classUniqueCode == classUniqueCode).toList();
+    ).where(
+      (c) =>
+          c.classUniqueCode == null ||
+          c.classUniqueCode!.isEmpty ||
+          c.classUniqueCode == classUniqueCode,
+    ).toList();
   }
 
   /// Aggiunge una nuova scheda catechesi al database. Se l'ID è vuoto,

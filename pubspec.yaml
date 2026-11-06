@@ -3,7 +3,7 @@ description: "Il tuo registro di catechismo"
 publish_to: 'none'
 license: MIT
 
-version: 1.1.1+7
+version: 1.1.2+8
 
 environment:
   sdk: '>=3.13.0 <4.0.0'

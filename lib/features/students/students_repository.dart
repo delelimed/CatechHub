@@ -15,6 +15,7 @@ import '../archive/historical_record_repository.dart';
 import '../attachments/attachments_repository.dart';
 import '../contact_notes/contact_notes_repository.dart';
 import '../responsabile/audit_log_repository.dart';
+import '../gdpr/tombstone_repository.dart';
 import 'student_daily_notes_repository.dart';
 
 final studentsRepositoryProvider = Provider<StudentsRepository>((ref) {
@@ -289,6 +290,10 @@ class StudentsRepository {
   }
 
   Future<void> deleteStudent(String id) async {
+    await TombstoneRepository().recordDeletion(
+      entityType: LocalDatabase.studentsBox,
+      entityId: id,
+    );
     await AttachmentsRepository().deleteAllForParent(
       parentId: id,
       parentType: AttachmentParentType.student,

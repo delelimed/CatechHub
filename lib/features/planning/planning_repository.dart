@@ -6,6 +6,7 @@ import '../../shared/models/attachment_parent_type.dart';
 import '../../shared/models/planning_meeting.dart';
 import '../../shared/utils/auth_utils.dart';
 import '../attachments/attachments_repository.dart';
+import '../gdpr/tombstone_repository.dart';
 
 /// Provider Riverpod singleton per [PlanningRepository].
 ///
@@ -140,6 +141,10 @@ class PlanningRepository {
   /// Elimina definitivamente un meeting e tutti i dati correlati:
   /// allegati, associazioni catechesi, record presenze e box planning.
   Future<void> deleteMeeting(String id) async {
+    await TombstoneRepository().recordDeletion(
+      entityType: LocalDatabase.planningBox,
+      entityId: id,
+    );
     await AttachmentsRepository().deleteAllForParent(
       parentId: id,
       parentType: AttachmentParentType.meeting,

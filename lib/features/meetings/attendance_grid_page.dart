@@ -13,9 +13,24 @@ class AttendanceGridPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final studentsAsync = ref.watch(currentClassStudentsSyncProvider);
+    if (studentsAsync.isLoading) {
+      return const AppScaffold(
+        title: 'Registro presenze',
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (studentsAsync.hasError) {
+      return AppScaffold(
+        title: 'Registro presenze',
+        child: Center(
+          child: Text('Errore caricamento ragazzi: ${studentsAsync.error}'),
+        ),
+      );
+    }
+
     try {
-      final allStudents =
-          ref.read(currentClassStudentsSyncProvider).value ?? const <Student>[];
+      final allStudents = studentsAsync.value ?? const <Student>[];
       if (allStudents.isEmpty) {
         return AppScaffold(
           title: 'Registro presenze',

@@ -8,6 +8,9 @@ import 'package:hive/hive.dart';
 import '../../../core/services/crypto_utils.dart';
 import '../../../core/services/field_encryption_service.dart';
 import '../../../core/storage/local_database.dart';
+import '../../../core/storage/encrypted_file_storage.dart';
+import '../../../features/gdpr/tombstone_repository.dart';
+import '../../../features/gdpr/tombstone_model.dart';
 import '../crdt/sync_crdt.dart';
 import 'p2p_security_service.dart';
 
@@ -152,6 +155,7 @@ bool _recordMatchesScope({
   required Map<String, dynamic> data,
   List<SyncClassScope>? scopes,
 }) {
+  if (boxName == LocalDatabase.tombstoneBox) return true;
   // `null` = nessun filtro (tutte le classi). Lista vuota = nessuna classe
   // condivisa → nessun record corrisponde.
   if (scopes == null) return true;
@@ -242,19 +246,22 @@ bool _recordMatchesSingleScope({
         String? parentClassCode;
         String? parentClassId;
         if (parentType == 'student') {
-          final studentRaw = Hive.box<Map>(LocalDatabase.studentsBox).get(parentId);
+          final studentRaw = Hive.box<Map>(LocalDatabase.studentsBox)
+              .get(parentId);
           if (studentRaw != null) {
             final student = LocalDatabase.toStringDynamicMap(studentRaw);
             parentClassId = student['classId']?.toString();
           }
         } else if (parentType == 'meeting') {
-          final meetingRaw = Hive.box<Map>(LocalDatabase.planningBox).get(parentId);
+          final meetingRaw = Hive.box<Map>(LocalDatabase.planningBox)
+              .get(parentId);
           if (meetingRaw != null) {
             final meeting = LocalDatabase.toStringDynamicMap(meetingRaw);
             parentClassId = meeting['classId']?.toString();
           }
         } else if (parentType == 'catechesi') {
-          final catechesiRaw = Hive.box<Map>(LocalDatabase.catechesiBox).get(parentId);
+          final catechesiRaw = Hive.box<Map>(LocalDatabase.catechesiBox)
+              .get(parentId);
           if (catechesiRaw != null) {
             final catechesi = LocalDatabase.toStringDynamicMap(catechesiRaw);
             parentClassCode = catechesi['classUniqueCode']?.toString();
@@ -292,6 +299,8 @@ class HiveSyncEngine {
     LocalDatabase.meetingCatechesiBox: 'meeting_catechesi',
     LocalDatabase.studentDailyNotesBox: 'student_daily_notes',
     LocalDatabase.aulaBox: 'aulas',
+    LocalDatabase.avvisiBox: 'avvisi',
+    LocalDatabase.tombstoneBox: 'tombstones',
   };
 
   static const _lastSyncKey = 'p2p_last_sync_timestamp';
@@ -323,6 +332,7 @@ class HiveSyncEngine {
     normalized.remove('updatedAt');
     normalized.remove('createdAt');
     normalized.remove('nameLocked');
+    normalized.remove('_contentBase64');
     // I campi sensibili sono cifrati con chiave PER-DISPOSITIVO: due
     // dispositivi con lo stesso dato hanno ciphertext diversi (nonce casuale).
     // Il checksum deve essere calcolato sulla forma canonica (decifrata) così
@@ -414,11 +424,19 @@ class HiveSyncEngine {
             // decifrati PRIMA della trasmissione (il canale è già protetto
             // AES-GCM con shared secret). Il ricevente li cifrerà di nuovo
             // con la propria chiave locale.
-            final transportData = boxName == LocalDatabase.studentsBox
+            var transportData = boxName == LocalDatabase.studentsBox
                 ? await FieldEncryptionService.decryptStudentMapForTransport(
                     data,
                   )
-                : data;
+                : Map<String, dynamic>.from(data);
+            if (boxName == LocalDatabase.attachmentsBox) {
+              try {
+                final bytes = await EncryptedFileStorage.read(id);
+                transportData['_contentBase64'] = base64Encode(bytes);
+              } catch (_) {
+                transportData['_contentBase64'] = '';
+              }
+            }
             records.add(
               SyncRecord.fromHiveEntry(
                 id: id,
@@ -443,6 +461,10 @@ class HiveSyncEngine {
       try {
         final box = Hive.box<Map>(remote.boxName);
         final localRaw = box.get(remote.id);
+        if (TombstoneRepository().hasTombstone(remote.id) &&
+            remote.boxName != LocalDatabase.tombstoneBox) {
+          continue;
+        }
         final localIsDeleted = localRaw != null
             ? (LocalDatabase.toStringDynamicMap(localRaw)['isDeleted'] == true)
             : false;
@@ -455,9 +477,8 @@ class HiveSyncEngine {
         }
         final localData = LocalDatabase.toStringDynamicMap(localRaw);
         final localUpdatedAt =
-            DateTime.tryParse(
-              localData['updatedAt']?.toString() ?? '',
-            )?.toUtc() ??
+            DateTime.tryParse(localData['updatedAt']?.toString() ?? '')
+                ?.toUtc() ??
             DateTime.fromMillisecondsSinceEpoch(0).toUtc();
 
         if (remote.isDeleted && !localIsDeleted) {
@@ -509,15 +530,23 @@ class HiveSyncEngine {
         )) {
           continue;
         }
+        var transportData = boxName == LocalDatabase.studentsBox
+            ? await FieldEncryptionService.decryptStudentMapForTransport(data)
+            : Map<String, dynamic>.from(data);
+        if (boxName == LocalDatabase.attachmentsBox) {
+          try {
+            transportData['_contentBase64'] = base64Encode(
+              await EncryptedFileStorage.read(recordId),
+            );
+          } catch (_) {
+            transportData['_contentBase64'] = '';
+          }
+        }
         records.add(
           SyncRecord.fromHiveEntry(
             id: recordId,
             boxName: boxName,
-            entry: boxName == LocalDatabase.studentsBox
-                ? await FieldEncryptionService.decryptStudentMapForTransport(
-                    data,
-                  )
-                : data,
+            entry: transportData,
           ),
         );
       } catch (_) {}
@@ -669,12 +698,21 @@ class HiveSyncEngine {
       if (!syncableBoxes.containsKey(remote.boxName)) continue;
 
       try {
+        if (remote.boxName == LocalDatabase.tombstoneBox) {
+          await _applyRemoteTombstone(remote);
+          appliedCount++;
+          continue;
+        }
         // M8 / Fase 3 — item 9: rifiuta sempre record demo in ingresso.
         if (_isDemoRecord(remote.data)) {
           continue;
         }
         final box = Hive.box<Map>(remote.boxName);
         final localRaw = box.get(remote.id);
+        if (remote.boxName != LocalDatabase.tombstoneBox &&
+            TombstoneRepository().hasTombstone(remote.id)) {
+          continue;
+        }
         final isClassBox = remote.boxName == 'classes';
         final isAttendanceBox = remote.boxName == LocalDatabase.attendanceBox;
 
@@ -689,7 +727,8 @@ class HiveSyncEngine {
 
         if (localRaw == null) {
           if (!remote.isDeleted) {
-            var data = Map<String, dynamic>.from(remote.data);
+            var data = Map<String, dynamic>.from(remote.data)
+              ..remove('_contentBase64');
             data.remove('_conflicts');
             if (isClassBox && data['nameLocked'] != true) {
               data['nameLocked'] = true;
@@ -701,6 +740,7 @@ class HiveSyncEngine {
                 data,
               );
             }
+            await _persistAttachmentPayload(remote);
             await box.put(remote.id, data);
             appliedCount++;
           }
@@ -709,9 +749,8 @@ class HiveSyncEngine {
 
         final localData = LocalDatabase.toStringDynamicMap(localRaw);
         final localUpdatedAt =
-            DateTime.tryParse(
-              localData['updatedAt']?.toString() ?? '',
-            )?.toUtc() ??
+            DateTime.tryParse(localData['updatedAt']?.toString() ?? '')
+                ?.toUtc() ??
             DateTime.fromMillisecondsSinceEpoch(0).toUtc();
         final localIsDeleted = localData['isDeleted'] == true;
 
@@ -767,6 +806,7 @@ class HiveSyncEngine {
 
         final conflictFields = (merged['_conflicts'] as List<String>?) ?? [];
         merged.remove('_conflicts');
+        merged.remove('_contentBase64');
         // La firma del timestamp è un dato di trasporto: non va persistita.
         merged.remove('updatedAtSignature');
 
@@ -790,13 +830,18 @@ class HiveSyncEngine {
           final unionIds = {...localIds, ...remoteIds}.toList();
           merged['catechistIds'] = unionIds;
 
-          final localAssoc = (localData['associatedCatechistIds'] as List? ?? [])
-              .map((e) => e.toString())
-              .toSet();
-          final remoteAssoc = (remote.data['associatedCatechistIds'] as List? ?? [])
-              .map((e) => e.toString())
-              .toSet();
-          merged['associatedCatechistIds'] = {...localAssoc, ...remoteAssoc}.toList();
+          final localAssoc =
+              (localData['associatedCatechistIds'] as List? ?? [])
+                  .map((e) => e.toString())
+                  .toSet();
+          final remoteAssoc =
+              (remote.data['associatedCatechistIds'] as List? ?? [])
+                  .map((e) => e.toString())
+                  .toSet();
+          merged['associatedCatechistIds'] = {
+            ...localAssoc,
+            ...remoteAssoc,
+          }.toList();
 
           final localRoles = localData['catechistRoles'] is Map
               ? Map<String, String>.from(localData['catechistRoles'] as Map)
@@ -834,10 +879,13 @@ class HiveSyncEngine {
           merged['catechistDeviceCounts'] = unionCounts;
 
           if ((merged['creatorCatechistId'] as String? ?? '').isEmpty) {
-            final localCreator = localData['creatorCatechistId']?.toString() ?? '';
-            final remoteCreator = remote.data['creatorCatechistId']?.toString() ?? '';
-            merged['creatorCatechistId'] =
-                localCreator.isNotEmpty ? localCreator : remoteCreator;
+            final localCreator =
+                localData['creatorCatechistId']?.toString() ?? '';
+            final remoteCreator =
+                remote.data['creatorCatechistId']?.toString() ?? '';
+            merged['creatorCatechistId'] = localCreator.isNotEmpty
+                ? localCreator
+                : remoteCreator;
           }
         }
 
@@ -846,11 +894,13 @@ class HiveSyncEngine {
         // Ingresso P2P: i campi sensibili arrivati in chiaro (o ereditati dal
         // merge con dati remoti in chiaro) vengono cifrati con la chiave
         // locale. L'operazione è idempotente: i campi già cifrati restano.
+        await _persistAttachmentPayload(remote);
         if (remote.boxName == LocalDatabase.studentsBox) {
           merged = await FieldEncryptionService.encryptStudentMapForStorage(
             merged,
           );
         }
+
         await box.put(remote.id, merged);
 
         if (conflictFields.isNotEmpty) {
@@ -886,6 +936,35 @@ class HiveSyncEngine {
       syncTimestamp: DateTime.now().toUtc(),
       conflictsResolved: conflictsResolved,
     );
+  }
+
+  Future<void> _persistAttachmentPayload(SyncRecord remote) async {
+    if (remote.boxName != LocalDatabase.attachmentsBox) return;
+    final encoded = remote.data['_contentBase64']?.toString() ?? '';
+    if (encoded.isEmpty) return;
+    await EncryptedFileStorage.write(remote.id, base64Decode(encoded));
+  }
+
+  Future<void> _applyRemoteTombstone(SyncRecord remote) async {
+    final tombstone = TombstoneRepository();
+    final entityId = remote.data['entityId']?.toString() ?? '';
+    if (entityId.isEmpty || tombstone.hasTombstone(entityId)) return;
+    await tombstone.put(
+      Tombstone.fromMap(remote.id, Map<String, dynamic>.from(remote.data)),
+    );
+
+    final entityType = remote.data['entityType']?.toString() ?? '';
+    final boxName = entityType == 'RAGAZZO'
+        ? LocalDatabase.studentsBox
+        : entityType;
+    if (!syncableBoxes.containsKey(boxName) ||
+        boxName == LocalDatabase.tombstoneBox) {
+      return;
+    }
+    if (boxName == LocalDatabase.attachmentsBox) {
+      await EncryptedFileStorage.deleteSecure(entityId);
+    }
+    await Hive.box<Map>(boxName).delete(entityId);
   }
 
   List<Map<String, dynamic>> serializeRecords(List<SyncRecord> records) {

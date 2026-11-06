@@ -71,8 +71,13 @@ class MeetingPdfService {
             _sectionTitle('Note'),
             _textBlock(meeting.notes),
           ],
+          if (catechesi.isNotEmpty) ...[
+            pw.SizedBox(height: 24),
+            _sectionTitle('Catechesi associate'),
+            ...catechesi.expand(_catechesiWidgets),
+          ],
           if (attachments.isNotEmpty) ...[
-            pw.SizedBox(height: 20),
+            pw.NewPage(),
             _sectionTitle('Allegati dell\'incontro'),
             _attachmentsList(attachments),
           ],
@@ -80,11 +85,6 @@ class MeetingPdfService {
             pw.SizedBox(height: 20),
             _sectionTitle('Immagini allegate'),
             _imageGrid(imageAttachments),
-          ],
-          if (catechesi.isNotEmpty) ...[
-            pw.SizedBox(height: 24),
-            _sectionTitle('Catechesi associate'),
-            ...catechesi.expand(_catechesiWidgets),
           ],
         ],
       ),
@@ -236,6 +236,8 @@ class MeetingPdfService {
                 'Tipo',
                 meeting.isReunion ? 'Riunione' : 'Giornata di catechismo',
               ),
+              if (meeting.classUniqueCode.isNotEmpty)
+                _labelValue('Classe', meeting.classUniqueCode),
             ],
           ),
         ],
@@ -297,9 +299,25 @@ class MeetingPdfService {
               child: pw.Row(
                 children: [
                   pw.Expanded(
-                    child: pw.Text(
-                      attachment.name,
-                      style: const pw.TextStyle(color: _text, fontSize: 9),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          attachment.name,
+                          style: const pw.TextStyle(color: _text, fontSize: 9),
+                        ),
+                        if (attachment.description?.trim().isNotEmpty == true)
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.only(top: 2),
+                            child: pw.Text(
+                              attachment.description!,
+                              style: const pw.TextStyle(
+                                color: _muted,
+                                fontSize: 8,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                   pw.Text(
@@ -315,14 +333,13 @@ class MeetingPdfService {
   }
 
   static pw.Widget _imageGrid(List<_ImageAttachment> images) {
-    return pw.Wrap(
-      spacing: 10,
-      runSpacing: 10,
+    return pw.Column(
       children: [
         for (final image in images)
           pw.Container(
-            width: 245,
-            padding: const pw.EdgeInsets.all(5),
+            width: double.infinity,
+            margin: const pw.EdgeInsets.only(top: 10),
+            padding: const pw.EdgeInsets.all(8),
             decoration: const pw.BoxDecoration(
               color: _softBackground,
               borderRadius: pw.BorderRadius.all(pw.Radius.circular(8)),
@@ -331,14 +348,13 @@ class MeetingPdfService {
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 pw.Container(
-                  height: 125,
+                  height: 210,
                   width: double.infinity,
                   child: pw.Image(image.image, fit: pw.BoxFit.contain),
                 ),
-                pw.SizedBox(height: 4),
+                pw.SizedBox(height: 5),
                 pw.Text(
                   image.attachment.name,
-                  maxLines: 1,
                   style: const pw.TextStyle(color: _muted, fontSize: 8),
                 ),
               ],
@@ -367,36 +383,82 @@ class MeetingPdfService {
               fontWeight: pw.FontWeight.bold,
             ),
           ),
+          if (item.classUniqueCode?.trim().isNotEmpty == true)
+            _detailLine('Classe', item.classUniqueCode!),
           if (item.description.trim().isNotEmpty) ...[
             pw.SizedBox(height: 6),
-            pw.Text(
-              item.description,
-              style: const pw.TextStyle(color: _text, fontSize: 9),
-            ),
+            _detailText('Descrizione', item.description),
           ],
           if (item.tags.isNotEmpty) ...[
             pw.SizedBox(height: 7),
-            pw.Text(
-              'Tag: ${item.tags.join(', ')}',
-              style: const pw.TextStyle(color: _muted, fontSize: 8),
-            ),
+            _detailLine('Tag', item.tags.join(', ')),
           ],
           if (item.biblicalReferences.isNotEmpty) ...[
             pw.SizedBox(height: 4),
-            pw.Text(
-              'Riferimenti biblici: ${item.biblicalReferences.join(', ')}',
-              style: const pw.TextStyle(color: _muted, fontSize: 8),
+            _detailLine(
+              'Riferimenti biblici',
+              item.biblicalReferences.join(', '),
             ),
           ],
           if (item.websiteReferences.isNotEmpty) ...[
             pw.SizedBox(height: 4),
-            pw.Text(
-              'Risorse: ${item.websiteReferences.join(', ')}',
-              style: const pw.TextStyle(color: _muted, fontSize: 8),
+            _detailText(
+              'Riferimenti sitografici',
+              item.websiteReferences.join('\n'),
             ),
+          ],
+          if (item.photoIds.isNotEmpty) ...[
+            pw.SizedBox(height: 4),
+            _detailText('Foto associate', item.photoIds.join('\n')),
           ],
         ],
       ),
+    );
+  }
+
+  static pw.Widget _detailLine(String label, String value) {
+    return pw.RichText(
+      text: pw.TextSpan(
+        children: [
+          pw.TextSpan(
+            text: '$label: ',
+            style: pw.TextStyle(
+              color: _primary,
+              fontSize: 8,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+          pw.TextSpan(
+            text: value,
+            style: const pw.TextStyle(color: _text, fontSize: 8),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _detailText(String label, String value) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          label,
+          style: pw.TextStyle(
+            color: _primary,
+            fontSize: 8,
+            fontWeight: pw.FontWeight.bold,
+          ),
+        ),
+        pw.SizedBox(height: 2),
+        pw.Text(
+          value,
+          style: const pw.TextStyle(
+            color: _text,
+            fontSize: 9,
+            lineSpacing: 1.3,
+          ),
+        ),
+      ],
     );
   }
 

@@ -81,6 +81,7 @@ class Tombstone {
     'entityType': entityType,
     'entityId': entityId,
     'deletedAt': deletedAt.toUtc().toIso8601String(),
+    'updatedAt': deletedAt.toUtc().toIso8601String(),
     'executedBy': executedBy,
     'executedByCatechistId': executedByCatechistId,
     'signature': signature,

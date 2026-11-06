@@ -5,6 +5,7 @@ import '../../shared/models/attachment_parent_type.dart';
 import '../../shared/models/catechesi_model.dart';
 import '../../shared/utils/auth_utils.dart';
 import '../attachments/attachments_repository.dart';
+import '../gdpr/tombstone_repository.dart';
 
 /// Provider Riverpod che espone un'istanza singleton di [CatechesiRepository].
 ///
@@ -50,30 +51,28 @@ class CatechesiRepository {
       _box,
       (id, data) => Catechesi.fromMap(id, data),
     ).map(
-      (list) =>
-          list
-              .where(
-                (c) =>
-                    c.classUniqueCode == null ||
-                    c.classUniqueCode!.isEmpty ||
-                    c.classUniqueCode == classUniqueCode,
-              )
-              .toList(),
+      (list) => list
+          .where(
+            (c) =>
+                c.classUniqueCode == null ||
+                c.classUniqueCode!.isEmpty ||
+                c.classUniqueCode == classUniqueCode,
+          )
+          .toList(),
     );
   }
 
   /// Lettura sincrona delle catechesi disponibili per una classe, inclusi
   /// i contenuti comuni senza codice di classe.
   List<Catechesi> getCatechesiByClassSync(String classUniqueCode) {
-    return LocalDatabase.values(
-      _box,
-      (id, data) => Catechesi.fromMap(id, data),
-    ).where(
-      (c) =>
-          c.classUniqueCode == null ||
-          c.classUniqueCode!.isEmpty ||
-          c.classUniqueCode == classUniqueCode,
-    ).toList();
+    return LocalDatabase.values(_box, (id, data) => Catechesi.fromMap(id, data))
+        .where(
+          (c) =>
+              c.classUniqueCode == null ||
+              c.classUniqueCode!.isEmpty ||
+              c.classUniqueCode == classUniqueCode,
+        )
+        .toList();
   }
 
   /// Aggiunge una nuova scheda catechesi al database. Se l'ID è vuoto,
@@ -110,6 +109,10 @@ class CatechesiRepository {
   /// Elimina una scheda catechesi e tutti gli allegati a essa associati
   /// (operazione di cascade delete su [AttachmentsRepository]).
   Future<void> deleteCatechesi(String id) async {
+    await TombstoneRepository().recordDeletion(
+      entityType: LocalDatabase.catechesiBox,
+      entityId: id,
+    );
     await AttachmentsRepository().deleteAllForParent(
       parentId: id,
       parentType: AttachmentParentType.catechesi,

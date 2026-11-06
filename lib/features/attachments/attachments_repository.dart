@@ -34,6 +34,7 @@ import '../../core/storage/encrypted_file_storage.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/attachment_model.dart';
 import '../../shared/utils/auth_utils.dart';
+import '../gdpr/tombstone_repository.dart';
 
 /// Provider Riverpod per [AttachmentsRepository].
 ///
@@ -182,6 +183,10 @@ class AttachmentsRepository {
   }
 
   Future<void> deleteAttachment(String attachmentId) async {
+    await TombstoneRepository().recordDeletion(
+      entityType: LocalDatabase.attachmentsBox,
+      entityId: attachmentId,
+    );
     // Fase 3 — item 8: wipe sicuro del file vault (sovrascrittura + delete).
     await EncryptedFileStorage.deleteSecure(attachmentId);
     await _box.delete(attachmentId);

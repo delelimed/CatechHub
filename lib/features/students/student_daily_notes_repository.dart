@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/student_daily_note_model.dart';
 import '../../shared/utils/auth_utils.dart';
+import '../gdpr/tombstone_repository.dart';
 
 final studentDailyNotesRepoProvider = Provider(
   (ref) => StudentDailyNotesRepository(),
@@ -129,6 +130,10 @@ class StudentDailyNotesRepository {
   }
 
   Future<void> deleteNote(String id) async {
+    await TombstoneRepository().recordDeletion(
+      entityType: LocalDatabase.studentDailyNotesBox,
+      entityId: id,
+    );
     await _box.delete(id);
   }
 

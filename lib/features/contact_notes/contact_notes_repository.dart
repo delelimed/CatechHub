@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/contact_note_model.dart';
 import '../../shared/utils/auth_utils.dart';
+import '../gdpr/tombstone_repository.dart';
 
 /// Provider Riverpod singleton del repository delle note di contatto.
 final contactNotesRepoProvider = Provider((ref) => ContactNotesRepository());
@@ -114,6 +115,10 @@ class ContactNotesRepository {
 
   /// Elimina una singola nota di contatto dal database tramite ID.
   Future<void> deleteNote(String id) async {
+    await TombstoneRepository().recordDeletion(
+      entityType: LocalDatabase.contactNotesBox,
+      entityId: id,
+    );
     await _box.delete(id);
   }
 

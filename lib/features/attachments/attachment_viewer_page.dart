@@ -18,6 +18,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../shared/models/attachment_model.dart';
 import 'attachments_repository.dart';
@@ -47,6 +48,26 @@ class _AttachmentViewerPageState extends ConsumerState<AttachmentViewerPage> {
         foregroundColor: Colors.white,
         title: Text(att.name, overflow: TextOverflow.ellipsis),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.share_rounded),
+            tooltip: 'Condividi',
+            onPressed: () async {
+              final bytes = await bytesFuture;
+              if (!context.mounted) return;
+              await SharePlus.instance.share(
+                ShareParams(
+                  files: [
+                    XFile.fromData(
+                      bytes,
+                      name: att.name,
+                      mimeType: att.mimeType,
+                    ),
+                  ],
+                  subject: att.name,
+                ),
+              );
+            },
+          ),
           if (att.isPdf)
             IconButton(
               icon: const Icon(Icons.print_rounded),

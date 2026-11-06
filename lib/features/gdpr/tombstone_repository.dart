@@ -8,6 +8,8 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import '../../core/storage/local_database.dart';
+import '../../core/auth/auth_service.dart';
+import '../../shared/utils/auth_utils.dart';
 import 'tombstone_model.dart';
 
 /// Repository dei tombstone (record di eliminazione definitiva).
@@ -18,6 +20,27 @@ class TombstoneRepository {
   Future<void> put(Tombstone tombstone) async {
     await _box.put(tombstone.id, tombstone.toMap());
     await _box.flush();
+  }
+
+  /// Registra una cancellazione CRUD così che un sync successivo non
+  /// possa ripristinare l'entità rimossa.
+  Future<Tombstone> recordDeletion({
+    required String entityType,
+    required String entityId,
+  }) async {
+    final now = DateTime.now().toUtc();
+    final tombstone = Tombstone(
+      id: LocalDatabase.newId('tombstone'),
+      entityType: entityType,
+      entityId: entityId,
+      deletedAt: now,
+      executedBy: getCurrentCatechistName(),
+      executedByCatechistId: AuthService.getCatechistId(),
+      signature: '',
+      signerDeviceId: AuthService.localUserId,
+    );
+    await put(tombstone);
+    return tombstone;
   }
 
   /// True se esiste un tombstone per l'entità [entityId].

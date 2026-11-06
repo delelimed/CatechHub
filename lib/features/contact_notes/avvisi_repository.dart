@@ -5,6 +5,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../core/storage/local_database.dart';
 import '../../shared/models/avviso_template_model.dart';
+import '../gdpr/tombstone_repository.dart';
 
 final avvisiRepoProvider = Provider<AvvisiRepository>((ref) {
   return AvvisiRepository();
@@ -60,6 +61,10 @@ class AvvisiRepository {
   }
 
   Future<void> delete(String id) async {
+    await TombstoneRepository().recordDeletion(
+      entityType: LocalDatabase.avvisiBox,
+      entityId: id,
+    );
     await _box.delete(id);
   }
 }

@@ -15,6 +15,7 @@
 library;
 
 import 'package:flutter/foundation.dart';
+
 import '../../core/auth/auth_service.dart';
 import '../../core/storage/local_database.dart';
 import '../../shared/models/audit_action.dart';
@@ -25,6 +26,7 @@ import '../../shared/models/user_role.dart';
 import '../../shared/utils/auth_utils.dart';
 import '../responsabile/audit_log_repository.dart';
 import '../responsabile/slot_conflict_service.dart';
+import '../gdpr/tombstone_repository.dart';
 
 class ClassesRepository {
   /// Ruolo interno "Titolare" per un catechista assegnato a una classe.
@@ -154,6 +156,10 @@ class ClassesRepository {
   }
 
   Future<void> deleteClass(String id) async {
+    await TombstoneRepository().recordDeletion(
+      entityType: LocalDatabase.classesBox,
+      entityId: id,
+    );
     try {
       await _box.delete(id);
       await _box.flush();

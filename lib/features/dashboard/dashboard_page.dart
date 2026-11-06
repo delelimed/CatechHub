@@ -416,6 +416,8 @@ class _NextMeetingCard extends StatelessWidget {
                         color: Colors.grey.shade700,
                         height: 1.3,
                       ),
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                   if (meeting!.notes.trim().isNotEmpty) ...[

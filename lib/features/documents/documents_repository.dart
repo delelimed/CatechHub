@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/storage/local_database.dart';
 import '../../shared/utils/auth_utils.dart';
+import '../gdpr/tombstone_repository.dart';
 
 /// Provider Riverpod singleton per [DocumentsRepository].
 final documentsRepositoryProvider = Provider<DocumentsRepository>((ref) {
@@ -133,6 +134,10 @@ class DocumentsRepository {
   /// Rimuove sia la voce dal box `documents` che quella dal box
   /// `documentDeliveries` (identificata dallo stesso [id]).
   Future<void> deleteDocument(String id) async {
+    await TombstoneRepository().recordDeletion(
+      entityType: LocalDatabase.documentsBox,
+      entityId: id,
+    );
     await _documentsBox.delete(id);
     await _deliveriesBox.delete(id);
   }

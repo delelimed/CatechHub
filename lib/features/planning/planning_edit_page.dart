@@ -217,7 +217,7 @@ class _PlanningEditPageState extends ConsumerState<PlanningEditPage> {
                           });
                         },
                       ),
-                      if (widget.existing != null) ...[
+                      if (widget.existing != null && !isReunion) ...[
                         const SizedBox(height: 16),
                         SizedBox(
                           width: double.infinity,
@@ -307,7 +307,8 @@ class _PlanningEditPageState extends ConsumerState<PlanningEditPage> {
                         color: Colors.orange,
                         child: TextField(
                           controller: activity,
-                          maxLines: 6,
+                          minLines: 6,
+                          maxLines: null,
                           readOnly: _readOnly,
                           decoration: const InputDecoration(
                             hintText: 'Attività / Argomenti',

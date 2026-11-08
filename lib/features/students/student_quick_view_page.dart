@@ -777,7 +777,11 @@ class _RelationsCard extends ConsumerWidget {
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => StudentRelationsPage(focusStudentId: student.id),
+            builder: (_) => StudentRelationsPage(
+              focusStudentId: student.id,
+              focusStudentClassId: student.classId,
+              focusStudentClassUniqueCode: student.classUniqueCode,
+            ),
           ),
         ),
       ),
@@ -801,7 +805,11 @@ class _RelationsCard extends ConsumerWidget {
           onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => StudentRelationsPage(focusStudentId: student.id),
+              builder: (_) => StudentRelationsPage(
+                focusStudentId: student.id,
+                focusStudentClassId: student.classId,
+                focusStudentClassUniqueCode: student.classUniqueCode,
+              ),
             ),
           ),
           icon: const Icon(Icons.account_tree),

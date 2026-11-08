@@ -12,6 +12,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../classes/classes_provider.dart';
 import '../../shared/models/planning_meeting.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/widgets/last_modified_info.dart';
@@ -39,8 +40,24 @@ final _studentsWithHistoryProvider = StreamProvider.autoDispose
     ) {
       final studentsRepo = ref.watch(studentsRepoProvider);
       final attendanceRepo = AttendanceRepository();
+      final classesAsync = ref.watch(classesStreamProvider);
+      final rosterIds = classesAsync.when(
+        data: (classes) => classes
+            .where((schoolClass) => schoolClass.id == args.classId)
+            .expand((schoolClass) => schoolClass.studentIds)
+            .toSet(),
+        loading: () => <String>{},
+        error: (_, _) => <String>{},
+      );
 
-      return studentsRepo.getStudentsByClass(args.classId).map((students) {
+      return studentsRepo.getAllStudents().map((allStudents) {
+        final students = allStudents
+            .where(
+              (student) =>
+                  student.classId == args.classId ||
+                  rosterIds.contains(student.id),
+            )
+            .toList();
         final attendance = attendanceRepo.getAttendanceSync()
           ..sort((a, b) {
             final aDate =
@@ -137,9 +154,8 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
     );
 
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Presenze salvate')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Presenze salvate')));
       Navigator.pop(context);
     }
   }

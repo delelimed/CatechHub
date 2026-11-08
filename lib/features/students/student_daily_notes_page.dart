@@ -3,115 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/providers/class_scoped_providers.dart';
-import '../../shared/models/planning_meeting.dart';
 import '../../shared/models/student_daily_note_model.dart';
 import '../../shared/models/student_model.dart';
 import '../../shared/widgets/app_scaffold.dart';
-import '../planning/planning_repository.dart';
+import 'student_daily_note_edit_page.dart';
 import 'student_daily_notes_repository.dart';
 
 class StudentDailyNotesPage extends ConsumerWidget {
   const StudentDailyNotesPage({super.key});
 
-  Future<void> _editNote(
-    BuildContext context,
-    WidgetRef ref,
-    Student student,
-    List<PlanningMeeting> meetings,
-    StudentDailyNote? existing,
-  ) async {
-    final controller = TextEditingController(text: existing?.text ?? '');
-    var meetingId =
-        existing?.meetingId ?? (meetings.isNotEmpty ? meetings.first.id : null);
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Text(
-            existing == null ? 'Nuova annotazione' : 'Modifica annotazione',
-          ),
-          content: SizedBox(
-            width: 420,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  initialValue: meetingId,
-                  decoration: const InputDecoration(labelText: 'Incontro'),
-                  items: meetings
-                      .map(
-                        (meeting) => DropdownMenuItem(
-                          value: meeting.id,
-                          child: Text(
-                            '${DateFormat('dd/MM/yyyy').format(meeting.date)} - ${meeting.title}',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) => setState(() => meetingId = value),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: controller,
-                  maxLines: 5,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Annotazione',
-                    hintText: 'Scrivi cosa osservare o ricordare...',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Annulla'),
-            ),
-            FilledButton(
-              onPressed: meetingId == null || controller.text.trim().isEmpty
-                  ? null
-                  : () async {
-                      final now = DateTime.now();
-                      final note = StudentDailyNote(
-                        id: existing?.id ?? '',
-                        studentId: student.id,
-                        meetingId: meetingId!,
-                        classUniqueCode: student.classUniqueCode,
-                        text: controller.text.trim(),
-                        createdAt: existing?.createdAt ?? now,
-                        updatedAt: now,
-                      );
-                      final repo = ref.read(studentDailyNotesRepoProvider);
-                      if (existing == null) {
-                        await repo.addNote(note);
-                      } else {
-                        await repo.updateNote(existing.id, note);
-                      }
-                      if (context.mounted) Navigator.pop(context, true);
-                    },
-              child: const Text('Salva'),
-            ),
-          ],
-        ),
-      ),
-    );
-    controller.dispose();
-    if (saved == true) ref.invalidate(studentDailyNotesRepositoryProvider);
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final studentsAsync = ref.watch(currentClassStudentsSyncProvider);
-    final meetings =
-        ref
-            .read(planningRepositoryProvider)
-            .getMeetingsSync()
-            .where((meeting) => !meeting.isReunion)
-            .toList()
-          ..sort((a, b) => b.date.compareTo(a.date));
     final repo = ref.read(studentDailyNotesRepoProvider);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -162,11 +65,20 @@ class StudentDailyNotesPage extends ConsumerWidget {
                   trailing: IconButton(
                     icon: const Icon(Icons.add_circle_outline),
                     tooltip: 'Aggiungi annotazione',
-                    onPressed: () =>
-                        _editNote(context, ref, student, meetings, null),
+                    onPressed: () async {
+                      final saved = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              StudentDailyNoteEditPage(student: student),
+                        ),
+                      );
+                      if (saved == true) {
+                        ref.invalidate(studentDailyNotesRepositoryProvider);
+                      }
+                    },
                   ),
-                  onTap: () =>
-                      _showStudentNotes(context, ref, student, meetings, notes),
+                  onTap: () => _showStudentNotes(context, ref, student, notes),
                 ),
               );
             }),
@@ -180,7 +92,6 @@ class StudentDailyNotesPage extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     Student student,
-    List<PlanningMeeting> meetings,
     List<StudentDailyNote> notes,
   ) async {
     await showModalBottomSheet<void>(
@@ -209,8 +120,19 @@ class StudentDailyNotesPage extends ConsumerWidget {
                   trailing: PopupMenuButton<String>(
                     onSelected: (value) async {
                       if (value == 'edit') {
-                        await _editNote(context, ref, student, meetings, note);
-                        if (context.mounted) Navigator.pop(context);
+                        Navigator.pop(context);
+                        final saved = await Navigator.push<bool>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => StudentDailyNoteEditPage(
+                              student: student,
+                              existing: note,
+                            ),
+                          ),
+                        );
+                        if (saved == true) {
+                          ref.invalidate(studentDailyNotesRepositoryProvider);
+                        }
                       } else {
                         await ref
                             .read(studentDailyNotesRepoProvider)

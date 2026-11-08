@@ -18,6 +18,7 @@ import '../documents/documents_provider.dart';
 import '../meetings/attendance_repository.dart';
 import '../planning/planning_repository.dart';
 import 'student_daily_notes_repository.dart';
+import 'student_daily_note_edit_page.dart';
 import 'student_relations_page.dart';
 import 'student_relations_repository.dart';
 import 'students_repository.dart';
@@ -843,7 +844,20 @@ class _DailyAnnotationsCard extends ConsumerWidget {
           size: 22,
           color: Colors.indigo,
         ),
-        onPressed: () => _showAddEditDialog(context, ref, null, null),
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => StudentDailyNoteEditPage(
+              student: Student(
+                id: studentId,
+                name: '',
+                surname: '',
+                classId: studentClassId,
+                classUniqueCode: studentClassUniqueCode,
+              ),
+            ),
+          ),
+        ),
         tooltip: 'Aggiungi annotazione',
       ),
       children: [
@@ -913,11 +927,20 @@ class _DailyAnnotationsCard extends ConsumerWidget {
                             constraints: const BoxConstraints(),
                             onSelected: (value) {
                               if (value == 'edit') {
-                                _showAddEditDialog(
+                                Navigator.push(
                                   context,
-                                  ref,
-                                  note,
-                                  meetingTitle,
+                                  MaterialPageRoute(
+                                    builder: (_) => StudentDailyNoteEditPage(
+                                      student: Student(
+                                        id: studentId,
+                                        name: '',
+                                        surname: '',
+                                        classId: studentClassId,
+                                        classUniqueCode: studentClassUniqueCode,
+                                      ),
+                                      existing: note,
+                                    ),
+                                  ),
                                 );
                               } else if (value == 'delete') {
                                 _showDeleteConfirm(context, ref, note);
@@ -985,6 +1008,7 @@ class _DailyAnnotationsCard extends ConsumerWidget {
     );
   }
 
+  // ignore: unused_element
   Future<void> _showAddEditDialog(
     BuildContext context,
     WidgetRef ref,

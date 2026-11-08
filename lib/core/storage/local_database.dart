@@ -67,6 +67,7 @@ class LocalDatabase {
   static const catechesiBox = 'catechesi_box';
   static const meetingCatechesiBox = 'meeting_catechesi_box';
   static const studentDailyNotesBox = 'student_daily_notes_box';
+  static const studentRelationsBox = 'student_relations_box';
   static const trustedDevicesBox = 'trusted_devices_box';
   static const meetingNotificationsBox = 'meeting_notifications_box';
   static const avvisiBox = 'avvisi_box';
@@ -213,6 +214,7 @@ class LocalDatabase {
         isMap: true,
         isCritical: false,
       ),
+      _BoxDefinition(name: studentRelationsBox, isMap: true, isCritical: false),
       _BoxDefinition(name: trustedDevicesBox, isMap: true, isCritical: false),
       _BoxDefinition(
         name: meetingNotificationsBox,
@@ -389,6 +391,7 @@ class LocalDatabase {
   static Box<Map> catechesi() => Hive.box<Map>(catechesiBox);
   static Box meetingCatechesi() => Hive.box(meetingCatechesiBox);
   static Box<Map> studentDailyNotes() => Hive.box<Map>(studentDailyNotesBox);
+  static Box<Map> studentRelations() => Hive.box<Map>(studentRelationsBox);
   static Box<Map> trustedDevices() => Hive.box<Map>(trustedDevicesBox);
   static Box<Map> meetingNotifications() =>
       Hive.box<Map>(meetingNotificationsBox);

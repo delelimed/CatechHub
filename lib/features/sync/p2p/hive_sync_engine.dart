@@ -236,6 +236,10 @@ bool _recordMatchesSingleScope({
     return false;
   }
 
+  if (boxName == LocalDatabase.studentRelationsBox) {
+    return data['classUniqueCode']?.toString() == scope.classUniqueCode;
+  }
+
   // Allegati: risolviamo la classe dal parent entity se classUniqueCode
   // non è direttamente sull'allegato.
   if (boxName == LocalDatabase.attachmentsBox) {
@@ -270,6 +274,11 @@ bool _recordMatchesSingleScope({
         if (parentClassCode != null && parentClassCode.isNotEmpty) {
           return parentClassCode == scope.classUniqueCode;
         }
+        if (parentType == 'catechesi') {
+          // Catechesi senza classe e relativi allegati sono contenuti
+          // condivisi, disponibili anche quando il sync è scoped per classe.
+          return true;
+        }
         if (parentClassId != null && parentClassId.isNotEmpty) {
           return parentClassId == scope.classId;
         }
@@ -298,6 +307,7 @@ class HiveSyncEngine {
     LocalDatabase.catechesiBox: 'catechesi',
     LocalDatabase.meetingCatechesiBox: 'meeting_catechesi',
     LocalDatabase.studentDailyNotesBox: 'student_daily_notes',
+    LocalDatabase.studentRelationsBox: 'student_relations',
     LocalDatabase.aulaBox: 'aulas',
     LocalDatabase.avvisiBox: 'avvisi',
     LocalDatabase.tombstoneBox: 'tombstones',
@@ -310,6 +320,30 @@ class HiveSyncEngine {
   /// tramite sync P2P (né essere applicati da un peer). Il purge demo all'avvio
   /// li rimuove dal DB locale, ma questo filtro è la seconda barriera.
   static bool _isDemoRecord(Map<String, dynamic> data) => data['_demo'] == true;
+
+  Map<String, dynamic> _syncData(String boxName, dynamic raw) {
+    if (boxName == LocalDatabase.meetingCatechesiBox && raw is List) {
+      final epoch = DateTime.fromMillisecondsSinceEpoch(0)
+          .toUtc()
+          .toIso8601String();
+      return {
+        'catechesiIds': List<dynamic>.from(raw),
+        'createdAt': epoch,
+        'updatedAt': epoch,
+      };
+    }
+    return LocalDatabase.toStringDynamicMap(raw);
+  }
+
+  dynamic _storageValue(String boxName, Map<String, dynamic> data) {
+    if (boxName == LocalDatabase.meetingCatechesiBox) {
+      return (data['catechesiIds'] as List<dynamic>? ?? const [])
+          .map((id) => id.toString())
+          .toList();
+    }
+
+    return data;
+  }
 
   Future<DateTime> getLastSyncTimestamp() async {
     final auth = LocalDatabase.auth();
@@ -351,12 +385,12 @@ class HiveSyncEngine {
     for (final entry in syncableBoxes.entries) {
       final boxName = entry.key;
       try {
-        final box = Hive.box<Map>(boxName);
+        final box = Hive.box(boxName);
         for (final key in box.keys) {
           final id = key.toString();
           final raw = box.get(key);
           if (raw == null) continue;
-          final data = LocalDatabase.toStringDynamicMap(raw);
+          final data = _syncData(boxName, raw);
           if (_isDemoRecord(data)) {
             continue;
           }
@@ -398,12 +432,12 @@ class HiveSyncEngine {
     for (final entry in syncableBoxes.entries) {
       final boxName = entry.key;
       try {
-        final box = Hive.box<Map>(boxName);
+        final box = Hive.box(boxName);
         for (final key in box.keys) {
           final id = key.toString();
           final raw = box.get(key);
           if (raw == null) continue;
-          final data = LocalDatabase.toStringDynamicMap(raw);
+          final data = _syncData(boxName, raw);
           if (_isDemoRecord(data)) {
             continue;
           }
@@ -459,14 +493,14 @@ class HiveSyncEngine {
 
     for (final remote in remoteIndex) {
       try {
-        final box = Hive.box<Map>(remote.boxName);
+        final box = Hive.box(remote.boxName);
         final localRaw = box.get(remote.id);
         if (TombstoneRepository().hasTombstone(remote.id) &&
             remote.boxName != LocalDatabase.tombstoneBox) {
           continue;
         }
         final localIsDeleted = localRaw != null
-            ? (LocalDatabase.toStringDynamicMap(localRaw)['isDeleted'] == true)
+            ? (_syncData(remote.boxName, localRaw)['isDeleted'] == true)
             : false;
 
         if (localRaw == null) {
@@ -475,7 +509,7 @@ class HiveSyncEngine {
           }
           continue;
         }
-        final localData = LocalDatabase.toStringDynamicMap(localRaw);
+        final localData = _syncData(remote.boxName, localRaw);
         final localUpdatedAt =
             DateTime.tryParse(localData['updatedAt']?.toString() ?? '')
                 ?.toUtc() ??
@@ -515,10 +549,10 @@ class HiveSyncEngine {
       final recordId = parts[1];
 
       try {
-        final box = Hive.box<Map>(boxName);
+        final box = Hive.box(boxName);
         final raw = box.get(recordId);
         if (raw == null) continue;
-        final data = LocalDatabase.toStringDynamicMap(raw);
+        final data = _syncData(boxName, raw);
         if (_isDemoRecord(data)) {
           continue;
         }
@@ -707,7 +741,7 @@ class HiveSyncEngine {
         if (_isDemoRecord(remote.data)) {
           continue;
         }
-        final box = Hive.box<Map>(remote.boxName);
+        final box = Hive.box(remote.boxName);
         final localRaw = box.get(remote.id);
         if (remote.boxName != LocalDatabase.tombstoneBox &&
             TombstoneRepository().hasTombstone(remote.id)) {
@@ -741,13 +775,13 @@ class HiveSyncEngine {
               );
             }
             await _persistAttachmentPayload(remote);
-            await box.put(remote.id, data);
+            await box.put(remote.id, _storageValue(remote.boxName, data));
             appliedCount++;
           }
           continue;
         }
 
-        final localData = LocalDatabase.toStringDynamicMap(localRaw);
+        final localData = _syncData(remote.boxName, localRaw);
         final localUpdatedAt =
             DateTime.tryParse(localData['updatedAt']?.toString() ?? '')
                 ?.toUtc() ??
@@ -758,7 +792,7 @@ class HiveSyncEngine {
           final merged = Map<String, dynamic>.from(localData);
           merged['isDeleted'] = true;
           merged['updatedAt'] = remote.updatedAt.toIso8601String();
-          await box.put(remote.id, merged);
+          await box.put(remote.id, _storageValue(remote.boxName, merged));
           appliedCount++;
           continue;
         }
@@ -774,7 +808,7 @@ class HiveSyncEngine {
           final merged = Map<String, dynamic>.from(localData);
           merged['isDeleted'] = true;
           merged['updatedAt'] = DateTime.now().toUtc().toIso8601String();
-          await box.put(remote.id, merged);
+          await box.put(remote.id, _storageValue(remote.boxName, merged));
           appliedCount++;
           continue;
         }
@@ -901,7 +935,7 @@ class HiveSyncEngine {
           );
         }
 
-        await box.put(remote.id, merged);
+        await box.put(remote.id, _storageValue(remote.boxName, merged));
 
         if (conflictFields.isNotEmpty) {
           final conflictKey = '${remote.boxName}:${remote.id}';
@@ -964,7 +998,7 @@ class HiveSyncEngine {
     if (boxName == LocalDatabase.attachmentsBox) {
       await EncryptedFileStorage.deleteSecure(entityId);
     }
-    await Hive.box<Map>(boxName).delete(entityId);
+    await Hive.box(boxName).delete(entityId);
   }
 
   List<Map<String, dynamic>> serializeRecords(List<SyncRecord> records) {

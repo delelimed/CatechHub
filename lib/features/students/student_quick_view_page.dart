@@ -18,6 +18,8 @@ import '../documents/documents_provider.dart';
 import '../meetings/attendance_repository.dart';
 import '../planning/planning_repository.dart';
 import 'student_daily_notes_repository.dart';
+import 'student_relations_page.dart';
+import 'student_relations_repository.dart';
 import 'students_repository.dart';
 
 final studentsRepoProvider = Provider((ref) => StudentsRepository());
@@ -208,6 +210,12 @@ class _StudentQuickViewPageState extends ConsumerState<StudentQuickViewPage> {
               colorScheme: colorScheme,
             ),
             const SizedBox(height: 16),
+            _RelationsCard(
+              student: _student,
+              isDark: isDark,
+              colorScheme: colorScheme,
+            ),
+            const SizedBox(height: 16),
             _ContactNotesCard(
               student: _student,
               isDark: isDark,
@@ -353,8 +361,9 @@ class _HeaderCard extends StatelessWidget {
                     DateFormat('dd/MM/yyyy').format(student.birthDate!),
                     style: TextStyle(
                       color: isDark
-                          ? colorScheme.onPrimaryContainer
-                              .withValues(alpha: 0.7)
+                          ? colorScheme.onPrimaryContainer.withValues(
+                              alpha: 0.7,
+                            )
                           : Colors.white70,
                       fontSize: 14,
                     ),
@@ -726,6 +735,77 @@ class _NotesCard extends StatelessWidget {
               fontStyle: FontStyle.italic,
             ),
           ),
+      ],
+    );
+  }
+}
+
+class _RelationsCard extends ConsumerWidget {
+  final Student student;
+  final bool isDark;
+  final ColorScheme colorScheme;
+
+  const _RelationsCard({
+    required this.student,
+    required this.isDark,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final code =
+        student.classUniqueCode ??
+        ref.read(currentClassUniqueCodeProvider) ??
+        '';
+    final relations = ref
+        .read(studentRelationsRepositoryProvider)
+        .getByClassSync(code)
+        .where(
+          (relation) =>
+              relation.studentAId == student.id ||
+              relation.studentBId == student.id,
+        )
+        .toList();
+    return _InfoCard(
+      title: 'Rapporti nel gruppo',
+      icon: Icons.hub_rounded,
+      color: Colors.deepPurple,
+      trailing: IconButton(
+        icon: const Icon(Icons.open_in_new, color: Colors.deepPurple),
+        tooltip: 'Apri grafico rapporti',
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => StudentRelationsPage(focusStudentId: student.id),
+          ),
+        ),
+      ),
+      children: [
+        if (relations.isEmpty)
+          Text(
+            'Nessun rapporto registrato',
+            style: TextStyle(
+              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+              fontStyle: FontStyle.italic,
+            ),
+          )
+        else
+          Text(
+            '${relations.length} rapport${relations.length == 1 ? 'o' : 'i'} registrati. '
+            'Usa il grafico per aggiungere amicizie o inimicizie.',
+            style: TextStyle(color: isDark ? colorScheme.onSurface : null),
+          ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => StudentRelationsPage(focusStudentId: student.id),
+            ),
+          ),
+          icon: const Icon(Icons.account_tree),
+          label: const Text('Visualizza e modifica relazioni'),
+        ),
       ],
     );
   }
@@ -1247,9 +1327,8 @@ class _AbsencesCard extends ConsumerWidget {
                                         Row(
                                           children: [
                                             Text(
-                                              DateFormat(
-                                                'dd/MM/yyyy',
-                                              ).format(date),
+                                              DateFormat('dd/MM/yyyy')
+                                                  .format(date),
                                               style: TextStyle(
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 14,
@@ -1567,14 +1646,12 @@ class _ContactNotesCard extends ConsumerWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: _mediumColor(
-                  note.medium,
-                ).withValues(alpha: isDark ? 0.15 : 0.05),
+                color: _mediumColor(note.medium)
+                    .withValues(alpha: isDark ? 0.15 : 0.05),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: _mediumColor(
-                    note.medium,
-                  ).withValues(alpha: isDark ? 0.3 : 0.2),
+                  color: _mediumColor(note.medium)
+                      .withValues(alpha: isDark ? 0.3 : 0.2),
                 ),
               ),
               child: Column(

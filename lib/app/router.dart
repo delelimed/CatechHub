@@ -40,6 +40,8 @@ import '../features/settings/delete_data_page.dart';
 import '../features/settings/pdf_report_page.dart';
 import '../features/documents/document_detail_page.dart';
 import '../features/students/allergies_page.dart';
+import '../features/students/student_relations_page.dart';
+import '../features/students/student_daily_notes_page.dart';
 import '../features/students/autonomous_exits_page.dart';
 import '../features/phone_verification/verify_number_page.dart';
 import '../features/update/update_page.dart';
@@ -360,12 +362,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           location != '/class-selection' &&
           location != '/onboarding-classes') {
         try {
-          final onboardingDone =
-              LocalDatabase.auth().get(
-                    'onboarding_completed',
-                    defaultValue: false,
-                  )
-                  as bool;
+          final onboardingDone = LocalDatabase.auth().get(
+            'onboarding_completed',
+            defaultValue: false,
+          ) as bool;
           if (!onboardingDone) return '/onboarding';
         } catch (_) {
           return '/onboarding';
@@ -477,12 +477,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               // Fase di onboarding multiclasse: finché non viene completata
               // dal catechista, il router lo mantiene sulla schermata dedicata
               // alla gestione delle classi (funziona anche senza classi).
-              final classesStepDone =
-                  LocalDatabase.auth().get(
-                        'onboarding_classes_completed',
-                        defaultValue: true,
-                      )
-                      as bool;
+              final classesStepDone = LocalDatabase.auth().get(
+                'onboarding_classes_completed',
+                defaultValue: true,
+              ) as bool;
               if (!classesStepDone) {
                 return '/onboarding-classes';
               }
@@ -503,12 +501,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               // Difesa in profondità: anche fuori da /login, se la gestione
               // classi dell'onboarding non è stata completata si torna alla
               // schermata dedicata (a meno di essere già su una route esclusa).
-              final classesStepDone =
-                  LocalDatabase.auth().get(
-                        'onboarding_classes_completed',
-                        defaultValue: true,
-                      )
-                      as bool;
+              final classesStepDone = LocalDatabase.auth().get(
+                'onboarding_classes_completed',
+                defaultValue: true,
+              ) as bool;
               if (!classesStepDone) {
                 return '/onboarding-classes';
               }
@@ -911,6 +907,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/allergies',
         builder: (context, state) => const AllergiesPage(),
+      ),
+      GoRoute(
+        path: '/student-relations',
+        builder: (context, state) => const StudentRelationsPage(),
+      ),
+      GoRoute(
+        path: '/daily-notes',
+        builder: (context, state) => const StudentDailyNotesPage(),
       ),
 
       /// Gestione delle autorizzazioni per uscite autonome degli studenti.

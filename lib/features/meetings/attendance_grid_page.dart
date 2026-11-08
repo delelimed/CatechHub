@@ -30,7 +30,14 @@ class AttendanceGridPage extends ConsumerWidget {
     }
 
     try {
-      final allStudents = studentsAsync.value ?? const <Student>[];
+      final allStudents = [...studentsAsync.value ?? const <Student>[]]
+        ..sort((a, b) {
+          final surname = a.surname.toLowerCase().compareTo(
+            b.surname.toLowerCase(),
+          );
+          if (surname != 0) return surname;
+          return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+        });
       if (allStudents.isEmpty) {
         return AppScaffold(
           title: 'Registro presenze',
@@ -143,7 +150,7 @@ class _GridBody extends StatelessWidget {
                 child: Column(
                   children: [
                     Container(
-                      height: headerH + 4,
+                      height: headerH,
                       alignment: Alignment.centerLeft,
                       padding: const EdgeInsets.only(left: 12, top: 12),
                       child: const Text(
@@ -187,9 +194,8 @@ class _GridBody extends StatelessWidget {
                   scrollDirection: Axis.horizontal,
                   child: Column(
                     children: [
-                      Container(
+                      SizedBox(
                         height: headerH,
-                        margin: const EdgeInsets.only(top: 12),
                         child: Row(
                           children: meetings.map((m) {
                             return SizedBox(

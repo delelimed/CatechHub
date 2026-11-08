@@ -1200,10 +1200,6 @@ class P2PSecurityService {
         assoc,
         Map<String, dynamic>.from(raw),
       );
-      if (!hydrated.isValid) {
-        await removeAssociation(deviceId);
-        return null;
-      }
       return hydrated;
     } catch (e) {
       if (kDebugMode) {
@@ -1215,8 +1211,6 @@ class P2PSecurityService {
 
   Future<List<P2PDeviceAssociation>> getAllAssociations() async {
     final associations = <P2PDeviceAssociation>[];
-    final expiredIds = <String>[];
-
     await _migrateAllFromSecureStorage(associations);
 
     for (final key in _assocBox.keys) {
@@ -1231,18 +1225,10 @@ class P2PSecurityService {
           assoc,
           Map<String, dynamic>.from(raw),
         );
-        if (hydrated.isValid) {
-          associations.add(hydrated);
-        } else {
-          expiredIds.add(key.toString());
-        }
+        associations.add(hydrated);
       } catch (_) {
-        expiredIds.add(key.toString());
+        continue;
       }
-    }
-
-    for (final id in expiredIds) {
-      await _assocBox.delete(id);
     }
 
     associations.sort((a, b) => b.associatedAt.compareTo(a.associatedAt));
@@ -1318,7 +1304,7 @@ class P2PSecurityService {
 
   Future<bool> hasValidAssociation() async {
     final associations = await getAllAssociations();
-    return associations.isNotEmpty;
+    return associations.any((association) => association.isValid);
   }
 
   Future<String?> getSharedSecret(String deviceId) async {
@@ -1366,11 +1352,10 @@ class P2PSecurityService {
                   ),
                 ),
               ) +
-            secretBytes
+              secretBytes
         : secretBytes;
     final hash = sha256BytesSync(combined);
-    final code =
-        ((hash[0] << 16) | (hash[1] << 8) | hash[2]) % 1000000;
+    final code = ((hash[0] << 16) | (hash[1] << 8) | hash[2]) % 1000000;
     return code.toString().padLeft(6, '0');
   }
 

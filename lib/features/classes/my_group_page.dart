@@ -69,10 +69,22 @@ final _groupStudentsStatsProvider = StreamProvider.autoDispose
             return bDate.compareTo(aDate);
           });
 
-        final studentIdsSet = args.studentIds.toSet();
-        final classStudents = allStudents
-            .where((s) => studentIdsSet.contains(s.id))
-            .toList();
+        final classStudents =
+            allStudents
+                .where(
+                  (s) =>
+                      s.classId == args.classId ||
+                      args.studentIds.contains(s.id),
+                )
+                .toList()
+              ..sort((a, b) {
+                final surname = a.surname.toLowerCase().compareTo(
+                  b.surname.toLowerCase(),
+                );
+                if (surname != 0) return surname;
+                return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+              });
+        final studentIdsSet = classStudents.map((s) => s.id).toSet();
 
         final totalPresenceMap = <String, int>{};
         final totalAbsenceMap = <String, int>{};

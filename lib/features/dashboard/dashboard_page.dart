@@ -895,6 +895,16 @@ class _QuickActionsGrid extends StatelessWidget {
         icon: Icons.contact_phone_rounded,
         path: '/contact-notes',
       ),
+      _ActionItem(
+        title: 'Annotazioni',
+        icon: Icons.auto_stories_rounded,
+        path: '/daily-notes',
+      ),
+      _ActionItem(
+        title: 'Rapporti gruppo',
+        icon: Icons.hub_rounded,
+        path: '/student-relations',
+      ),
     ];
 
     return Column(
@@ -919,6 +929,18 @@ class _QuickActionsGrid extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _buildAction(context, actions[3], iconColor, textColor),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildAction(context, actions[4], iconColor, textColor),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildAction(context, actions[5], iconColor, textColor),
             ),
           ],
         ),

@@ -43,7 +43,16 @@ final currentClassStudentsProvider = StreamProvider.autoDispose<List<Student>>((
   final classId = ref.watch(currentClassIdProvider);
   if (classId.isEmpty) return const Stream.empty();
   final repo = ref.read(studentsRepoProvider);
-  return repo.getStudentsByClass(classId);
+  final classDetails = ref.watch(currentClassDetailsProvider);
+  final rosterIds = classDetails?.studentIds.toSet() ?? <String>{};
+  return repo.getAllStudents().map(
+    (students) => students
+        .where(
+          (student) =>
+              student.classId == classId || rosterIds.contains(student.id),
+        )
+        .toList(),
+  );
 });
 
 /// Lista (async) degli studenti della classe corrente.
@@ -52,7 +61,12 @@ final currentClassStudentsSyncProvider =
       final classId = ref.watch(currentClassIdProvider);
       if (classId.isEmpty) return [];
       final repo = ref.read(studentsRepoProvider);
-      return repo.getStudentsByClassSync(classId);
+      final classDetails = ref.read(currentClassDetailsProvider);
+      final rosterIds = classDetails?.studentIds.toSet() ?? <String>{};
+      final students = await repo.getAllStudentsSync();
+      return students.where((student) {
+        return student.classId == classId || rosterIds.contains(student.id);
+      }).toList();
     });
 
 /// Stream degli incontri (planning) della classe corrente.

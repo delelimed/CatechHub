@@ -516,6 +516,7 @@ class DataDeletionService {
     await LocalDatabase.catechesi().clear();
     await LocalDatabase.meetingCatechesi().clear();
     await LocalDatabase.studentDailyNotes().clear();
+    await LocalDatabase.studentRelations().clear();
     await LocalDatabase.trustedDevices().clear();
     await LocalDatabase.meetingNotifications().clear();
     await LocalDatabase.avvisi().clear();
